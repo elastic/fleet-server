@@ -13,8 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"gopkg.in/yaml.v3"
-
 	"github.com/gofrs/uuid/v5"
 	"github.com/open-telemetry/opamp-go/protobufs"
 	oaServer "github.com/open-telemetry/opamp-go/server"
@@ -417,19 +415,26 @@ func (oa *OpAMPT) updateAgent(zlog zerolog.Logger, agent *model.Agent, aToS *pro
 	}
 
 	if aToS.EffectiveConfig != nil {
-		effectiveConfigBytes, err := ParseEffectiveConfig(aToS.EffectiveConfig)
+		parsedFiles, err := parseConfigFiles(aToS.EffectiveConfig)
 		if err != nil {
 			return fmt.Errorf("failed to parse effective config: %w", err)
 		}
-		if effectiveConfigBytes != nil {
-			initialOpts = append(initialOpts, checkin.WithEffectiveConfig(effectiveConfigBytes))
-		}
 
-		configHash, err := HashEffectiveConfig(aToS.EffectiveConfig)
+		// Hash before redaction: redactSensitive mutates the parsed map in place.
+		configHash, err := HashEffectiveConfig(parsedFiles)
 		if err != nil {
 			zlog.Warn().Err(err).Msg("failed to compute effective config hash")
 		} else if configHash != "" {
 			initialOpts = append(initialOpts, checkin.WithEffectiveConfigHash(configHash))
+		}
+
+		if defaultParsed, ok := parsedFiles[""]; ok {
+			redactSensitive(defaultParsed)
+			effectiveConfigBytes, err := json.Marshal(defaultParsed)
+			if err != nil {
+				return fmt.Errorf("failed to marshal effective config: %w", err)
+			}
+			initialOpts = append(initialOpts, checkin.WithEffectiveConfig(effectiveConfigBytes))
 		}
 	}
 
@@ -453,27 +458,6 @@ type localMetadata struct {
 	} `json:"os"`
 }
 
-func ParseEffectiveConfig(effectiveConfig *protobufs.EffectiveConfig) ([]byte, error) {
-	if effectiveConfig.ConfigMap != nil && effectiveConfig.ConfigMap.ConfigMap[""] != nil {
-		configMap := effectiveConfig.ConfigMap.ConfigMap[""]
-
-		if len(configMap.Body) != 0 {
-			bodyBytes := configMap.Body
-
-			obj := make(map[string]any)
-			if err := yaml.Unmarshal(bodyBytes, &obj); err != nil {
-				return nil, fmt.Errorf("unmarshal effective config failure: %w", err)
-			}
-			redactSensitive(obj)
-			effectiveConfigBytes, err := json.Marshal(obj)
-			if err != nil {
-				return nil, fmt.Errorf("failed to marshal effective config: %w", err)
-			}
-			return effectiveConfigBytes, nil
-		}
-	}
-	return nil, nil
-}
 
 func redactSensitive(v any) {
 	const redacted = "[REDACTED]"

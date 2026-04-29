@@ -7,6 +7,7 @@ package api
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"maps"
 	"slices"
@@ -15,11 +16,34 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// HashEffectiveConfig computes a SHA-256 hash of all config files in the OpAMP
-// ConfigMap. Each file body is parsed and re-marshalled so that key ordering
-// differences produce the same hash. Files are processed in sorted key order
-// for determinism. Returns "" with no error when the config is nil or all
-// files are empty.
+// parseConfigFiles parses every entry in the OpAMP ConfigMap from YAML into a
+// map[string]any. The returned map is keyed by the ConfigMap entry name.
+// Empty or nil entries are omitted. Call this once and pass the result to both
+// HashEffectiveConfig and the redact/marshal path so the YAML is only parsed once.
+func parseConfigFiles(ec *protobufs.EffectiveConfig) (map[string]map[string]any, error) {
+	out := make(map[string]map[string]any)
+	if ec == nil || ec.ConfigMap == nil {
+		return out, nil
+	}
+	for k, file := range ec.ConfigMap.ConfigMap {
+		if file == nil || len(file.Body) == 0 {
+			continue
+		}
+		var parsed map[string]any
+		if err := yaml.Unmarshal(file.Body, &parsed); err != nil {
+			return nil, fmt.Errorf("unmarshal config %q for hashing: %w", k, err)
+		}
+		out[k] = parsed
+	}
+	return out, nil
+}
+
+// HashEffectiveConfig computes a SHA-256 hash of pre-parsed effective config
+// files. Use parseConfigFiles to produce the input so YAML is only parsed once.
+// Files are processed in sorted key order for determinism. Each file is
+// canonicalised with json.Marshal, which sorts map keys alphabetically, so key
+// ordering differences in the original YAML do not affect the hash.
+// Returns "" with no error when parsedFiles is empty.
 //
 // This hash describes what the collector is actually running (EffectiveConfig,
 // reported by the collector in AgentToServer). It is stored as
@@ -29,25 +53,21 @@ import (
 // ServerToAgent messages, which is the OpAMP protocol hash used to detect
 // whether the collector has acknowledged and applied a config pushed by
 // fleet-server.
-func HashEffectiveConfig(effectiveConfig *protobufs.EffectiveConfig) (string, error) {
-	if effectiveConfig == nil || effectiveConfig.ConfigMap == nil || len(effectiveConfig.ConfigMap.ConfigMap) == 0 {
+func HashEffectiveConfig(parsedFiles map[string]map[string]any) (string, error) {
+	if len(parsedFiles) == 0 {
 		return "", nil
 	}
 
-	keys := slices.Sorted(maps.Keys(effectiveConfig.ConfigMap.ConfigMap))
+	keys := slices.Sorted(maps.Keys(parsedFiles))
 
 	h := sha256.New()
 	hasData := false
 	for _, k := range keys {
-		file := effectiveConfig.ConfigMap.ConfigMap[k]
-		if file == nil || len(file.Body) == 0 {
+		parsed := parsedFiles[k]
+		if parsed == nil {
 			continue
 		}
-		var parsed map[string]any
-		if err := yaml.Unmarshal(file.Body, &parsed); err != nil {
-			return "", fmt.Errorf("unmarshal config %q for hashing: %w", k, err)
-		}
-		canonical, err := yaml.Marshal(parsed)
+		canonical, err := json.Marshal(parsed)
 		if err != nil {
 			return "", fmt.Errorf("canonicalize config %q for hashing: %w", k, err)
 		}
