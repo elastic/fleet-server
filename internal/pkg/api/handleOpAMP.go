@@ -200,10 +200,8 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 		}
 
 		sendCapabilities := false
-		newlyEnrolled := false
 		if agent == nil {
 			sendCapabilities = true
-			newlyEnrolled = true
 			if agent, err = oa.enrollAgent(zlog, instanceUID.String(), message, apiKey); err != nil {
 				return &protobufs.ServerToAgent{
 					InstanceUid: instanceUID.Bytes(),
@@ -215,14 +213,6 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 			}
 		} else if !isActiveStatus(agent.LastCheckinStatus) {
 			sendCapabilities = true
-		}
-
-		if !newlyEnrolled && message.SequenceNum != uint64(agent.SequenceNum)+1 { //nolint:gosec // agent seq num will not be negative
-			zlog.Debug().
-				Int64("stored_seq", agent.SequenceNum).
-				Uint64("msg_seq", message.SequenceNum).
-				Str("last_status", agent.LastCheckinStatus).
-				Msg("sequence number drift detected")
 		}
 
 		if err := oa.updateAgent(zlog, agent, message); err != nil {
@@ -237,7 +227,6 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 
 		sToA := protobufs.ServerToAgent{
 			InstanceUid: instanceUID.Bytes(),
-			Flags:       uint64(protobufs.ServerToAgentFlags_ServerToAgentFlags_ReportFullState),
 		}
 		if sendCapabilities {
 			sToA.Capabilities = serverCapabilities
