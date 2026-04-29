@@ -458,7 +458,6 @@ type localMetadata struct {
 	} `json:"os"`
 }
 
-
 func redactSensitive(v any) {
 	const redacted = "[REDACTED]"
 	switch typed := v.(type) {
