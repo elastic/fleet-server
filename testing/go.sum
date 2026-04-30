@@ -45,8 +45,8 @@ github.com/ebitengine/purego v0.10.0 h1:QIw4xfpWT6GWTzaW5XEKy3HXoqrJGx1ijYHzTF0/
 github.com/ebitengine/purego v0.10.0/go.mod h1:iIjxzd6CiRiOG0UyXP+V1+jWqUXVjPKLAI0mRfJZTmQ=
 github.com/elastic/elastic-agent-client/v7 v7.18.1 h1:WnM53JjaukeysrAuiTyrhDPmFxJG07ZAByc2TrkcKcs=
 github.com/elastic/elastic-agent-client/v7 v7.18.1/go.mod h1:uDpSGZ+YCKgqgtkwCA0qjwX0gU/wmixDsVbPjY3GkPs=
-github.com/elastic/elastic-agent-libs v0.40.0 h1:LdIuTlgfILIg/CFLbdjwFI5m1JQtue3OH+r0+upBCd4=
-github.com/elastic/elastic-agent-libs v0.40.0/go.mod h1:axkpqDCCzAky6G4D/cklgtZQa3jTNGAMVHVkU0u6YbU=
+github.com/elastic/elastic-agent-libs v0.41.1 h1:XBFpgtM71LtNDkxdvijxuKM4OWAi0WhFzXdEO22Xc6c=
+github.com/elastic/elastic-agent-libs v0.41.1/go.mod h1:axkpqDCCzAky6G4D/cklgtZQa3jTNGAMVHVkU0u6YbU=
 github.com/elastic/go-sysinfo v1.15.1 h1:zBmTnFEXxIQ3iwcQuk7MzaUotmKRp3OabbbWM8TdzIQ=
 github.com/elastic/go-sysinfo v1.15.1/go.mod h1:jPSuTgXG+dhhh0GKIyI2Cso+w5lPJ5PvVqKlL8LV/Hk=
 github.com/elastic/go-ucfg v0.9.1 h1:OwbVLC9pAmHqlBDq5owRC7HbfldsLuqPqrwg23n17BQ=
