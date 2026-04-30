@@ -1,0 +1,3 @@
+kind: bug-fix
+summary: Fix typos in default rate limit YAML keys that prevented PGP retrieval and policy limits from loading
+component: fleet-server

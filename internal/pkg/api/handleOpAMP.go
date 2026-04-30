@@ -35,7 +35,9 @@ import (
 )
 
 const (
-	kOpAMPMod = "opAMP"
+	kOpAMPMod          = "opAMP"
+	serverCapabilities = uint64(protobufs.ServerCapabilities_ServerCapabilities_AcceptsStatus |
+		protobufs.ServerCapabilities_ServerCapabilities_AcceptsEffectiveConfig)
 )
 
 type OpAMPT struct {
@@ -177,7 +179,31 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 			Bool("is_enrolled", agent != nil).
 			Msg("agent enrollment status")
 
+		// Handle agent disconnect: set status to offline for enrolled agents,
+		// return an error for unenrolled agents.
+		if message.AgentDisconnect != nil {
+			if agent == nil {
+				zlog.Debug().Msg("agent disconnect received from unenrolled agent")
+				return &protobufs.ServerToAgent{
+					InstanceUid: instanceUID.Bytes(),
+					ErrorResponse: &protobufs.ServerErrorResponse{
+						Type:         protobufs.ServerErrorResponseType_ServerErrorResponseType_BadRequest,
+						ErrorMessage: "agent is not enrolled",
+					},
+				}
+			}
+			zlog.Debug().Msg("agent disconnect received")
+			_ = oa.bc.CheckIn(instanceUID.String(), checkin.WithStatus(string(CheckinRequestStatusDisconnected)))
+			return &protobufs.ServerToAgent{
+				InstanceUid: instanceUID.Bytes(),
+			}
+		}
+
+		sendCapabilities := false
+		newlyEnrolled := false
 		if agent == nil {
+			sendCapabilities = true
+			newlyEnrolled = true
 			if agent, err = oa.enrollAgent(zlog, instanceUID.String(), message, apiKey); err != nil {
 				return &protobufs.ServerToAgent{
 					InstanceUid: instanceUID.Bytes(),
@@ -187,6 +213,16 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 					},
 				}
 			}
+		} else if !isActiveStatus(agent.LastCheckinStatus) {
+			sendCapabilities = true
+		}
+
+		if !newlyEnrolled && message.SequenceNum != uint64(agent.SequenceNum)+1 { //nolint:gosec // agent seq num will not be negative
+			zlog.Debug().
+				Int64("stored_seq", agent.SequenceNum).
+				Uint64("msg_seq", message.SequenceNum).
+				Str("last_status", agent.LastCheckinStatus).
+				Msg("sequence number drift detected")
 		}
 
 		if err := oa.updateAgent(zlog, agent, message); err != nil {
@@ -199,9 +235,12 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 			}
 		}
 
-		// Empty message for now since we're only using OpAMP for monitoring.
 		sToA := protobufs.ServerToAgent{
 			InstanceUid: instanceUID.Bytes(),
+			Flags:       uint64(protobufs.ServerToAgentFlags_ServerToAgentFlags_ReportFullState),
+		}
+		if sendCapabilities {
+			sToA.Capabilities = serverCapabilities
 		}
 
 		return &sToA
@@ -332,14 +371,14 @@ func (oa *OpAMPT) updateAgent(zlog zerolog.Logger, agent *model.Agent, aToS *pro
 
 	initialOpts := make([]checkin.Option, 0)
 
-	status := "online"
+	status := CheckinRequestStatusOnline
 
 	// Extract the health status from the health message if it exists.
 	if aToS.Health != nil {
 		if !aToS.Health.Healthy {
-			status = "error"
+			status = CheckinRequestStatusError
 		} else if aToS.Health.Status == "StatusRecoverableError" {
-			status = "degraded"
+			status = CheckinRequestStatusDegraded
 		}
 
 		// Extract the last_checkin_message from the health message if it exists.
@@ -355,11 +394,13 @@ func (oa *OpAMPT) updateAgent(zlog zerolog.Logger, agent *model.Agent, aToS *pro
 		initialOpts = append(initialOpts, checkin.WithHealth(healthBytes))
 	}
 
-	initialOpts = append(initialOpts, checkin.WithStatus(status))
+	initialOpts = append(initialOpts, checkin.WithStatus(string(status)))
 	initialOpts = append(initialOpts, checkin.WithSequenceNum(aToS.SequenceNum))
 
-	capabilities := decodeCapabilities(aToS.Capabilities)
-	initialOpts = append(initialOpts, checkin.WithCapabilities(capabilities))
+	if aToS.Capabilities != 0 {
+		capabilities := decodeCapabilities(aToS.Capabilities)
+		initialOpts = append(initialOpts, checkin.WithCapabilities(capabilities))
+	}
 
 	if aToS.EffectiveConfig != nil {
 		effectiveConfigBytes, err := ParseEffectiveConfig(aToS.EffectiveConfig)
@@ -511,20 +552,18 @@ func ProtobufKVToRawMessage(zlog zerolog.Logger, kv []*protobufs.KeyValue) (json
 	return json.RawMessage(b), nil
 }
 
+func isActiveStatus(status string) bool {
+	return status == string(CheckinRequestStatusOnline) ||
+		status == string(CheckinRequestStatusError) ||
+		status == string(CheckinRequestStatusDegraded)
+}
+
 // decodeCapabilities converts capability bitmask to human-readable strings
 func decodeCapabilities(caps uint64) []string {
 	var result []string
-	capMap := map[uint64]string{
-		uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsStatus):              "ReportsStatus",
-		uint64(protobufs.AgentCapabilities_AgentCapabilities_AcceptsRemoteConfig):        "AcceptsRemoteConfig",
-		uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsEffectiveConfig):     "ReportsEffectiveConfig",
-		uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsHealth):              "ReportsHealth",
-		uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsAvailableComponents): "ReportsAvailableComponents",
-		uint64(protobufs.AgentCapabilities_AgentCapabilities_AcceptsRestartCommand):      "AcceptsRestartCommand",
-	}
-	for mask, name := range capMap {
-		if caps&mask != 0 {
-			result = append(result, name)
+	for mask, name := range protobufs.AgentCapabilities_name {
+		if caps&uint64(mask) != 0 { //nolint:gosec // mask values are not negative so no overflow is possible here
+			result = append(result, strings.TrimPrefix(name, "AgentCapabilities_"))
 		}
 	}
 	return result

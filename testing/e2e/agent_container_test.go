@@ -19,8 +19,8 @@ import (
 
 	"github.com/elastic/fleet-server/testing/e2e/scaffold"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/mount"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/mount"
 	"github.com/stretchr/testify/suite"
 	"github.com/testcontainers/testcontainers-go"
 )

@@ -1,8 +1,8 @@
 module github.com/elastic/fleet-server/pkg/api
 
-go 1.25.7
+go 1.25.0
 
-require github.com/oapi-codegen/runtime v1.3.1
+require github.com/oapi-codegen/runtime v1.4.0
 
 require (
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect

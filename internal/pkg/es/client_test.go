@@ -6,20 +6,25 @@ package es
 
 import (
 	"context"
+	"crypto/fips140"
 	"crypto/tls"
 	"crypto/x509"
 	_ "embed"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"syscall"
 	"testing"
 	"time"
 
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
-	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/testing/certs"
 	"github.com/stretchr/testify/require"
+
+	"github.com/elastic/go-elasticsearch/v8"
 )
 
 var enabled bool = true
@@ -200,8 +205,13 @@ func TestConnectionTLS(t *testing.T) {
 
 	_, err = FetchESVersion(ctx, client)
 
-	if build.FIPSDistribution {
-		require.ErrorContains(t, err, "tls: internal error")
+	if fips140.Enforced() {
+		// When FIPS 140 is enforced (GODEBUG=fips140=only), Go's crypto
+		// stack rejects signing with a 1024-bit RSA key. Note: fips140=on
+		// with microsoft/go's systemcrypto backend silently falls back to
+		// stdlib in test binaries (via UnreachableExceptTests), so only
+		// fips140=only reliably enforces this.
+		require.Error(t, err)
 	} else {
 		require.NoError(t, err)
 	}
@@ -247,4 +257,98 @@ func startTLSServer(t *testing.T) *httptest.Server {
 	server.StartTLS()
 
 	return server
+}
+
+func TestIsTLSHandshakeError(t *testing.T) {
+	certErr := &tls.CertificateVerificationError{
+		Err: errors.New("x509: certificate signed by unknown authority"),
+	}
+
+	cases := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{
+			name: "nil",
+			err:  nil,
+			want: false,
+		},
+		{
+			name: "unrelated error",
+			err:  errors.New("boom"),
+			want: false,
+		},
+		{
+			name: "ECONNREFUSED",
+			err:  syscall.ECONNREFUSED,
+			want: false,
+		},
+		{
+			name: "direct CertificateVerificationError",
+			err:  certErr,
+			want: true,
+		},
+		{
+			name: "wrapped via fmt.Errorf %w",
+			err:  fmt.Errorf("get https://es.example: %w", certErr),
+			want: true,
+		},
+		{
+			name: "wrapped via *url.Error (mirrors net/http transport)",
+			err: &url.Error{
+				Op:  "Get",
+				URL: "https://es.example",
+				Err: certErr,
+			},
+			want: true,
+		},
+		{
+			name: "doubly wrapped (fmt.Errorf around *url.Error)",
+			err: fmt.Errorf("retry: %w", &url.Error{
+				Op:  "Get",
+				URL: "https://es.example",
+				Err: certErr,
+			}),
+			want: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.want, isTLSHandshakeError(tc.err))
+		})
+	}
+}
+
+func TestWithRetryOnTLSHandshakeError(t *testing.T) {
+	certErr := &tls.CertificateVerificationError{
+		Err: errors.New("x509: certificate signed by unknown authority"),
+	}
+	wrappedCertErr := &url.Error{Op: "Get", URL: "https://es.example", Err: certErr}
+
+	t.Run("composes with no prior predicate", func(t *testing.T) {
+		var cfg elasticsearch.Config
+		WithRetryOnTLSHandshakeError()(&cfg)
+
+		require.NotNil(t, cfg.RetryOnError)
+		require.True(t, cfg.RetryOnError(nil, wrappedCertErr), "should retry on TLS cert error")
+		require.False(t, cfg.RetryOnError(nil, errors.New("other")), "should not retry on unrelated error")
+		require.False(t, cfg.RetryOnError(nil, nil), "should not retry on nil error")
+	})
+
+	t.Run("composes with prior predicate (OR semantics)", func(t *testing.T) {
+		var cfg elasticsearch.Config
+		// Prior predicate retries only on ECONNREFUSED.
+		WithRetryOnErrs(syscall.ECONNREFUSED)(&cfg)
+		WithRetryOnTLSHandshakeError()(&cfg)
+
+		require.NotNil(t, cfg.RetryOnError)
+		// Prior predicate still honored.
+		require.True(t, cfg.RetryOnError(nil, syscall.ECONNREFUSED))
+		// New TLS predicate triggers.
+		require.True(t, cfg.RetryOnError(nil, wrappedCertErr))
+		// Neither matches.
+		require.False(t, cfg.RetryOnError(nil, syscall.ECONNRESET))
+	})
 }

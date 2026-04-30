@@ -1,0 +1,4 @@
+kind: bug-fix
+summary: Always Set ReportFullState flag in OpAMP responses
+component: fleet-server
+issue: https://github.com/elastic/fleet-server/issues/6783
