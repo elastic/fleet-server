@@ -775,6 +775,10 @@
         "effective_config": {
           "description": "The effective config that the collector is running",
           "format": "raw"
+        },
+        "effective_config_hash": {
+          "description": "SHA-256 hex hash of the full effective config reported in AgentToServer.EffectiveConfig. Distinct from the RemoteConfig hash in the OpAMP protocol, which is used by the collector to acknowledge a config pushed by fleet-server.",
+          "type": "string"
         }
       },
       "required": ["_id", "type", "active", "enrolled_at", "status"]
