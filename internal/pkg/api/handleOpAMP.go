@@ -420,19 +420,31 @@ func (oa *OpAMPT) updateAgent(zlog zerolog.Logger, agent *model.Agent, aToS *pro
 			return fmt.Errorf("failed to parse effective config: %w", err)
 		}
 
-		// Hash before redaction: redactSensitive mutates the parsed map in place.
-		configHash, err := HashEffectiveConfig(parsedFiles)
+		// Redact before hashing so the canonical bytes returned by HashEffectiveConfig
+		// can be used directly for storage without a second marshal pass.
+		for _, parsed := range parsedFiles {
+			redactSensitive(parsed)
+		}
+
+		configHash, canonical, err := HashEffectiveConfig(parsedFiles)
 		if err != nil {
 			zlog.Warn().Err(err).Msg("failed to compute effective config hash")
 		} else if configHash != "" {
 			initialOpts = append(initialOpts, checkin.WithEffectiveConfigHash(configHash))
 		}
 
-		if defaultParsed, ok := parsedFiles[""]; ok {
-			redactSensitive(defaultParsed)
-			effectiveConfigBytes, err := json.Marshal(defaultParsed)
-			if err != nil {
-				return fmt.Errorf("failed to marshal effective config: %w", err)
+		if len(canonical) > 0 {
+			var effectiveConfigBytes []byte
+			if fileBytes, ok := canonical[""]; ok && len(canonical) == 1 {
+				// Single unnamed file: keep existing flat JSON format for backward compatibility.
+				effectiveConfigBytes = fileBytes
+			} else {
+				// Multiple files or a single named file: store all files keyed by name.
+				var marshalErr error
+				effectiveConfigBytes, marshalErr = json.Marshal(canonical)
+				if marshalErr != nil {
+					return fmt.Errorf("failed to marshal effective config: %w", marshalErr)
+				}
 			}
 			initialOpts = append(initialOpts, checkin.WithEffectiveConfig(effectiveConfigBytes))
 		}

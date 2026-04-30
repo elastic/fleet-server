@@ -29,6 +29,11 @@ func parseConfigFiles(ec *protobufs.EffectiveConfig) (map[string]map[string]any,
 		if file == nil || len(file.Body) == 0 {
 			continue
 		}
+		// Only parse YAML files; skip any other content type.
+		// An empty content_type defaults to text/yaml per the OpAMP spec.
+		if ct := file.ContentType; ct != "" && ct != "text/yaml" {
+			continue
+		}
 		var parsed map[string]any
 		if err := yaml.Unmarshal(file.Body, &parsed); err != nil {
 			return nil, fmt.Errorf("unmarshal config %q for hashing: %w", k, err)
@@ -39,11 +44,16 @@ func parseConfigFiles(ec *protobufs.EffectiveConfig) (map[string]map[string]any,
 }
 
 // HashEffectiveConfig computes a SHA-256 hash of pre-parsed effective config
-// files. Use parseConfigFiles to produce the input so YAML is only parsed once.
+// files and returns the canonical JSON bytes for each file. Use parseConfigFiles
+// to produce the input so YAML is only parsed once.
+//
 // Files are processed in sorted key order for determinism. Each file is
-// canonicalised with json.Marshal, which sorts map keys alphabetically, so key
-// ordering differences in the original YAML do not affect the hash.
-// Returns "" with no error when parsedFiles is empty.
+// canonicalised with json.Marshal (map keys sorted alphabetically), so key
+// ordering differences in the original YAML do not affect the hash. The same
+// canonical bytes are returned to the caller for storage — callers should
+// redact parsedFiles before calling so the stored bytes are already redacted.
+//
+// Returns ("", nil, nil) when parsedFiles is empty.
 //
 // This hash describes what the collector is actually running (EffectiveConfig,
 // reported by the collector in AgentToServer). It is stored as
@@ -53,33 +63,33 @@ func parseConfigFiles(ec *protobufs.EffectiveConfig) (map[string]map[string]any,
 // ServerToAgent messages, which is the OpAMP protocol hash used to detect
 // whether the collector has acknowledged and applied a config pushed by
 // fleet-server.
-func HashEffectiveConfig(parsedFiles map[string]map[string]any) (string, error) {
+func HashEffectiveConfig(parsedFiles map[string]map[string]any) (string, map[string]json.RawMessage, error) {
 	if len(parsedFiles) == 0 {
-		return "", nil
+		return "", nil, nil
 	}
 
 	keys := slices.Sorted(maps.Keys(parsedFiles))
 
 	h := sha256.New()
-	hasData := false
+	canonical := make(map[string]json.RawMessage, len(parsedFiles))
 	for _, k := range keys {
 		parsed := parsedFiles[k]
 		if parsed == nil {
 			continue
 		}
-		canonical, err := json.Marshal(parsed)
+		b, err := json.Marshal(parsed)
 		if err != nil {
-			return "", fmt.Errorf("canonicalize config %q for hashing: %w", k, err)
+			return "", nil, fmt.Errorf("canonicalize config %q for hashing: %w", k, err)
 		}
+		canonical[k] = b
 		// Include the file key so differently-named files produce different hashes.
 		// Null byte separator prevents "a"+"bc" colliding with "ab"+"c".
 		fmt.Fprintf(h, "%s\x00", k)
-		h.Write(canonical)
-		hasData = true
+		h.Write(b)
 	}
 
-	if !hasData {
-		return "", nil
+	if len(canonical) == 0 {
+		return "", nil, nil
 	}
-	return hex.EncodeToString(h.Sum(nil)), nil
+	return hex.EncodeToString(h.Sum(nil)), canonical, nil
 }

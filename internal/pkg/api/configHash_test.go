@@ -48,13 +48,13 @@ func mustParse(t *testing.T, ec *protobufs.EffectiveConfig) map[string]map[strin
 }
 
 func TestHashEffectiveConfig_NilConfig(t *testing.T) {
-	hash, err := HashEffectiveConfig(mustParse(t, &protobufs.EffectiveConfig{}))
+	hash, _, err := HashEffectiveConfig(mustParse(t, &protobufs.EffectiveConfig{}))
 	require.NoError(t, err)
 	assert.Empty(t, hash)
 }
 
 func TestHashEffectiveConfig_EmptyBody(t *testing.T) {
-	hash, err := HashEffectiveConfig(mustParse(t, makeEffectiveConfig("")))
+	hash, _, err := HashEffectiveConfig(mustParse(t, makeEffectiveConfig("")))
 	require.NoError(t, err)
 	assert.Empty(t, hash)
 }
@@ -73,9 +73,9 @@ service:
 receivers:
   otlp: {}
 `
-	h1, err := HashEffectiveConfig(mustParse(t, makeEffectiveConfig(orderA)))
+	h1, _, err := HashEffectiveConfig(mustParse(t, makeEffectiveConfig(orderA)))
 	require.NoError(t, err)
-	h2, err := HashEffectiveConfig(mustParse(t, makeEffectiveConfig(orderB)))
+	h2, _, err := HashEffectiveConfig(mustParse(t, makeEffectiveConfig(orderB)))
 	require.NoError(t, err)
 	assert.Equal(t, h1, h2, "key order must not affect the hash")
 }
@@ -94,9 +94,9 @@ service:
       receivers: [prometheus]
       exporters: [debug]
 `
-	h1, err := HashEffectiveConfig(mustParse(t, makeEffectiveConfig(configA)))
+	h1, _, err := HashEffectiveConfig(mustParse(t, makeEffectiveConfig(configA)))
 	require.NoError(t, err)
-	h2, err := HashEffectiveConfig(mustParse(t, makeEffectiveConfig(configB)))
+	h2, _, err := HashEffectiveConfig(mustParse(t, makeEffectiveConfig(configB)))
 	require.NoError(t, err)
 	assert.NotEqual(t, h1, h2, "different config must produce different hash")
 }
@@ -117,9 +117,9 @@ service:
       receivers: [otlp]
       exporters: [debug]
 `
-	h1, err := HashEffectiveConfig(mustParse(t, makeEffectiveConfig(baseConfig)))
+	h1, _, err := HashEffectiveConfig(mustParse(t, makeEffectiveConfig(baseConfig)))
 	require.NoError(t, err)
-	h2, err := HashEffectiveConfig(mustParse(t, makeEffectiveConfig(withTelemetry)))
+	h2, _, err := HashEffectiveConfig(mustParse(t, makeEffectiveConfig(withTelemetry)))
 	require.NoError(t, err)
 	assert.NotEqual(t, h1, h2, "service.telemetry must affect the hash")
 }
@@ -147,9 +147,9 @@ service:
       receivers: [otlp]
       exporters: [debug]
 `
-	h1, err := HashEffectiveConfig(mustParse(t, makeEffectiveConfig(withExtensions)))
+	h1, _, err := HashEffectiveConfig(mustParse(t, makeEffectiveConfig(withExtensions)))
 	require.NoError(t, err)
-	h2, err := HashEffectiveConfig(mustParse(t, makeEffectiveConfig(withoutExtensions)))
+	h2, _, err := HashEffectiveConfig(mustParse(t, makeEffectiveConfig(withoutExtensions)))
 	require.NoError(t, err)
 	assert.NotEqual(t, h1, h2, "extensions config must affect the hash")
 }
@@ -167,9 +167,9 @@ service:
       exporters: [debug]
 `
 	// Two separate files should hash differently from the same content in one file.
-	hSingle, err := HashEffectiveConfig(mustParse(t, makeEffectiveConfig(receivers+pipeline)))
+	hSingle, _, err := HashEffectiveConfig(mustParse(t, makeEffectiveConfig(receivers+pipeline)))
 	require.NoError(t, err)
-	hMulti, err := HashEffectiveConfig(mustParse(t, makeEffectiveConfigMulti(map[string]string{
+	hMulti, _, err := HashEffectiveConfig(mustParse(t, makeEffectiveConfigMulti(map[string]string{
 		"":         receivers,
 		"pipeline": pipeline,
 	})))
@@ -177,7 +177,7 @@ service:
 	assert.NotEqual(t, hSingle, hMulti, "single-file and multi-file configs must produce different hashes")
 
 	// Multi-file hash must be deterministic regardless of Go map iteration order.
-	hMulti2, err := HashEffectiveConfig(mustParse(t, makeEffectiveConfigMulti(map[string]string{
+	hMulti2, _, err := HashEffectiveConfig(mustParse(t, makeEffectiveConfigMulti(map[string]string{
 		"pipeline": pipeline,
 		"":         receivers,
 	})))
@@ -186,7 +186,7 @@ service:
 }
 
 func TestHashEffectiveConfig_HexEncoded(t *testing.T) {
-	hash, err := HashEffectiveConfig(mustParse(t, makeEffectiveConfig("receivers:\n  otlp: {}\n")))
+	hash, _, err := HashEffectiveConfig(mustParse(t, makeEffectiveConfig("receivers:\n  otlp: {}\n")))
 	require.NoError(t, err)
 	require.NotEmpty(t, hash)
 	assert.Len(t, hash, 64, "SHA-256 hex digest must be 64 characters")

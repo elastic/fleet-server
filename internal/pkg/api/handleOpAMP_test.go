@@ -379,6 +379,179 @@ func TestUpdateAgentWithAgentToServerMessage(t *testing.T) {
 	require.Equal(t, float64(2), config["num"])
 }
 
+func TestUpdateAgentEffectiveConfigMap(t *testing.T) {
+	yamlFile := func(body string, ct string) *protobufs.AgentConfigFile {
+		return &protobufs.AgentConfigFile{Body: []byte(body), ContentType: ct}
+	}
+
+	cases := []struct {
+		name string
+		ec   *protobufs.EffectiveConfig
+		// wantConfig is the expected stored JSON. nil means WithEffectiveConfig
+		// must not be called. Use a map for flat single-file format or a
+		// map[string]map[string]any for the multi-file keyed format.
+		wantConfig any
+		wantHash   bool
+	}{
+		{
+			name:       "nil EffectiveConfig",
+			ec:         nil,
+			wantConfig: nil,
+			wantHash:   false,
+		},
+		{
+			name:       "nil ConfigMap",
+			ec:         &protobufs.EffectiveConfig{},
+			wantConfig: nil,
+			wantHash:   false,
+		},
+		{
+			name: "empty ConfigMap — no file entries",
+			ec: &protobufs.EffectiveConfig{
+				ConfigMap: &protobufs.AgentConfigMap{ConfigMap: map[string]*protobufs.AgentConfigFile{}},
+			},
+			wantConfig: nil,
+			wantHash:   false,
+		},
+		{
+			name: "single unnamed file with text/yaml content type",
+			ec: &protobufs.EffectiveConfig{
+				ConfigMap: &protobufs.AgentConfigMap{ConfigMap: map[string]*protobufs.AgentConfigFile{
+					"": yamlFile("receivers:\n  otlp: {}\n", "text/yaml"),
+				}},
+			},
+			// Stored as flat JSON, not wrapped in a filename key.
+			wantConfig: map[string]any{"receivers": map[string]any{"otlp": map[string]any{}}},
+			wantHash:   true,
+		},
+		{
+			name: "single unnamed file with empty content type defaults to yaml",
+			ec: &protobufs.EffectiveConfig{
+				ConfigMap: &protobufs.AgentConfigMap{ConfigMap: map[string]*protobufs.AgentConfigFile{
+					"": yamlFile("exporters:\n  debug: {}\n", ""),
+				}},
+			},
+			wantConfig: map[string]any{"exporters": map[string]any{"debug": map[string]any{}}},
+			wantHash:   true,
+		},
+		{
+			name: "single named file stored keyed by name",
+			ec: &protobufs.EffectiveConfig{
+				ConfigMap: &protobufs.AgentConfigMap{ConfigMap: map[string]*protobufs.AgentConfigFile{
+					"pipeline": yamlFile("service:\n  pipelines: {}\n", "text/yaml"),
+				}},
+			},
+			// Named file: stored as {"pipeline": {...}}.
+			wantConfig: map[string]any{"pipeline": map[string]any{"service": map[string]any{"pipelines": map[string]any{}}}},
+			wantHash:   true,
+		},
+		{
+			name: "multiple files stored keyed by name",
+			ec: &protobufs.EffectiveConfig{
+				ConfigMap: &protobufs.AgentConfigMap{ConfigMap: map[string]*protobufs.AgentConfigFile{
+					"":         yamlFile("receivers:\n  otlp: {}\n", "text/yaml"),
+					"pipeline": yamlFile("service:\n  pipelines: {}\n", "text/yaml"),
+				}},
+			},
+			wantConfig: map[string]any{
+				"":         map[string]any{"receivers": map[string]any{"otlp": map[string]any{}}},
+				"pipeline": map[string]any{"service": map[string]any{"pipelines": map[string]any{}}},
+			},
+			wantHash: true,
+		},
+		{
+			name: "non-YAML file is skipped",
+			ec: &protobufs.EffectiveConfig{
+				ConfigMap: &protobufs.AgentConfigMap{ConfigMap: map[string]*protobufs.AgentConfigFile{
+					"cfg": {Body: []byte(`{"key":"value"}`), ContentType: "application/json"},
+				}},
+			},
+			wantConfig: nil,
+			wantHash:   false,
+		},
+		{
+			name: "YAML and non-YAML mixed — only YAML file stored",
+			ec: &protobufs.EffectiveConfig{
+				ConfigMap: &protobufs.AgentConfigMap{ConfigMap: map[string]*protobufs.AgentConfigFile{
+					"":    yamlFile("receivers:\n  otlp: {}\n", "text/yaml"),
+					"cfg": {Body: []byte(`{"key":"value"}`), ContentType: "application/json"},
+				}},
+			},
+			// The non-YAML file is skipped; only the unnamed YAML file survives,
+			// so it uses the flat single-file format.
+			wantConfig: map[string]any{"receivers": map[string]any{"otlp": map[string]any{}}},
+			wantHash:   true,
+		},
+		{
+			name: "file with empty body is skipped",
+			ec: &protobufs.EffectiveConfig{
+				ConfigMap: &protobufs.AgentConfigMap{ConfigMap: map[string]*protobufs.AgentConfigFile{
+					"": {Body: []byte{}, ContentType: "text/yaml"},
+				}},
+			},
+			wantConfig: nil,
+			wantHash:   false,
+		},
+		{
+			name: "sensitive fields are redacted before storage",
+			ec: &protobufs.EffectiveConfig{
+				ConfigMap: &protobufs.AgentConfigMap{ConfigMap: map[string]*protobufs.AgentConfigFile{
+					"": yamlFile("password: secret\nreceivers:\n  otlp: {}\n", "text/yaml"),
+				}},
+			},
+			wantConfig: map[string]any{
+				"password":  "[REDACTED]",
+				"receivers": map[string]any{"otlp": map[string]any{}},
+			},
+			wantHash: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			checker := &mockCheckin{}
+			oa := &OpAMPT{bc: checker}
+			agent := &model.Agent{ESDocument: model.ESDocument{Id: "agent-1"}}
+			msg := &protobufs.AgentToServer{EffectiveConfig: tc.ec}
+
+			require.NoError(t, oa.updateAgent(zerolog.Nop(), agent, msg))
+
+			// Collect the stored config and hash from the options applied to
+			// a zero pending value.
+			var storedConfig []byte
+			var storedHash string
+			if len(checker.opts) > 0 {
+				pending := pendingFromOptions(t, checker.opts)
+				extra := getUnexportedField(pending, "extra")
+				if !extra.IsNil() {
+					extraVal := extra.Elem()
+					storedConfig = getUnexportedField(extraVal, "effectiveConfig").Bytes()
+					storedHash = getUnexportedField(extraVal, "effectiveConfigHash").String()
+				}
+			}
+
+			if tc.wantConfig == nil {
+				require.Empty(t, storedConfig, "expected no effectiveConfig to be stored")
+			} else {
+				require.NotEmpty(t, storedConfig)
+				var got any
+				require.NoError(t, json.Unmarshal(storedConfig, &got))
+				wantJSON, err := json.Marshal(tc.wantConfig)
+				require.NoError(t, err)
+				var want any
+				require.NoError(t, json.Unmarshal(wantJSON, &want))
+				require.Equal(t, want, got)
+			}
+
+			if tc.wantHash {
+				require.NotEmpty(t, storedHash)
+			} else {
+				require.Empty(t, storedHash)
+			}
+		})
+	}
+}
+
 func TestHandleMessageAgentDisconnect(t *testing.T) {
 	//nolint:dupl // test cases
 	cases := []struct {
