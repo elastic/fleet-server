@@ -7,16 +7,21 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -395,4 +400,153 @@ key: %s`,
 		default:
 		}
 	})
+}
+
+func Test_server_TLSCertReload(t *testing.T) {
+	// This test verifies end-to-end TLS certificate hot-reload through a
+	// running server: start the server with cert1, rotate to cert2 on disk,
+	// and verify that new TLS connections receive cert2.
+
+	sm := mock.NewMockMonitor()
+	sm.On("State").Return(client.UnitStateHealthy)
+
+	ca := certs.GenCA(t)
+	cert1 := certs.GenCert(t, ca)
+
+	// Write cert and key to a shared directory so we can overwrite them
+	// in place to simulate certificate rotation.
+	dir := t.TempDir()
+	certPath := filepath.Join(dir, "cert.pem")
+	keyPath := filepath.Join(dir, "key.pem")
+	caPath := certs.CertToFile(t, ca, "ca")
+
+	writePEM := func(path string, pemType string, data []byte) {
+		t.Helper()
+		f, err := os.Create(path)
+		require.NoError(t, err)
+		require.NoError(t, pem.Encode(f, &pem.Block{Type: pemType, Bytes: data}))
+		require.NoError(t, f.Close())
+	}
+	writeCertAndKey := func(cert tls.Certificate) {
+		t.Helper()
+		writePEM(certPath, "CERTIFICATE", cert.Certificate[0])
+		keyBytes, err := x509.MarshalPKCS8PrivateKey(cert.PrivateKey)
+		require.NoError(t, err)
+		writePEM(keyPath, "PRIVATE KEY", keyBytes)
+	}
+
+	// Write the initial certificate pair.
+	writeCertAndKey(cert1)
+
+	// Build the TLS config via YAML, same as the other TLS tests.
+	tlsYML := fmt.Sprintf(tlsCFGTempl, caPath, certPath, keyPath)
+	ucfg, err := yaml.NewConfig([]byte(tlsYML))
+	require.NoError(t, err)
+	tlsCFG := &tlscommon.ServerConfig{}
+	err = tlsCFG.Unpack(libsconfig.C(*ucfg))
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ctx = testlog.SetLogger(t).WithContext(ctx)
+
+	// Configure the server with certificate reload enabled.
+	port, err := ftesting.FreePort()
+	require.NoError(t, err)
+	cfg := &config.Server{}
+	cfg.InitDefaults()
+	cfg.Host = "localhost"
+	cfg.Port = port
+	addr := cfg.BindEndpoints()[0]
+	cfg.TLS = tlsCFG
+
+	st := NewStatusT(cfg, nil, nil, WithSelfMonitor(sm))
+	srv := NewServer(addr, cfg, WithStatus(st))
+
+	// Trust the test CA for client connections.
+	certPool := x509.NewCertPool()
+	certPool.AddCert(ca.Leaf)
+
+	// Start the server in a background goroutine.
+	errCh := make(chan error, 1)
+	var wg sync.WaitGroup
+	wg.Go(func() {
+		if err := srv.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
+			errCh <- err
+		}
+	})
+
+	statusURL := "https://" + addr + "/api/status"
+
+	// getServerCert makes an HTTPS request to the server and captures the raw
+	// server certificate from the TLS handshake via VerifyConnection callback.
+	getServerCert := func() []byte {
+		t.Helper()
+		var serverCert []byte
+		httpClient := &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					RootCAs: certPool,
+					VerifyConnection: func(cs tls.ConnectionState) error {
+						if len(cs.PeerCertificates) > 0 {
+							serverCert = cs.PeerCertificates[0].Raw
+						}
+						return nil
+					},
+				},
+			},
+		}
+		rCtx, rCancel := context.WithTimeout(ctx, 5*time.Second)
+		defer rCancel()
+		req, err := http.NewRequestWithContext(rCtx, "GET", statusURL, nil)
+		require.NoError(t, err)
+		resp, err := httpClient.Do(req)
+		require.NoError(t, err)
+		resp.Body.Close()
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		return serverCert
+	}
+
+	// Wait until the server is ready by hitting the status endpoint.
+	require.EventuallyWithT(t, func(ct *assert.CollectT) {
+		rCtx, rCancel := context.WithTimeout(ctx, 1*time.Second)
+		defer rCancel()
+
+		req, err := http.NewRequestWithContext(rCtx, "GET", statusURL, nil)
+		require.NoError(ct, err)
+
+		resp, err := (&http.Client{Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{RootCAs: certPool},
+		}}).Do(req)
+		require.NoError(ct, err)
+		resp.Body.Close()
+
+		require.Equal(ct, http.StatusOK, resp.StatusCode)
+	}, 5*time.Second, 10*time.Millisecond, "server should be serving TLS")
+
+	// Capture the server cert before rotation.
+	initialCert := getServerCert()
+	require.NotEmpty(t, initialCert)
+
+	// Simulate certificate rotation by writing a new cert/key pair to the
+	// same paths. The CertReloader's fsnotify watcher should detect this.
+	cert2 := certs.GenCert(t, ca)
+	writeCertAndKey(cert2)
+
+	// Poll until the server presents the new certificate. The CertReloader
+	// uses a 5s default debounce, so we allow up to 10s for the full cycle
+	// (fsnotify delivery + debounce + reload).
+	require.Eventually(t, func() bool {
+		c := getServerCert()
+		return len(c) > 0 && !bytes.Equal(c, initialCert)
+	}, 10*time.Second, 500*time.Millisecond, "server should present the new certificate after reload")
+
+	// Clean shutdown.
+	cancel()
+	wg.Wait()
+	select {
+	case err := <-errCh:
+		require.NoError(t, err)
+	default:
+	}
 }
