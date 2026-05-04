@@ -124,6 +124,7 @@ var (
 		"linux/amd64",
 		"linux/arm64",
 		"windows/amd64",
+		"windows/arm64",
 	}
 	// plaformsFIPS is the list of all FIPS-capable platforms.
 	platformsFIPS = []string{
