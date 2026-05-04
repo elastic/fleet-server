@@ -1,0 +1,120 @@
+version: 9.4.0
+entries:
+    - kind: enhancement
+      summary: Adds file-delivery source routing to integration indices
+      description: |
+        Adds an optional query parameter (?source) to the existing file delivery API. When
+        omitted, files are pulled from the fleet-owned file data streams as before. When used,
+        fleet server will pull from the calling integration's owned indices.
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/6599
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1773776832
+      file:
+        name: 1773776832-Add-file-delivery-sources.yaml
+        checksum: e5f5bc3c057cad0130cefa0619bcf4c6b1707f8e
+    - kind: bug-fix
+      summary: Retry Elasticsearch requests on TLS handshake errors so multi-host outputs can fail over
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/6772
+        - https://github.com/elastic/fleet-server/pull/6938
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1775592233
+      file:
+        name: 1775592233-retry-on-tls-handshake-errors-in-es-client.yaml
+        checksum: 703a02ee507109eab46fa3b42780571aa311030e
+    - kind: bug-fix
+      summary: Handle OpAMP AgentDisconnect message by setting agent status to disconnected
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/6772
+        - https://github.com/elastic/fleet-server/pull/6938
+      issue:
+        - https://github.com/elastic/fleet-server/issues/6784
+      impact: ""
+      action: ""
+      timestamp: 1775675165
+      file:
+        name: 1775675165-handle-opamp-agent-disconnect.yaml
+        checksum: 5f8b8042de4a715cec7a0e83f1812283c636aed9
+    - kind: enhancement
+      summary: Update go to v1.26.2
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/6772
+        - https://github.com/elastic/fleet-server/pull/6938
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1775752898
+      file:
+        name: 1775752898-Update-go-to-v1.26.2.yaml
+        checksum: 2dbe92d49257181d0e4522080f2732c71d8d7e4f
+    - kind: bug-fix
+      summary: Report server capabilities in OpAMP ServerToAgent responses as required by the spec
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/6772
+        - https://github.com/elastic/fleet-server/pull/6938
+      issue:
+        - https://github.com/elastic/fleet-server/issues/6785
+      impact: ""
+      action: ""
+      timestamp: 1776103950
+      file:
+        name: 1776103950-report-opamp-server-capabilities.yaml
+        checksum: 05476ded36ddaacd9d6ee7ed4615cce8d81ad002
+    - kind: bug-fix
+      summary: Decode all opamp-agent capabilites
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/6772
+        - https://github.com/elastic/fleet-server/pull/6938
+      issue:
+        - https://github.com/elastic/fleet-server/issues/6790
+      impact: ""
+      action: ""
+      timestamp: 1776106832
+      file:
+        name: 1776106832-Decode-all-opamp-agent-capabilites.yaml
+        checksum: c18accb44e0a2855ae9ee944dc2b28627083da45
+    - kind: bug-fix
+      summary: Always Set ReportFullState flag in OpAMP responses
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/6772
+        - https://github.com/elastic/fleet-server/pull/6938
+      issue:
+        - https://github.com/elastic/fleet-server/issues/6783
+      impact: ""
+      action: ""
+      timestamp: 1776112788
+      file:
+        name: 1776112788-opamp-report-full-state-flag.yaml
+        checksum: 7709247422465bcdd8f5f15308cc54bc4a7d1648
+    - kind: bug-fix
+      summary: Fix typos in default rate limit YAML keys that prevented PGP retrieval and policy limits from loading
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/6772
+        - https://github.com/elastic/fleet-server/pull/6938
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1776205410
+      file:
+        name: 1776205410-Fix-typos-in-default-rate-limit-YAML-keys-that-prevented-PGP-retrieval-and-policy-limits-from-loading.yaml
+        checksum: 61d720b8c3d12d0ebef9d669fe1aacb498d121e9
