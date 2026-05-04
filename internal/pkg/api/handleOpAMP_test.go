@@ -534,7 +534,7 @@ func TestUpdateAgentWithAgentToServerMessage(t *testing.T) {
 				ConfigMap: &protobufs.AgentConfigMap{
 					ConfigMap: map[string]*protobufs.AgentConfigFile{
 						"": {
-							Body:        []byte("password: 12345\nnum: 2\n"),
+							Body:        []byte("password: hunter2\nnum: 2\n"),
 							ContentType: "text/yaml",
 						},
 					},
@@ -569,7 +569,7 @@ func TestUpdateAgentWithAgentToServerMessage(t *testing.T) {
 		configBytes := getUnexportedField(extraVal, "effectiveConfig").Bytes()
 		var config map[string]any
 		require.NoError(t, json.Unmarshal(configBytes, &config))
-		require.Equal(t, "[REDACTED]", config["password"])
+		require.Equal(t, redact.REDACTED, config["password"])
 		require.Equal(t, float64(2), config["num"])
 	})
 
