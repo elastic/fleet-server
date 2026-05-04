@@ -22,6 +22,8 @@ import (
 	"github.com/stretchr/testify/require"
 	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
 
+	"github.com/elastic/elastic-agent-libs/redact"
+
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/checkin"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
@@ -139,6 +141,103 @@ func TestProtobufKVToRawMessage(t *testing.T) {
 	require.Equal(t, base64.StdEncoding.EncodeToString([]byte("bin")), got["bytes_key"])
 	require.Equal(t, []any{"elem1", float64(2)}, got["array_key"])
 	require.Equal(t, map[string]any{"nested_string_key": "nested", "nested_int_key": float64(99)}, got["kvlist_key"])
+}
+
+func TestParseEffectiveConfigRedaction(t *testing.T) {
+	cases := []struct {
+		name string
+		body string
+		want map[string]any
+	}{
+		{
+			name: "sensitive top-level keys are redacted",
+			body: `password: hunter2
+api_key: abcd-1234
+routekey: should-not-be-redacted
+plain: keepme
+`,
+			want: map[string]any{
+				"password": redact.REDACTED,
+				"api_key":  redact.REDACTED,
+				"routekey": "should-not-be-redacted",
+				"plain":    "keepme",
+			},
+		},
+		{
+			name: "sensitive keys nested inside maps and slices are redacted",
+			body: `outputs:
+  default:
+    type: elasticsearch
+    password: hunter2
+    hosts:
+      - https://es.example.com
+inputs:
+  - type: filestream
+    secret: shhh
+`,
+			want: map[string]any{
+				"outputs": map[string]any{
+					"default": map[string]any{
+						"type":     "elasticsearch",
+						"password": redact.REDACTED,
+						"hosts":    []any{"https://es.example.com"},
+					},
+				},
+				"inputs": []any{
+					map[string]any{
+						"type":   "filestream",
+						"secret": redact.REDACTED,
+					},
+				},
+			},
+		},
+		{
+			name: "name/value header pairs with sensitive name are redacted",
+			body: `headers:
+  - name: Authorization
+    value: Bearer SecretValue
+  - name: X-Api-Key
+    value: top-secret
+  - name: User-Agent
+    value: fleet-server/9.x
+`,
+			want: map[string]any{
+				"headers": []any{
+					map[string]any{
+						"name":  "Authorization",
+						"value": redact.REDACTED,
+					},
+					map[string]any{
+						"name":  "X-Api-Key",
+						"value": redact.REDACTED,
+					},
+					map[string]any{
+						"name":  "User-Agent",
+						"value": "fleet-server/9.x",
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ec := &protobufs.EffectiveConfig{
+				ConfigMap: &protobufs.AgentConfigMap{
+					ConfigMap: map[string]*protobufs.AgentConfigFile{
+						"": {Body: []byte(tc.body)},
+					},
+				},
+			}
+
+			out, err := ParseEffectiveConfig(ec)
+			require.NoError(t, err)
+
+			var got map[string]any
+			require.NoError(t, json.Unmarshal(out, &got))
+			require.Equal(t, tc.want, got)
+		})
+	}
 }
 
 func TestEnrollAgentWithAgentToServerMessage(t *testing.T) {
