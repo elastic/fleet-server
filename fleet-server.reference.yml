@@ -101,6 +101,11 @@ fleet:
 #        certificate: /creds/cert.pem
 #        key: /creds/key.pem
 #        key_passphrase_path: /creds/key.pem
+#        certificate_reload:
+#          enabled: true     # Enabled by default; set to false to disable periodic reload
+#          reload_interval: 5s  # How often to re-read cert/key files from disk.
+#                               # After rotation, new certs are picked up within
+#                               # this interval on the next TLS handshake.
 #
 #     # timeouts controls various api timeouts
 #     timeouts:
