@@ -8,7 +8,7 @@ require (
 	github.com/dgraph-io/ristretto v0.2.0
 	github.com/docker/go-units v0.5.0
 	github.com/elastic/elastic-agent-client/v7 v7.18.1
-	github.com/elastic/elastic-agent-libs v0.37.0
+	github.com/elastic/elastic-agent-libs v0.41.1
 	github.com/elastic/elastic-agent-system-metrics v0.14.3
 	github.com/elastic/go-elasticsearch/v8 v8.19.4
 	github.com/elastic/go-ucfg v0.9.1
@@ -19,7 +19,7 @@ require (
 	github.com/hashicorp/go-cleanhttp v0.5.2
 	github.com/hashicorp/go-version v1.9.0
 	github.com/hashicorp/golang-lru/v2 v2.0.7
-	github.com/magefile/mage v1.17.1
+	github.com/magefile/mage v1.17.2
 	github.com/mailru/easyjson v0.9.2
 	github.com/miolini/datacounter v1.0.3
 	github.com/oapi-codegen/runtime v1.4.0
@@ -38,7 +38,7 @@ require (
 	go.elastic.co/apm/v2 v2.7.8
 	go.elastic.co/ecszerolog v0.2.0
 	go.opentelemetry.io/otel v1.43.0
-	go.uber.org/zap v1.27.1
+	go.uber.org/zap v1.28.0
 	golang.org/x/net v0.53.0
 	golang.org/x/sync v0.20.0
 	golang.org/x/time v0.15.0
