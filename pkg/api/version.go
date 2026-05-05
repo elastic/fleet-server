@@ -4,10 +4,7 @@
 
 package api
 
-const (
-	// DefaultFleetAPIVersion is the current Fleet Server API version.
-	DefaultFleetAPIVersion = "2023-06-01"
-
-	// ElasticAPIVersionHeaderKey is the HTTP header used to negotiate the API version.
-	ElasticAPIVersionHeaderKey = "Elastic-Api-Version"
-)
+// DefaultFleetAPIVersion is the current Fleet Server API version.
+// The header name is already defined in the OpenAPI spec as a parameter
+// on each endpoint and is handled by the generated client/params structs.
+const DefaultFleetAPIVersion = "2023-06-01"
