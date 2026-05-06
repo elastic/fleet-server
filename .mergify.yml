@@ -7,7 +7,7 @@ commands_restrictions:
 queue_rules:
   - name: default
     merge_method: squash
-    conditions:
+    merge_conditions:
       - check-success=fleet-server/pr-merge
 defaults:
   actions:
