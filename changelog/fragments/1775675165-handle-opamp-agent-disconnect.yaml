@@ -1,4 +1,0 @@
-kind: bug-fix
-summary: Handle OpAMP AgentDisconnect message by setting agent status to disconnected
-component: fleet-server
-issue: https://github.com/elastic/fleet-server/issues/6784
