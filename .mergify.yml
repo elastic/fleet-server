@@ -1,6 +1,11 @@
 queue_rules:
   - name: default
+<<<<<<< HEAD
     conditions:
+=======
+    merge_method: squash
+    merge_conditions:
+>>>>>>> 0b31a09 (ci(mergify): upgrade configuration to current format (#6972))
       - check-success=fleet-server/pr-merge
 
 pull_request_rules:
