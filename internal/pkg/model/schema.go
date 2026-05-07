@@ -159,6 +159,9 @@ type Agent struct {
 	// The effective config that the collector is running
 	EffectiveConfig json.RawMessage `json:"effective_config,omitempty"`
 
+	// SHA-256 hex hash of the full effective config reported in AgentToServer.EffectiveConfig. Distinct from the RemoteConfig hash in the OpAMP protocol, which is used by the collector to acknowledge a config pushed by fleet-server.
+	EffectiveConfigHash string `json:"effective_config_hash,omitempty"`
+
 	// Date/time the Elastic Agent enrolled
 	EnrolledAt string `json:"enrolled_at"`
 

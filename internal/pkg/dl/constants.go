@@ -49,6 +49,7 @@ const (
 	FieldHealth                        = "health"
 	FieldCapabilities                  = "capabilities"
 	FieldEffectiveConfig               = "effective_config"
+	FieldEffectiveConfigHash           = "effective_config_hash"
 
 	FieldActive             = "active"
 	FieldNamespaces         = "namespaces"
