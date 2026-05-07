@@ -12,7 +12,6 @@ import (
 	slog "log"
 	"net"
 	"net/http"
-	"os"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
@@ -120,30 +119,6 @@ func (s *server) Run(ctx context.Context) error {
 		// (see https://golang.org/pkg/net/http/#Server.Serve)
 		srv.TLSConfig.NextProtos = []string{"h2", "http/1.1"}
 
-		if s.cfg.TLS.CertificateReload.IsEnabled() {
-			var opts []tlscommon.CertReloaderOption
-			if s.cfg.TLS.CertificateReload.ReloadInterval > 0 {
-				opts = append(opts, tlscommon.WithReloadInterval(s.cfg.TLS.CertificateReload.ReloadInterval))
-			}
-			passphrase, err := resolvePassphrase(s.cfg.TLS.Certificate)
-			if err != nil {
-				return fmt.Errorf("failed to resolve TLS key passphrase: %w", err)
-			}
-			if passphrase != "" {
-				opts = append(opts, tlscommon.WithPassphrase(passphrase))
-			}
-			reloader, err := tlscommon.NewCertReloader(
-				s.cfg.TLS.Certificate.Certificate,
-				s.cfg.TLS.Certificate.Key,
-				opts...,
-			)
-			if err != nil {
-				return fmt.Errorf("failed to initialize TLS cert reloader: %w", err)
-			}
-			srv.TLSConfig.GetCertificate = reloader.GetCertificate
-			srv.TLSConfig.Certificates = nil
-		}
-
 		ln = tls.NewListener(ln, srv.TLSConfig)
 
 	} else {
@@ -245,18 +220,4 @@ func wrapConnLimitter(ctx context.Context, ln net.Listener, cfg *config.Server) 
 	}
 
 	return ln
-}
-
-func resolvePassphrase(cert tlscommon.CertificateConfig) (string, error) {
-	if cert.Passphrase != "" {
-		return cert.Passphrase, nil
-	}
-	if cert.PassphrasePath != "" {
-		p, err := os.ReadFile(cert.PassphrasePath)
-		if err != nil {
-			return "", fmt.Errorf("unable to read key passphrase file: %w", err)
-		}
-		return string(p), nil
-	}
-	return "", nil
 }
