@@ -24,6 +24,8 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
 
+	"github.com/elastic/elastic-agent-libs/redact"
+
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
@@ -492,7 +494,7 @@ func ParseEffectiveConfig(effectiveConfig *protobufs.EffectiveConfig) ([]byte, e
 			if err := yaml.Unmarshal(bodyBytes, &obj); err != nil {
 				return nil, fmt.Errorf("unmarshal effective config failure: %w", err)
 			}
-			redactSensitive(obj)
+			redact.Redact(obj, redact.WithIgnoreKeys("routekey"))
 			effectiveConfigBytes, err := json.Marshal(obj)
 			if err != nil {
 				return nil, fmt.Errorf("failed to marshal effective config: %w", err)
@@ -501,51 +503,6 @@ func ParseEffectiveConfig(effectiveConfig *protobufs.EffectiveConfig) ([]byte, e
 		}
 	}
 	return nil, nil
-}
-
-func redactSensitive(v any) {
-	const redacted = "[REDACTED]"
-	switch typed := v.(type) {
-	case map[string]any:
-		for key, val := range typed {
-			if redactKey(key) {
-				typed[key] = redacted
-				continue
-			}
-			redactSensitive(val)
-		}
-	case map[any]any:
-		for rawKey, val := range typed {
-			key, ok := rawKey.(string)
-			if ok && redactKey(key) {
-				typed[rawKey] = redacted
-				continue
-			}
-			redactSensitive(val)
-		}
-	case []any:
-		for i := range typed {
-			redactSensitive(typed[i])
-		}
-	}
-}
-
-// TODO move to a common place, same as https://github.com/elastic/elastic-agent/blob/1c3fb4b4c8989cd2cfb692780debd7619820ae72/internal/pkg/diagnostics/diagnostics.go#L454-L468
-func redactKey(k string) bool {
-	// "routekey" shouldn't be redacted.
-	// Add any other exceptions here.
-	if k == "routekey" {
-		return false
-	}
-
-	k = strings.ToLower(k)
-	return strings.Contains(k, "auth") ||
-		strings.Contains(k, "certificate") ||
-		strings.Contains(k, "passphrase") ||
-		strings.Contains(k, "password") ||
-		strings.Contains(k, "token") ||
-		strings.Contains(k, "key") ||
-		strings.Contains(k, "secret")
 }
 
 // anyValueToInterface recursively converts protobufs.AnyValue to Go interface{} for JSON marshalling
