@@ -29,6 +29,9 @@ const defaultFlushInterval = 10 * time.Second
 //go:embed deleteAuditFieldsOnCheckin.painless
 var deleteAuditAttributesScript string
 
+//go:embed checkinWithEffectiveConfig.painless
+var checkinWithEffectiveConfigScript string
+
 type optionsT struct {
 	flushInterval time.Duration
 }
@@ -331,7 +334,34 @@ func (bc *Bulk) flush(ctx context.Context) error {
 			}
 			body, err = json.Marshal(&action)
 			if err != nil {
-				return fmt.Errorf("could not marshall script action: %w", err)
+				return fmt.Errorf("could not marshal script action: %w", err)
+			}
+		} else if pendingData.extra.effectiveConfig != nil {
+			// effective_config is a nested JSON object. ES's {"doc": ...} partial
+			// update recursively merges objects, so keys removed from the config
+			// (e.g. deleted pipelines) would persist. For example, if the stored
+			// config has pipelines {traces, metrics} and the collector reports
+			// only {traces}, the merge would keep metrics when it should be
+			// removed. A script avoids this by assigning directly to
+			// ctx._source, fully replacing the field.
+			if pendingData.extra.seqNo.IsSet() {
+				needRefresh = true
+			}
+			params, err := encodeParams(nowTimestamp, pendingData)
+			if err != nil {
+				return fmt.Errorf("unable to parse checkin details as params: %w", err)
+			}
+			action := &estypes.UpdateAction{
+				Script: &estypes.Script{
+					Lang:    &scriptlanguage.Painless,
+					Source:  &checkinWithEffectiveConfigScript,
+					Options: map[string]string{},
+					Params:  params,
+				},
+			}
+			body, err = json.Marshal(&action)
+			if err != nil {
+				return fmt.Errorf("could not marshal script action: %w", err)
 			}
 		} else {
 			if pendingData.extra.seqNo.IsSet() {
@@ -439,13 +469,19 @@ func encodeParams(now string, data pendingT) (map[string]json.RawMessage, error)
 		reason  json.RawMessage
 
 		// optional attributes below
-		policyID    json.RawMessage
-		revisionIDX json.RawMessage
-		ver         json.RawMessage
-		meta        json.RawMessage
-		components  json.RawMessage
-		isSet       json.RawMessage
-		seqNo       json.RawMessage
+		policyID           json.RawMessage
+		revisionIDX        json.RawMessage
+		sequenceNum        json.RawMessage
+		ver                json.RawMessage
+		meta               json.RawMessage
+		components         json.RawMessage
+		health             json.RawMessage
+		capabilities       json.RawMessage
+		effectiveConfig    json.RawMessage
+		isSet              json.RawMessage
+		seqNo              json.RawMessage
+		availableRollbacks json.RawMessage
+		deleteAudit        json.RawMessage
 
 		err error
 	)
@@ -463,11 +499,15 @@ func encodeParams(now string, data pendingT) (map[string]json.RawMessage, error)
 	Err = errors.Join(Err, err)
 	revisionIDX, err = json.Marshal(data.revisionIDX)
 	Err = errors.Join(Err, err)
+	sequenceNum, err = json.Marshal(data.sequenceNum)
+	Err = errors.Join(Err, err)
 	ver, err = json.Marshal(data.extra.ver)
 	Err = errors.Join(Err, err)
 	isSet, err = json.Marshal(data.extra.seqNo.IsSet())
 	Err = errors.Join(Err, err)
 	seqNo, err = json.Marshal(data.extra.seqNo)
+	Err = errors.Join(Err, err)
+	deleteAudit, err = json.Marshal(data.extra.deleteAudit)
 	Err = errors.Join(Err, err)
 	if data.extra.meta != nil {
 		meta = data.extra.meta
@@ -475,21 +515,40 @@ func encodeParams(now string, data pendingT) (map[string]json.RawMessage, error)
 	if data.extra.components != nil {
 		components = data.extra.components
 	}
+	if data.extra.health != nil {
+		health = data.extra.health
+	}
+	if data.extra.capabilities != nil {
+		capabilities, err = json.Marshal(data.extra.capabilities)
+		Err = errors.Join(Err, err)
+	}
+	if data.extra.effectiveConfig != nil {
+		effectiveConfig = data.extra.effectiveConfig
+	}
+	if data.extra.availableRollbacks != nil {
+		availableRollbacks = data.extra.availableRollbacks
+	}
 	if Err != nil {
 		return nil, Err
 	}
 	return map[string]json.RawMessage{
-		"Now":             tsNow,
-		"TS":              ts,
-		"Status":          status,
-		"Message":         message,
-		"UnhealthyReason": reason,
-		"PolicyID":        policyID,
-		"RevisionIDX":     revisionIDX,
-		"Ver":             ver,
-		"Meta":            meta,
-		"Components":      components,
-		"SeqNoSet":        isSet,
-		"SeqNo":           seqNo,
+		"Now":                tsNow,
+		"TS":                 ts,
+		"Status":             status,
+		"Message":            message,
+		"UnhealthyReason":    reason,
+		"PolicyID":           policyID,
+		"RevisionIDX":        revisionIDX,
+		"SequenceNum":        sequenceNum,
+		"Ver":                ver,
+		"Meta":               meta,
+		"Components":         components,
+		"Health":             health,
+		"Capabilities":       capabilities,
+		"EffectiveConfig":    effectiveConfig,
+		"SeqNoSet":           isSet,
+		"SeqNo":              seqNo,
+		"AvailableRollbacks": availableRollbacks,
+		"DeleteAudit":        deleteAudit,
 	}, nil
 }

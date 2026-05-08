@@ -16,6 +16,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
+	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 
@@ -50,21 +51,19 @@ func TestEffectiveConfigReplacesRemovedFields(t *testing.T) {
 	_, err = bulker.Create(ctx, index, agentID, initialDoc, bulk.WithRefresh())
 	require.NoError(t, err)
 
-	// Step 2: Build the update body that fleet-server would send when the
-	// collector reports effective_config with only 1 pipeline (metrics removed).
+	// Step 2: Check in with effective_config containing only 1 pipeline
+	// (metrics removed), then flush to ES.
 	updatedConfig := []byte(`{"service":{"pipelines":{"traces":{"receivers":["otlp"],"exporters":["logging"]}}}}`)
-	now = time.Now().UTC().Format(time.RFC3339)
-	body, err := toUpdateBody(now, pendingT{
-		ts:      now,
-		status:  "online",
-		message: "",
-		extra: &extraT{
-			effectiveConfig: updatedConfig,
-		},
-	})
+
+	bc := NewBulk(bulker)
+	err = bc.CheckIn(agentID,
+		WithStatus("online"),
+		WithEffectiveConfig(updatedConfig),
+		WithSeqNo(sqn.SeqNo{1}), // triggers refresh on flush
+	)
 	require.NoError(t, err)
 
-	err = bulker.Update(ctx, index, agentID, body, bulk.WithRefresh())
+	err = bc.flush(ctx)
 	require.NoError(t, err)
 
 	// Step 3: Read the document back and verify the removed pipeline is gone.

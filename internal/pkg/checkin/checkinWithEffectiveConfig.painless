@@ -1,0 +1,42 @@
+ctx._source.last_checkin = params.TS;
+ctx._source.updated_at = params.Now;
+ctx._source.last_checkin_status = params.Status;
+ctx._source.last_checkin_message = params.Message;
+ctx._source.unhealthy_reason = params.UnhealthyReason;
+ctx._source.sequence_num = params.SequenceNum;
+if (params.PolicyID != "") {
+  ctx._source.agent_policy_id = params.PolicyID;
+  ctx._source.policy_revision_idx = params.RevisionIDX;
+}
+if (params.Ver != "") {
+  ctx._source.agent.version = params.Ver;
+}
+if (params.Meta != null) {
+  ctx._source.local_metadata = params.Meta;
+}
+if (params.Components != null) {
+  ctx._source.components = params.Components;
+}
+if (params.Health != null) {
+  ctx._source.health = params.Health;
+}
+if (params.Capabilities != null) {
+  ctx._source.capabilities = params.Capabilities;
+}
+if (params.EffectiveConfig != null) {
+  ctx._source.effective_config = params.EffectiveConfig;
+}
+if (params.SeqNoSet) {
+  ctx._source.action_seq_no = params.SeqNo;
+}
+if (params.AvailableRollbacks != null) {
+  if (ctx._source.upgrade == null) {
+    ctx._source.upgrade = new HashMap();
+  }
+  ctx._source.upgrade.rollbacks = params.AvailableRollbacks;
+}
+if (params.DeleteAudit) {
+  ctx._source.remove('audit_unenrolled_reason');
+  ctx._source.remove('audit_unenrolled_time');
+  ctx._source.remove('unenrolled_at');
+}
