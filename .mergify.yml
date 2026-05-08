@@ -1,6 +1,7 @@
 queue_rules:
   - name: default
-    conditions:
+    merge_method: squash
+    merge_conditions:
       - check-success=fleet-server/pr-merge
 
 pull_request_rules:
