@@ -24,6 +24,8 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
 
+	"github.com/elastic/elastic-agent-libs/redact"
+
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
@@ -432,7 +434,7 @@ func ParseEffectiveConfig(effectiveConfig *protobufs.EffectiveConfig) ([]byte, e
 			if err := yaml.Unmarshal(bodyBytes, &obj); err != nil {
 				return nil, fmt.Errorf("unmarshal effective config failure: %w", err)
 			}
-			redactSensitive(obj)
+			redact.Redact(obj, redact.WithIgnoreKeys("routekey"))
 			effectiveConfigBytes, err := json.Marshal(obj)
 			if err != nil {
 				return nil, fmt.Errorf("failed to marshal effective config: %w", err)
@@ -443,6 +445,7 @@ func ParseEffectiveConfig(effectiveConfig *protobufs.EffectiveConfig) ([]byte, e
 	return nil, nil
 }
 
+<<<<<<< HEAD
 func redactSensitive(v interface{}) {
 	const redacted = "[REDACTED]"
 	switch typed := v.(type) {
@@ -488,6 +491,8 @@ func redactKey(k string) bool {
 		strings.Contains(k, "secret")
 }
 
+=======
+>>>>>>> 4d84c65 (OpAMP redact slice maps (#6955))
 // anyValueToInterface recursively converts protobufs.AnyValue to Go interface{} for JSON marshalling
 func anyValueToInterface(zlog zerolog.Logger, av *protobufs.AnyValue) interface{} {
 	switch v := av.GetValue().(type) {

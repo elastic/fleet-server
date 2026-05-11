@@ -20,6 +20,8 @@ import (
 	"github.com/stretchr/testify/require"
 	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
 
+	"github.com/elastic/elastic-agent-libs/redact"
+
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/checkin"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
@@ -138,6 +140,103 @@ func TestProtobufKVToRawMessage(t *testing.T) {
 	require.Equal(t, map[string]interface{}{"nested_string_key": "nested", "nested_int_key": float64(99)}, got["kvlist_key"])
 }
 
+func TestParseEffectiveConfigRedaction(t *testing.T) {
+	cases := []struct {
+		name string
+		body string
+		want map[string]any
+	}{
+		{
+			name: "sensitive top-level keys are redacted",
+			body: `password: hunter2
+api_key: abcd-1234
+routekey: should-not-be-redacted
+plain: keepme
+`,
+			want: map[string]any{
+				"password": redact.REDACTED,
+				"api_key":  redact.REDACTED,
+				"routekey": "should-not-be-redacted",
+				"plain":    "keepme",
+			},
+		},
+		{
+			name: "sensitive keys nested inside maps and slices are redacted",
+			body: `outputs:
+  default:
+    type: elasticsearch
+    password: hunter2
+    hosts:
+      - https://es.example.com
+inputs:
+  - type: filestream
+    secret: shhh
+`,
+			want: map[string]any{
+				"outputs": map[string]any{
+					"default": map[string]any{
+						"type":     "elasticsearch",
+						"password": redact.REDACTED,
+						"hosts":    []any{"https://es.example.com"},
+					},
+				},
+				"inputs": []any{
+					map[string]any{
+						"type":   "filestream",
+						"secret": redact.REDACTED,
+					},
+				},
+			},
+		},
+		{
+			name: "name/value header pairs with sensitive name are redacted",
+			body: `headers:
+  - name: Authorization
+    value: Bearer SecretValue
+  - name: X-Api-Key
+    value: top-secret
+  - name: User-Agent
+    value: fleet-server/9.x
+`,
+			want: map[string]any{
+				"headers": []any{
+					map[string]any{
+						"name":  "Authorization",
+						"value": redact.REDACTED,
+					},
+					map[string]any{
+						"name":  "X-Api-Key",
+						"value": redact.REDACTED,
+					},
+					map[string]any{
+						"name":  "User-Agent",
+						"value": "fleet-server/9.x",
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ec := &protobufs.EffectiveConfig{
+				ConfigMap: &protobufs.AgentConfigMap{
+					ConfigMap: map[string]*protobufs.AgentConfigFile{
+						"": {Body: []byte(tc.body)},
+					},
+				},
+			}
+
+			out, err := ParseEffectiveConfig(ec)
+			require.NoError(t, err)
+
+			var got map[string]any
+			require.NoError(t, json.Unmarshal(out, &got))
+			require.Equal(t, tc.want, got)
+		})
+	}
+}
+
 func TestEnrollAgentWithAgentToServerMessage(t *testing.T) {
 	bulker := ftesting.NewMockBulk()
 
@@ -226,6 +325,7 @@ func TestUpdateAgentWithAgentToServerMessage(t *testing.T) {
 
 	agent := &model.Agent{ESDocument: model.ESDocument{Id: "agent-123"}}
 
+<<<<<<< HEAD
 	msg := &protobufs.AgentToServer{
 		SequenceNum: 7,
 		Capabilities: uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsHealth) |
@@ -241,6 +341,24 @@ func TestUpdateAgentWithAgentToServerMessage(t *testing.T) {
 					"": {
 						Body:        []byte("password: 12345\nnum: 2\n"),
 						ContentType: "text/yaml",
+=======
+		msg := &protobufs.AgentToServer{
+			SequenceNum: 7,
+			Capabilities: uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsHealth) |
+				uint64(protobufs.AgentCapabilities_AgentCapabilities_AcceptsRemoteConfig),
+			Health: &protobufs.ComponentHealth{
+				Healthy:   true,
+				Status:    "StatusRecoverableError",
+				LastError: "boom",
+			},
+			EffectiveConfig: &protobufs.EffectiveConfig{
+				ConfigMap: &protobufs.AgentConfigMap{
+					ConfigMap: map[string]*protobufs.AgentConfigFile{
+						"": {
+							Body:        []byte("password: hunter2\nnum: 2\n"),
+							ContentType: "text/yaml",
+						},
+>>>>>>> 4d84c65 (OpAMP redact slice maps (#6955))
 					},
 				},
 			},
@@ -271,11 +389,60 @@ func TestUpdateAgentWithAgentToServerMessage(t *testing.T) {
 	require.Equal(t, "boom", health.LastError)
 	require.Equal(t, "StatusRecoverableError", health.Status)
 
+<<<<<<< HEAD
 	configBytes := getUnexportedField(extraVal, "effectiveConfig").Bytes()
 	var config map[string]interface{}
 	require.NoError(t, json.Unmarshal(configBytes, &config))
 	require.Equal(t, "[REDACTED]", config["password"])
 	require.Equal(t, float64(2), config["num"])
+=======
+		configBytes := getUnexportedField(extraVal, "effectiveConfig").Bytes()
+		var config map[string]any
+		require.NoError(t, json.Unmarshal(configBytes, &config))
+		require.Equal(t, redact.REDACTED, config["password"])
+		require.Equal(t, float64(2), config["num"])
+	})
+
+	t.Run("checkin clears audit_unenroll attributes", func(t *testing.T) {
+		checker := &mockCheckin{}
+		oa := &OpAMPT{bc: checker}
+
+		agent := &model.Agent{
+			ESDocument:            model.ESDocument{Id: "agent-123"},
+			AuditUnenrolledReason: reenrolled,
+			AuditUnenrolledTime:   time.Now().UTC().Format(time.RFC3339),
+		}
+
+		msg := &protobufs.AgentToServer{
+			SequenceNum:  3,
+			Capabilities: uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsHealth),
+			Health: &protobufs.ComponentHealth{
+				Healthy: true,
+			},
+		}
+
+		zlog := zerolog.New(io.Discard)
+		require.NoError(t, oa.updateAgent(zlog, agent, msg))
+		require.Equal(t, "agent-123", checker.id)
+
+		pending := pendingFromOptions(t, checker.opts)
+		require.Equal(t, string(CheckinRequestStatusOnline), getUnexportedField(pending, "status").String())
+
+		extra := getUnexportedField(pending, "extra")
+		require.False(t, extra.IsNil())
+		extraVal := extra.Elem()
+
+		capabilitiesVal := getUnexportedField(extraVal, "capabilities")
+		capabilities, ok := capabilitiesVal.Interface().([]string)
+		require.True(t, ok)
+		require.ElementsMatch(t, []string{"ReportsHealth"}, capabilities)
+
+		deleteAuditVal := getUnexportedField(extraVal, "deleteAudit")
+		deleteAudit, ok := deleteAuditVal.Interface().(bool)
+		require.True(t, ok)
+		require.True(t, deleteAudit)
+	})
+>>>>>>> 4d84c65 (OpAMP redact slice maps (#6955))
 }
 
 func TestHandleMessageAgentDisconnect(t *testing.T) {
