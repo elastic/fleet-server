@@ -82,7 +82,7 @@ steps:
       - label: "Package aarch64"
         key: "package-arm64-pr"
         env:
-          PLATFORMS: "linux/arm64,darwin/arm64"
+          PLATFORMS: "linux/arm64,darwin/arm64,windows/arm64"
         command: ".buildkite/scripts/release_test.sh"
         artifact_paths:
           - build/distributions/**
