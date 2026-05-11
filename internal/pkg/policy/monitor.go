@@ -7,6 +7,7 @@ package policy
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -65,6 +66,10 @@ type Monitor interface {
 
 	// LatestRev returns the latest revision idx for the specified policy.
 	LatestRev(ctx context.Context, policyID string) int64
+
+	// GetPolicy returns the cached policy for the given policy ID.
+	// If the policy is not in the cache, it forces a reload from Elasticsearch.
+	GetPolicy(ctx context.Context, policyID string) (*model.Policy, error)
 }
 
 type policyFetcher func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error)
@@ -590,4 +595,33 @@ func (m *monitorT) LatestRev(ctx context.Context, id string) int64 {
 		}
 	}
 	return p.pp.Policy.RevisionIdx
+}
+
+// GetPolicy returns the policy for the given policy ID from the in-memory cache.
+// If the policy is not found in cache, all policies are reloaded from Elasticsearch.
+func (m *monitorT) GetPolicy(ctx context.Context, policyID string) (*model.Policy, error) {
+	if policyID == "" {
+		return nil, errors.New("policy ID is empty")
+	}
+
+	m.mut.Lock()
+	p, ok := m.policies[policyID]
+	m.mut.Unlock()
+
+	if ok {
+		return &p.pp.Policy, nil
+	}
+
+	if err := m.loadPolicies(ctx); err != nil {
+		return nil, fmt.Errorf("loading policies: %w", err)
+	}
+
+	m.mut.Lock()
+	p, ok = m.policies[policyID]
+	m.mut.Unlock()
+
+	if !ok {
+		return nil, fmt.Errorf("policy %s not found", policyID)
+	}
+	return &p.pp.Policy, nil
 }

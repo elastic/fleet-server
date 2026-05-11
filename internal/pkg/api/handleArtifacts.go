@@ -25,6 +25,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
+	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
 	"github.com/elastic/fleet-server/v7/internal/pkg/throttle"
 
 	"github.com/rs/zerolog"
@@ -36,23 +37,27 @@ const (
 )
 
 var (
-	ErrorThrottle     = errors.New("cannot acquire throttle token")
-	ErrorBadSha2      = errors.New("malformed sha256")
-	ErrorRecord       = errors.New("artifact record mismatch")
-	ErrorMismatchSha2 = errors.New("mismatched sha256")
+	ErrorThrottle           = errors.New("cannot acquire throttle token")
+	ErrorBadSha2            = errors.New("malformed sha256")
+	ErrorRecord             = errors.New("artifact record mismatch")
+	ErrorMismatchSha2       = errors.New("mismatched sha256")
+	ErrUnauthorizedArtifact = errors.New("agent not authorized for artifact")
+	ErrAgentPolicyIDMissing = errors.New("agent has no policy ID")
 )
 
 type ArtifactT struct {
 	bulker     bulk.Bulk
 	cache      cache.Cache
 	esThrottle *throttle.Throttle
+	pm         policy.Monitor
 }
 
-func NewArtifactT(cfg *config.Server, bulker bulk.Bulk, cache cache.Cache) *ArtifactT {
+func NewArtifactT(cfg *config.Server, bulker bulk.Bulk, cache cache.Cache, pm policy.Monitor) *ArtifactT {
 	return &ArtifactT{
 		bulker:     bulker,
 		cache:      cache,
 		esThrottle: throttle.NewThrottle(defaultMaxParallel),
+		pm:         pm,
 	}
 }
 
@@ -138,19 +143,57 @@ func (at ArtifactT) processRequest(ctx context.Context, zlog zerolog.Logger, age
 	return rdr, nil
 }
 
-// TODO: Pull the policy record for this agent and validate that the
-// requested artifact is assigned to this policy.  This will prevent
-// agents from retrieving artifacts that they do not have access to.
-// Note that this is racy, the policy could have changed to allow an
-// artifact before this instantiation of FleetServer has its local
-// copy updated.  Take the race conditions into consideration.
-//
-// Initial implementation is dependent on security by obscurity; ie.
-// it should be difficult for an attacker to guess a guid.
-func (at ArtifactT) authorizeArtifact(ctx context.Context, _ *model.Agent, _, _ string) error {
-	span, _ := apm.StartSpan(ctx, "authorizeArtifacts", "auth") // TODO return and use span ctx if this is ever not a nop
+func (at ArtifactT) authorizeArtifact(ctx context.Context, agent *model.Agent, id, sha2 string) error {
+	span, ctx := apm.StartSpan(ctx, "authorizeArtifacts", "auth")
 	defer span.End()
-	return nil // TODO
+
+	if agent.AgentPolicyID == "" {
+		return ErrAgentPolicyIDMissing
+	}
+
+	p, err := at.pm.GetPolicy(ctx, agent.AgentPolicyID)
+	if err != nil {
+		return fmt.Errorf("authorizeArtifact: %w", err)
+	}
+
+	if p.Data != nil && policyHasArtifact(p.Data, id, sha2) {
+		return nil
+	}
+
+	return ErrUnauthorizedArtifact
+}
+
+func policyHasArtifact(pd *model.PolicyData, id, sha2 string) bool {
+	for _, input := range pd.Inputs {
+		am, ok := input["artifact_manifest"]
+		if !ok {
+			continue
+		}
+		amMap, ok := am.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		artifacts, ok := amMap["artifacts"]
+		if !ok {
+			continue
+		}
+		artifactsMap, ok := artifacts.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		artEntry, ok := artifactsMap[id]
+		if !ok {
+			continue
+		}
+		artMap, ok := artEntry.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if ds, ok := artMap["decoded_sha256"].(string); ok && ds == sha2 {
+			return true
+		}
+	}
+	return false
 }
 
 // Return artifact from cache by sha2 or fetch directly from Elastic.

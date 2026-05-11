@@ -533,7 +533,7 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 		return err
 	}
 
-	at := api.NewArtifactT(&cfg.Inputs[0].Server, bulker, f.cache)
+	at := api.NewArtifactT(&cfg.Inputs[0].Server, bulker, f.cache, pm)
 	ack := api.NewAckT(&cfg.Inputs[0].Server, bulker, f.cache)
 	st := api.NewStatusT(&cfg.Inputs[0].Server, bulker, f.cache, api.WithSelfMonitor(sm), api.WithBuildInfo(f.bi))
 	oa := api.NewOpAMPT(ctx, &cfg.Inputs[0].Server, bulker, f.cache, bc)
