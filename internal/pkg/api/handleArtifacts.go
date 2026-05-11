@@ -143,6 +143,19 @@ func (at ArtifactT) processRequest(ctx context.Context, zlog zerolog.Logger, age
 	return rdr, nil
 }
 
+// authorizeArtifact checks that the requested artifact is listed in the agent's
+// assigned policy. The policy is read from the in-memory cache maintained by the
+// policy monitor, which introduces a staleness window between ES updates and
+// cache refresh. This creates two race conditions:
+//
+//   - False negative (deny when should allow): an artifact was just added to a
+//     policy but the cache hasn't refreshed yet. This is self-healing — the agent
+//     will retry and succeed once the cache catches up.
+//
+//   - False positive (allow when should deny): an artifact was just removed from
+//     a policy but the stale cache still lists it. The agent can download the
+//     artifact until the cache refreshes. This is the security-sensitive direction.
+//     A future improvement could verify against ES when the cache says "allow".
 func (at ArtifactT) authorizeArtifact(ctx context.Context, agent *model.Agent, id, sha2 string) error {
 	span, ctx := apm.StartSpan(ctx, "authorizeArtifacts", "auth")
 	defer span.End()
