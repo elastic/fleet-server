@@ -469,18 +469,20 @@ func encodeParams(now string, data pendingT) (map[string]json.RawMessage, error)
 		reason  json.RawMessage
 
 		// optional attributes below
-		policyID           json.RawMessage
-		revisionIDX        json.RawMessage
-		sequenceNum        json.RawMessage
-		ver                json.RawMessage
-		meta               json.RawMessage
-		components         json.RawMessage
-		health             json.RawMessage
-		capabilities       json.RawMessage
-		effectiveConfig    json.RawMessage
-		isSet              json.RawMessage
-		seqNo              json.RawMessage
-		availableRollbacks json.RawMessage
+		policyID              json.RawMessage
+		revisionIDX           json.RawMessage
+		ver                   json.RawMessage
+		meta                  json.RawMessage
+		components            json.RawMessage
+		isSet                 json.RawMessage
+		seqNo                 json.RawMessage
+		availableRollbacks    json.RawMessage
+
+		// OpAMP-specific attributes
+		opampSequenceNum      json.RawMessage
+		opampHealth           json.RawMessage
+		opampCapabilities     json.RawMessage
+		opampEffectiveConfig  json.RawMessage
 
 		err error
 	)
@@ -498,7 +500,7 @@ func encodeParams(now string, data pendingT) (map[string]json.RawMessage, error)
 	Err = errors.Join(Err, err)
 	revisionIDX, err = json.Marshal(data.revisionIDX)
 	Err = errors.Join(Err, err)
-	sequenceNum, err = json.Marshal(data.sequenceNum)
+	opampSequenceNum, err = json.Marshal(data.sequenceNum)
 	Err = errors.Join(Err, err)
 	ver, err = json.Marshal(data.extra.ver)
 	Err = errors.Join(Err, err)
@@ -513,14 +515,14 @@ func encodeParams(now string, data pendingT) (map[string]json.RawMessage, error)
 		components = data.extra.components
 	}
 	if data.extra.health != nil {
-		health = data.extra.health
+		opampHealth = data.extra.health
 	}
 	if data.extra.capabilities != nil {
-		capabilities, err = json.Marshal(data.extra.capabilities)
+		opampCapabilities, err = json.Marshal(data.extra.capabilities)
 		Err = errors.Join(Err, err)
 	}
 	if data.extra.effectiveConfig != nil {
-		effectiveConfig = data.extra.effectiveConfig
+		opampEffectiveConfig = data.extra.effectiveConfig
 	}
 	if data.extra.availableRollbacks != nil {
 		availableRollbacks = data.extra.availableRollbacks
@@ -536,15 +538,15 @@ func encodeParams(now string, data pendingT) (map[string]json.RawMessage, error)
 		"UnhealthyReason":    reason,
 		"PolicyID":           policyID,
 		"RevisionIDX":        revisionIDX,
-		"SequenceNum":        sequenceNum,
-		"Ver":                ver,
-		"Meta":               meta,
-		"Components":         components,
-		"Health":             health,
-		"Capabilities":       capabilities,
-		"EffectiveConfig":    effectiveConfig,
-		"SeqNoSet":           isSet,
-		"SeqNo":              seqNo,
-		"AvailableRollbacks": availableRollbacks,
+		"Ver":                    ver,
+		"Meta":                   meta,
+		"Components":             components,
+		"SeqNoSet":               isSet,
+		"SeqNo":                  seqNo,
+		"AvailableRollbacks":     availableRollbacks,
+		"OpAMPSequenceNum":       opampSequenceNum,
+		"OpAMPHealth":            opampHealth,
+		"OpAMPCapabilities":      opampCapabilities,
+		"OpAMPEffectiveConfig":   opampEffectiveConfig,
 	}, nil
 }
