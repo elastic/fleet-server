@@ -310,24 +310,6 @@ type Artifact struct {
 	PackageName string `json:"package_name,omitempty"`
 }
 
-// ArtifactManifest represents the artifact_manifest field within a policy input.
-type ArtifactManifest struct {
-	ManifestVersion string                   `json:"manifest_version"`
-	SchemaVersion   string                   `json:"schema_version"`
-	Artifacts       map[string]ManifestEntry `json:"artifacts"`
-}
-
-// ManifestEntry represents a single artifact entry within an artifact manifest.
-type ManifestEntry struct {
-	DecodedSha256 string `json:"decoded_sha256"`
-	DecodedSize   int64  `json:"decoded_size"`
-	EncodedSha256 string `json:"encoded_sha256"`
-	EncodedSize   int64  `json:"encoded_size"`
-	RelativeURL   string `json:"relative_url"`
-	Compression   string `json:"compression_algorithm"`
-	Encryption    string `json:"encryption_algorithm"`
-}
-
 // AvailableRollback
 type AvailableRollback struct {
 	ValidUntil string `json:"valid_until,omitempty"`
