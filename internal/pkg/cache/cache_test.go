@@ -8,6 +8,7 @@ package cache
 
 import (
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
@@ -17,46 +18,46 @@ import (
 )
 
 func TestValidAPIKeyDisabledKey(t *testing.T) {
-	cfg := config.Cache{
-		NumCounters: 100,
-		MaxCost:     100000,
-		APIKeyTTL:   5 * time.Minute,
-	}
-	c, err := New(cfg)
-	require.NoError(t, err)
+	synctest.Test(t, func(t *testing.T) {
+		cfg := config.Cache{
+			NumCounters: 100,
+			MaxCost:     100000,
+			APIKeyTTL:   5 * time.Minute,
+		}
+		c, err := New(cfg)
+		require.NoError(t, err)
+		defer c.cache.Close() // stop ristretto background goroutines before bubble exits
 
-	key := APIKey{ID: "test-id", Key: "test-key"}
+		key := APIKey{ID: "test-id", Key: "test-key"}
 
-	// Cache the key as disabled
-	c.SetAPIKey(key, false)
-	// ristretto is async; wait for value to be available
-	time.Sleep(10 * time.Millisecond)
+		c.SetAPIKey(key, false)
+		synctest.Wait()
 
-	// A disabled key must not be considered valid
-	assert.False(t, c.ValidAPIKey(key), "disabled API key should not be valid")
+		assert.False(t, c.ValidAPIKey(key), "disabled API key should not be valid")
+	})
 }
 
 func TestValidAPIKeyEnabledKey(t *testing.T) {
-	cfg := config.Cache{
-		NumCounters: 100,
-		MaxCost:     100000,
-		APIKeyTTL:   5 * time.Minute,
-	}
-	c, err := New(cfg)
-	require.NoError(t, err)
+	synctest.Test(t, func(t *testing.T) {
+		cfg := config.Cache{
+			NumCounters: 100,
+			MaxCost:     100000,
+			APIKeyTTL:   5 * time.Minute,
+		}
+		c, err := New(cfg)
+		require.NoError(t, err)
+		defer c.cache.Close()
 
-	key := APIKey{ID: "test-id", Key: "test-key"}
+		key := APIKey{ID: "test-id", Key: "test-key"}
 
-	// Cache the key as enabled
-	c.SetAPIKey(key, true)
-	time.Sleep(10 * time.Millisecond)
+		c.SetAPIKey(key, true)
+		synctest.Wait()
 
-	// Matching key should be valid
-	assert.True(t, c.ValidAPIKey(key), "enabled API key with matching key should be valid")
+		assert.True(t, c.ValidAPIKey(key), "enabled API key with matching key should be valid")
 
-	// Wrong key value should not be valid
-	wrongKey := APIKey{ID: "test-id", Key: "wrong-key"}
-	assert.False(t, c.ValidAPIKey(wrongKey), "API key with mismatched key value should not be valid")
+		wrongKey := APIKey{ID: "test-id", Key: "wrong-key"}
+		assert.False(t, c.ValidAPIKey(wrongKey), "API key with mismatched key value should not be valid")
+	})
 }
 
 func TestValidAPIKeyMiss(t *testing.T) {
@@ -70,6 +71,5 @@ func TestValidAPIKeyMiss(t *testing.T) {
 
 	key := APIKey{ID: "nonexistent", Key: "test-key"}
 
-	// Key not in cache should not be valid
 	assert.False(t, c.ValidAPIKey(key), "API key not in cache should not be valid")
 }
