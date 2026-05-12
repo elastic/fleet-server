@@ -202,6 +202,7 @@ func (c *CacheT) ValidAPIKey(key APIKey) bool {
 		switch v {
 		case "":
 			c.log.Trace().Str("id", key.ID).Msg("ApiKey cache HIT on disabled KEY")
+			ok = false
 		case key.Key:
 			c.log.Trace().Str("id", key.ID).Msg("ApiKey cache HIT")
 		default:
