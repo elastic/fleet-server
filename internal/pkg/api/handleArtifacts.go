@@ -178,35 +178,31 @@ func (at ArtifactT) authorizeArtifact(ctx context.Context, agent *model.Agent, i
 
 func policyHasArtifact(pd *model.PolicyData, id, sha2 string) bool {
 	for _, input := range pd.Inputs {
-		am, ok := input["artifact_manifest"]
-		if !ok {
+		manifest, err := parseArtifactManifest(input)
+		if err != nil || manifest == nil {
 			continue
 		}
-		amMap, ok := am.(map[string]any)
-		if !ok {
-			continue
-		}
-		artifacts, ok := amMap["artifacts"]
-		if !ok {
-			continue
-		}
-		artifactsMap, ok := artifacts.(map[string]any)
-		if !ok {
-			continue
-		}
-		artEntry, ok := artifactsMap[id]
-		if !ok {
-			continue
-		}
-		artMap, ok := artEntry.(map[string]any)
-		if !ok {
-			continue
-		}
-		if ds, ok := artMap["decoded_sha256"].(string); ok && ds == sha2 {
+		if entry, ok := manifest.Artifacts[id]; ok && entry.DecodedSha256 == sha2 {
 			return true
 		}
 	}
 	return false
+}
+
+func parseArtifactManifest(input map[string]any) (*model.ArtifactManifest, error) {
+	raw, ok := input["artifact_manifest"]
+	if !ok {
+		return nil, nil
+	}
+	data, err := json.Marshal(raw)
+	if err != nil {
+		return nil, err
+	}
+	var manifest model.ArtifactManifest
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		return nil, err
+	}
+	return &manifest, nil
 }
 
 // Return artifact from cache by sha2 or fetch directly from Elastic.

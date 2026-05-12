@@ -13,7 +13,7 @@ import (
 
 func TestPolicyHasArtifact(t *testing.T) {
 	policyData := &model.PolicyData{
-		Inputs: []map[string]interface{}{
+		Inputs: []map[string]any{
 			{
 				"type": "logfile",
 				"id":   "logfile-1",
@@ -21,15 +21,15 @@ func TestPolicyHasArtifact(t *testing.T) {
 			{
 				"type": "endpoint",
 				"id":   "endpoint-1",
-				"artifact_manifest": map[string]interface{}{
+				"artifact_manifest": map[string]any{
 					"manifest_version": "1.0.28",
 					"schema_version":   "v1",
-					"artifacts": map[string]interface{}{
-						"endpoint-trustlist-windows-v1": map[string]interface{}{
+					"artifacts": map[string]any{
+						"endpoint-trustlist-windows-v1": map[string]any{
 							"decoded_sha256": "74c2255ce31e0b48ada298ed6dacf6d1be7b0fb40c1bcb251d2da66f4b060acf",
 							"decoded_size":   float64(338),
 						},
-						"endpoint-trustlist-linux-v1": map[string]interface{}{
+						"endpoint-trustlist-linux-v1": map[string]any{
 							"decoded_sha256": "d801aa1fb7ddcc330a5e3173372ea6af4a3d08ec58074478e85aa5603e926658",
 							"decoded_size":   float64(14),
 						},
@@ -92,7 +92,7 @@ func TestPolicyHasArtifact_NoInputs(t *testing.T) {
 
 func TestPolicyHasArtifact_NoArtifactManifest(t *testing.T) {
 	pd := &model.PolicyData{
-		Inputs: []map[string]interface{}{
+		Inputs: []map[string]any{
 			{"type": "logfile"},
 		},
 	}
@@ -101,13 +101,13 @@ func TestPolicyHasArtifact_NoArtifactManifest(t *testing.T) {
 
 func TestPolicyHasArtifact_MultipleInputsWithArtifacts(t *testing.T) {
 	pd := &model.PolicyData{
-		Inputs: []map[string]interface{}{
+		Inputs: []map[string]any{
 			{"type": "logfile"},
 			{
 				"type": "endpoint",
-				"artifact_manifest": map[string]interface{}{
-					"artifacts": map[string]interface{}{
-						"endpoint-trustlist-linux-v1": map[string]interface{}{
+				"artifact_manifest": map[string]any{
+					"artifacts": map[string]any{
+						"endpoint-trustlist-linux-v1": map[string]any{
 							"decoded_sha256": "aaaa",
 						},
 					},
@@ -115,9 +115,9 @@ func TestPolicyHasArtifact_MultipleInputsWithArtifacts(t *testing.T) {
 			},
 			{
 				"type": "another-endpoint",
-				"artifact_manifest": map[string]interface{}{
-					"artifacts": map[string]interface{}{
-						"endpoint-blocklist-linux-v1": map[string]interface{}{
+				"artifact_manifest": map[string]any{
+					"artifacts": map[string]any{
+						"endpoint-blocklist-linux-v1": map[string]any{
 							"decoded_sha256": "bbbb",
 						},
 					},
