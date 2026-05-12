@@ -23,9 +23,7 @@ if (params.Health != null) {
 if (params.Capabilities != null) {
   ctx._source.capabilities = params.Capabilities;
 }
-if (params.EffectiveConfig != null) {
-  ctx._source.effective_config = params.EffectiveConfig;
-}
+ctx._source.effective_config = params.EffectiveConfig;
 if (params.SeqNoSet) {
   ctx._source.action_seq_no = params.SeqNo;
 }
