@@ -141,6 +141,11 @@ func (ut *UploadT) handleUploadChunk(zlog zerolog.Logger, w http.ResponseWriter,
 		return err
 	}
 
+	// Validate that the requesting agent owns this upload session
+	if _, err := ut.authAgent(r, &upinfo.AgentID, ut.bulker, ut.cache); err != nil {
+		return fmt.Errorf("error authenticating for chunk upload: %w", err)
+	}
+
 	// prevent over-sized chunks
 	data := http.MaxBytesReader(w, r.Body, file.MaxChunkSize)
 
