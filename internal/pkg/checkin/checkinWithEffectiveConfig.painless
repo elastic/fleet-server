@@ -35,8 +35,3 @@ if (params.AvailableRollbacks != null) {
   }
   ctx._source.upgrade.rollbacks = params.AvailableRollbacks;
 }
-if (params.DeleteAudit) {
-  ctx._source.remove('audit_unenrolled_reason');
-  ctx._source.remove('audit_unenrolled_time');
-  ctx._source.remove('unenrolled_at');
-}

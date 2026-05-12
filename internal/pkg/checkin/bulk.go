@@ -481,7 +481,6 @@ func encodeParams(now string, data pendingT) (map[string]json.RawMessage, error)
 		isSet              json.RawMessage
 		seqNo              json.RawMessage
 		availableRollbacks json.RawMessage
-		deleteAudit        json.RawMessage
 
 		err error
 	)
@@ -506,8 +505,6 @@ func encodeParams(now string, data pendingT) (map[string]json.RawMessage, error)
 	isSet, err = json.Marshal(data.extra.seqNo.IsSet())
 	Err = errors.Join(Err, err)
 	seqNo, err = json.Marshal(data.extra.seqNo)
-	Err = errors.Join(Err, err)
-	deleteAudit, err = json.Marshal(data.extra.deleteAudit)
 	Err = errors.Join(Err, err)
 	if data.extra.meta != nil {
 		meta = data.extra.meta
@@ -549,6 +546,5 @@ func encodeParams(now string, data pendingT) (map[string]json.RawMessage, error)
 		"SeqNoSet":           isSet,
 		"SeqNo":              seqNo,
 		"AvailableRollbacks": availableRollbacks,
-		"DeleteAudit":        deleteAudit,
 	}, nil
 }
