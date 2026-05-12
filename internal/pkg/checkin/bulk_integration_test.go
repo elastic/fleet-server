@@ -33,7 +33,7 @@ func TestEffectiveConfigReplacesRemovedFields(t *testing.T) {
 	ctx := testlog.SetLogger(t).WithContext(t.Context())
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, dl.FleetAgents)
-	agentID := uuid.Must(uuid.NewV4()).String()
+	agentID := uuid.Must(uuid.NewV7()).String()
 
 	// Step 1: Create a document with effective_config containing 2 pipelines.
 	now := time.Now().UTC().Format(time.RFC3339)
