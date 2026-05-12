@@ -27,9 +27,3 @@ ctx._source.effective_config = params.OpAMPEffectiveConfig;
 if (params.SeqNoSet) {
   ctx._source.action_seq_no = params.SeqNo;
 }
-if (params.AvailableRollbacks != null) {
-  if (ctx._source.upgrade == null) {
-    ctx._source.upgrade = new HashMap();
-  }
-  ctx._source.upgrade.rollbacks = params.AvailableRollbacks;
-}

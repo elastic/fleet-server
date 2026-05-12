@@ -469,20 +469,19 @@ func encodeParams(now string, data pendingT) (map[string]json.RawMessage, error)
 		reason  json.RawMessage
 
 		// optional attributes below
-		policyID              json.RawMessage
-		revisionIDX           json.RawMessage
-		ver                   json.RawMessage
-		meta                  json.RawMessage
-		components            json.RawMessage
-		isSet                 json.RawMessage
-		seqNo                 json.RawMessage
-		availableRollbacks    json.RawMessage
+		policyID    json.RawMessage
+		revisionIDX json.RawMessage
+		ver         json.RawMessage
+		meta        json.RawMessage
+		components  json.RawMessage
+		isSet       json.RawMessage
+		seqNo       json.RawMessage
 
 		// OpAMP-specific attributes
-		opampSequenceNum      json.RawMessage
-		opampHealth           json.RawMessage
-		opampCapabilities     json.RawMessage
-		opampEffectiveConfig  json.RawMessage
+		opampSequenceNum     json.RawMessage
+		opampHealth          json.RawMessage
+		opampCapabilities    json.RawMessage
+		opampEffectiveConfig json.RawMessage
 
 		err error
 	)
@@ -524,29 +523,25 @@ func encodeParams(now string, data pendingT) (map[string]json.RawMessage, error)
 	if data.extra.effectiveConfig != nil {
 		opampEffectiveConfig = data.extra.effectiveConfig
 	}
-	if data.extra.availableRollbacks != nil {
-		availableRollbacks = data.extra.availableRollbacks
-	}
 	if Err != nil {
 		return nil, Err
 	}
 	return map[string]json.RawMessage{
-		"Now":                tsNow,
-		"TS":                 ts,
-		"Status":             status,
-		"Message":            message,
-		"UnhealthyReason":    reason,
-		"PolicyID":           policyID,
-		"RevisionIDX":        revisionIDX,
-		"Ver":                    ver,
-		"Meta":                   meta,
-		"Components":             components,
-		"SeqNoSet":               isSet,
-		"SeqNo":                  seqNo,
-		"AvailableRollbacks":     availableRollbacks,
-		"OpAMPSequenceNum":       opampSequenceNum,
-		"OpAMPHealth":            opampHealth,
-		"OpAMPCapabilities":      opampCapabilities,
-		"OpAMPEffectiveConfig":   opampEffectiveConfig,
+		"Now":                  tsNow,
+		"TS":                   ts,
+		"Status":               status,
+		"Message":              message,
+		"UnhealthyReason":      reason,
+		"PolicyID":             policyID,
+		"RevisionIDX":          revisionIDX,
+		"Ver":                  ver,
+		"Meta":                 meta,
+		"Components":           components,
+		"SeqNoSet":             isSet,
+		"SeqNo":                seqNo,
+		"OpAMPSequenceNum":     opampSequenceNum,
+		"OpAMPHealth":          opampHealth,
+		"OpAMPCapabilities":    opampCapabilities,
+		"OpAMPEffectiveConfig": opampEffectiveConfig,
 	}, nil
 }
