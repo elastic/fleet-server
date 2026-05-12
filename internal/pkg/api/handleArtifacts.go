@@ -182,7 +182,7 @@ func policyHasArtifact(pd *model.PolicyData, id, sha2 string) bool {
 		if !ok {
 			continue
 		}
-		amMap, ok := am.(map[string]interface{})
+		amMap, ok := am.(map[string]any)
 		if !ok {
 			continue
 		}
@@ -190,7 +190,7 @@ func policyHasArtifact(pd *model.PolicyData, id, sha2 string) bool {
 		if !ok {
 			continue
 		}
-		artifactsMap, ok := artifacts.(map[string]interface{})
+		artifactsMap, ok := artifacts.(map[string]any)
 		if !ok {
 			continue
 		}
@@ -198,7 +198,7 @@ func policyHasArtifact(pd *model.PolicyData, id, sha2 string) bool {
 		if !ok {
 			continue
 		}
-		artMap, ok := artEntry.(map[string]interface{})
+		artMap, ok := artEntry.(map[string]any)
 		if !ok {
 			continue
 		}
