@@ -188,11 +188,6 @@ func (a *apiServer) UploadChunk(w http.ResponseWriter, r *http.Request, id strin
 	zlog := hlog.FromRequest(r).With().Str(LogAgentID, id).Logger()
 	w.Header().Set("Content-Type", "application/json")
 
-	if _, err := a.ut.authAPIKey(r, a.ut.bulker, a.ut.cache); err != nil {
-		cntUploadChunk.IncError(err)
-		ErrorResp(w, r, err)
-		return
-	}
 	if err := a.ut.handleUploadChunk(zlog, w, r, id, chunkNum, params.XChunkSHA2); err != nil {
 		cntUploadChunk.IncError(err)
 		ErrorResp(w, r, err)

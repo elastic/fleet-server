@@ -388,6 +388,75 @@ func TestUploadBeginFileSize(t *testing.T) {
   Chunk data upload route
 */
 
+func TestChunkUploadRequiresMatchingAuth(t *testing.T) {
+	data := []byte("filedata")
+	hasher := sha256.New()
+	_, err := hasher.Write(data)
+	require.NoError(t, err)
+	hash := hex.EncodeToString(hasher.Sum(nil))
+	mockUploadID := "abc123"
+
+	tests := []struct {
+		Name              string
+		AuthSuccess       bool
+		AgentFromAPIKey   string
+		AgentInFileRecord string
+		ExpectStatus      int
+	}{
+		{"Agent ID matching API Key succeeds", true, "foo", "foo", http.StatusOK},
+		{"Agent ID in upload not matching API Key should reject", true, "oneID", "differentID", http.StatusForbidden},
+		{"Bad auth should reject request", false, "", "foo", http.StatusUnauthorized},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.Name, func(t *testing.T) {
+			hr, rt, fakebulk, _ := prepareUploaderMock(t)
+			mockUploadInfoResult(fakebulk, file.Info{
+				DocID:     "bar." + tc.AgentInFileRecord,
+				ID:        mockUploadID,
+				ChunkSize: file.MaxChunkSize,
+				Total:     10,
+				Count:     1,
+				Start:     time.Now(),
+				Status:    file.StatusProgress,
+				Source:    "agent",
+				AgentID:   tc.AgentInFileRecord,
+				ActionID:  "bar",
+			})
+
+			if !tc.AuthSuccess {
+				rt.ut.authAPIKey = func(r *http.Request, b bulk.Bulk, c cache.Cache) (*apikey.APIKey, error) {
+					return nil, apikey.ErrInvalidToken
+				}
+				rt.ut.authAgent = func(r *http.Request, s *string, b bulk.Bulk, c cache.Cache) (*model.Agent, error) {
+					return nil, apikey.ErrInvalidToken
+				}
+			} else {
+				rt.ut.authAgent = func(r *http.Request, s *string, b bulk.Bulk, c cache.Cache) (*model.Agent, error) {
+					if *s != tc.AgentFromAPIKey {
+						return nil, ErrAgentIdentity
+					}
+					return &model.Agent{
+						ESDocument: model.ESDocument{
+							Id: tc.AgentFromAPIKey,
+						},
+						Agent: &model.AgentMetadata{
+							ID: tc.AgentFromAPIKey,
+						},
+					}, nil
+				}
+			}
+
+			rec := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodPut, "/api/fleet/uploads/"+mockUploadID+"/0", bytes.NewReader(data))
+			req.Header.Set("X-Chunk-SHA2", hash)
+			hr.ServeHTTP(rec, req)
+
+			assert.Equal(t, tc.ExpectStatus, rec.Code)
+		})
+	}
+}
+
 func TestChunkUploadRouteParams(t *testing.T) {
 	data := []byte("filedata")
 	hasher := sha256.New()
