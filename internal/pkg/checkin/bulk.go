@@ -29,6 +29,9 @@ const defaultFlushInterval = 10 * time.Second
 //go:embed deleteAuditFieldsOnCheckin.painless
 var deleteAuditAttributesScript string
 
+//go:embed checkinWithEffectiveConfig.painless
+var checkinWithEffectiveConfigScript string
+
 type optionsT struct {
 	flushInterval time.Duration
 }
@@ -331,7 +334,34 @@ func (bc *Bulk) flush(ctx context.Context) error {
 			}
 			body, err = json.Marshal(&action)
 			if err != nil {
-				return fmt.Errorf("could not marshall script action: %w", err)
+				return fmt.Errorf("could not marshal script action: %w", err)
+			}
+		} else if pendingData.extra.effectiveConfig != nil {
+			// effective_config is a nested JSON object. ES's {"doc": ...} partial
+			// update recursively merges objects, so keys removed from the config
+			// (e.g. deleted pipelines) would persist. For example, if the stored
+			// config has pipelines {traces, metrics} and the collector reports
+			// only {traces}, the merge would keep metrics when it should be
+			// removed. A script avoids this by assigning directly to
+			// ctx._source, fully replacing the field.
+			if pendingData.extra.seqNo.IsSet() {
+				needRefresh = true
+			}
+			params, err := encodeParams(nowTimestamp, pendingData)
+			if err != nil {
+				return fmt.Errorf("unable to parse checkin details as params: %w", err)
+			}
+			action := &estypes.UpdateAction{
+				Script: &estypes.Script{
+					Lang:    &scriptlanguage.Painless,
+					Source:  &checkinWithEffectiveConfigScript,
+					Options: map[string]string{},
+					Params:  params,
+				},
+			}
+			body, err = json.Marshal(&action)
+			if err != nil {
+				return fmt.Errorf("could not marshal script action: %w", err)
 			}
 		} else {
 			if pendingData.extra.seqNo.IsSet() {
@@ -447,6 +477,12 @@ func encodeParams(now string, data pendingT) (map[string]json.RawMessage, error)
 		isSet       json.RawMessage
 		seqNo       json.RawMessage
 
+		// OpAMP-specific attributes
+		opampSequenceNum     json.RawMessage
+		opampHealth          json.RawMessage
+		opampCapabilities    json.RawMessage
+		opampEffectiveConfig json.RawMessage
+
 		err error
 	)
 	tsNow, err = json.Marshal(now)
@@ -463,6 +499,8 @@ func encodeParams(now string, data pendingT) (map[string]json.RawMessage, error)
 	Err = errors.Join(Err, err)
 	revisionIDX, err = json.Marshal(data.revisionIDX)
 	Err = errors.Join(Err, err)
+	opampSequenceNum, err = json.Marshal(data.sequenceNum)
+	Err = errors.Join(Err, err)
 	ver, err = json.Marshal(data.extra.ver)
 	Err = errors.Join(Err, err)
 	isSet, err = json.Marshal(data.extra.seqNo.IsSet())
@@ -475,21 +513,35 @@ func encodeParams(now string, data pendingT) (map[string]json.RawMessage, error)
 	if data.extra.components != nil {
 		components = data.extra.components
 	}
+	if data.extra.health != nil {
+		opampHealth = data.extra.health
+	}
+	if data.extra.capabilities != nil {
+		opampCapabilities, err = json.Marshal(data.extra.capabilities)
+		Err = errors.Join(Err, err)
+	}
+	if data.extra.effectiveConfig != nil {
+		opampEffectiveConfig = data.extra.effectiveConfig
+	}
 	if Err != nil {
 		return nil, Err
 	}
 	return map[string]json.RawMessage{
-		"Now":             tsNow,
-		"TS":              ts,
-		"Status":          status,
-		"Message":         message,
-		"UnhealthyReason": reason,
-		"PolicyID":        policyID,
-		"RevisionIDX":     revisionIDX,
-		"Ver":             ver,
-		"Meta":            meta,
-		"Components":      components,
-		"SeqNoSet":        isSet,
-		"SeqNo":           seqNo,
+		"Now":                  tsNow,
+		"TS":                   ts,
+		"Status":               status,
+		"Message":              message,
+		"UnhealthyReason":      reason,
+		"PolicyID":             policyID,
+		"RevisionIDX":          revisionIDX,
+		"Ver":                  ver,
+		"Meta":                 meta,
+		"Components":           components,
+		"SeqNoSet":             isSet,
+		"SeqNo":                seqNo,
+		"OpAMPSequenceNum":     opampSequenceNum,
+		"OpAMPHealth":          opampHealth,
+		"OpAMPCapabilities":    opampCapabilities,
+		"OpAMPEffectiveConfig": opampEffectiveConfig,
 	}, nil
 }
