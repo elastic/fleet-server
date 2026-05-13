@@ -45,11 +45,14 @@ func WithFlushInterval(d time.Duration) Opt {
 }
 
 type extraT struct {
-	meta        []byte
-	seqNo       sqn.SeqNo
-	ver         string
-	components  []byte
-	deleteAudit bool
+	meta            []byte
+	seqNo           sqn.SeqNo
+	ver             string
+	components      []byte
+	deleteAudit     bool
+	health          []byte
+	capabilities    []string
+	effectiveConfig []byte
 }
 
 // Minimize the size of this structure.
@@ -322,19 +325,6 @@ func (bc *Bulk) flush(ctx context.Context) error {
 
 func encodeParams(now string, data pendingT) (map[string]json.RawMessage, error) {
 	var (
-<<<<<<< HEAD
-		tsNow      json.RawMessage
-		ts         json.RawMessage
-		status     json.RawMessage
-		message    json.RawMessage
-		reason     json.RawMessage
-		ver        json.RawMessage
-		meta       json.RawMessage
-		components json.RawMessage
-		isSet      json.RawMessage
-		seqNo      json.RawMessage
-		err        error
-=======
 		tsNow   json.RawMessage
 		ts      json.RawMessage
 		status  json.RawMessage
@@ -342,22 +332,18 @@ func encodeParams(now string, data pendingT) (map[string]json.RawMessage, error)
 		reason  json.RawMessage
 
 		// optional attributes below
-		policyID    json.RawMessage
-		revisionIDX json.RawMessage
-		ver         json.RawMessage
-		meta        json.RawMessage
-		components  json.RawMessage
-		isSet       json.RawMessage
-		seqNo       json.RawMessage
+		ver        json.RawMessage
+		meta       json.RawMessage
+		components json.RawMessage
+		isSet      json.RawMessage
+		seqNo      json.RawMessage
 
 		// OpAMP-specific attributes
-		opampSequenceNum     json.RawMessage
 		opampHealth          json.RawMessage
 		opampCapabilities    json.RawMessage
 		opampEffectiveConfig json.RawMessage
 
 		err error
->>>>>>> 71564d8 (Fix effective_config merge bug for OpAMP collectors (#6988))
 	)
 	tsNow, err = json.Marshal(now)
 	Err := errors.Join(err)
@@ -369,15 +355,6 @@ func encodeParams(now string, data pendingT) (map[string]json.RawMessage, error)
 	Err = errors.Join(Err, err)
 	reason, err = json.Marshal(data.unhealthyReason)
 	Err = errors.Join(Err, err)
-<<<<<<< HEAD
-=======
-	policyID, err = json.Marshal(data.agentPolicyID)
-	Err = errors.Join(Err, err)
-	revisionIDX, err = json.Marshal(data.revisionIDX)
-	Err = errors.Join(Err, err)
-	opampSequenceNum, err = json.Marshal(data.sequenceNum)
-	Err = errors.Join(Err, err)
->>>>>>> 71564d8 (Fix effective_config merge bug for OpAMP collectors (#6988))
 	ver, err = json.Marshal(data.extra.ver)
 	Err = errors.Join(Err, err)
 	isSet, err = json.Marshal(data.extra.seqNo.IsSet())
@@ -404,34 +381,18 @@ func encodeParams(now string, data pendingT) (map[string]json.RawMessage, error)
 		return nil, Err
 	}
 	return map[string]json.RawMessage{
-<<<<<<< HEAD
-		"Now":             tsNow,
-		"TS":              ts,
-		"Status":          status,
-		"Message":         message,
-		"UnhealthyReason": reason,
-		"Ver":             ver,
-		"Meta":            meta,
-		"Components":      components,
-		"SeqNoSet":        isSet,
-		"SeqNo":           seqNo,
-=======
 		"Now":                  tsNow,
 		"TS":                   ts,
 		"Status":               status,
 		"Message":              message,
 		"UnhealthyReason":      reason,
-		"PolicyID":             policyID,
-		"RevisionIDX":          revisionIDX,
 		"Ver":                  ver,
 		"Meta":                 meta,
 		"Components":           components,
 		"SeqNoSet":             isSet,
 		"SeqNo":                seqNo,
-		"OpAMPSequenceNum":     opampSequenceNum,
 		"OpAMPHealth":          opampHealth,
 		"OpAMPCapabilities":    opampCapabilities,
 		"OpAMPEffectiveConfig": opampEffectiveConfig,
->>>>>>> 71564d8 (Fix effective_config merge bug for OpAMP collectors (#6988))
 	}, nil
 }
