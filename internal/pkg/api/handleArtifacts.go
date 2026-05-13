@@ -176,6 +176,14 @@ func (at ArtifactT) authorizeArtifact(ctx context.Context, agent *model.Agent, i
 	return ErrUnauthorizedArtifact
 }
 
+type artifactManifest struct {
+	Artifacts map[string]manifestEntry `json:"artifacts"`
+}
+
+type manifestEntry struct {
+	DecodedSha256 string `json:"decoded_sha256"`
+}
+
 func policyHasArtifact(pd *model.PolicyData, id, sha2 string) bool {
 	for _, input := range pd.Inputs {
 		manifest, err := parseArtifactManifest(input)
@@ -189,7 +197,7 @@ func policyHasArtifact(pd *model.PolicyData, id, sha2 string) bool {
 	return false
 }
 
-func parseArtifactManifest(input map[string]any) (*model.ArtifactManifest, error) {
+func parseArtifactManifest(input map[string]any) (*artifactManifest, error) {
 	raw, ok := input["artifact_manifest"]
 	if !ok {
 		return nil, nil
@@ -198,7 +206,7 @@ func parseArtifactManifest(input map[string]any) (*model.ArtifactManifest, error
 	if err != nil {
 		return nil, err
 	}
-	var manifest model.ArtifactManifest
+	var manifest artifactManifest
 	if err := json.Unmarshal(data, &manifest); err != nil {
 		return nil, err
 	}

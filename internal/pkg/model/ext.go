@@ -133,24 +133,6 @@ func cloneOTelService(s *Service) *Service {
 	return &clone
 }
 
-// ArtifactManifest represents the artifact_manifest field within a policy input.
-type ArtifactManifest struct {
-	ManifestVersion string                   `json:"manifest_version"`
-	SchemaVersion   string                   `json:"schema_version"`
-	Artifacts       map[string]ManifestEntry `json:"artifacts"`
-}
-
-// ManifestEntry represents a single artifact entry within an artifact manifest.
-type ManifestEntry struct {
-	DecodedSha256 string `json:"decoded_sha256"`
-	DecodedSize   int64  `json:"decoded_size"`
-	EncodedSha256 string `json:"encoded_sha256"`
-	EncodedSize   int64  `json:"encoded_size"`
-	RelativeURL   string `json:"relative_url"`
-	Compression   string `json:"compression_algorithm"`
-	Encryption    string `json:"encryption_algorithm"`
-}
-
 // cloneMap does a deep copy on a map of objects
 // TODO generics?
 func cloneMap(m map[string]map[string]any) map[string]map[string]any {
