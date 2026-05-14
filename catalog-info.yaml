@@ -44,6 +44,12 @@ spec:
     spec:
       repository: elastic/fleet-server
       pipeline_file: ".buildkite/pipeline.yml"
+      initial_step_plugins:
+        - sparse-checkout#v1.6.0:
+            paths:
+              - .buildkite
+              - .go-version
+            cleanup_sparse_state: true
       # patterns for tags are required to trigger the step that publishes the docker.elastic.co/package-registry/distribution images
       # step with key: "release-package-registry"
       branch_configuration: "main 9.* 8.* 7.* v9.* v8.* v7.*"
@@ -96,6 +102,12 @@ spec:
     spec:
       repository: elastic/fleet-server
       pipeline_file: ".buildkite/pipeline.package.mbp.yml"
+      initial_step_plugins:
+        - sparse-checkout#v1.6.0:
+            paths:
+              - .buildkite
+              - .go-version
+            cleanup_sparse_state: true
       provider_settings:
         build_pull_request_forks: false
         build_pull_requests: true
@@ -151,6 +163,12 @@ spec:
     spec:
       repository: elastic/fleet-server
       pipeline_file: .buildkite/pipeline.fleet-server-tests.yaml
+      initial_step_plugins:
+        - sparse-checkout#v1.6.0:
+            paths:
+              - .buildkite
+              - .go-version
+            cleanup_sparse_state: true
       branch_configuration: "main"
       skip_intermediate_builds: false
       provider_settings:
@@ -188,6 +206,12 @@ spec:
     spec:
       repository: elastic/fleet-server
       pipeline_file: .buildkite/pipeline.perf-tests.yaml
+      initial_step_plugins:
+        - sparse-checkout#v1.6.0:
+            paths:
+              - .buildkite
+              - .go-version
+            cleanup_sparse_state: true
       branch_configuration: "main"
       provider_settings:
         build_pull_request_forks: false
