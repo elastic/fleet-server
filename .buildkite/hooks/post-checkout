@@ -24,6 +24,10 @@ checkout_merge() {
     git config user.name "github-merged-pr-post-checkout"
     git config user.email "auto-merge@buildkite"
 
+    # sparse-checkout creates a shallow clone without full commit history;
+    # unshallow so git can find the common ancestor needed for the merge
+    git fetch --unshallow 2>/dev/null || true
+
     git merge --no-edit "${BUILDKITE_COMMIT}" || {
         local merge_result=$?
         echo "Merge failed: ${merge_result}"
