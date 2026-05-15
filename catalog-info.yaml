@@ -163,12 +163,6 @@ spec:
     spec:
       repository: elastic/fleet-server
       pipeline_file: .buildkite/pipeline.fleet-server-tests.yaml
-      initial_step_plugins:
-        - sparse-checkout#v1.6.0:
-            paths:
-              - .buildkite
-              - .go-version
-            cleanup_sparse_state: true
       branch_configuration: "main"
       skip_intermediate_builds: false
       provider_settings:
@@ -206,12 +200,6 @@ spec:
     spec:
       repository: elastic/fleet-server
       pipeline_file: .buildkite/pipeline.perf-tests.yaml
-      initial_step_plugins:
-        - sparse-checkout#v1.6.0:
-            paths:
-              - .buildkite
-              - .go-version
-            cleanup_sparse_state: true
       branch_configuration: "main"
       provider_settings:
         build_pull_request_forks: false
