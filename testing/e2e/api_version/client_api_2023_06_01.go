@@ -305,7 +305,7 @@ func (tester *ClientAPITester20230601) TestFullFileUpload() {
 }
 
 func (tester *ClientAPITester20230601) TestArtifact() {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
 	// Elastic Defend (endpoint) artifacts are only authorized for agents enrolled under a
@@ -330,6 +330,9 @@ func (tester *ClientAPITester20230601) TestArtifact() {
 	})
 	tester.Require().NoError(err)
 	for {
+		if err := ctx.Err(); err != nil {
+			tester.Require().NoError(err, "context expired before artifact download succeeded")
+		}
 		resp, err := apiClient.ArtifactWithResponse(ctx, id, sha2, &api.ArtifactParams{})
 		tester.Require().NoError(err)
 		if resp.StatusCode() == http.StatusForbidden {

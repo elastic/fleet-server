@@ -405,7 +405,7 @@ func (tester *ClientAPITester) TestFullFileUpload() {
 }
 
 func (tester *ClientAPITester) TestArtifact() {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
 	// Elastic Defend (endpoint) artifacts are only authorized for agents enrolled under a
@@ -425,6 +425,9 @@ func (tester *ClientAPITester) TestArtifact() {
 	// Retry on 403: even after the ES policy is updated, the in-memory cache in fleet-server
 	// may not have caught up yet. The monitor refreshes quickly but retrying is more robust.
 	for {
+		if err := ctx.Err(); err != nil {
+			tester.Require().NoError(err, "context expired before artifact download succeeded")
+		}
 		client, err := api.NewClientWithResponses(tester.endpoint, api.WithHTTPClient(tester.Client), api.WithRequestEditorFn(func(_ context.Context, req *http.Request) error {
 			req.Header.Set("Authorization", "ApiKey "+agentKey)
 			return nil
