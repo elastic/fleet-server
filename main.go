@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 //go:generate go tool -modfile ./dev-tools/go.mod github.com/elastic/go-json-schema-generate/cmd/schema-generate -esdoc -s -cm "{\"Api\": \"API\", \"Id\": \"ID\"}" -o internal/pkg/model/schema.go -p model model/schema.json
 //go:generate go tool -modfile ./dev-tools/go.mod github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen --config model/oapi-cfg.yml model/openapi.yml
