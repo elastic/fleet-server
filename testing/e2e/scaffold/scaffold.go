@@ -648,24 +648,20 @@ func (s *Scaffold) FleetPolicyHasArtifact(ctx context.Context, policyID, identif
 }
 
 func policyInputHasArtifact(input map[string]any, identifier, decodedSha256 string) bool {
-	raw, ok := input["artifact_manifest"]
+	manifestRaw, ok := input["artifact_manifest"].(map[string]any)
 	if !ok {
 		return false
 	}
-	data, err := json.Marshal(raw)
-	if err != nil {
+	artifacts, ok := manifestRaw["artifacts"].(map[string]any)
+	if !ok {
 		return false
 	}
-	var manifest struct {
-		Artifacts map[string]struct {
-			DecodedSha256 string `json:"decoded_sha256"`
-		} `json:"artifacts"`
-	}
-	if err := json.Unmarshal(data, &manifest); err != nil {
+	entry, ok := artifacts[identifier].(map[string]any)
+	if !ok {
 		return false
 	}
-	entry, ok := manifest.Artifacts[identifier]
-	return ok && entry.DecodedSha256 == decodedSha256
+	sha, _ := entry["decoded_sha256"].(string)
+	return sha == decodedSha256
 }
 
 type logger struct {
