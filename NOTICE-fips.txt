@@ -5159,11 +5159,19 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : google.golang.org/grpc
+<<<<<<< HEAD
 Version: v1.80.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
 Contents of probable licence file $GOMODCACHE/google.golang.org/grpc@v1.80.0/LICENSE:
+=======
+Version: v1.81.1
+Licence type (autodetected): Apache-2.0
+--------------------------------------------------------------------------------
+
+Contents of probable licence file $GOMODCACHE/google.golang.org/grpc@v1.81.1/LICENSE:
+>>>>>>> 9bede34 (build(deps): bump google.golang.org/grpc from 1.81.0 to 1.81.1 (#7040))
 
 
                                  Apache License
