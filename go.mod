@@ -42,11 +42,7 @@ require (
 	golang.org/x/net v0.54.0
 	golang.org/x/sync v0.20.0
 	golang.org/x/time v0.15.0
-<<<<<<< HEAD
-	google.golang.org/grpc v1.80.0
-=======
 	google.golang.org/grpc v1.81.1
->>>>>>> 9bede34 (build(deps): bump google.golang.org/grpc from 1.81.0 to 1.81.1 (#7040))
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/yaml.v3 v3.0.1
 )
