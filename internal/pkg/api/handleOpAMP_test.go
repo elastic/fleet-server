@@ -325,7 +325,6 @@ func TestUpdateAgentWithAgentToServerMessage(t *testing.T) {
 
 	agent := &model.Agent{ESDocument: model.ESDocument{Id: "agent-123"}}
 
-<<<<<<< HEAD
 	msg := &protobufs.AgentToServer{
 		SequenceNum: 7,
 		Capabilities: uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsHealth) |
@@ -339,26 +338,8 @@ func TestUpdateAgentWithAgentToServerMessage(t *testing.T) {
 			ConfigMap: &protobufs.AgentConfigMap{
 				ConfigMap: map[string]*protobufs.AgentConfigFile{
 					"": {
-						Body:        []byte("password: 12345\nnum: 2\n"),
+						Body:        []byte("password: hunter2\nnum: 2\n"),
 						ContentType: "text/yaml",
-=======
-		msg := &protobufs.AgentToServer{
-			SequenceNum: 7,
-			Capabilities: uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsHealth) |
-				uint64(protobufs.AgentCapabilities_AgentCapabilities_AcceptsRemoteConfig),
-			Health: &protobufs.ComponentHealth{
-				Healthy:   true,
-				Status:    "StatusRecoverableError",
-				LastError: "boom",
-			},
-			EffectiveConfig: &protobufs.EffectiveConfig{
-				ConfigMap: &protobufs.AgentConfigMap{
-					ConfigMap: map[string]*protobufs.AgentConfigFile{
-						"": {
-							Body:        []byte("password: hunter2\nnum: 2\n"),
-							ContentType: "text/yaml",
-						},
->>>>>>> 4d84c65 (OpAMP redact slice maps (#6955))
 					},
 				},
 			},
@@ -389,60 +370,11 @@ func TestUpdateAgentWithAgentToServerMessage(t *testing.T) {
 	require.Equal(t, "boom", health.LastError)
 	require.Equal(t, "StatusRecoverableError", health.Status)
 
-<<<<<<< HEAD
 	configBytes := getUnexportedField(extraVal, "effectiveConfig").Bytes()
-	var config map[string]interface{}
+	var config map[string]any
 	require.NoError(t, json.Unmarshal(configBytes, &config))
-	require.Equal(t, "[REDACTED]", config["password"])
+	require.Equal(t, redact.REDACTED, config["password"])
 	require.Equal(t, float64(2), config["num"])
-=======
-		configBytes := getUnexportedField(extraVal, "effectiveConfig").Bytes()
-		var config map[string]any
-		require.NoError(t, json.Unmarshal(configBytes, &config))
-		require.Equal(t, redact.REDACTED, config["password"])
-		require.Equal(t, float64(2), config["num"])
-	})
-
-	t.Run("checkin clears audit_unenroll attributes", func(t *testing.T) {
-		checker := &mockCheckin{}
-		oa := &OpAMPT{bc: checker}
-
-		agent := &model.Agent{
-			ESDocument:            model.ESDocument{Id: "agent-123"},
-			AuditUnenrolledReason: reenrolled,
-			AuditUnenrolledTime:   time.Now().UTC().Format(time.RFC3339),
-		}
-
-		msg := &protobufs.AgentToServer{
-			SequenceNum:  3,
-			Capabilities: uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsHealth),
-			Health: &protobufs.ComponentHealth{
-				Healthy: true,
-			},
-		}
-
-		zlog := zerolog.New(io.Discard)
-		require.NoError(t, oa.updateAgent(zlog, agent, msg))
-		require.Equal(t, "agent-123", checker.id)
-
-		pending := pendingFromOptions(t, checker.opts)
-		require.Equal(t, string(CheckinRequestStatusOnline), getUnexportedField(pending, "status").String())
-
-		extra := getUnexportedField(pending, "extra")
-		require.False(t, extra.IsNil())
-		extraVal := extra.Elem()
-
-		capabilitiesVal := getUnexportedField(extraVal, "capabilities")
-		capabilities, ok := capabilitiesVal.Interface().([]string)
-		require.True(t, ok)
-		require.ElementsMatch(t, []string{"ReportsHealth"}, capabilities)
-
-		deleteAuditVal := getUnexportedField(extraVal, "deleteAudit")
-		deleteAudit, ok := deleteAuditVal.Interface().(bool)
-		require.True(t, ok)
-		require.True(t, deleteAudit)
-	})
->>>>>>> 4d84c65 (OpAMP redact slice maps (#6955))
 }
 
 func TestHandleMessageAgentDisconnect(t *testing.T) {

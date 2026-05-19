@@ -445,54 +445,6 @@ func ParseEffectiveConfig(effectiveConfig *protobufs.EffectiveConfig) ([]byte, e
 	return nil, nil
 }
 
-<<<<<<< HEAD
-func redactSensitive(v interface{}) {
-	const redacted = "[REDACTED]"
-	switch typed := v.(type) {
-	case map[string]interface{}:
-		for key, val := range typed {
-			if redactKey(key) {
-				typed[key] = redacted
-				continue
-			}
-			redactSensitive(val)
-		}
-	case map[interface{}]interface{}:
-		for rawKey, val := range typed {
-			key, ok := rawKey.(string)
-			if ok && redactKey(key) {
-				typed[rawKey] = redacted
-				continue
-			}
-			redactSensitive(val)
-		}
-	case []interface{}:
-		for i := range typed {
-			redactSensitive(typed[i])
-		}
-	}
-}
-
-// TODO move to a common place, same as https://github.com/elastic/elastic-agent/blob/1c3fb4b4c8989cd2cfb692780debd7619820ae72/internal/pkg/diagnostics/diagnostics.go#L454-L468
-func redactKey(k string) bool {
-	// "routekey" shouldn't be redacted.
-	// Add any other exceptions here.
-	if k == "routekey" {
-		return false
-	}
-
-	k = strings.ToLower(k)
-	return strings.Contains(k, "auth") ||
-		strings.Contains(k, "certificate") ||
-		strings.Contains(k, "passphrase") ||
-		strings.Contains(k, "password") ||
-		strings.Contains(k, "token") ||
-		strings.Contains(k, "key") ||
-		strings.Contains(k, "secret")
-}
-
-=======
->>>>>>> 4d84c65 (OpAMP redact slice maps (#6955))
 // anyValueToInterface recursively converts protobufs.AnyValue to Go interface{} for JSON marshalling
 func anyValueToInterface(zlog zerolog.Logger, av *protobufs.AnyValue) interface{} {
 	switch v := av.GetValue().(type) {
