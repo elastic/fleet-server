@@ -110,6 +110,18 @@ func (c *Server) InitDefaults() {
 	c.PDKDF2.InitDefaults()
 }
 
+// Validate applies backport-branch defaults and validates the server configuration.
+func (c *Server) Validate() error {
+	// Certificate hot-reload was introduced after this branch was cut. Disable it
+	// by default so it does not land silently in a patch release. Operators who
+	// want it can set ssl.certificate_reload.enabled: true in their config.
+	if c.TLS != nil && c.TLS.CertificateReload.Enabled == nil {
+		disabled := false
+		c.TLS.CertificateReload.Enabled = &disabled
+	}
+	return nil
+}
+
 // BindEndpoints returns the binding address for the all HTTP server listeners.
 func (c *Server) BindEndpoints() []string {
 	primaryAddress := c.BindAddress()
