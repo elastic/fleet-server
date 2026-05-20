@@ -81,6 +81,9 @@ Until a bug fix is available in a later release, you can resolve the issue tempo
 
 2. After the output confirms all files were successfully processed, run the `enroll` command again.
 
+**Resolved**
+
+Resolved in {{agent}} 9.0.7 and 9.1.4. For more information, refer to [PR #9623](https://github.com/elastic/elastic-agent/pull/9623).
 :::
 
 :::{dropdown} Elastic Agent checkins to Fleet Server fail with "tried to parse field [local_metadata] as object, but found a concrete value" or "cannot unmarshal string into Go struct field Agent.components" errors.
