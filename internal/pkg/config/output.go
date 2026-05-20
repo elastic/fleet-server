@@ -74,6 +74,12 @@ func (c *Elasticsearch) Validate() error {
 			return err
 		}
 	}
+	// Certificate hot-reload was introduced after this branch was cut. Disable it
+	// by default so it does not land silently in a patch release.
+	if c.TLS != nil && c.TLS.CertificateReload.Enabled == nil {
+		disabled := false
+		c.TLS.CertificateReload.Enabled = &disabled
+	}
 	if c.TLS != nil && c.TLS.IsEnabled() {
 		_, err := tlscommon.LoadTLSConfig(c.TLS, zap.NewStub("elasticsearch-output"))
 		if err != nil {
