@@ -405,7 +405,7 @@ func (tester *ClientAPITester) TestFullFileUpload() {
 }
 
 func (tester *ClientAPITester) TestArtifact() {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(tester.T().Context(), 5*time.Minute)
 	defer cancel()
 
 	// Elastic Defend (endpoint) artifacts are only authorized for agents enrolled under a
