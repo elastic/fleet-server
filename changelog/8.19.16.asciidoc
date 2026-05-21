@@ -1,0 +1,31 @@
+// begin 8.19.16 relnotes
+
+[[release-notes-8.19.16]]
+==  8.19.16
+
+Review important information about the  8.19.16 release.
+
+[discrete]
+[[security-updates-8.19.16]]
+=== Security updates
+
+
+
+
+* Fix missing authagent in uploadchunk. https://github.com/elastic/fleet-server/pull/7054[#7054] 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// end 8.19.16 relnotes

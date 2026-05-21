@@ -1,0 +1,16 @@
+version: 8.19.16
+entries:
+    - kind: security
+      summary: fix missing authagent in uploadchunk
+      description: |
+        Validate that the uploading agent of the chunk has the permissions to write that chunk.
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/7054
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1778534244
+      file:
+        name: 1778534244-fix-missing-authagent-in-uploadchunk.yaml
+        checksum: 8d4dcc68c12c238c6424e294daf18359f2e154c4
