@@ -16,6 +16,7 @@ import (
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
+	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 
 	"github.com/rs/zerolog"
@@ -161,6 +162,18 @@ func WithEffectiveConfig(effectiveConfig []byte) Option {
 	}
 }
 
+func WithComponentsStream(components []model.ComponentsItems, i int) Option {
+	return func(pending *pendingT) {
+		if pending.extra == nil {
+			pending.extra = &extraT{}
+		}
+		pending.extra.componentsStream = &componentStream{
+			flushNum:   i,
+			components: components,
+		}
+	}
+}
+
 func WithAvailableRollbacks(availableRollbacks []byte) Option {
 	return func(pending *pendingT) {
 		if pending.extra == nil {
@@ -180,6 +193,12 @@ type extraT struct {
 	health             []byte
 	capabilities       []string
 	effectiveConfig    []byte
+	componentsStream   *componentStream
+}
+
+type componentStream struct {
+	flushNum   int
+	components []model.ComponentsItems
 }
 
 // Minimize the size of this structure.
@@ -302,7 +321,8 @@ func (bc *Bulk) flush(ctx context.Context) error {
 	var needRefresh bool
 	for id, pendingData := range pending {
 		var body []byte
-		if pendingData.extra == nil {
+		switch {
+		case pendingData.extra == nil:
 			// agents that checkin without extra attributes are cachable
 			// Cacheable agents can share the same status, message, and unhealthy reason. Timestamps are ignored.
 			// This prevents an extra JSON serialization when agents have the same update body.
@@ -315,7 +335,7 @@ func (bc *Bulk) flush(ctx context.Context) error {
 				}
 				simpleCache[pendingData] = body
 			}
-		} else if pendingData.extra.deleteAudit {
+		case pendingData.extra.deleteAudit:
 			if pendingData.extra.seqNo.IsSet() {
 				needRefresh = true
 			}
@@ -336,7 +356,7 @@ func (bc *Bulk) flush(ctx context.Context) error {
 			if err != nil {
 				return fmt.Errorf("could not marshal script action: %w", err)
 			}
-		} else if pendingData.extra.effectiveConfig != nil {
+		case pendingData.extra.effectiveConfig != nil:
 			// effective_config is a nested JSON object. ES's {"doc": ...} partial
 			// update recursively merges objects, so keys removed from the config
 			// (e.g. deleted pipelines) would persist. For example, if the stored
@@ -363,7 +383,12 @@ func (bc *Bulk) flush(ctx context.Context) error {
 			if err != nil {
 				return fmt.Errorf("could not marshal script action: %w", err)
 			}
-		} else {
+		case pendingData.extra.componentsStream != nil:
+			if pendingData.extra.componentsStream.flushNum == 0 {
+				needRefresh = true
+			}
+			// TODO write the fleet-server -> ES intermediate update
+		default:
 			if pendingData.extra.seqNo.IsSet() {
 				needRefresh = true
 			}

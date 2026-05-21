@@ -181,12 +181,12 @@ func (ct *CheckinT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, 
 	span, ctx := apm.StartSpan(r.Context(), "validateRequest", "validate")
 	defer span.End()
 
-	body := r.Body
-	// Limit the size of the body to prevent malicious agent from exhausting RAM in server
-	if ct.cfg.Limits.CheckinLimit.MaxBody > 0 {
-		body = http.MaxBytesReader(w, body, ct.cfg.Limits.CheckinLimit.MaxBody)
+	// Checkin requests that have unknown size or that are too large will use the streaming validation approach
+	if r.ContentLength == -1 || r.ContentLength > ct.cfg.Limits.CheckinLimit.MaxBody {
+		return ct.validateRequestStream(zlog, w, r, start, agent)
 	}
-	readCounter := datacounter.NewReaderCounter(body)
+
+	readCounter := datacounter.NewReaderCounter(r.Body)
 
 	// Decompress the body when the client signals Content-Encoding: gzip.
 	var bodyReader io.Reader = readCounter
