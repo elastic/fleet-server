@@ -6,7 +6,7 @@ entries:
         Validate that the uploading agent of the chunk has the permissions to write that chunk.
       component: fleet-server
       pr:
-        - https://github.com/elastic/fleet-server/pull/7054
+        - https://github.com/elastic/fleet-server/pull/7020
       issue: []
       impact: ""
       action: ""
