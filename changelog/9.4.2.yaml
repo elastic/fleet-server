@@ -5,8 +5,7 @@ entries:
       description: ""
       component: fleet-server
       pr:
-        - https://github.com/elastic/fleet-server/pull/7108
-        - https://github.com/elastic/fleet-server/pull/7113
+        - https://github.com/elastic/fleet-server/pull/6955
       issue:
         - https://github.com/elastic/elastic-agent-libs/issues/415
       impact: ""
@@ -20,8 +19,7 @@ entries:
       description: ""
       component: fleet-server
       pr:
-        - https://github.com/elastic/fleet-server/pull/7108
-        - https://github.com/elastic/fleet-server/pull/7113
+        - https://github.com/elastic/fleet-server/pull/6988
       issue:
         - https://github.com/elastic/fleet-server/issues/6877
       impact: ""
@@ -36,8 +34,7 @@ entries:
         Validate that the uploading agent of the chunk has the permissions to write that chunk.
       component: fleet-server
       pr:
-        - https://github.com/elastic/fleet-server/pull/7108
-        - https://github.com/elastic/fleet-server/pull/7113
+        - https://github.com/elastic/fleet-server/pull/7007
       issue: []
       impact: ""
       action: ""
