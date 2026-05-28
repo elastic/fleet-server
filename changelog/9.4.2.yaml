@@ -1,0 +1,44 @@
+version: 9.4.2
+entries:
+    - kind: bug-fix
+      summary: OpAMP redact sensitive values in slice maps
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/6955
+      issue:
+        - https://github.com/elastic/elastic-agent-libs/issues/415
+      impact: ""
+      action: ""
+      timestamp: 1777917457
+      file:
+        name: 1777917457-OpAMP-redact-sensitive-values-in-header-maps.yaml
+        checksum: 3c0d316a2b28c2597e6377c42c3358fad6ef908c
+    - kind: bug-fix
+      summary: fix effective_config not removing deleted pipelines for opamp collectors
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/6988
+      issue:
+        - https://github.com/elastic/fleet-server/issues/6877
+      impact: ""
+      action: ""
+      timestamp: 1778261857
+      file:
+        name: 1778261857-fix-effective_config-not-removing-deleted-pipelines-for-opamp-collectors.yaml
+        checksum: fe28bca1fbe918cc694ba3f62090bd872f72262b
+    - kind: security
+      summary: fix missing authagent in uploadchunk
+      description: |
+        Validate that the uploading agent of the chunk has the permissions to write that chunk.
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/7007
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1778534244
+      file:
+        name: 1778534244-fix-missing-authagent-in-uploadchunk.yaml
+        checksum: 8d4dcc68c12c238c6424e294daf18359f2e154c4
