@@ -20,6 +20,7 @@ type ServerLimits struct {
 	MaxHeaderByteSize      int     `config:"max_header_byte_size"`
 	MaxConnections         int     `config:"max_connections"`
 	MaxFileStorageByteSize *uint64 `config:"max_file_storage_size"`
+	MaxAgentDocSize        int64   `config:"max_agent_doc_size"`
 
 	ActionLimit        Limit `config:"action_limit"`
 	PolicyLimit        Limit `config:"policy_limit"`
@@ -50,6 +51,7 @@ func (c *ServerLimits) LoadLimits(limits *envLimits) {
 		c.MaxConnections = l.MaxConnections
 	}
 	c.MaxFileStorageByteSize = l.MaxFileStorageByteSize
+	c.MaxAgentDocSize = l.MaxAgentDocSize
 
 	c.ActionLimit = mergeEnvLimit(c.ActionLimit, l.ActionLimit)
 	c.PolicyLimit = mergeEnvLimit(c.PolicyLimit, l.PolicyLimit)
