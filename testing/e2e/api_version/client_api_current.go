@@ -608,11 +608,12 @@ func (tester *ClientAPITester) TestCheckinWithPolicyIDRevision() {
 	tester.Require().Equal(policyID, policyChange.Policy.Id)
 	tester.Require().Equal(revIDX, int64(policyChange.Policy.Revision))
 
+	// Wait longer than the checkin bulk flush interval (10s default) since checkin 3 returns immediately.
 	tester.Require().EventuallyWithT(func(c *assert.CollectT) {
 		agent := tester.GetAgent(ctx, agentID)
 		assert.Equal(c, policyID, agent.AgentPolicyID)
 		assert.Equal(c, newRevIDX, int64(agent.Revision))
-	}, time.Second*10, time.Second)
+	}, time.Second*20, time.Second)
 
 	// Update policy
 	// Get the policy then "update" it without changing anything - revision ID should increment
@@ -721,6 +722,7 @@ func (tester *ClientAPITester) TestCheckinWithPolicyIDRevision() {
 	checkin = resp.JSON200
 	tester.Require().NotEmpty(checkin.Actions, "Expected action in response")
 
+	// Wait longer than the checkin bulk flush interval (10s default) since checkin 6 returns immediately.
 	tester.Require().EventuallyWithT(func(c *assert.CollectT) {
 		agent := tester.GetAgent(ctx, agentID)
 		require.Equal(c, policyID, agent.AgentPolicyID)
