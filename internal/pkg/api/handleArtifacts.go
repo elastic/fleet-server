@@ -186,11 +186,11 @@ func policyHasArtifact(pd *model.PolicyData, id, sha2 string) bool {
 }
 
 func inputHasArtifact(input map[string]any, id, sha2 string) bool {
-	manifestRaw, ok := input["artifact_manifest"].(map[string]any)
+	manifestRaw, ok := input[dl.FieldArtifactManifest].(map[string]any)
 	if !ok {
 		return false
 	}
-	artifacts, ok := manifestRaw["artifacts"].(map[string]any)
+	artifacts, ok := manifestRaw[dl.FieldArtifacts].(map[string]any)
 	if !ok {
 		return false
 	}
@@ -198,7 +198,7 @@ func inputHasArtifact(input map[string]any, id, sha2 string) bool {
 	if !ok {
 		return false
 	}
-	sha, _ := entry["decoded_sha256"].(string)
+	sha, _ := entry[dl.FieldDecodedSha256].(string)
 	return sha == sha2
 }
 
