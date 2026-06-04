@@ -196,7 +196,10 @@ func (ct *CheckinT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, 
 			return validatedCheckin{}, &BadRequestErr{msg: "unable to create gzip reader for request body", nextErr: err}
 		}
 		defer gr.Close()
-		bodyReader = http.MaxBytesReader(w, gr, ct.cfg.Limits.MaxAgentDocSize)
+		bodyReader = gr
+		if ct.cfg.Limits.CheckinLimit.MaxBodyDecompressed > 0 {
+			bodyReader = http.MaxBytesReader(w, gr, ct.cfg.Limits.CheckinLimit.MaxBodyDecompressed)
+		}
 	}
 
 	var val validatedCheckin
