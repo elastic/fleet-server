@@ -637,7 +637,7 @@ func (s *Scaffold) FleetPolicyHasArtifact(ctx context.Context, policyID, identif
 
 			if result.Hits.Total.Value > 0 {
 				for _, input := range result.Hits.Hits[0].Source.Data.Inputs {
-					if policyInputHasArtifact(input, identifier, decodedSha256) {
+					if inputHasArtifact(input, identifier, decodedSha256) {
 						return
 					}
 				}
@@ -647,7 +647,7 @@ func (s *Scaffold) FleetPolicyHasArtifact(ctx context.Context, policyID, identif
 	}
 }
 
-func policyInputHasArtifact(input map[string]any, identifier, decodedSha256 string) bool {
+func inputHasArtifact(input map[string]any, identifier, decodedSha256 string) bool {
 	manifestRaw, ok := input["artifact_manifest"].(map[string]any)
 	if !ok {
 		return false
