@@ -21,11 +21,11 @@ type stubPolicyMonitor struct {
 	getPolicy func(ctx context.Context, policyID string) (*model.Policy, error)
 }
 
-func (s *stubPolicyMonitor) Run(_ context.Context) error                              { return nil }
+func (s *stubPolicyMonitor) Run(_ context.Context) error { return nil }
 func (s *stubPolicyMonitor) Subscribe(_, _ string, _ int64) (policy.Subscription, error) {
 	return nil, nil
 }
-func (s *stubPolicyMonitor) Unsubscribe(_ policy.Subscription) error { return nil }
+func (s *stubPolicyMonitor) Unsubscribe(_ policy.Subscription) error     { return nil }
 func (s *stubPolicyMonitor) LatestRev(_ context.Context, _ string) int64 { return 0 }
 func (s *stubPolicyMonitor) GetPolicy(ctx context.Context, policyID string) (*model.Policy, error) {
 	return s.getPolicy(ctx, policyID)
@@ -152,7 +152,7 @@ func TestPolicyHasArtifact_MultipleInputsWithArtifacts(t *testing.T) {
 
 func TestAuthorizeArtifact(t *testing.T) {
 	const (
-		policyID  = "test-policy-id"
+		policyID   = "test-policy-id"
 		artifactID = "endpoint-trustlist-linux-v1"
 		sha2       = "d801aa1fb7ddcc330a5e3173372ea6af4a3d08ec58074478e85aa5603e926658"
 	)
@@ -215,10 +215,10 @@ func TestAuthorizeArtifact(t *testing.T) {
 			wantErr: nil, // wrapped, so we check IsUnauthorized is false
 		},
 		{
-			name:    "forbidden: agent has no policy ID",
-			agent:   &model.Agent{},
+			name:      "forbidden: agent has no policy ID",
+			agent:     &model.Agent{},
 			setupMock: func(pm *mockPolicyMonitor) {},
-			wantErr: ErrAgentPolicyIDMissing,
+			wantErr:   ErrAgentPolicyIDMissing,
 		},
 	}
 
