@@ -165,6 +165,9 @@ func (at ArtifactT) authorizeArtifact(ctx context.Context, agent *model.Agent, i
 	}
 
 	p, err := at.pm.GetPolicy(ctx, agent.AgentPolicyID)
+	if errors.Is(err, policy.ErrPolicyNotFound) {
+		return ErrUnauthorizedArtifact
+	}
 	if err != nil {
 		return fmt.Errorf("authorizeArtifact: %w", err)
 	}

@@ -26,6 +26,8 @@ import (
 
 const cloudPolicyID = "policy-elastic-agent-on-cloud"
 
+var ErrPolicyNotFound = errors.New("policy not found")
+
 /*
 Design should have the following properties
 
@@ -621,7 +623,7 @@ func (m *monitorT) GetPolicy(ctx context.Context, policyID string) (*model.Polic
 	m.mut.Unlock()
 
 	if !ok {
-		return nil, fmt.Errorf("policy %s not found", policyID)
+		return nil, fmt.Errorf("%w: %s", ErrPolicyNotFound, policyID)
 	}
 	return &p.pp.Policy, nil
 }
