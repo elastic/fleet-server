@@ -215,6 +215,14 @@ func TestAuthorizeArtifact(t *testing.T) {
 			wantErr: nil, // wrapped, so we check IsUnauthorized is false
 		},
 		{
+			name:  "authorized: uses PolicyID when AgentPolicyID is empty (pre-checkin)",
+			agent: &model.Agent{PolicyID: policyID},
+			setupMock: func(pm *mockPolicyMonitor) {
+				pm.On("GetPolicy", context.Background(), policyID).Return(policyWithArtifact, nil)
+			},
+			wantErr: nil,
+		},
+		{
 			name:      "forbidden: agent has no policy ID",
 			agent:     &model.Agent{},
 			setupMock: func(pm *mockPolicyMonitor) {},
