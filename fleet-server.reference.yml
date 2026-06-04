@@ -154,8 +154,6 @@ fleet:
 #       # max_connections is the maximum number of in-flight HTTP requests per API listener
 #       max_connections: 0
 #
-#       max_agent_doc_size: 20971520 # 20mb limit that applies to checkin request bodies when decompressing
-#
 #       # action_limit is a limiter for the action dispatcher, it is added to control how fast the checkin endpoint writes responses when an action effecting multiple agents is detected.
 #       # This is done in order to be able to reuse gzip writers if gzip is requested as allocating new writers is expensive (around 1.2MB for a new allocation).
 #       # If the interval is too high it may negativly effect assumtions around server write timeouts and poll poll durations, if used we expect the value to be around 5ms.
@@ -180,6 +178,7 @@ fleet:
 #         burst: 1000
 #         max: 0
 #         max_body_byte_size: 1048567 # 1MiB
+#         max_body_decompressed: 20971520 # 20MiB
 #       artifact_limit:
 #         interval: 5ms
 #         burst: 25

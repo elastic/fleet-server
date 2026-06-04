@@ -155,7 +155,6 @@ type serverLimitDefaults struct {
 	PolicyThrottle         time.Duration `config:"policy_throttle"` // deprecated: replaced by policy_limit
 	MaxConnections         int           `config:"max_connections"`
 	MaxFileStorageByteSize *uint64       `config:"max_file_storage_size"`
-	MaxAgentDocSize        int64         `config:"max_agent_doc_size"`
 
 	ActionLimit        limit `config:"action_limit"`
 	PolicyLimit        limit `config:"policy_limit"`
