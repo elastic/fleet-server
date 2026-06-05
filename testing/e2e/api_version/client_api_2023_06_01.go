@@ -305,13 +305,47 @@ func (tester *ClientAPITester20230601) TestFullFileUpload() {
 }
 
 func (tester *ClientAPITester20230601) TestArtifact() {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	ctx, cancel := context.WithTimeout(tester.T().Context(), 5*time.Minute)
 	defer cancel()
 
-	_, agentKey := tester.Enroll(ctx, tester.enrollmentKey)
+	// Elastic Defend (endpoint) artifacts are only authorized for agents enrolled under a
+	// policy that has the Elastic Defend integration (security-policy). dummy-policy has no
+	// Elastic Defend input and therefore no artifact_manifest, so agents enrolled there
+	// would get 403 when downloading endpoint artifacts.
+	securityPolicyKey := tester.GetEnrollmentTokenForPolicyID(ctx, "security-policy")
+	_, agentKey := tester.Enroll(ctx, securityPolicyKey)
 	tester.AddSecurityContainer(ctx)
 	tester.AddSecurityContainerItem(ctx)
 
 	hits := tester.FleetHasArtifacts(ctx)
-	tester.Artifact(ctx, agentKey, hits[0].Source.Identifier, hits[0].Source.DecodedSHA256, hits[0].Source.EncodedSHA256)
+	id, sha2, encodedSHA := hits[0].Source.Identifier, hits[0].Source.DecodedSHA256, hits[0].Source.EncodedSHA256
+	// Wait for the policy document in ES to reference the artifact. This also gives the
+	// fleet-server policy monitor time to refresh its cache before we attempt the download.
+	tester.FleetPolicyHasArtifact(ctx, "security-policy", id, sha2)
+	// Retry on 403: even after the ES policy is updated, the in-memory cache in fleet-server
+	// may not have caught up yet. The monitor refreshes quickly but retrying is more robust.
+	apiClient, err := tester.getAPIClient(func(_ context.Context, req *http.Request) error {
+		req.Header.Set("Authorization", "ApiKey "+agentKey)
+		return nil
+	})
+	tester.Require().NoError(err)
+	for {
+		if err := ctx.Err(); err != nil {
+			tester.Require().NoError(err, "context expired before artifact download succeeded")
+		}
+		resp, err := apiClient.ArtifactWithResponse(ctx, id, sha2, &api.ArtifactParams{})
+		tester.Require().NoError(err)
+		if resp.StatusCode() == http.StatusForbidden {
+			select {
+			case <-ctx.Done():
+				tester.Require().NoError(ctx.Err(), "context expired while retrying artifact download")
+			case <-time.After(time.Second):
+			}
+			continue
+		}
+		tester.Require().Equal(http.StatusOK, resp.StatusCode())
+		hash := sha256.Sum256(resp.Body)
+		tester.Require().Equal(encodedSHA, fmt.Sprintf("%x", hash[:]))
+		break
+	}
 }

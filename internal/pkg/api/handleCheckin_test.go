@@ -64,6 +64,12 @@ func (m *mockPolicyMonitor) LatestRev(ctx context.Context, id string) int64 {
 	return args.Get(0).(int64)
 }
 
+func (m *mockPolicyMonitor) GetPolicy(ctx context.Context, policyID string) (*model.Policy, error) {
+	args := m.Called(ctx, policyID)
+	p, _ := args.Get(0).(*model.Policy)
+	return p, args.Error(1)
+}
+
 func TestConvertActionData(t *testing.T) {
 	tests := []struct {
 		name   string
