@@ -41,6 +41,39 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+<<<<<<< HEAD
+=======
+type mockPolicyMonitor struct {
+	mock.Mock
+}
+
+func (m *mockPolicyMonitor) Run(ctx context.Context) error {
+	args := m.Called(ctx)
+	return args.Error(0)
+}
+
+func (m *mockPolicyMonitor) Subscribe(agentID, policyID string, revIDX int64) (policy.Subscription, error) {
+	args := m.Called(agentID, policyID, revIDX)
+	return args.Get(0).(policy.Subscription), args.Error(1)
+}
+
+func (m *mockPolicyMonitor) Unsubscribe(sub policy.Subscription) error {
+	args := m.Called(sub)
+	return args.Error(0)
+}
+
+func (m *mockPolicyMonitor) LatestRev(ctx context.Context, id string) int64 {
+	args := m.Called(ctx, id)
+	return args.Get(0).(int64)
+}
+
+func (m *mockPolicyMonitor) GetPolicy(ctx context.Context, policyID string) (*model.Policy, error) {
+	args := m.Called(ctx, policyID)
+	p, _ := args.Get(0).(*model.Policy)
+	return p, args.Error(1)
+}
+
+>>>>>>> caa8b2d (fix: enforce policy-based access control on artifact downloads (#7009))
 func TestConvertActionData(t *testing.T) {
 	tests := []struct {
 		name   string
