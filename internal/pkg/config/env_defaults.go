@@ -35,7 +35,7 @@ const (
 	defaultCheckinInterval = time.Millisecond
 	defaultCheckinBurst    = 1000
 	defaultCheckinMax      = 0
-	defaultCheckinMaxBody  = 1024 * 1024
+	defaultCheckinMaxBody  = 1024 * 1024 * 2
 
 	defaultArtifactInterval = time.Millisecond * 5
 	defaultArtifactBurst    = 25
