@@ -1261,7 +1261,7 @@ func TestValidateCheckinRequest(t *testing.T) {
 			cfg: &config.Server{
 				Limits: config.ServerLimits{
 					CheckinLimit: config.Limit{
-						MaxBody:             512, // compressed body is lower then doc size
+						MaxBody:             512, // compressed body is lower than doc size
 						MaxBodyDecompressed: 1024,
 					},
 				},
