@@ -32,10 +32,11 @@ const (
 	defaultPolicyInterval = time.Millisecond * 5
 	defaultPolicyBurst    = 1 // NOTE: burst 1 keeps the same behaviour as the previous throttle
 
-	defaultCheckinInterval = time.Millisecond
-	defaultCheckinBurst    = 1000
-	defaultCheckinMax      = 0
-	defaultCheckinMaxBody  = 1024 * 1024
+	defaultCheckinInterval        = time.Millisecond
+	defaultCheckinBurst           = 1000
+	defaultCheckinMax             = 0
+	defaultCheckinMaxBody         = 1024 * 1024
+	defaultCheckinMaxDecompressed = 20 * 1024 * 1024 // 20mb limit
 
 	defaultArtifactInterval = time.Millisecond * 5
 	defaultArtifactBurst    = 25
@@ -143,6 +144,11 @@ type limit struct {
 	// Used in the ack, checkin, and enroll endpoints.
 	// A zero value disabled the check.
 	MaxBody int64 `config:"max_body_byte_size"`
+
+	// MaxBodyDecompressed is the request body size limit post decompression.
+	// Used in the checkin endpoint
+	// A zero value disables the check
+	MaxBodyDecompressed int64 `config:"max_body_decompressed"`
 }
 
 type serverLimitDefaults struct {
@@ -178,10 +184,11 @@ func defaultserverLimitDefaults() *serverLimitDefaults {
 			Burst:    defaultPolicyBurst,
 		},
 		CheckinLimit: limit{
-			Interval: defaultCheckinInterval,
-			Burst:    defaultCheckinBurst,
-			Max:      defaultCheckinMax,
-			MaxBody:  defaultCheckinMaxBody,
+			Interval:            defaultCheckinInterval,
+			Burst:               defaultCheckinBurst,
+			Max:                 defaultCheckinMax,
+			MaxBody:             defaultCheckinMaxBody,
+			MaxBodyDecompressed: defaultCheckinMaxDecompressed,
 		},
 		ArtifactLimit: limit{
 			Interval: defaultArtifactInterval,
