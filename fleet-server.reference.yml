@@ -178,6 +178,7 @@ fleet:
 #         burst: 1000
 #         max: 0
 #         max_body_byte_size: 1048567 # 1MiB
+#         max_body_decompressed: 20971520 # 20MiB
 #       artifact_limit:
 #         interval: 5ms
 #         burst: 25

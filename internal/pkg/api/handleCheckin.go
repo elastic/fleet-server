@@ -197,6 +197,9 @@ func (ct *CheckinT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, 
 		}
 		defer gr.Close()
 		bodyReader = gr
+		if ct.cfg.Limits.CheckinLimit.MaxBodyDecompressed > 0 {
+			bodyReader = http.MaxBytesReader(w, gr, ct.cfg.Limits.CheckinLimit.MaxBodyDecompressed)
+		}
 	}
 
 	var val validatedCheckin

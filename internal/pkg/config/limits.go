@@ -9,10 +9,11 @@ import (
 )
 
 type Limit struct {
-	Interval time.Duration `config:"interval"`
-	Burst    int           `config:"burst"`
-	Max      int64         `config:"max"`
-	MaxBody  int64         `config:"max_body_byte_size"`
+	Interval            time.Duration `config:"interval"`
+	Burst               int           `config:"burst"`
+	Max                 int64         `config:"max"`
+	MaxBody             int64         `config:"max_body_byte_size"`
+	MaxBodyDecompressed int64         `config:"max_body_decompressed"`
 }
 
 type ServerLimits struct {
@@ -69,10 +70,11 @@ func (c *ServerLimits) LoadLimits(limits *envLimits) {
 
 func mergeEnvLimit(L Limit, l limit) Limit {
 	result := Limit{
-		Interval: L.Interval,
-		Burst:    L.Burst,
-		Max:      L.Max,
-		MaxBody:  L.MaxBody,
+		Interval:            L.Interval,
+		Burst:               L.Burst,
+		Max:                 L.Max,
+		MaxBody:             L.MaxBody,
+		MaxBodyDecompressed: L.MaxBodyDecompressed,
 	}
 	if result.Interval == 0 {
 		result.Interval = l.Interval
@@ -85,6 +87,9 @@ func mergeEnvLimit(L Limit, l limit) Limit {
 	}
 	if result.MaxBody == 0 {
 		result.MaxBody = l.MaxBody
+	}
+	if result.MaxBodyDecompressed == 0 {
+		result.MaxBodyDecompressed = l.MaxBodyDecompressed
 	}
 	return result
 }
