@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/fleet-server/v7/internal/pkg/dsl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 )
@@ -55,13 +56,21 @@ func makePolicyHit(withTarget bool) es.HitT {
 	return es.HitT{Source: src}
 }
 
-// BenchmarkQueryPoliciesRender measures the cost of rendering the zero-token
-// policies template. QueryOutputFromPolicy calls Render with an empty params
-// map on every invocation; this benchmark captures that overhead.
+// BenchmarkQueryPoliciesRender measures the cost of Render on a zero-token
+// template with an empty params map. This was the hot path in
+// QueryOutputFromPolicy before the static-bytes optimisation; it is kept as a
+// standalone benchmark so the render overhead is visible in benchstat output.
 func BenchmarkQueryPoliciesRender(b *testing.B) {
+	tmpl := dsl.NewTmpl()
+	root := dsl.NewRoot()
+	root.Size(100)
+	root.Sort().SortOrder("@timestamp", "desc")
+	root.Source().Includes("data.outputs")
+	tmpl.MustResolve(root)
+
 	b.ReportAllocs()
 	for b.Loop() {
-		_, err := tmplQueryPolicies.Render(map[string]any{})
+		_, err := tmpl.Render(map[string]any{})
 		if err != nil {
 			b.Fatal(err)
 		}
