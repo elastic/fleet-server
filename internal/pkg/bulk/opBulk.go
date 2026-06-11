@@ -47,9 +47,14 @@ func (b *Bulker) Delete(ctx context.Context, index, id string, opts ...Opt) erro
 }
 
 func (b *Bulker) waitBulkAction(ctx context.Context, action actionT, index, id string, body []byte, opts ...Opt) (*BulkIndexerResponseItem, error) {
-	span, ctx := apm.StartSpan(ctx, fmt.Sprintf("Bulker: %s", action.String()), "bulker")
+	span, ctx := apm.StartSpan(ctx, bulkSpanNames[action], "bulker")
 	defer span.End()
-	opt := b.parseOpts(append(opts, withAPMLinkedContext(ctx))...)
+	opt := b.parseOpts(opts...)
+	if tx := apm.TransactionFromContext(ctx); tx != nil {
+		tCtx := tx.TraceContext()
+		opt.spanLink = apm.SpanLink{Trace: tCtx.Trace, Span: tCtx.Span}
+		opt.hasSpanLink = true
+	}
 	blk := b.newBlk(action, opt)
 
 	// Serialize request
@@ -172,16 +177,18 @@ func (b *Bulker) flushBulk(ctx context.Context, queue queueT) error {
 
 	bufSz := max(queue.cnt*kRoughEstimatePerItem, queue.pending)
 
-	var buf bytes.Buffer
+	buf := b.flushBufPool.Get().(*bytes.Buffer)
+	buf.Reset()
 	buf.Grow(bufSz)
+	defer b.flushBufPool.Put(buf)
 
 	queueCnt := 0
-	links := []apm.SpanLink{}
+	links := make([]apm.SpanLink, 0, queue.cnt)
 	for n := queue.head; n != nil; n = n.next {
 		buf.Write(n.buf.Bytes())
 		queueCnt += 1
-		if n.spanLink != nil {
-			links = append(links, *n.spanLink)
+		if n.hasSpanLink {
+			links = append(links, n.spanLink)
 		}
 	}
 
@@ -190,7 +197,7 @@ func (b *Bulker) flushBulk(ctx context.Context, queue queueT) error {
 	if len(links) == 0 {
 		links = nil
 	}
-	span, ctx := apm.StartSpanOptions(ctx, fmt.Sprintf("Flush: %s", queue.Type()), queue.Type(), apm.SpanOptions{
+	span, ctx := apm.StartSpanOptions(ctx, flushSpanNames[queue.ty], queue.Type(), apm.SpanOptions{
 		Links: links,
 	})
 	defer span.End()

@@ -5,7 +5,6 @@
 package bulk
 
 import (
-	"context"
 	"strconv"
 	"time"
 
@@ -25,7 +24,8 @@ type optionsT struct {
 	Indices            []string
 	WaitForCheckpoints []int64
 	IgnoreUnavailable  bool
-	spanLink           *apm.SpanLink
+	spanLink           apm.SpanLink
+	hasSpanLink        bool
 }
 
 type Opt func(*optionsT)
@@ -63,19 +63,6 @@ func WithWaitForCheckpoints(checkpoints []int64) Opt {
 	}
 }
 
-func withAPMLinkedContext(ctx context.Context) Opt {
-	return func(opt *optionsT) {
-		trace := apm.TransactionFromContext(ctx)
-		if trace == nil {
-			return
-		}
-		tCtx := trace.TraceContext()
-		opt.spanLink = &apm.SpanLink{
-			Trace: tCtx.Trace,
-			Span:  tCtx.Span,
-		}
-	}
-}
 
 //-----
 // Bulk API options
