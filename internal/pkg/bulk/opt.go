@@ -63,7 +63,6 @@ func WithWaitForCheckpoints(checkpoints []int64) Opt {
 	}
 }
 
-
 //-----
 // Bulk API options
 
