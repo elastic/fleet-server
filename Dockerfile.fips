@@ -1,5 +1,5 @@
 ARG GO_VERSION
-# Suffix should be main-debian11-fips or base-arm-debian11-fips
+# Suffix should be main-debian11 or base-arm-debian11
 ARG SUFFIX
 FROM docker.elastic.co/beats-dev/golang-crossbuild:${GO_VERSION}-${SUFFIX} AS base
 
@@ -10,21 +10,22 @@ WORKDIR /fleet-server/
 
 # pre-copy/cache go.mod for pre-downloading dependencies and only redownloading them in subsequent builds if they change
 COPY go.mod go.sum ./
+# GOFIPS140 must be set before go mod download so that the golang.org/fips140 module is cached during image build.
+# Without this, the module would be fetched at build time by the host user who lacks write access to the module cache.
+ENV GOFIPS140=certified
+ENV FIPS=true
 RUN go mod download && go mod verify
 RUN go install github.com/magefile/mage # uses version in go.mod
 
 ENV PATH="$PATH:/go/bin"
-ENV FIPS=true
-ENV CGO_ENABLED=1
 ENV MAGEFILE_CACHE=/fleet-server/build/.magefile
-ENV MS_GOTOOLCHAIN_TELEMETRY_ENABLED=0
 ENTRYPOINT [ "mage" ]
 CMD [ "build:release" ]
 
 # FIPS docker image defined below
 # Does not use base as the lowest layer so we don't have to deal with user/ownership issues when building the image.
 ARG GO_VERSION
-# Suffix should be main-debian11-fips or base-arm-debian11-fips
+# Suffix should be main-debian11 or base-arm-debian11
 ARG SUFFIX
 FROM docker.elastic.co/beats-dev/golang-crossbuild:${GO_VERSION}-${SUFFIX} AS builder
 
@@ -42,7 +43,7 @@ ARG DEV=""
 ARG SNAPSHOT=""
 ARG TARGETPLATFORM
 
-RUN MS_GOTOOLCHAIN_TELEMETRY_ENABLED=0 FIPS=true CGO_ENABLED=1 GCFLAGS="${GCFLAGS}" LDFLAGS="${LDFLAGS}" SNAPSHOT="${SNAPSHOT}" DEV="${DEV}" PLATFORMS="${TARGETPLATFORM}" mage build:release
+RUN FIPS=true GCFLAGS="${GCFLAGS}" LDFLAGS="${LDFLAGS}" SNAPSHOT="${SNAPSHOT}" DEV="${DEV}" PLATFORMS="${TARGETPLATFORM}" mage build:release
 
 FROM docker.elastic.co/wolfi/chainguard-base-fips:latest
 ARG VERSION

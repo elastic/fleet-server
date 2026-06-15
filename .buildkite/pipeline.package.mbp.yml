@@ -27,7 +27,10 @@ steps:
     # as prereleases are only intended to be used with staging; details in https://github.com/elastic/ingest-dev/issues/4855
     if: "build.env('VERSION_QUALIFIER') == null"
     key: "package-x86-64-snapshot"
-    command: ".buildkite/scripts/package.sh snapshot"
+    command: ".buildkite/scripts/package.sh"
+    env:
+      PLATFORMS: "linux/amd64,darwin/amd64,windows/amd64"
+      SNAPSHOT: "true"
     agents:
       provider: "gcp"
       image: "${IMAGE_UBUNTU_X86_64}"
@@ -41,7 +44,9 @@ steps:
     key: "package-x86-64-staging"
     command: |
       source .buildkite/scripts/version_qualifier.sh
-      .buildkite/scripts/package.sh staging
+      .buildkite/scripts/package.sh
+    env:
+      PLATFORMS: "linux/amd64,darwin/amd64,windows/amd64"
     agents:
       provider: "gcp"
       image: "${IMAGE_UBUNTU_X86_64}"
@@ -55,9 +60,11 @@ steps:
   - label: "Package FIPS x86_64 snapshot"
     if: "build.env('VERSION_QUALIFIER') == null"
     key: "package-fips-x86-64-snapshot"
-    command: ".buildkite/scripts/package.sh snapshot"
+    command: ".buildkite/scripts/package.sh"
     env:
+      SNAPSHOT: "true"
       FIPS: "true"
+      PLATFORMS: "linux/amd64,windows/amd64"
     agents:
       provider: "gcp"
       image: "${IMAGE_UBUNTU_X86_64}"
@@ -72,9 +79,10 @@ steps:
     key: "package-fips-x86-64-staging"
     command: |
       source .buildkite/scripts/version_qualifier.sh
-      .buildkite/scripts/package.sh staging
+      .buildkite/scripts/package.sh
     env:
       FIPS: "true"
+      PLATFORMS: "linux/amd64,windows/amd64"
     agents:
       provider: "gcp"
       image: "${IMAGE_UBUNTU_X86_64}"
@@ -88,7 +96,10 @@ steps:
   - label: "Package aarch64 snapshot"
     if: "build.env('VERSION_QUALIFIER') == null"
     key: "package-arm-snapshot"
-    command: ".buildkite/scripts/package.sh snapshot"
+    command: ".buildkite/scripts/package.sh"
+    env:
+      SNAPSHOT: "true"
+      PLATFORMS: "linux/arm64,darwin/arm64,windows/arm64"
     agents:
       provider: "aws"
       imagePrefix: "${IMAGE_UBUNTU_ARM_64}"
@@ -103,7 +114,9 @@ steps:
     key: "package-arm-staging"
     command: |
       source .buildkite/scripts/version_qualifier.sh
-      .buildkite/scripts/package.sh staging
+      .buildkite/scripts/package.sh
+    env:
+      PLATFORMS: "linux/arm64,darwin/arm64,windows/arm64"
     agents:
       provider: "aws"
       imagePrefix: "${IMAGE_UBUNTU_ARM_64}"
@@ -117,9 +130,11 @@ steps:
   - label: "Package FIPS aarch64 snapshot"
     if: "build.env('VERSION_QUALIFIER') == null"
     key: "package-fips-arm-snapshot"
-    command: ".buildkite/scripts/package.sh snapshot"
+    command: ".buildkite/scripts/package.sh"
     env:
+      SNAPSHOT: "true"
       FIPS: "true"
+      PLATFORMS: "linux/arm64,windows/arm64"
     agents:
       provider: "aws"
       imagePrefix: "${IMAGE_UBUNTU_ARM_64}"
@@ -134,9 +149,10 @@ steps:
     key: "package-fips-arm-staging"
     command: |
       source .buildkite/scripts/version_qualifier.sh
-      .buildkite/scripts/package.sh staging
+      .buildkite/scripts/package.sh
     env:
       FIPS: "true"
+      PLATFORMS: "linux/arm64,windows/arm64"
     agents:
       provider: "aws"
       imagePrefix: "${IMAGE_UBUNTU_ARM_64}"

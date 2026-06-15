@@ -5,7 +5,6 @@ env:
   TERRAFORM_VERSION: "1.6.4"
   IMAGE_UBUNTU_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1776780011"
   IMAGE_UBUNTU_ARM_64: "platform-ingest-elastic-agent-ubuntu-2204-aarch64-1776780011"
-  IMAGE_UBUNTU_X86_64_FIPS: "platform-ingest-fleet-server-ubuntu-2204-fips"
 
 # This section is used to define the plugins that will be used in the pipeline.
 # See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
@@ -67,7 +66,7 @@ steps:
         key: "package-fips-x86-64-pr"
         env:
           FIPS: "true"
-          PLATFORMS: "linux/amd64"
+          PLATFORMS: "linux/amd64,windows/amd64"
         command: ".buildkite/scripts/release_test.sh"
         artifact_paths:
           - build/distributions/**
@@ -98,7 +97,7 @@ steps:
         key: "package-fips-arm64-pr"
         env:
           FIPS: "true"
-          PLATFORMS: "linux/arm64"
+          PLATFORMS: "linux/arm64,windows/arm64"
         command: ".buildkite/scripts/release_test.sh"
         artifact_paths:
           - build/distributions/**
@@ -164,32 +163,27 @@ steps:
           - build/*.xml
           - build/coverage*.out
 
-      - label: ":smartbear-testexecute: Run fips140=on unit tests with FIPS provider and microsoft/go"
-        key: unit-test-fips-tag
+      - label: ":smartbear-testexecute: Run unit tests with FIPS"
+        key: unit-test-fips
         command: ".buildkite/scripts/unit_test.sh"
         env:
           FIPS: "true"
-          GOEXPERIMENT: "systemcrypto"
-          GO_DISTRO: "microsoft"
           GODEBUG: "fips140=on,tlsmlkem=0"
         agents:
-          provider: "aws"
-          imagePrefix: "${IMAGE_UBUNTU_X86_64_FIPS}"
-          instanceType: "m5.xlarge"
+          provider: "gcp"
+          image: "${IMAGE_UBUNTU_X86_64}"
         artifact_paths:
           - build/*.xml
           - build/coverage*.out
 
-      - label: ":smartbear-testexecute: Run fips140=only unit tests with FIPS provider and upstream go"
+      - label: ":smartbear-testexecute: Run fips140=only unit tests"
         key: unit-test-fips140-only
         command: ".buildkite/scripts/unit_test_fipsonly.sh"
         env:
           FIPS: "true"
-          GO_DISTRO: "stdlib"
         agents:
-          provider: "aws"
-          imagePrefix: "${IMAGE_UBUNTU_X86_64_FIPS}"
-          instanceType: "m5.xlarge"
+          provider: "gcp"
+          image: "${IMAGE_UBUNTU_X86_64}"
         artifact_paths:
           - build/*.xml
           - build/coverage*.out
