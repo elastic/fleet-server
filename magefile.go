@@ -2279,24 +2279,31 @@ func (Test) CloudE2EDown() error {
 }
 
 // CloudE2ERun runs tests against the remote cloud deployment.
+// It reads credentials from env vars (FLEET_SERVER_URL, KIBANA_URL, ELASTIC_USER, ELASTIC_PASS).
+// In CI, cloud_e2e_test.sh populates these from oblt-cli cluster secrets before calling this target.
+// Locally, if the env vars are absent, it falls back to reading from the terraform state written by CloudE2EUp.
 func (Test) CloudE2ERun() error {
-	fleetURL, err := sh.Output("terraform", "output", "--raw", "--state="+filepath.Join("dev-tools", "cloud", "terraform", "terraform.tfstate"), "fleet_url")
-	if err != nil {
-		return fmt.Errorf("unable to retrive fleet-server cloud url: %w", err)
-	}
+	fleetURL := os.Getenv("FLEET_SERVER_URL")
+	kibanaURL := os.Getenv("KIBANA_URL")
+	user := os.Getenv("ELASTIC_USER")
+	pass := os.Getenv("ELASTIC_PASS")
 
-	kibanaURL, err := sh.Output("terraform", "output", "--raw", "--state="+filepath.Join("dev-tools", "cloud", "terraform", "terraform.tfstate"), "kibana_url")
-	if err != nil {
-		return fmt.Errorf("unable to retrive kibana cloud url: %w", err)
-	}
-
-	user, err := sh.Output("terraform", "output", "--raw", "--state="+filepath.Join("dev-tools", "cloud", "terraform", "terraform.tfstate"), "elasticsearch_username")
-	if err != nil {
-		return fmt.Errorf("unable to retrive es username: %w", err)
-	}
-	pass, err := sh.Output("terraform", "output", "--raw", "--state="+filepath.Join("dev-tools", "cloud", "terraform", "terraform.tfstate"), "elasticsearch_password")
-	if err != nil {
-		return fmt.Errorf("unable to retrive es password: %w", err)
+	if fleetURL == "" || kibanaURL == "" || user == "" || pass == "" {
+		log.Println("Credential env vars not set, falling back to terraform state")
+		tfState := filepath.Join("dev-tools", "cloud", "terraform", "terraform.tfstate")
+		var err error
+		if fleetURL, err = sh.Output("terraform", "output", "--raw", "--state="+tfState, "fleet_url"); err != nil {
+			return fmt.Errorf("unable to retrieve fleet-server cloud url: %w", err)
+		}
+		if kibanaURL, err = sh.Output("terraform", "output", "--raw", "--state="+tfState, "kibana_url"); err != nil {
+			return fmt.Errorf("unable to retrieve kibana cloud url: %w", err)
+		}
+		if user, err = sh.Output("terraform", "output", "--raw", "--state="+tfState, "elasticsearch_username"); err != nil {
+			return fmt.Errorf("unable to retrieve es username: %w", err)
+		}
+		if pass, err = sh.Output("terraform", "output", "--raw", "--state="+tfState, "elasticsearch_password"); err != nil {
+			return fmt.Errorf("unable to retrieve es password: %w", err)
+		}
 	}
 
 	var b bytes.Buffer
@@ -2311,7 +2318,7 @@ func (Test) CloudE2ERun() error {
 	)
 	cmd.Stdout = w
 	cmd.Stderr = w
-	err = cmd.Run()
+	err := cmd.Run()
 	err = errors.Join(err, os.WriteFile(filepath.Join("build", "test-cloude2e.out"), b.Bytes(), 0o644))
 	return err
 }

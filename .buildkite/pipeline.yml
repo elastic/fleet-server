@@ -34,6 +34,16 @@ common:
         lifetime: 10800 # seconds
         project-id: "elastic-observability-ci"
         project-number: "911195782929"
+  # See https://github.com/elastic/oblt-infra/blob/main/conf/resources/repos/fleet-server/01-gcp-buildkite-oidc.tf
+  # This plugin authenticates to Google Cloud for oblt-cli access.
+  - google_oidc_observability_plugin: &google_oidc_observability_plugin
+      elastic/oblt-google-auth#v1.3.0:
+        lifetime: 10800 # seconds
+  - oblt_cli_plugin: &oblt_cli_plugin
+      elastic/oblt-cli#v0.4.0:
+        version-file: .oblt-cli-version
+  - vault_github_token: &vault_github_token
+      elastic/vault-github-token#v0.1.0:
 
 steps:
   - group: "Check and build"
@@ -264,16 +274,14 @@ steps:
           DOCKER_IMAGE_TAG: "pr-${BUILDKITE_PULL_REQUEST}-${BUILDKITE_COMMIT:0:12}"
           SNAPSHOT: "true"
           PLATFORMS: "linux/amd64"
-          TF_VAR_pull_request: "${BUILDKITE_PULL_REQUEST}"
         command: ".buildkite/scripts/cloud_e2e_test.sh"
         agents:
           provider: "gcp"
         plugins:
           - *docker_elastic_login_plugin
-          - elastic/vault-secrets#v0.1.0:
-              path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
-              field: "apiKey"
-              env_var: "EC_API_KEY"
+          - *google_oidc_observability_plugin
+          - *oblt_cli_plugin
+          - *vault_github_token
         depends_on:
           - step: "unit-test"
             allow_failure: false
@@ -295,24 +303,15 @@ steps:
           DOCKER_IMAGE_TAG: "pr-${BUILDKITE_PULL_REQUEST}-${BUILDKITE_COMMIT:0:12}"
           SNAPSHOT: "true"
           PLATFORMS: "linux/amd64"
-          TF_VAR_pull_request: "${BUILDKITE_PULL_REQUEST}"
           FIPS: "true"
-          # Cloud e2e test is temporarily redirected to prod as new deployments are not able to start on FRH-staging.
-          # The following env vars should be uncommented once FRH-staging is fixed.
-          #EC_ENDPOINT: "https://api.staging.elastic-gov.com"
-          #TF_VAR_ess_region: "us-gov-east-1"
-          #TF_VAR_deployment_template_id: "aws-general-purpose"
         command: ".buildkite/scripts/cloud_e2e_test.sh"
         agents:
           provider: "gcp"
         plugins:
           - *docker_elastic_login_plugin
-          - elastic/vault-secrets#v0.1.0:
-              path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
-              # Use the commented path below instead of the one above when FRH-staging is fixed.
-              #path: "kv/ci-shared/platform-ingest/platform-ingest-ec-staging-gov"
-              field: "apiKey"
-              env_var: "EC_API_KEY"
+          - *google_oidc_observability_plugin
+          - *oblt_cli_plugin
+          - *vault_github_token
         depends_on:
           - step: "unit-test"
             allow_failure: false
