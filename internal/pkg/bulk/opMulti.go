@@ -91,7 +91,7 @@ func (b *Bulker) multiWaitBulkOp(ctx context.Context, action actionT, ops []Mult
 
 		bulk := &bulks[i]
 		bulk.ch = ch
-		bulk.idx = int32(i) //nolint:gosec // disable G115
+		bulk.idx = int32(i) //nolint:gosec
 		bulk.action = action
 		bulk.buf.Set(bodySlice)
 		bulk.spanLink = spanLink
@@ -117,7 +117,7 @@ func (b *Bulker) multiWaitBulkOp(ctx context.Context, action actionT, ops []Mult
 				lastErr = r.err
 			}
 			if r.data != nil {
-				items[r.idx] = *r.data.(*BulkIndexerResponseItem)
+				items[r.idx] = *r.data.(*BulkIndexerResponseItem) //nolint:errcheck // response data type is guaranteed by the bulk engine
 			}
 		case <-ctx.Done():
 			return nil, ctx.Err()

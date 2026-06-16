@@ -73,7 +73,7 @@ func (b *Bulker) flushRead(ctx context.Context, queue queueT) error {
 
 	bufSz := max(queue.cnt*kRoughEstimatePerItem, queue.pending+len(rSuffix))
 
-	buf := b.flushBufPool.Get().(*bytes.Buffer)
+	buf := b.flushBufPool.Get().(*bytes.Buffer) //nolint:errcheck // we control what is placed in the pool
 	buf.Reset()
 	buf.Grow(bufSz + len(rPrefix))
 	buf.WriteString(rPrefix)

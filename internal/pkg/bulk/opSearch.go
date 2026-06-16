@@ -79,7 +79,8 @@ func (b *Bulker) writeMsearchMeta(buf *Buf, index string, moreIndices []string, 
 			return err
 		}
 
-		indices := []string{index}
+		indices := make([]string, 0, 1+len(moreIndices))
+		indices = append(indices, index)
 		indices = append(indices, moreIndices...)
 
 		_, _ = buf.WriteString(`"index": `)
@@ -132,7 +133,7 @@ func (b *Bulker) flushSearch(ctx context.Context, queue queueT) error {
 
 	bufSz := max(queue.cnt*kRoughEstimatePerItem, queue.pending)
 
-	buf := b.flushBufPool.Get().(*bytes.Buffer)
+	buf := b.flushBufPool.Get().(*bytes.Buffer) //nolint:errcheck // we control what is placed in the pool
 	buf.Reset()
 	buf.Grow(bufSz)
 	defer b.flushBufPool.Put(buf)

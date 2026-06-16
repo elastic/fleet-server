@@ -301,12 +301,8 @@ func (b *Bulker) RemoteOutputConfigChanged(zlog zerolog.Logger, name string, new
 	defer b.remoteOutputMutex.RUnlock()
 	curCfg := b.remoteOutputConfigMap[name]
 
-	hasChanged := false
-
 	// when output config first added, not reporting change
-	if curCfg != nil && !reflect.DeepEqual(curCfg, newCfg) {
-		hasChanged = true
-	}
+	hasChanged := curCfg != nil && !reflect.DeepEqual(curCfg, newCfg)
 	return hasChanged
 }
 
