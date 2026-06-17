@@ -10,6 +10,8 @@ with_go
 
 with_docker_compose
 
+with_mage
+
 # Extract stack version from dev-tools/integration/.env.
 # Mirrors the regex logic in the former terraform main.tf:
 # ELASTICSEARCH_VERSION=9.5.0-<hash>-SNAPSHOT -> 9.5.0-SNAPSHOT
