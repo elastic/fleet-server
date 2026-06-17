@@ -5,6 +5,7 @@
 package bulk
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -87,11 +88,36 @@ type Bulk interface {
 
 const kModBulk = "bulk"
 
+var bulkSpanNames = func() [ActionFleetSearch + 1]string {
+	var names [ActionFleetSearch + 1]string
+	for i := range names {
+		names[i] = "Bulker: " + actionT(i).String()
+	}
+	return names
+}()
+
+var flushQueueTxNames = func() [kNumQueues]string {
+	var names [kNumQueues]string
+	for i := range names {
+		names[i] = "Flush queue " + queueT{ty: queueType(i)}.Type()
+	}
+	return names
+}()
+
+var flushSpanNames = func() [kNumQueues]string {
+	var names [kNumQueues]string
+	for i := range names {
+		names[i] = "Flush: " + queueT{ty: queueType(i)}.Type()
+	}
+	return names
+}()
+
 type Bulker struct {
 	es                    esapi.Transport
 	ch                    chan *bulkT
 	opts                  bulkOptT
 	blkPool               sync.Pool
+	flushBufPool          sync.Pool
 	apikeyLimit           *semaphore.Weighted
 	tracer                *apm.Tracer
 	cancelFn              context.CancelFunc
@@ -134,6 +160,7 @@ func NewBulker(es esapi.Transport, tracer *apm.Tracer, opts ...BulkOpt) *Bulker 
 		es:                    es,
 		ch:                    make(chan *bulkT, bopts.blockQueueSz),
 		blkPool:               sync.Pool{New: poolFunc},
+		flushBufPool:          sync.Pool{New: func() any { return new(bytes.Buffer) }},
 		apikeyLimit:           semaphore.NewWeighted(int64(bopts.apikeyMaxParallel)),
 		tracer:                tracer,
 		remoteOutputConfigMap: make(map[string]map[string]any),
@@ -274,12 +301,8 @@ func (b *Bulker) RemoteOutputConfigChanged(zlog zerolog.Logger, name string, new
 	defer b.remoteOutputMutex.RUnlock()
 	curCfg := b.remoteOutputConfigMap[name]
 
-	hasChanged := false
-
 	// when output config first added, not reporting change
-	if curCfg != nil && !reflect.DeepEqual(curCfg, newCfg) {
-		hasChanged = true
-	}
+	hasChanged := curCfg != nil && !reflect.DeepEqual(curCfg, newCfg)
 	return hasChanged
 }
 
@@ -496,7 +519,7 @@ func (b *Bulker) flushQueue(ctx context.Context, w *semaphore.Weighted, queue qu
 		defer cancel()
 
 		if b.tracer != nil {
-			trans := b.tracer.StartTransaction(fmt.Sprintf("Flush queue %s", queue.Type()), "bulker")
+			trans := b.tracer.StartTransaction(flushQueueTxNames[queue.ty], "bulker")
 			trans.Context.SetLabel("queue.size", queue.cnt)
 			trans.Context.SetLabel("queue.pending", queue.pending)
 			ctx = apm.ContextWithTransaction(ctx, trans)
@@ -565,6 +588,7 @@ func (b *Bulker) newBlk(action actionT, opts optionsT) *bulkT {
 		blk.flags.Set(flagRefresh)
 	}
 	blk.spanLink = opts.spanLink
+	blk.hasSpanLink = opts.hasSpanLink
 
 	return blk
 }

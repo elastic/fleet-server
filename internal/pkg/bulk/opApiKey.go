@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"math"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
@@ -110,30 +111,25 @@ func (b *Bulker) APIKeyUpdate(ctx context.Context, id, outputPolicyHash string, 
 // Even if the order was incorrect we end up with just a bit broader permission set, never too strict, so agent does not
 // end up with fewer permissions than it needs
 func (b *Bulker) flushUpdateAPIKey(ctx context.Context, queue queueT) error {
-	idsPerRole := make(map[string][]string)
-	roles := make(map[string]json.RawMessage)
-	rolePerID := make(map[string]string)
-	responses := make(map[int]int)
-	idxToID := make(map[int32]string)
-	IDToResponse := make(map[string]int)
+	idsPerRole := make(map[string][]string, queue.cnt)
+	roles := make(map[string]json.RawMessage, queue.cnt)
+	rolePerID := make(map[string]string, queue.cnt)
+	responses := make(map[int]int, queue.cnt)
+	idxToID := make(map[int32]string, queue.cnt)
+	IDToResponse := make(map[string]int, queue.cnt)
 	maxKeySize := 0
-	links := []apm.SpanLink{}
+	links := make([]apm.SpanLink, 0, queue.cnt)
 
 	// merge ids
 	for n := queue.head; n != nil; n = n.next {
 		content := n.buf.Bytes()
-		metaMap := make(map[string]any)
-		dec := json.NewDecoder(bytes.NewReader(content))
-		if err := dec.Decode(&metaMap); err != nil {
-			zerolog.Ctx(ctx).Error().
-				Err(err).
-				Str("mod", kModBulk).
-				Msg("Failed to unmarshal api key update meta map")
-			return err
+		_, body, ok := bytes.Cut(content, []byte("\n"))
+		if !ok {
+			return fmt.Errorf("invalid APIKeyUpdate buffer: missing meta separator")
 		}
 
-		var req *apiKeyUpdateRequest
-		if err := dec.Decode(&req); err != nil {
+		var req apiKeyUpdateRequest
+		if err := json.Unmarshal(body, &req); err != nil {
 			zerolog.Ctx(ctx).Error().
 				Err(err).
 				Str("mod", kModBulk).
@@ -152,8 +148,8 @@ func (b *Bulker) flushUpdateAPIKey(ctx context.Context, queue queueT) error {
 		if maxKeySize < len(req.ID) {
 			maxKeySize = len(req.ID)
 		}
-		if n.spanLink != nil {
-			links = append(links, *n.spanLink)
+		if n.hasSpanLink {
+			links = append(links, n.spanLink)
 		}
 	}
 
