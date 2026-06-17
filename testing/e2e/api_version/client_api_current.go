@@ -320,19 +320,19 @@ func (tester *ClientAPITester) AuditUnenroll(ctx context.Context, apiKey, id str
 }
 
 func (tester *ClientAPITester) TestStatus_Unauthenticated() {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(tester.T().Context())
 	defer cancel()
 	tester.Status(ctx, "")
 }
 
 func (tester *ClientAPITester) TestStatus_Authenticated() {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(tester.T().Context())
 	defer cancel()
 	tester.Status(ctx, tester.enrollmentKey)
 }
 
 func (tester *ClientAPITester) TestEnrollCheckinAck() {
-	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
+	ctx, cancel := context.WithTimeout(tester.T().Context(), 4*time.Minute)
 	defer cancel()
 
 	tester.T().Log("test enrollment")
@@ -358,7 +358,7 @@ func (tester *ClientAPITester) TestEnrollCheckinAck() {
 }
 
 func (tester *ClientAPITester) TestCheckinWithBadRequest() {
-	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
+	ctx, cancel := context.WithTimeout(tester.T().Context(), 4*time.Minute)
 	defer cancel()
 
 	tester.T().Log("test enrollment")
@@ -372,7 +372,7 @@ func (tester *ClientAPITester) TestCheckinWithBadRequest() {
 }
 
 func (tester *ClientAPITester) TestCheckinWithActionNotFound() {
-	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
+	ctx, cancel := context.WithTimeout(tester.T().Context(), 4*time.Minute)
 	defer cancel()
 
 	// enroll agent
@@ -395,7 +395,7 @@ func (tester *ClientAPITester) TestCheckinWithActionNotFound() {
 }
 
 func (tester *ClientAPITester) TestFullFileUpload() {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(tester.T().Context())
 	defer cancel()
 
 	agentID, agentKey := tester.Enroll(ctx, tester.enrollmentKey)
@@ -417,13 +417,13 @@ func (tester *ClientAPITester) TestArtifact() {
 }
 
 func (tester *ClientAPITester) TestGetPGPKey() {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(tester.T().Context())
 	defer cancel()
 	tester.GetPGPKey(ctx)
 }
 
 func (tester *ClientAPITester) TestEnrollAuditUnenroll() {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(tester.T().Context())
 	defer cancel()
 	now := time.Now().UTC()
 
