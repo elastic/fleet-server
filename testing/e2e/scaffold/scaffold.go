@@ -197,6 +197,7 @@ func (s *Scaffold) FleetServerStatusNeverBecomes(ctx context.Context, url string
 // If the passed context terminates before, the current test will be marked as failed.
 func (s *Scaffold) FleetServerStatusCondition(ctx context.Context, url string, condition func(resp *http.Response) bool, failOnDone bool) {
 	timer := time.NewTimer(time.Second)
+	var lastStatusCode int
 	for {
 		select {
 		case <-ctx.Done():
@@ -211,16 +212,28 @@ func (s *Scaffold) FleetServerStatusCondition(ctx context.Context, url string, c
 
 			resp, err := s.Client.Do(req)
 			if err != nil {
+				if lastStatusCode != -1 {
+					s.T().Logf("fleet-server %s: connection error: %v", url, err)
+					lastStatusCode = -1
+				}
 				timer.Reset(time.Second)
 				continue
 			}
 
+			// Read body once so both condition and logging can use it.
+			body, _ := io.ReadAll(resp.Body)
+			resp.Body.Close()
+			resp.Body = io.NopCloser(bytes.NewReader(body))
+
 			// on success
 			if condition(resp) {
-				resp.Body.Close()
 				return
 			}
-			resp.Body.Close()
+
+			if resp.StatusCode != lastStatusCode {
+				s.T().Logf("fleet-server %s: %s %s", url, resp.Status, string(body))
+				lastStatusCode = resp.StatusCode
+			}
 
 			// fail, try after a wait
 			timer.Reset(time.Second)

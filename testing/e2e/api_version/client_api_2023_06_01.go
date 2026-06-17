@@ -259,19 +259,19 @@ func (tester *ClientAPITester20230601) Artifact(ctx context.Context, apiKey, id,
 }
 
 func (tester *ClientAPITester20230601) TestStatus_Unauthenticated() {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(tester.T().Context())
 	defer cancel()
 	tester.Status(ctx, "")
 }
 
 func (tester *ClientAPITester20230601) TestStatus_Authenticated() {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(tester.T().Context())
 	defer cancel()
 	tester.Status(ctx, tester.enrollmentKey)
 }
 
 func (tester *ClientAPITester20230601) TestEnrollCheckinAck() {
-	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
+	ctx, cancel := context.WithTimeout(tester.T().Context(), 4*time.Minute)
 	defer cancel()
 
 	tester.T().Log("test enrollment")
@@ -295,7 +295,7 @@ func (tester *ClientAPITester20230601) TestEnrollCheckinAck() {
 }
 
 func (tester *ClientAPITester20230601) TestFullFileUpload() {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(tester.T().Context())
 	defer cancel()
 
 	agentID, agentKey := tester.Enroll(ctx, tester.enrollmentKey)
