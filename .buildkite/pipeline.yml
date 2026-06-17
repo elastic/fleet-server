@@ -37,13 +37,13 @@ common:
   # See https://github.com/elastic/oblt-infra/blob/main/conf/resources/repos/fleet-server/01-gcp-buildkite-oidc.tf
   # This plugin authenticates to Google Cloud for oblt-cli access.
   - google_oidc_observability_plugin: &google_oidc_observability_plugin
-      elastic/oblt-google-auth#v1.3.0:
+      elastic/oblt-google-auth#v1.3.1:
         lifetime: 10800 # seconds
   - oblt_cli_plugin: &oblt_cli_plugin
-      elastic/oblt-cli#v0.4.0:
+      elastic/oblt-cli#v0.4.2:
         version-file: .oblt-cli-version
   - vault_github_token: &vault_github_token
-      elastic/vault-github-token#v0.1.0:
+      elastic/vault-github-token#v0.2.1:
 
 steps:
   - group: "Check and build"
