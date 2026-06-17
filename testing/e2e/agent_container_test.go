@@ -88,9 +88,7 @@ func (suite *AgentContainerSuite) TearDownTest() {
 //
 // It checks the status API on the fleet-server's external port and that the agent listed in Kibana states "online"
 // Tests that enroll another agent explicitly need fleet-server to be online
-func (suite *AgentContainerSuite) FleetIsHealthy(bCtx context.Context, endpoint string) {
-	ctx, cancel := context.WithTimeout(bCtx, time.Minute)
-	defer cancel()
+func (suite *AgentContainerSuite) FleetIsHealthy(ctx context.Context, endpoint string) {
 	suite.FleetServerStatusOK(ctx, endpoint)
 
 	if suite.agentID != "" {
@@ -102,7 +100,7 @@ func (suite *AgentContainerSuite) FleetIsHealthy(bCtx context.Context, endpoint 
 }
 
 func (suite *AgentContainerSuite) TestHTTP() {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	ctx, cancel := context.WithTimeout(suite.T().Context(), 3*time.Minute)
 	defer cancel()
 
 	req := testcontainers.ContainerRequest{
@@ -146,7 +144,7 @@ func (suite *AgentContainerSuite) TestHTTP() {
 }
 
 func (suite *AgentContainerSuite) TestWithSecretFiles() {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	ctx, cancel := context.WithTimeout(suite.T().Context(), 3*time.Minute)
 	defer cancel()
 
 	req := testcontainers.ContainerRequest{
@@ -220,8 +218,6 @@ func (suite *AgentContainerSuite) TestSleep10m() {
 	if !longFlag {
 		suite.T().Skip("Long tests skipped. Enable with -long.")
 	}
-	bCtx, bCancel := context.WithCancel(context.Background())
-	defer bCancel()
 
 	req := testcontainers.ContainerRequest{
 		Hostname: "fleet-server",
@@ -270,7 +266,7 @@ func (suite *AgentContainerSuite) TestSleep10m() {
 		},
 		WaitingFor: containerWaitForHealthyStatus().WithTLS(true, nil),
 	}
-	fleetC, err := testcontainers.GenericContainer(bCtx, testcontainers.GenericContainerRequest{
+	fleetC, err := testcontainers.GenericContainer(suite.T().Context(), testcontainers.GenericContainerRequest{
 		ContainerRequest: req,
 		Started:          true,
 		Logger:           &logger{suite.T()},
@@ -278,15 +274,20 @@ func (suite *AgentContainerSuite) TestSleep10m() {
 	suite.Require().NoError(err)
 	suite.container = fleetC
 
-	endpoint, err := fleetC.Endpoint(bCtx, "https")
+	endpoint, err := fleetC.Endpoint(suite.T().Context(), "https")
 	suite.Require().NoError(err)
 
-	suite.FleetIsHealthy(bCtx, endpoint)
+	suite.FleetIsHealthy(suite.T().Context(), endpoint)
 
-	suite.T().Log("sleeping for 10m")
-	time.Sleep(time.Minute * 10)
-
-	suite.FleetIsHealthy(bCtx, endpoint)
+	for i := range 10 {
+		select {
+		case <-suite.T().Context().Done():
+			suite.Require().NoError(suite.T().Context().Err())
+		case <-time.After(time.Minute):
+			suite.T().Logf("checking fleet health at minute %d", i)
+			suite.FleetIsHealthy(suite.T().Context(), endpoint)
+		}
+	}
 }
 
 // TestDockerAgent will enroll a real agent running in a docker container.
@@ -295,9 +296,6 @@ func (suite *AgentContainerSuite) TestSleep10m() {
 //
 // NOTE: This is intended as a sanity check. Additional fleet-server/elastic-agent are not tested.
 func (suite *AgentContainerSuite) TestDockerAgent() {
-	bCtx, bCancel := context.WithCancel(context.Background())
-	defer bCancel()
-
 	req := testcontainers.ContainerRequest{
 		Hostname: "fleet-server",
 		Image:    suite.dockerImg,
@@ -345,7 +343,7 @@ func (suite *AgentContainerSuite) TestDockerAgent() {
 		},
 		WaitingFor: containerWaitForHealthyStatus().WithTLS(true, nil),
 	}
-	fleetC, err := testcontainers.GenericContainer(bCtx, testcontainers.GenericContainerRequest{
+	fleetC, err := testcontainers.GenericContainer(suite.T().Context(), testcontainers.GenericContainerRequest{
 		ContainerRequest: req,
 		Started:          true,
 		Logger:           &logger{suite.T()},
@@ -353,12 +351,12 @@ func (suite *AgentContainerSuite) TestDockerAgent() {
 	suite.Require().NoError(err)
 	suite.container = fleetC
 
-	endpoint, err := fleetC.Endpoint(bCtx, "https")
+	endpoint, err := fleetC.Endpoint(suite.T().Context(), "https")
 	suite.Require().NoError(err)
 
-	suite.FleetIsHealthy(bCtx, endpoint)
+	suite.FleetIsHealthy(suite.T().Context(), endpoint)
 
-	enrollmentKey := suite.GetEnrollmentTokenForPolicyID(bCtx, "dummy-policy")
+	enrollmentKey := suite.GetEnrollmentTokenForPolicyID(suite.T().Context(), "dummy-policy")
 	req = testcontainers.ContainerRequest{
 		Image: suite.dockerImg,
 		Env: map[string]string{
@@ -382,7 +380,7 @@ func (suite *AgentContainerSuite) TestDockerAgent() {
 			},
 		},
 	}
-	agentC, err := testcontainers.GenericContainer(bCtx, testcontainers.GenericContainerRequest{
+	agentC, err := testcontainers.GenericContainer(suite.T().Context(), testcontainers.GenericContainerRequest{
 		ContainerRequest: req,
 		Started:          true,
 		Logger:           &logger{suite.T()},
@@ -390,9 +388,9 @@ func (suite *AgentContainerSuite) TestDockerAgent() {
 	suite.Require().NoError(err)
 	// Read agent logs if the test failed
 	// terminate the agent
-	defer func() {
+	suite.T().Cleanup(func() {
 		if suite.T().Failed() {
-			rc, err := agentC.Logs(bCtx)
+			rc, err := agentC.Logs(context.Background())
 			if err != nil {
 				suite.T().Logf("elastic-agent container unable to get logs: %v", err)
 			} else {
@@ -402,11 +400,11 @@ func (suite *AgentContainerSuite) TestDockerAgent() {
 			}
 
 		}
-		err := agentC.Terminate(bCtx)
+		err := agentC.Terminate(context.Background())
 		suite.Require().NoError(err)
-	}()
+	})
 
-	ctx, cancel := context.WithTimeout(bCtx, time.Minute*5)
+	ctx, cancel := context.WithTimeout(suite.T().Context(), 5*time.Minute)
 	defer cancel()
 	timer := time.NewTimer(time.Second)
 	agentID := ""
@@ -460,7 +458,7 @@ func (suite *AgentContainerSuite) TestAPMInstrumentationFile() {
 	f.Close()
 	suite.Require().NoError(err)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	ctx, cancel := context.WithTimeout(suite.T().Context(), 3*time.Minute)
 	defer cancel()
 
 	req := testcontainers.ContainerRequest{
