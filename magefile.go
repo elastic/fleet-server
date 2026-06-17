@@ -2279,14 +2279,15 @@ func (Test) CloudE2EDown() error {
 }
 
 // CloudE2ERun runs tests against the remote cloud deployment.
-// It reads credentials from env vars (FLEET_SERVER_URL, KIBANA_URL, ELASTIC_USER, ELASTIC_PASS).
-// In CI, cloud_e2e_test.sh populates these from oblt-cli cluster secrets before calling this target.
+// It reads credentials from env vars matching those set by `oblt-cli cluster secrets env`:
+// FLEET_URL, KIBANA_HOST, ELASTICSEARCH_USERNAME, ELASTICSEARCH_PASSWORD.
+// In CI, cloud_e2e_test.sh populates these before calling this target.
 // Locally, if the env vars are absent, it falls back to reading from the terraform state written by CloudE2EUp.
 func (Test) CloudE2ERun() error {
-	fleetURL := os.Getenv("FLEET_SERVER_URL")
-	kibanaURL := os.Getenv("KIBANA_URL")
-	user := os.Getenv("ELASTIC_USER")
-	pass := os.Getenv("ELASTIC_PASS")
+	fleetURL := os.Getenv("FLEET_URL")
+	kibanaURL := os.Getenv("KIBANA_HOST")
+	user := os.Getenv("ELASTICSEARCH_USERNAME")
+	pass := os.Getenv("ELASTICSEARCH_PASSWORD")
 
 	if fleetURL == "" || kibanaURL == "" || user == "" || pass == "" {
 		log.Println("Credential env vars not set, falling back to terraform state")
@@ -2311,10 +2312,10 @@ func (Test) CloudE2ERun() error {
 	cmd := exec.Command("go", "test", "-v", "-timeout", "30m", "-tags=cloude2e", "-count=1", "-p", "1", "./...")
 	cmd.Dir = "testing"
 	cmd.Env = append(os.Environ(),
-		"FLEET_SERVER_URL="+fleetURL,
-		"KIBANA_URL="+kibanaURL,
-		"ELASTIC_USER="+user,
-		"ELASTIC_PASS="+pass,
+		"FLEET_URL="+fleetURL,
+		"KIBANA_HOST="+kibanaURL,
+		"ELASTICSEARCH_USERNAME="+user,
+		"ELASTICSEARCH_PASSWORD="+pass,
 	)
 	cmd.Stdout = w
 	cmd.Stderr = w

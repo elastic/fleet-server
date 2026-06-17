@@ -53,7 +53,7 @@ CLUSTER_NAME=$(jq -r '.ClusterName' cluster-info.json)
 echo "Cluster: ${CLUSTER_NAME}"
 
 # Load deployment credentials as env vars.
-# oblt-cli exports vars with the prefixes: ELASTICSEARCH_*, KIBANA_*, FLEET_SERVER_*, INTEGRATIONS_SERVER_*
+# oblt-cli exports: FLEET_URL, KIBANA_HOST, ELASTICSEARCH_USERNAME, ELASTICSEARCH_PASSWORD, and others.
 oblt-cli cluster secrets env \
   --cluster-name="${CLUSTER_NAME}" \
   --output-file=secrets.env.sh
@@ -63,14 +63,8 @@ source secrets.env.sh
 set +a
 rm -f secrets.env.sh
 
-# Map oblt-cli output var names to the names expected by testing/cloude2e/cloude2e_test.go
-export FLEET_SERVER_URL="${FLEET_SERVER_HOST:-}"
-export KIBANA_URL="${KIBANA_HOST:-}"
-export ELASTIC_USER="${ELASTICSEARCH_USERNAME:-}"
-export ELASTIC_PASS="${ELASTICSEARCH_PASSWORD:-}"
-
-if [[ "${FLEET_SERVER_URL}" == "" ]]; then
-  message="FLEET_SERVER_URL is empty, cloud e2e tests cannot be executed"
+if [[ "${FLEET_URL:-}" == "" ]]; then
+  message="FLEET_URL is empty, cloud e2e tests cannot be executed"
   if [[ "${CI:-}" == "true" ]]; then
     buildkite-agent annotate \
       "${message}" \
@@ -81,7 +75,7 @@ if [[ "${FLEET_SERVER_URL}" == "" ]]; then
   exit 1
 fi
 
-echo "Fleet server: ${FLEET_SERVER_URL}"
+echo "Fleet server: ${FLEET_URL}"
 
 echo "--- Trigger cloud E2E test"
 mage test:cloudE2ERun
