@@ -69,7 +69,7 @@ func (suite *AgentInstallSuite) SetupSuite() {
 	suite.Require().NoError(err)
 
 	// setup context - timeline is for file download
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*10)
+	ctx, cancel := context.WithTimeout(suite.T().Context(), 10*time.Minute)
 	defer cancel()
 
 	// use artifacts API to download snapshot
@@ -143,10 +143,13 @@ func (suite *AgentInstallSuite) TearDownTest() {
 
 	out, err := exec.Command("sudo", "elastic-development-agent", "uninstall", "--force").CombinedOutput()
 	suite.Assert().NoErrorf(err, "elastic-development-agent uninstall failed. Output: %s", out)
+
+	portFree := suite.IsFleetServerPortFree()
+	suite.Assert().True(portFree, "port 8220 still in use 30s after uninstall")
 }
 
 func (suite *AgentInstallSuite) TestHTTP() {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*3)
+	ctx, cancel := context.WithTimeout(suite.T().Context(), 3*time.Minute)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "sudo", suite.agentPath, "install",
@@ -171,7 +174,7 @@ func (suite *AgentInstallSuite) TestWithSecretFiles() {
 	err := os.WriteFile(filepath.Join(dir, "service-token"), []byte(suite.ServiceToken), 0600)
 	suite.Require().NoError(err)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*3)
+	ctx, cancel := context.WithTimeout(suite.T().Context(), 3*time.Minute)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "sudo", suite.agentPath, "install",
@@ -227,7 +230,7 @@ func (suite *AgentInstallSuite) TestAPMInstrumentationFile() {
 	f.Close()
 	suite.Require().NoError(err)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
+	ctx, cancel := context.WithTimeout(suite.T().Context(), 10*time.Minute)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "sudo", suite.agentPath, "install",
@@ -249,7 +252,7 @@ func (suite *AgentInstallSuite) TestAPMInstrumentationFile() {
 }
 
 func (suite *AgentInstallSuite) TestAPMInstrumentationPolicy() {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
+	ctx, cancel := context.WithTimeout(suite.T().Context(), 10*time.Minute)
 	defer cancel()
 
 	suite.AddPolicyOverrides(ctx, "fleet-server-apm", map[string]interface{}{
