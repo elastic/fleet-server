@@ -80,6 +80,11 @@ func getRunCommand(bi build.Info) func(cmd *cobra.Command, args []string) error 
 				return err
 			}
 
+			if err := validateEnv(); err != nil {
+				log.Error().Err(err).Msg("Failed to validate runtime")
+				return err
+			}
+
 			srv, err := server.NewAgent(cliCfg, os.Stdin, bi, l)
 			if err != nil {
 				return err
@@ -115,6 +120,11 @@ func getRunCommand(bi build.Info) func(cmd *cobra.Command, args []string) error 
 
 			l, err = initLogger(cfg, bi.Version, bi.Commit)
 			if err != nil {
+				return err
+			}
+
+			if err := validateEnv(); err != nil {
+				log.Error().Err(err).Msg("Failed to validate runtime")
 				return err
 			}
 

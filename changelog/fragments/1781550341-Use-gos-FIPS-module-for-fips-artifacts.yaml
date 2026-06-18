@@ -18,9 +18,8 @@ summary: Use go's FIPS module for fips artifacts
 # NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
 description: |
   Use go's FIPS module instead of microsoft/go for creating FIPS artifacts.
-  Mechanically it sets GOFIPS140=certified at compile time which enables
-  FIPS mode but does not force it. The certified value ensures that the
-  latest certified go FIPS module is used when compiling.
+  Mechanically it sets GOFIPS140=v1.0.0 at compile time which enables
+  FIPS mode but does not force it.
 
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
 component: fleet-server
