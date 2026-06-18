@@ -9,4 +9,4 @@ with_go
 with_mage
 
 echo "Starting the fips140=only unit tests..."
-GODEBUG=fips140=only,tlsmlkem=0 mage test:unitFIPSOnly test:junitReport
+mage test:unitFIPSOnly test:junitReport

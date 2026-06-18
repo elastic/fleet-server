@@ -382,7 +382,7 @@ func environMap() map[string]string {
 
 // addFIPSEnvVars mutates the passed env map by adding settings needed to produce a FIPS-capable binary.
 func addFIPSEnvVars(env map[string]string) {
-	env["GOFIPS140"] = "certified" // use the latest certified FIPS module.
+	env["GOFIPS140"] = "v1.0.0" // use a pinned version of the fips provider.
 }
 
 // teeCommand runs the specified command, stdout and stederr will be written to stdout and will be collected and returned.
@@ -1207,7 +1207,7 @@ func (Docker) CustomAgentImage() error {
 // Unit runs unit tests.
 // Produces a unit test output file, and test coverage file in the build directory.
 // SNAPSHOT adds the snapshot build tag.
-// FIPS adds the requirefips build tag.
+// FIPS adds the requirefips build tag and env GOFIPS140 env var.
 // TEST_RUN can be used to pass the value to go test -run.
 func (Test) Unit() error {
 	mg.Deps(mg.F(mkDir, "build"))
@@ -1646,13 +1646,27 @@ func checkFIPSBinary(path string) error {
 		switch setting.Key {
 		case "-tags":
 			foundTags = true
-			if !strings.Contains(setting.Value, "requirefips") {
+			requireFipsTag := false
+			fips140Tag := false
+
+			for _, tag := range strings.Split(setting.Value, ",") {
+				switch tag {
+				case "requirefips":
+					requireFipsTag = true
+				case "fips140v1.0":
+					fips140Tag = true
+				}
+			}
+			if !requireFipsTag {
 				return fmt.Errorf("requirefips tag not found in %s", setting.Value)
+			}
+			if !fips140Tag {
+				return fmt.Errorf("fips140v1.0 tag not found in %s", setting.Value)
 			}
 		case "GOFIPS140":
 			foundFIPS140 = true
 			if setting.Value == "" {
-				return fmt.Errorf("GOFIPS140 is empty in build settings")
+				return fmt.Errorf("GOFIPS140 is empty")
 			}
 		}
 	}
@@ -2163,21 +2177,6 @@ func (Test) E2eDown() error {
 // ConvertCoverage formats coverage data emitted by coverage-enabled binaries in e2e tests.
 func (Test) ConvertCoverage() error {
 	return sh.RunV("go", "tool", "covdata", "textfmt", "-i="+filepath.Join("build", "e2e-cover"), "-o="+filepath.Join("build", "e2e-coverage.out"))
-}
-
-// FipsProviderUnit runs unit tests with GOFIPS140=v1.0.0 set and the requirefips build tag.
-// Produces a unit test output file, and test coverage file in the build directory.
-func (Test) FipsProviderUnit() error {
-	mg.Deps(mg.F(mkDir, "build"))
-	os.Setenv(envFIPS, "true")
-	if !isFIPS() {
-		return fmt.Errorf("FIPS must be set to true.")
-	}
-	env := environMap()
-	addFIPSEnvVars(env)
-	output, err := teeCommand(env, "go", "test", "-tags="+getTagsString(), "-v", "-race", "-coverprofile="+filepath.Join("build", "coverage-fips-provider-"+runtime.GOOS+".out"), "./...")
-	err = errors.Join(err, os.WriteFile(filepath.Join("build", "test-unit-fips-provider-"+runtime.GOOS+".out"), output, 0o644))
-	return err
 }
 
 // CloudE2E provisions a cloud deployment, tests the remote fleet-server instance, then destroys the deployment.
