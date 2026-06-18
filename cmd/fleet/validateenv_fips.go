@@ -15,4 +15,5 @@ func validateEnv() error {
 	if !fips140.Enabled() {
 		return fmt.Errorf("fips disabled")
 	}
+	return nil
 }
