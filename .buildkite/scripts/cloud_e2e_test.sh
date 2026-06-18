@@ -47,7 +47,9 @@ oblt-cli cluster create custom \
   --wait 20 \
   --parameter "StackVersion=${STACK_VERSION}" \
   --parameter "ExpireInHours=2" \
-  --parameter "ElasticAgentDockerImage=${DOCKER_IMAGE}:${DOCKER_IMAGE_TAG}"
+  --parameter "ElasticAgentDockerImage=${DOCKER_IMAGE}:${DOCKER_IMAGE_TAG}" \
+  --parameter "ElasticTeam=elastic-agent-control-plane" \
+  --parameter "ElasticProject=fleet-server-ci"
 
 CLUSTER_NAME=$(jq -r '.ClusterName' cluster-info.json)
 echo "Cluster: ${CLUSTER_NAME}"
