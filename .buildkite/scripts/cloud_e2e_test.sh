@@ -12,14 +12,14 @@ with_docker_compose
 
 with_mage
 
-# Extract stack version from dev-tools/integration/.env.
-# Mirrors the regex logic in the former terraform main.tf:
-# ELASTICSEARCH_VERSION=9.5.0-<hash>-SNAPSHOT -> 9.5.0-SNAPSHOT
-ES_VERSION=$(grep "^ELASTICSEARCH_VERSION=" dev-tools/integration/.env | cut -d= -f2)
-if [[ "$ES_VERSION" == *SNAPSHOT* ]]; then
-  STACK_VERSION=$(echo "$ES_VERSION" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)-SNAPSHOT
+# STACK_BUILD_ID is the full pinned version from .env, e.g. 9.5.0-335b21fa-SNAPSHOT.
+# It is used to pin ES and Kibana images to the exact build being tested.
+STACK_BUILD_ID=$(grep "^ELASTICSEARCH_VERSION=" dev-tools/integration/.env | cut -d= -f2)
+# STACK_VERSION strips the build hash for the oblt-cli StackVersion parameter, e.g. 9.5.0-SNAPSHOT.
+if [[ "$STACK_BUILD_ID" == *SNAPSHOT* ]]; then
+  STACK_VERSION=$(echo "$STACK_BUILD_ID" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)-SNAPSHOT
 else
-  STACK_VERSION=$(echo "$ES_VERSION" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+  STACK_VERSION=$(echo "$STACK_BUILD_ID" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
 fi
 
 cleanup() {
@@ -48,6 +48,8 @@ oblt-cli cluster create custom \
   --parameter "StackVersion=${STACK_VERSION}" \
   --parameter "ExpireInHours=2" \
   --parameter "ElasticAgentDockerImage=${DOCKER_IMAGE}:${DOCKER_IMAGE_TAG}" \
+  --parameter "ElasticsearchDockerImage=docker.elastic.co/cloud-release/elasticsearch-cloud-ess:${STACK_BUILD_ID}" \
+  --parameter "KibanaDockerImage=docker.elastic.co/cloud-release/kibana-cloud:${STACK_BUILD_ID}" \
   --parameter "ElasticTeam=elastic-agent-control-plane" \
   --parameter "ElasticProject=fleet-server-ci"
 
