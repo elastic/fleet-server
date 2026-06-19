@@ -25,22 +25,22 @@ func TestThrottleZero(t *testing.T) {
 
 	N := rand.Intn(64) + 10 //nolint:gosec // random number is used for testing
 
-	var tokens []*Token
+	tokens := make([]Token, 0, N)
 	for i := range N {
 
 		key := strconv.Itoa(i)
 
 		// Acquire token for key with long timeout so doesn't trip unit test
-		token1 := throttle.Acquire(l, key, time.Hour)
-		if token1 == nil {
+		token1, ok := throttle.Acquire(l, key, time.Hour)
+		if !ok {
 			t.Fatal("Acquire failed")
 		}
 		tokens = append(tokens, token1)
 
 		// Second acquire should fail because we have not released the original token,
 		// or possibly if i == N-1 we could max parallel
-		token2 := throttle.Acquire(l, key, time.Hour)
-		if token2 != nil {
+		_, ok = throttle.Acquire(l, key, time.Hour)
+		if ok {
 			t.Error("Expected second acquire to fail on conflict")
 		}
 	}
@@ -51,8 +51,8 @@ func TestThrottleZero(t *testing.T) {
 		key := strconv.Itoa(i)
 
 		// Acquire should fail because we have not released the original token,
-		token := throttle.Acquire(l, key, time.Hour)
-		if token != nil {
+		_, ok := throttle.Acquire(l, key, time.Hour)
+		if ok {
 			t.Error("Expected acquire to fail on conflict")
 		}
 	}
@@ -73,8 +73,8 @@ func TestThrottleZero(t *testing.T) {
 		// We should now be able to to acquire
 		key := strconv.Itoa(i)
 
-		token = throttle.Acquire(l, key, time.Hour)
-		if token == nil {
+		token, ok := throttle.Acquire(l, key, time.Hour)
+		if !ok {
 			t.Fatal("Acquire failed")
 		}
 
@@ -93,22 +93,22 @@ func TestThrottleN(t *testing.T) {
 
 		throttle := NewThrottle(N)
 
-		var tokens []*Token
+		var tokens []Token
 		for i := 0; i < N; i++ {
 
 			key := strconv.Itoa(i)
 
 			// Acquire token for key with long timeout so doesn't trip unit test
-			token1 := throttle.Acquire(l, key, time.Hour)
-			if token1 == nil {
+			token1, ok := throttle.Acquire(l, key, time.Hour)
+			if !ok {
 				t.Fatal("Acquire failed")
 			}
 			tokens = append(tokens, token1)
 
 			// Second acquire should fail because we have not released the original token,
 			// or possibly if i == N-1 we could max parallel
-			token2 := throttle.Acquire(l, key, time.Hour)
-			if token2 != nil {
+			_, ok = throttle.Acquire(l, key, time.Hour)
+			if ok {
 				t.Error("Expected second acquire to fail on conflict")
 			}
 		}
@@ -119,8 +119,8 @@ func TestThrottleN(t *testing.T) {
 
 			key := strconv.Itoa(N + i)
 
-			token1 := throttle.Acquire(l, key, time.Hour)
-			if token1 != nil {
+			_, ok := throttle.Acquire(l, key, time.Hour)
+			if ok {
 				t.Fatal("Expect acquire to fail on max tokens")
 			}
 		}
@@ -142,8 +142,8 @@ func TestThrottleN(t *testing.T) {
 			// We should now be able to to acquire
 			key := strconv.Itoa(i)
 
-			token = throttle.Acquire(l, key, time.Hour)
-			if token == nil {
+			token, ok := throttle.Acquire(l, key, time.Hour)
+			if !ok {
 				t.Fatal("Acquire failed")
 			}
 
@@ -162,19 +162,22 @@ func TestThrottleExpireIdentity(t *testing.T) {
 	throttle := NewThrottle(1)
 
 	const key = "xxx"
-	token := throttle.Acquire(l, key, time.Second)
+	token, ok := throttle.Acquire(l, key, time.Second)
+	if !ok {
+		t.Fatal("Acquire failed")
+	}
 
 	// Should *NOT* be able to re-acquire until TTL
-	token2 := throttle.Acquire(l, key, time.Hour)
-	if token2 != nil {
+	_, ok = throttle.Acquire(l, key, time.Hour)
+	if ok {
 		t.Error("Expected second acquire to fail on conflict")
 	}
 
 	time.Sleep(time.Second)
 
 	// Should be able to re-acquire on expiration
-	token3 := throttle.Acquire(l, key, time.Hour)
-	if token3 == nil {
+	token3, ok := throttle.Acquire(l, key, time.Hour)
+	if !ok {
 		t.Fatal("Expected third acquire to succeed")
 	}
 
@@ -199,20 +202,23 @@ func TestThrottleExpireAtMax(t *testing.T) {
 	throttle := NewThrottle(1)
 
 	key1 := "xxx"
-	token1 := throttle.Acquire(l, key1, time.Second)
+	token1, ok := throttle.Acquire(l, key1, time.Second)
+	if !ok {
+		t.Fatal("Acquire failed")
+	}
 
 	// Should be at max, cannot acquire different key
 	key2 := "yyy"
-	token2 := throttle.Acquire(l, key2, time.Hour)
-	if token2 != nil {
+	_, ok = throttle.Acquire(l, key2, time.Hour)
+	if ok {
 		t.Error("Expected second acquire to fail on max")
 	}
 
 	time.Sleep(time.Second)
 
 	// Should be able acquire second after timeout
-	token2 = throttle.Acquire(l, key2, time.Hour)
-	if token2 == nil {
+	token2, ok := throttle.Acquire(l, key2, time.Hour)
+	if !ok {
 		t.Fatal("Expected third acquire to succeed")
 	}
 

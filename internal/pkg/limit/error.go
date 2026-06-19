@@ -5,7 +5,6 @@
 package limit
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 
@@ -17,35 +16,28 @@ var (
 	ErrMaxLimit  = errors.New("max limit")
 )
 
+var (
+	errBodyRateLimit = []byte(`{"statusCode":429,"error":"RateLimit","message":"exceeded the rate limit"}`)
+	errBodyMaxLimit  = []byte(`{"statusCode":429,"error":"MaxLimit","message":"exceeded the max limit"}`)
+	errBodyUnknown   = []byte(`{"statusCode":429,"error":"UnknownLimiterError","message":"unknown limiter error encountered"}`)
+)
+
 // writeError recreates the behaviour of api/error.go.
 // It is defined separately here to stop a circular import
 func writeError(log *zerolog.Logger, w http.ResponseWriter, err error) error {
-	resp := struct {
-		Status  int    `json:"statusCode"`
-		Error   string `json:"error"`
-		Message string `json:"message"`
-	}{
-		Status:  http.StatusTooManyRequests,
-		Error:   "UnknownLimiterError",
-		Message: "unknown limiter error encountered",
-	}
+	var body []byte
 	switch {
 	case errors.Is(err, ErrRateLimit):
-		resp.Error = "RateLimit"
-		resp.Message = "exceeded the rate limit"
+		body = errBodyRateLimit
 	case errors.Is(err, ErrMaxLimit):
-		resp.Error = "MaxLimit"
-		resp.Message = "exceeded the max limit"
+		body = errBodyMaxLimit
 	default:
 		log.Error().Err(err).Msg("Encountered unknown limiter error")
-	}
-	p, wErr := json.Marshal(&resp)
-	if wErr != nil {
-		return wErr
+		body = errBodyUnknown
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.WriteHeader(http.StatusTooManyRequests)
-	_, wErr = w.Write(p)
+	_, wErr := w.Write(body)
 	return wErr
 }
