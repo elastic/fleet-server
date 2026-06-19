@@ -622,9 +622,29 @@ func (Check) Imports() error {
 	return sh.Run("go", "tool", "-modfile", filepath.Join("dev-tools", "go.mod"), "golang.org/x/tools/cmd/goimports", "-w", ".")
 }
 
+// Vet builds and runs the custom dslcheck analyzer with go vet.
+//
+// The dslcheck analayzer ensures that the number of Bind calls does not exceed the pre-allocated array.
+func (Check) Vet() error {
+	mg.Deps(mg.F(mkDir, filepath.Join("build", "static")))
+	log.Println("Build dev-tools/static/dslcheck analyzer")
+	// get the path starting with "./" or ".\" on windows
+	relSourcePath := fmt.Sprintf(".%c%s", filepath.Separator, filepath.Join("static", "cmd", "dslcheck"))
+	cmd := exec.Command("go", "build", "-o", filepath.Join("..", "build", "static", "dslcheck"), relSourcePath)
+	cmd.Dir = "dev-tools"
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("unable to build dslcheck output: %s, err: %w", string(out), err)
+	}
+	log.Println("Run dev-tools/static/dslcheck analyzer")
+	if err := sh.Run("go", "vet", "-vettool="+filepath.Join("build", "static", "dslcheck"), "./..."); err != nil {
+		return fmt.Errorf("dslcheck failure: %w", err)
+	}
+	return nil
+}
+
 // Ci runs CI related checks - runs generate, imports, fix, checkHeaders, notice, checkNoChanges.
 func (Check) Ci() {
-	mg.SerialDeps(Generate, Check.Imports, Check.Fix, Check.Headers, Check.Notice, Check.NoChanges)
+	mg.SerialDeps(Generate, Check.Imports, Check.Vet, Check.Fix, Check.Headers, Check.Notice, Check.NoChanges)
 }
 
 // Go installs and runs golangci-lint.
