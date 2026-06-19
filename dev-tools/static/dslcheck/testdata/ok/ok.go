@@ -27,6 +27,14 @@ func OneToken() {
 func TwoTemplates() {
 	t1 := stub.NewTmpl()
 	t2 := stub.NewTmpl()
-	t1.Bind("a"); t1.Bind("b"); t1.Bind("c"); t1.Bind("d"); t1.Bind("e")
-	t2.Bind("a"); t2.Bind("b"); t2.Bind("c"); t2.Bind("d"); t2.Bind("e")
+	t1.Bind("a")
+	t1.Bind("b")
+	t1.Bind("c")
+	t1.Bind("d")
+	t1.Bind("e")
+	t2.Bind("a")
+	t2.Bind("b")
+	t2.Bind("c")
+	t2.Bind("d")
+	t2.Bind("e")
 }
