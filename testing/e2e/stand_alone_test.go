@@ -89,7 +89,8 @@ func (suite *StandAloneSuite) TestHTTP() {
 	f.Close()
 	suite.Require().NoError(err)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	ctx, cancel := context.WithTimeout(suite.T().Context(), 3*time.Minute)
+	defer cancel()
 
 	// Run the fleet-server binary
 	cmd := exec.CommandContext(ctx, suite.binaryPath, "-c", filepath.Join(dir, "config.yml"))
@@ -108,7 +109,8 @@ func (suite *StandAloneSuite) TestHTTP() {
 // TestWithElasticsearchConnectionFailures checks the behaviour of stand alone Fleet Server
 // when Elasticsearch is not reachable.
 func (suite *StandAloneSuite) TestWithElasticsearchConnectionFailures() {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(suite.T().Context(), 5*time.Minute)
+	defer cancel()
 
 	proxyContainer := suite.StartToxiproxy(ctx)
 	proxyEndpoint, err := proxyContainer.URI(ctx)
@@ -162,7 +164,8 @@ func (suite *StandAloneSuite) TestWithElasticsearchConnectionFailures() {
 // TestWithElasticsearchConnectionFlakyness checks the behaviour of stand alone Fleet Server
 // when Elasticsearch is not reachable portion of the time.
 func (suite *StandAloneSuite) TestWithElasticsearchConnectionFlakyness() {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(suite.T().Context(), 5*time.Minute)
+	defer cancel()
 
 	proxyContainer := suite.StartToxiproxy(ctx)
 	proxyEndpoint, err := proxyContainer.URI(ctx)
@@ -205,6 +208,7 @@ func (suite *StandAloneSuite) TestWithElasticsearchConnectionFlakyness() {
 
 	// wait for unit state degraded
 	timeoutCtx, tCancel := context.WithTimeout(ctx, 30*time.Second)
+	defer tCancel()
 	suite.FleetServerStatusNeverBecomes(timeoutCtx, "http://localhost:8220", client.UnitStateDegraded)
 
 	// test should not fail at this point
@@ -241,7 +245,7 @@ func (suite *StandAloneSuite) TestWithSecretFiles() {
 	f.Close()
 	suite.Require().NoError(err)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	ctx, cancel := context.WithTimeout(suite.T().Context(), 3*time.Minute)
 	defer cancel()
 
 	// Run the fleet-server binary, cancelling context should stop process
@@ -279,7 +283,7 @@ func (suite *StandAloneSuite) TestStaticTokenAuthentication() {
 	suite.Require().NoError(err)
 	f.Close()
 
-	bCtx, bCancel := context.WithCancel(context.Background())
+	bCtx, bCancel := context.WithCancel(suite.T().Context())
 	defer bCancel()
 	suite.T().Log("testing fleet-server binary")
 	// Run the fleet-server binary, cancelling context should stop process
@@ -293,14 +297,13 @@ func (suite *StandAloneSuite) TestStaticTokenAuthentication() {
 	err = cmd.Start()
 	suite.Require().NoError(err)
 
-	ctx, cancel := context.WithTimeout(bCtx, time.Minute)
+	ctx, cancel := context.WithTimeout(bCtx, 3*time.Minute)
+	defer cancel()
 	suite.FleetServerStatusOK(ctx, "https://localhost:8220")
 
 	// echo -n "01234:abcdefg" | base64
 	// the id does not matter, the key is the important part
 	enrollmentToken := "MDEyMzQ6YWJjZGVmZw=="
-
-	defer cancel()
 	tester := api_version.NewClientAPITesterCurrent(
 		suite.Scaffold,
 		"https://localhost:8220",
@@ -321,7 +324,8 @@ func (suite *StandAloneSuite) TestStaticTokenAuthentication() {
 // TestElasticsearch429OnStartup will check to ensure fleet-server functions as expected (does not crash)
 // if Elasticsearch returns 429s on startup.
 func (suite *StandAloneSuite) TestElasticsearch429OnStartup() {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	ctx, cancel := context.WithTimeout(suite.T().Context(), 3*time.Minute)
+	defer cancel()
 
 	// Create a proxy that returns 429s
 	proxy := NewStatusProxy(suite.T(), 429)
@@ -353,11 +357,10 @@ func (suite *StandAloneSuite) TestElasticsearch429OnStartup() {
 	err = cmd.Start()
 	suite.Require().NoError(err)
 
-	// FIXME timeout to make sure fleet-server has started
-	time.Sleep(5 * time.Second)
+	sCtx, sCancel := context.WithTimeout(ctx, 10*time.Second)
+	defer sCancel()
 	suite.T().Log("Checking fleet-server status")
-	// Wait to check that it is Starting.
-	suite.FleetServerStatusIs(ctx, "http://localhost:8220", client.UnitStateStarting) // fleet-server returns 503:starting if upstream ES returns 429.
+	suite.FleetServerStatusIs(sCtx, "http://localhost:8220", client.UnitStateStarting) // fleet-server returns 503:starting if upstream ES returns 429.
 
 	// Disable proxy and ensure fleet-server recovers
 	suite.T().Log("Disable proxy")
@@ -371,7 +374,8 @@ func (suite *StandAloneSuite) TestElasticsearch429OnStartup() {
 // TestElasticsearch503OnStartup will check to ensure fleet-server functions as expected (does not crash)
 // if Elasticsearch returns 503s on startup.
 func (suite *StandAloneSuite) TestElasticsearch503OnStartup() {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	ctx, cancel := context.WithTimeout(suite.T().Context(), 3*time.Minute)
+	defer cancel()
 
 	// Create a proxy that returns 503s
 	proxy := NewStatusProxy(suite.T(), http.StatusServiceUnavailable)
@@ -403,11 +407,10 @@ func (suite *StandAloneSuite) TestElasticsearch503OnStartup() {
 	err = cmd.Start()
 	suite.Require().NoError(err)
 
-	// FIXME timeout to make sure fleet-server has started
-	time.Sleep(5 * time.Second)
+	sCtx, sCancel := context.WithTimeout(ctx, 10*time.Second)
+	defer sCancel()
 	suite.T().Log("Checking fleet-server status")
-	// Wait to check that it is Starting.
-	suite.FleetServerStatusIs(ctx, "http://localhost:8220", client.UnitStateStarting) // fleet-server returns 503:starting if upstream ES returns 429.
+	suite.FleetServerStatusIs(sCtx, "http://localhost:8220", client.UnitStateStarting) // fleet-server returns 503:starting if upstream ES returns 429.
 
 	// Disable proxy and ensure fleet-server recovers
 	suite.T().Log("Disable proxy")
@@ -421,7 +424,8 @@ func (suite *StandAloneSuite) TestElasticsearch503OnStartup() {
 // TestElasticsearch503OnEnroll will check to ensure fleet-server returns a 503 error when elasticsearch returns a
 // 503 gateway error.
 func (suite *StandAloneSuite) TestElasticsearch503OnEnroll() {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	ctx, cancel := context.WithTimeout(suite.T().Context(), 3*time.Minute)
+	defer cancel()
 
 	// Create a proxy that returns 503s
 	proxy := NewStatusProxy(suite.T(), http.StatusServiceUnavailable)
@@ -460,11 +464,10 @@ func (suite *StandAloneSuite) TestElasticsearch503OnEnroll() {
 		cmd.Wait()
 	}()
 
-	// FIXME timeout to make sure fleet-server has started
-	time.Sleep(5 * time.Second)
+	sCtx, sCancel := context.WithTimeout(ctx, 10*time.Second)
+	defer sCancel()
 	suite.T().Log("Checking fleet-server status")
-	// Should start healthy as the proxy is disabled.
-	suite.FleetServerStatusIs(ctx, "http://localhost:8220", client.UnitStateHealthy)
+	suite.FleetServerStatusIs(sCtx, "http://localhost:8220", client.UnitStateHealthy)
 
 	// Ensure enrollment works correctly
 	suite.T().Log("Checking enrollment works")
@@ -500,7 +503,8 @@ func (suite *StandAloneSuite) TestElasticsearch503OnEnroll() {
 // TestElasticsearchTimeoutOnStartup will check to ensure fleet-server functions as expected (does not crash)
 // if Elasticsearch times out on startup.
 func (suite *StandAloneSuite) TestElasticsearchTimeoutOnStartup() {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	ctx, cancel := context.WithTimeout(suite.T().Context(), 3*time.Minute)
+	defer cancel()
 
 	proxyContainer := suite.StartToxiproxy(ctx)
 	proxyEndpoint, err := proxyContainer.URI(ctx)
@@ -564,7 +568,7 @@ func (suite *StandAloneSuite) TestAPMInstrumentation() {
 	f.Close()
 	suite.Require().NoError(err)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*3)
+	ctx, cancel := context.WithTimeout(suite.T().Context(), 3*time.Minute)
 
 	// Run the fleet-server binary
 	cmd := exec.CommandContext(ctx, suite.binaryPath, "-c", filepath.Join(dir, "config.yml"))
@@ -645,7 +649,7 @@ func (suite *StandAloneSuite) writeOpAMPCollectorConfig(configFilePath, instance
 func (suite *StandAloneSuite) TestOpAMPWithUpstreamCollector() {
 	dir := suite.T().TempDir()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(suite.T().Context(), 5*time.Minute)
 	defer cancel()
 
 	apiKey := suite.startFleetServerForOpAMP(ctx, dir, "opamp-e2e-test-key")
@@ -741,7 +745,7 @@ func (suite *StandAloneSuite) TestOpAMPWithEDOTCollector() {
 	agentExtractDir := filepath.Join(dir, "elastic-agent-package")
 	suite.Require().NoError(os.MkdirAll(agentExtractDir, 0755))
 
-	downloadCtx, downloadCancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	downloadCtx, downloadCancel := context.WithTimeout(suite.T().Context(), 10*time.Minute)
 	defer downloadCancel()
 	rc := downloadElasticAgent(downloadCtx, suite.T(), suite.Client)
 	var paths extractedPaths
@@ -760,7 +764,7 @@ func (suite *StandAloneSuite) TestOpAMPWithEDOTCollector() {
 
 	suite.T().Logf("Found elastic-agent binary at %s", agentBinaryPath)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	ctx, cancel := context.WithTimeout(suite.T().Context(), 2*time.Minute)
 	defer cancel()
 
 	apiKey := suite.startFleetServerForOpAMP(ctx, dir, "edot-opamp-e2e-test-key")
