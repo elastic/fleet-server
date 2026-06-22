@@ -262,13 +262,13 @@ func (c *Elasticsearch) DiagRequests(ctx context.Context) []byte {
 		hostURL, err := makeURL(c.Protocol, "", host, 9200)
 		if err != nil {
 			zerolog.Ctx(ctx).Warn().Err(err).Str("host", host).Msg("Unable to transform host to url.URL")
-			fmt.Fprintf(res, "Unable to transform host %q to url.URL: %v\n", host, err)
+			fmt.Fprintf(&res, "Unable to transform host %q to url.URL: %v\n", host, err)
 			continue
 		}
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, hostURL, nil)
 		if err != nil {
 			zerolog.Ctx(ctx).Warn().Err(err).Str("host", host).Msg("Unable to create request to host")
-			fmt.Fprintf(res, "Unable to create request to host %q: %v\n", host, err)
+			fmt.Fprintf(&res, "Unable to create request to host %q: %v\n", host, err)
 			continue
 		}
 		req.Header = headers.Clone()
