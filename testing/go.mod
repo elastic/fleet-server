@@ -1,6 +1,6 @@
 module github.com/elastic/fleet-server/testing
 
-go 1.26.3
+go 1.26.4
 
 replace (
 	github.com/elastic/fleet-server/pkg/api => ../pkg/api
@@ -14,7 +14,7 @@ require (
 	github.com/elastic/fleet-server/pkg/api v0.0.0-00010101000000-000000000000
 	github.com/elastic/fleet-server/v7 v7.0.0-00010101000000-000000000000
 	github.com/gofrs/uuid/v5 v5.4.0
-	github.com/moby/moby/api v1.54.2
+	github.com/moby/moby/api v1.55.0
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.42.0
 	github.com/testcontainers/testcontainers-go/modules/toxiproxy v0.42.0
@@ -60,7 +60,7 @@ require (
 	github.com/moby/sys/user v0.4.0 // indirect
 	github.com/moby/sys/userns v0.1.0 // indirect
 	github.com/moby/term v0.5.2 // indirect
-	github.com/oapi-codegen/runtime v1.4.1 // indirect
+	github.com/oapi-codegen/runtime v1.4.2 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
@@ -73,8 +73,8 @@ require (
 	github.com/tklauser/numcpus v0.11.0 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
-	go.elastic.co/apm/module/apmhttp/v2 v2.7.9 // indirect
-	go.elastic.co/apm/v2 v2.7.9 // indirect
+	go.elastic.co/apm/module/apmhttp/v2 v2.7.12 // indirect
+	go.elastic.co/apm/v2 v2.7.12 // indirect
 	go.elastic.co/ecszap v1.0.3 // indirect
 	go.elastic.co/fastjson v1.5.1 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
@@ -84,10 +84,10 @@ require (
 	go.opentelemetry.io/otel/trace v1.43.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.28.0 // indirect
-	golang.org/x/crypto v0.51.0 // indirect
-	golang.org/x/net v0.55.0 // indirect
-	golang.org/x/sys v0.45.0 // indirect
-	golang.org/x/text v0.37.0 // indirect
+	golang.org/x/crypto v0.53.0 // indirect
+	golang.org/x/net v0.56.0 // indirect
+	golang.org/x/sys v0.46.0 // indirect
+	golang.org/x/text v0.38.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260226221140-a57be14db171 // indirect
 	google.golang.org/grpc v1.81.1 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect

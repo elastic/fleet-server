@@ -1,6 +1,6 @@
 module github.com/elastic/fleet-server/v7
 
-go 1.26.3
+go 1.26.4
 
 require (
 	github.com/Pallinder/go-randomdata v1.2.0
@@ -28,16 +28,16 @@ require (
 	github.com/rs/zerolog v1.35.1
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
-	go.elastic.co/apm/module/apmchiv5/v2 v2.7.9
-	go.elastic.co/apm/module/apmelasticsearch/v2 v2.7.9
-	go.elastic.co/apm/module/apmhttp/v2 v2.7.9
-	go.elastic.co/apm/module/apmprometheus/v2 v2.7.9
-	go.elastic.co/apm/module/apmzerolog/v2 v2.7.9
-	go.elastic.co/apm/v2 v2.7.9
+	go.elastic.co/apm/module/apmchiv5/v2 v2.7.12
+	go.elastic.co/apm/module/apmelasticsearch/v2 v2.7.12
+	go.elastic.co/apm/module/apmhttp/v2 v2.7.12
+	go.elastic.co/apm/module/apmprometheus/v2 v2.7.12
+	go.elastic.co/apm/module/apmzerolog/v2 v2.7.12
+	go.elastic.co/apm/v2 v2.7.12
 	go.elastic.co/ecszerolog v0.2.0
 	go.uber.org/zap v1.28.0
-	golang.org/x/net v0.55.0
-	golang.org/x/sync v0.20.0
+	golang.org/x/net v0.56.0
+	golang.org/x/sync v0.21.0
 	golang.org/x/time v0.15.0
 	google.golang.org/grpc v1.81.1
 	google.golang.org/protobuf v1.36.11
@@ -92,9 +92,11 @@ require (
 	go.opentelemetry.io/otel/trace v1.43.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
-	golang.org/x/crypto v0.51.0 // indirect
-	golang.org/x/sys v0.45.0 // indirect
-	golang.org/x/text v0.37.0 // indirect
+	golang.org/x/crypto v0.53.0 // indirect
+	golang.org/x/mod v0.36.0 // indirect
+	golang.org/x/sys v0.46.0 // indirect
+	golang.org/x/text v0.38.0 // indirect
+	golang.org/x/tools v0.45.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260226221140-a57be14db171 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	howett.net/plist v1.0.1 // indirect

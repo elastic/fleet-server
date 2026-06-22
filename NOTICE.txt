@@ -3059,11 +3059,11 @@ Contents of probable licence file $GOMODCACHE/github.com/spf13/cobra@v1.10.2/LIC
 
 --------------------------------------------------------------------------------
 Dependency : go.elastic.co/apm/module/apmchiv5/v2
-Version: v2.7.9
+Version: v2.7.12
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmchiv5/v2@v2.7.9/LICENSE:
+Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmchiv5/v2@v2.7.12/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -3270,11 +3270,11 @@ Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmchiv5/
 
 --------------------------------------------------------------------------------
 Dependency : go.elastic.co/apm/module/apmelasticsearch/v2
-Version: v2.7.9
+Version: v2.7.12
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmelasticsearch/v2@v2.7.9/LICENSE:
+Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmelasticsearch/v2@v2.7.12/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -3481,11 +3481,11 @@ Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmelasti
 
 --------------------------------------------------------------------------------
 Dependency : go.elastic.co/apm/module/apmhttp/v2
-Version: v2.7.9
+Version: v2.7.12
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmhttp/v2@v2.7.9/LICENSE:
+Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmhttp/v2@v2.7.12/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -3692,11 +3692,11 @@ Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmhttp/v
 
 --------------------------------------------------------------------------------
 Dependency : go.elastic.co/apm/module/apmprometheus/v2
-Version: v2.7.9
+Version: v2.7.12
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmprometheus/v2@v2.7.9/LICENSE:
+Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmprometheus/v2@v2.7.12/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -3903,11 +3903,11 @@ Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmpromet
 
 --------------------------------------------------------------------------------
 Dependency : go.elastic.co/apm/module/apmzerolog/v2
-Version: v2.7.9
+Version: v2.7.12
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmzerolog/v2@v2.7.9/LICENSE:
+Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmzerolog/v2@v2.7.12/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -4114,11 +4114,11 @@ Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmzerolo
 
 --------------------------------------------------------------------------------
 Dependency : go.elastic.co/apm/v2
-Version: v2.7.9
+Version: v2.7.12
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/v2@v2.7.9/LICENSE:
+Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/v2@v2.7.12/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -4566,11 +4566,11 @@ THE SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : golang.org/x/net
-Version: v0.55.0
+Version: v0.56.0
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/golang.org/x/net@v0.55.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/golang.org/x/net@v0.56.0/LICENSE:
 
 Copyright 2009 The Go Authors.
 
@@ -4603,11 +4603,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : golang.org/x/sync
-Version: v0.20.0
+Version: v0.21.0
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/golang.org/x/sync@v0.20.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/golang.org/x/sync@v0.21.0/LICENSE:
 
 Copyright 2009 The Go Authors.
 
@@ -10023,11 +10023,11 @@ Contents of probable licence file $GOMODCACHE/go.yaml.in/yaml/v2@v2.4.2/LICENSE:
 
 --------------------------------------------------------------------------------
 Dependency : golang.org/x/crypto
-Version: v0.51.0
+Version: v0.53.0
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/golang.org/x/crypto@v0.51.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/golang.org/x/crypto@v0.53.0/LICENSE:
 
 Copyright 2009 The Go Authors.
 
@@ -10060,11 +10060,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : golang.org/x/sys
-Version: v0.45.0
+Version: v0.46.0
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/golang.org/x/sys@v0.45.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/golang.org/x/sys@v0.46.0/LICENSE:
 
 Copyright 2009 The Go Authors.
 
@@ -10097,11 +10097,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : golang.org/x/text
-Version: v0.37.0
+Version: v0.38.0
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/golang.org/x/text@v0.37.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/golang.org/x/text@v0.38.0/LICENSE:
 
 Copyright 2009 The Go Authors.
 
