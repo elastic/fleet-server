@@ -27,7 +27,11 @@ jobs:
           GOOS: ${{ matrix.GOOS }}
         run: echo Go GOOS=$GOOS
 
+<<<<<<< HEAD
       - uses: actions/checkout@v4
+=======
+      - uses: actions/checkout@v7
+>>>>>>> 6eecb2e (build(deps): bump actions/checkout (#7232))
 
       - uses: actions/setup-go@v5
         with:
