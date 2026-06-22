@@ -44,6 +44,8 @@ require (
 	golang.org/x/mod v0.37.0 // indirect
 	golang.org/x/perf v0.0.0-20250305200902-02a15fd477ba // indirect
 	golang.org/x/sync v0.21.0 // indirect
+	golang.org/x/sys v0.46.0 // indirect
+	golang.org/x/telemetry v0.0.0-20260610154732-fb80ec83bdd9 // indirect
 	golang.org/x/text v0.23.0 // indirect
 	golang.org/x/tools v0.46.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
