@@ -21,12 +21,7 @@ require (
 	github.com/magefile/mage v1.17.2
 	github.com/mailru/easyjson v0.9.2
 	github.com/miolini/datacounter v1.0.3
-<<<<<<< HEAD
-	github.com/oapi-codegen/runtime v1.4.1
-=======
 	github.com/oapi-codegen/runtime v1.4.2
-	github.com/open-telemetry/opamp-go v0.23.0
->>>>>>> 2f473c0 (build(deps): bump github.com/oapi-codegen/runtime from 1.4.1 to 1.4.2 (#7233))
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/prometheus/client_golang v1.23.2
 	github.com/rs/xid v1.6.0
