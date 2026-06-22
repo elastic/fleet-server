@@ -204,7 +204,7 @@ type Bulk struct {
 	ts   string
 	opts optionsT
 	unix int64
-	mut  sync.Mutex // used to controll access to pending map
+	mut  sync.Mutex // used to control access to pending map
 }
 
 func NewBulk(bulker bulk.Bulk, opts ...Opt) *Bulk {

@@ -100,7 +100,7 @@ type monitorT struct {
 	dispatchCh    chan struct{}
 	policiesIndex string
 
-	mut sync.Mutex // controlls access to pendingQ and policies map
+	mut sync.Mutex // controls access to pendingQ and policies map
 }
 
 // NewMonitor creates the policy monitor for subscribing agents.

@@ -22,8 +22,9 @@ import (
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger/zap"
 
-	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/rs/zerolog"
+
+	"github.com/elastic/go-elasticsearch/v8"
 )
 
 // The timeout would be driven by the server for long poll.
@@ -261,13 +262,13 @@ func (c *Elasticsearch) DiagRequests(ctx context.Context) []byte {
 		hostURL, err := makeURL(c.Protocol, "", host, 9200)
 		if err != nil {
 			zerolog.Ctx(ctx).Warn().Err(err).Str("host", host).Msg("Unable to transform host to url.URL")
-			res.WriteString(fmt.Sprintf("Unable to transform host %q to url.URL: %v\n", host, err))
+			fmt.Fprintf(res, "Unable to transform host %q to url.URL: %v\n", host, err)
 			continue
 		}
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, hostURL, nil)
 		if err != nil {
 			zerolog.Ctx(ctx).Warn().Err(err).Str("host", host).Msg("Unable to create request to host")
-			res.WriteString(fmt.Sprintf("Unable to create request to host %q: %v\n", host, err))
+			fmt.Fprintf(res, "Unable to create request to host %q: %v\n", host, err)
 			continue
 		}
 		req.Header = headers.Clone()

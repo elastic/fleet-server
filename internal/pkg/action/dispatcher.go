@@ -41,7 +41,7 @@ type Dispatcher struct {
 	limit  *rate.Limiter
 
 	subs map[string]Sub
-	mx   sync.RWMutex // used to controll access to subs map
+	mx   sync.RWMutex // used to control access to subs map
 }
 
 // NewDispatcher creates a Dispatcher using the provided monitor.

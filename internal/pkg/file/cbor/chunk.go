@@ -80,8 +80,8 @@ func encodePreambleToCBOR(final bool, baseID string, chunkHash string, chunkSize
 	preamble[11] = 'p'
 	preamble[12] = 0x1b // uint64 to follow
 	// occupies 8 bytes, indexes 13-20
-	binary.BigEndian.PutUint64(preamble[13:], uint64(time.Now().UnixMilli())) //nolint:gosec // disable G115
-	preamble[21] = 0x64                                                       // string with 4 chars (key: last)
+	binary.BigEndian.PutUint64(preamble[13:], uint64(time.Now().UnixMilli()))
+	preamble[21] = 0x64 // string with 4 chars (key: last)
 	preamble[22] = 'l'
 	preamble[23] = 'a'
 	preamble[24] = 's'
@@ -188,8 +188,8 @@ func writeKey(buf []byte, key string) (int, error) {
 	}
 
 	buf[0] = byte(0x60 + keylen)
-	for i, c := range key {
-		buf[i+1] = byte(c)
+	for i, c := range []byte(key) { // convert string into []byte so any runes are properly handled
+		buf[i+1] = c
 	}
 
 	return keylen + 1, nil
@@ -207,8 +207,8 @@ func writeString(buf []byte, val string) (int, error) {
 
 	buf[0] = 0x78 // Descriptor for: "UTF8 string. Next byte is a uint8 for n, and then n bytes follow"
 	buf[1] = uint8(strlen)
-	for i, c := range val {
-		buf[i+2] = byte(c)
+	for i, c := range []byte(val) { // convert string into []byte so any runes are properly handled
+		buf[i+2] = c
 	}
 
 	return strlen + 2, nil
