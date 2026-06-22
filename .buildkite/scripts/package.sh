@@ -4,7 +4,6 @@ set -euo pipefail
 
 source .buildkite/scripts/common.sh
 
-TYPE="$1"
 readonly VERSION_QUALIFIER="${VERSION_QUALIFIER:-""}"
 
 if [[ ${BUILDKITE_BRANCH} == "main" && ${TYPE} == "staging" && -z ${VERSION_QUALIFIER} ]]; then
