@@ -150,16 +150,16 @@ func IndexChunk(ctx context.Context, client *elasticsearch.Client, body *cbor.Ch
 }
 
 type ChunkUploadResponse struct {
-	Index   string `json:"_index"`
-	ID      string `json:"_id"`
-	Result  string `json:"result"`
-	Version int    `json:"_version"`
-	Shards  struct {
+	Error  es.ErrorT `json:"error"`
+	Index  string    `json:"_index"`
+	ID     string    `json:"_id"`
+	Result string    `json:"result"`
+	Shards struct {
 		Total   int `json:"total"`
 		Success int `json:"successful"`
 		Failed  int `json:"failed"`
 	} `json:"_shards"`
-	Error es.ErrorT `json:"error"`
+	Version int `json:"_version"`
 }
 
 func DeleteChunk(ctx context.Context, bulker bulk.Bulk, source string, fileID string, chunkNum int) error {

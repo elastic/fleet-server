@@ -21,13 +21,13 @@ const (
 // TODO: Why do we have both ErrElastic and ErrorT?  Very strange.
 
 type ErrElastic struct {
-	Status int
-	Type   string
-	Reason string
-	Cause  struct {
+	Cause struct {
 		Type   string
 		Reason string
 	}
+	Type   string
+	Reason string
+	Status int
 }
 
 func (e *ErrElastic) Unwrap() error {

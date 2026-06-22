@@ -35,26 +35,26 @@ var hasScheme = regexp.MustCompile(`^([a-z][a-z0-9+\-.]*)://`)
 
 // Output is the output configuration to elasticsearch.
 type Output struct {
-	Elasticsearch Elasticsearch  `config:"elasticsearch"`
 	Extra         map[string]any `config:",inline"`
+	Elasticsearch Elasticsearch  `config:"elasticsearch"`
 }
 
 // Elasticsearch is the configuration for elasticsearch.
 type Elasticsearch struct {
-	Protocol         string            `config:"protocol"`
-	Hosts            []string          `config:"hosts"`
-	Path             string            `config:"path"`
 	Headers          map[string]string `config:"headers"`
+	ProxyHeaders     map[string]string `config:"proxy_headers"`
+	TLS              *tlscommon.Config `config:"ssl"`
+	Protocol         string            `config:"protocol"`
+	Path             string            `config:"path"`
 	ServiceToken     string            `config:"service_token"`
 	ServiceTokenPath string            `config:"service_token_path"`
 	ProxyURL         string            `config:"proxy_url"`
-	ProxyDisable     bool              `config:"proxy_disable"`
-	ProxyHeaders     map[string]string `config:"proxy_headers"`
-	TLS              *tlscommon.Config `config:"ssl"`
+	Hosts            []string          `config:"hosts"`
 	MaxRetries       int               `config:"max_retries"`
 	MaxConnPerHost   int               `config:"max_conn_per_host"`
 	Timeout          time.Duration     `config:"timeout"`
 	MaxContentLength int               `config:"max_content_length"`
+	ProxyDisable     bool              `config:"proxy_disable"`
 }
 
 // InitDefaults initializes the defaults for the configuration.

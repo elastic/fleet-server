@@ -171,40 +171,40 @@ func WithAvailableRollbacks(availableRollbacks []byte) Option {
 }
 
 type extraT struct {
+	ver                string
 	meta               []byte
 	seqNo              sqn.SeqNo
-	ver                string
 	components         []byte
-	deleteAudit        bool
 	availableRollbacks []byte
 	health             []byte
 	capabilities       []string
 	effectiveConfig    []byte
+	deleteAudit        bool
 }
 
 // Minimize the size of this structure.
 // There will be 10's of thousands of items
 // in the map at any point.
 type pendingT struct {
+	extra           *extraT
+	unhealthyReason *[]string
 	ts              string
 	status          string
 	message         string
 	agentPolicyID   string // may be empty
 	revisionIDX     int64
-	extra           *extraT
-	unhealthyReason *[]string
 	sequenceNum     uint64
 }
 
 // Bulk will batch pending checkins and update elasticsearch at a set interval.
 type Bulk struct {
-	opts    optionsT
 	bulker  bulk.Bulk
-	mut     sync.Mutex
 	pending map[string]pendingT
 
 	ts   string
+	opts optionsT
 	unix int64
+	mut  sync.Mutex // used to controll access to pending map
 }
 
 func NewBulk(bulker bulk.Bulk, opts ...Opt) *Bulk {

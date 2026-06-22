@@ -10,12 +10,14 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/elastic/fleet-server/v7/internal/pkg/es"
-	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 	"github.com/rs/zerolog"
 
-	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
+	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
+
 	"golang.org/x/sync/errgroup"
+
+	"github.com/elastic/go-elasticsearch/v8"
 )
 
 const (
@@ -44,8 +46,8 @@ type Monitor interface {
 
 // subT is a subscription to get notified for new documents.
 type subT struct {
-	idx uint64
 	c   chan []es.HitT
+	idx uint64
 }
 
 // Output returns the subscription channel.
@@ -56,9 +58,9 @@ func (s *subT) Output() <-chan []es.HitT {
 // monitorT monitors for new documents in an index.
 type monitorT struct {
 	sm         SimpleMonitor
-	mut        sync.RWMutex
 	subs       map[uint64]*subT
 	subTimeout time.Duration
+	mut        sync.RWMutex // subs mutex
 }
 
 // New creates new subscription monitor.

@@ -40,11 +40,11 @@ var (
 
 type Uploader struct {
 	cache     cache.Cache // cache of file metadata doc info
+	bulker    bulk.Bulk
 	sizeLimit *uint64
-	timeLimit time.Duration
 
 	chunkClient *elasticsearch.Client
-	bulker      bulk.Bulk
+	timeLimit   time.Duration
 }
 
 func New(chunkClient *elasticsearch.Client, bulker bulk.Bulk, cache cache.Cache, sizeLimit *uint64, timeLimit time.Duration) *Uploader {

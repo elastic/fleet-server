@@ -622,9 +622,9 @@ func (Check) Imports() error {
 	return sh.Run("go", "tool", "-modfile", filepath.Join("dev-tools", "go.mod"), "golang.org/x/tools/cmd/goimports", "-w", ".")
 }
 
-// Ci runs CI related checks - runs generate, imports, fix, checkHeaders, notice, checkNoChanges.
+// Ci runs CI related checks - runs generate, imports, align, fix, checkHeaders, notice, checkNoChanges.
 func (Check) Ci() {
-	mg.SerialDeps(Generate, Check.Imports, Check.Fix, Check.Headers, Check.Notice, Check.NoChanges)
+	mg.SerialDeps(Generate, Check.Imports, Check.Align, Check.Fix, Check.Headers, Check.Notice, Check.NoChanges)
 }
 
 // Go installs and runs golangci-lint.
@@ -654,6 +654,13 @@ func (Check) Fix() error {
 		}
 	}
 	return err
+}
+
+// Align runs betteralign to fix struct alignment across the codebase.
+//
+// By default generated files are excluded from this.
+func (Check) Align() error {
+	return sh.Run("go", "tool", "-modfile", filepath.Join("dev-tools", "go.mod"), "betteralign", "-fix", "./...")
 }
 
 // getLinter ensures that the linter of the correct version is installed to GOPATH.

@@ -26,10 +26,10 @@ var (
 )
 
 type ClientError struct {
-	StatusCode int
+	err        error
 	Type       string
 	Reason     string
-	err        error
+	StatusCode int
 }
 
 func (e *ClientError) Error() string {

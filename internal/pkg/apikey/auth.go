@@ -24,14 +24,14 @@ var (
 
 // SecurityInfo contains all related information about an APIKey that Elasticsearch tracks.
 type SecurityInfo struct {
-	UserName    string            `json:"username"`
 	Roles       []string          `json:"roles"`
-	FullName    string            `json:"full_name"`
-	Email       string            `json:"email"`
 	Metadata    json.RawMessage   `json:"metadata"`
 	Enabled     bool              `json:"enabled"`
 	AuthRealm   map[string]string `json:"authentication_realm"`
 	LookupRealm map[string]string `json:"lookup_realm"`
+	UserName    string            `json:"username"`
+	FullName    string            `json:"full_name"`
+	Email       string            `json:"email"`
 }
 
 // Authenticate will return the SecurityInfo associated with the APIKey (retrieved from Elasticsearch).

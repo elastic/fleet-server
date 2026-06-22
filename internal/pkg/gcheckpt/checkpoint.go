@@ -29,8 +29,8 @@ var ErrGlobalCheckpoint = errors.New("global checkpoint error")
 
 type globalCheckpointsResponse struct {
 	GlobalCheckpoints []int64         `json:"global_checkpoints"`
-	TimedOut          bool            `json:"timed_out"`
 	Error             json.RawMessage `json:"error,omitempty"`
+	TimedOut          bool            `json:"timed_out"`
 }
 
 func Query(ctx context.Context, es *elasticsearch.Client, index string) (seqno sqn.SeqNo, err error) {

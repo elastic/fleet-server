@@ -17,24 +17,24 @@ import (
 // Token indicates successful access.
 // Release should be called once operations are complete
 type Token struct {
-	id       uint64
-	key      string
 	throttle *Throttle
+	key      string
+	id       uint64
 }
 
 type tstate struct {
-	id     uint64
 	expire time.Time
+	id     uint64
 }
 
 // Throttle provides tokens to callers with two rules:
 // 1) Only one Token per key at a time can be acquired. Token expires if not released by ttl.
 // 2) Only max unexpired tokens acquired at any one time.
 type Throttle struct {
-	mut         sync.Mutex
+	tokenMap    map[string]tstate
 	maxParallel int
 	tokenCnt    uint64
-	tokenMap    map[string]tstate
+	mut         sync.Mutex
 }
 
 // NewThrottle creates a new throttle with the passed maximum parallel value.

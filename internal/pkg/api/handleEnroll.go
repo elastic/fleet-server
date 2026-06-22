@@ -68,10 +68,10 @@ var (
 )
 
 type EnrollerT struct {
-	verCon version.Constraints
-	cfg    *config.Server
 	bulker bulk.Bulk
 	cache  cache.Cache
+	cfg    *config.Server
+	verCon version.Constraints
 }
 
 func NewEnrollerT(verCon version.Constraints, cfg *config.Server, bulker bulk.Bulk, c cache.Cache) (*EnrollerT, error) {

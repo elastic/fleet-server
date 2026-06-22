@@ -5,9 +5,9 @@
 package bulk
 
 type queueT struct {
+	head    *bulkT
 	ty      queueType
 	cnt     int
-	head    *bulkT
 	pending int
 }
 

@@ -77,14 +77,13 @@ type Monitor interface {
 type policyFetcher func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error)
 
 type policyT struct {
-	pp   ParsedPolicy
 	head *subT
+	pp   ParsedPolicy
 }
 
 type monitorT struct {
 	log zerolog.Logger
 
-	mut     sync.Mutex
 	bulker  bulk.Bulk
 	monitor monitor.Monitor
 
@@ -94,12 +93,14 @@ type monitorT struct {
 	policies map[string]policyT
 	pendingQ *subT
 
-	policyF       policyFetcher
-	policiesIndex string
-	limit         *rate.Limiter
+	policyF policyFetcher
+	limit   *rate.Limiter
 
-	startCh    chan struct{}
-	dispatchCh chan struct{}
+	startCh       chan struct{}
+	dispatchCh    chan struct{}
+	policiesIndex string
+
+	mut sync.Mutex // controlls access to pendingQ and policies map
 }
 
 // NewMonitor creates the policy monitor for subscribing agents.

@@ -19,10 +19,10 @@ import (
 // A suitable general purpose library, if the future needs one, is github.com/fxamacker/cbor/v2
 type ChunkEncoder struct {
 	chunk       io.Reader
-	final       bool
 	preamble    []byte
-	prbWritten  bool
 	prbWritePos int
+	final       bool
+	prbWritten  bool
 	wroteTerm   bool
 }
 

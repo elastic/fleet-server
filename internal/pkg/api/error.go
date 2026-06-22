@@ -48,8 +48,8 @@ const (
 // unmarshal errors such as json.SyntaxError, or any other input validation
 // error.
 type BadRequestErr struct {
-	msg     string
 	nextErr error
+	msg     string
 }
 
 func (e *BadRequestErr) Error() string {

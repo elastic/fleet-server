@@ -23,9 +23,6 @@ import (
 type standAloneSelfMonitorT struct {
 	log zerolog.Logger
 
-	mut   sync.RWMutex
-	state client.UnitState
-
 	bulker   bulk.Bulk
 	reporter state.Reporter
 
@@ -33,6 +30,9 @@ type standAloneSelfMonitorT struct {
 	policiesIndex string
 	checkTime     time.Duration
 	checkTimeout  time.Duration
+
+	mut   sync.RWMutex
+	state client.UnitState
 }
 
 // NewStandAloneSelfMonitor creates the self policy monitor for an stand-alone Fleet Server.

@@ -56,8 +56,8 @@ func Create(ctx context.Context, client *elasticsearch.Client, name, ttl, refres
 	type APIKeyResponse struct {
 		ID         string `json:"id"`
 		Name       string `json:"name"`
-		Expiration uint64 `json:"expiration"`
 		APIKey     string `json:"api_key"`
+		Expiration uint64 `json:"expiration"`
 	}
 
 	var resp APIKeyResponse

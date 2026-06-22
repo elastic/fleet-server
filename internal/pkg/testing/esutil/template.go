@@ -41,8 +41,8 @@ const (
 )
 
 type Template struct {
-	Version  int            `json:"version"`
 	Settings map[string]any `json:"settings"`
+	Version  int            `json:"version"`
 }
 
 type AckResponse struct {

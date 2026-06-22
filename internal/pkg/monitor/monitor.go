@@ -78,26 +78,28 @@ type SimpleMonitor interface {
 
 // simpleMonitorT monitors for new documents in an index
 type simpleMonitorT struct {
+	log zerolog.Logger
+
 	esCli     *elasticsearch.Client
 	monCli    *elasticsearch.Client
 	tracer    *apm.Tracer
 	tmplCheck *dsl.Tmpl
 	tmplQuery *dsl.Tmpl
 
-	index          string
-	pollTimeout    time.Duration
-	withExpiration bool
-	fetchSize      int
-	debounceTime   time.Duration
-
-	checkpoint sqn.SeqNo    // index global checkpoint
-	mx         sync.RWMutex // checkpoint mutex
-
-	log zerolog.Logger
-
 	outCh chan []es.HitT
 
 	readyCh chan error
+
+	index string
+
+	checkpoint   sqn.SeqNo // index global checkpoint
+	pollTimeout  time.Duration
+	fetchSize    int
+	debounceTime time.Duration
+
+	mx sync.RWMutex // checkpoint mutex
+
+	withExpiration bool
 }
 
 // Option is a functional configuration option.

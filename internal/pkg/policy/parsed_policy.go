@@ -34,8 +34,8 @@ var (
 )
 
 type RoleT struct {
-	Raw  []byte
 	Sha2 string
+	Raw  []byte
 }
 
 type RoleMapT map[string]RoleT

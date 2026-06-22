@@ -113,11 +113,11 @@ var flushSpanNames = func() [kNumQueues]string {
 }()
 
 type Bulker struct {
-	es                    esapi.Transport
-	ch                    chan *bulkT
 	opts                  bulkOptT
 	blkPool               sync.Pool
 	flushBufPool          sync.Pool
+	es                    esapi.Transport
+	ch                    chan *bulkT
 	apikeyLimit           *semaphore.Weighted
 	tracer                *apm.Tracer
 	cancelFn              context.CancelFunc
@@ -125,7 +125,7 @@ type Bulker struct {
 
 	remoteOutputConfigMap map[string]map[string]any
 	bulkerMap             map[string]Bulk
-	remoteOutputMutex     sync.RWMutex
+	remoteOutputMutex     sync.RWMutex // Used to control acces to bulkerMap and remoteOutputConfigMap
 }
 
 const (

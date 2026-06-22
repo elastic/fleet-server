@@ -73,20 +73,21 @@ var validActionTypes = map[string]bool{
 }
 
 type CheckinT struct {
-	verCon version.Constraints
-	cfg    *config.Server
-	cache  cache.Cache
-	bc     *checkin.Bulk
-	pm     policy.Monitor
-	gcp    monitor.GlobalCheckpointProvider
-	ad     *action.Dispatcher
-	tr     *action.TokenResolver
 
 	// gwPool is a gzip.Writer pool intended to lower the amount of writers created when responding to checkin requests.
 	// gzip.Writer allocations are expensive (~1.2MB each) and can exhaust an instance's memory if a lot of concurrent responses are sent (this occurs when a mass-action such as an upgrade is detected).
 	// effectiveness of the pool is controlled by rate limiter configured through the limit.action_limit attribute.
 	gwPool sync.Pool
+	cache  cache.Cache
+	pm     policy.Monitor
+	gcp    monitor.GlobalCheckpointProvider
 	bulker bulk.Bulk
+	cfg    *config.Server
+	bc     *checkin.Bulk
+	ad     *action.Dispatcher
+	tr     *action.TokenResolver
+
+	verCon version.Constraints
 }
 
 func NewCheckinT(
@@ -169,12 +170,12 @@ func invalidateAPIKeysOfInactiveAgent(ctx context.Context, zlog zerolog.Logger, 
 // validatedCheckin is a struct to wrap all the things that validateRequest returns.
 type validatedCheckin struct {
 	req                   *CheckinRequest
-	dur                   time.Duration
+	unhealthyReason       *[]string
 	rawMeta               []byte
 	rawComp               []byte
 	seqno                 sqn.SeqNo
-	unhealthyReason       *[]string
 	rawAvailableRollbacks []byte
+	dur                   time.Duration
 }
 
 func (ct *CheckinT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, start time.Time, agent *model.Agent) (validatedCheckin, error) {
