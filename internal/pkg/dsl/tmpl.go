@@ -17,18 +17,10 @@ import (
 const kPrefix = "TMPL."
 const kTokenSz = len(kPrefix) + 36 // len of uuid string
 
-// renderPairsCap is the capacity of the stack-allocated backing array used in
-// Render. All templates must have at most this many bound tokens; Resolve
-// enforces this so that violations are caught at package initialisation time.
-// 8 is chosen to be 2x the widest template currently in the codebase:
-// QueryAgentActions binds 4 tokens (FieldSeqNo, FieldMaxSeqNo, FieldExpiration, FieldAgents).
-const renderPairsCap = 8
-
 var (
 	ErrTokenUndefined = errors.New("bound token not defined")
 	ErrTokenNotFound  = errors.New("named token not found")
 	ErrNotResolved    = errors.New("template not resolved")
-	ErrTooManyTokens  = fmt.Errorf("template exceeds render buffer capacity of %d tokens", renderPairsCap)
 )
 
 type Tmpl struct {
@@ -129,9 +121,6 @@ func (t *Tmpl) Resolve(n *Node) error {
 	if len(matches) != len(rmap) {
 		return ErrTokenUndefined
 	}
-	if len(rmap) > renderPairsCap {
-		return ErrTooManyTokens
-	}
 
 	t.sseq = sliceSeq
 	t.bcnt = sum
@@ -160,8 +149,7 @@ func (t *Tmpl) RenderOne(name string, v any) ([]byte, error) {
 }
 
 func (t *Tmpl) Render(m map[string]any) ([]byte, error) {
-	var fixed [renderPairsCap]namedBytes
-	pairs := fixed[:0]
+	pairs := make([]namedBytes, 0, len(m)*2)
 	var sum int
 
 	for name, v := range m {
