@@ -20,7 +20,7 @@ jobs:
       pull-requests: write
     steps:
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Updatecli in the runner
         uses: updatecli/updatecli-action@af341a800cdbcde3ddcebb7a62410ac06a78a207 # v3.1.2
