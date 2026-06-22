@@ -75,7 +75,7 @@ func (c *Instrumentation) APMHTTPTransportOptions() (apmtransport.HTTPTransportO
 			return apmtransport.HTTPTransportOptions{}, fmt.Errorf("unable to parse instrumentation certificate: %w", err)
 		}
 		tlsConfig.InsecureSkipVerify = true
-		tlsConfig.VerifyPeerCertificate = func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+		tlsConfig.VerifyPeerCertificate = func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error { //nolint:gosec // don't worry about resumed sessions here
 			return verifyPeerCertificate(rawCerts, cert)
 		}
 	}
