@@ -29,6 +29,7 @@ cleanup() {
     if [ -n "${CLUSTER_NAME}" ] && [ "${CLUSTER_NAME}" != "null" ]; then
       echo "--- Deployment detected, running cleanup."
       oblt-cli cluster destroy --cluster-name "${CLUSTER_NAME}" --force || true
+      rm -f secrets.env.sh cluster-info.json
     fi
   else
     echo "--- No deployment detected, skipping cleanup."
