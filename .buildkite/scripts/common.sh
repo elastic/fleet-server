@@ -118,7 +118,10 @@ get_bucket_uri() {
 
 upload_mbp_packages_to_gcp_bucket() {
     local pattern=${1}
-    local type=${2}
+    local type="staging"
+    if [[ ${SNAPSHOT:-false}  == "true" ]]; then
+        type="snapshot"
+    fi
     get_bucket_uri "${type}"
     gcloud storage cp --recursive --quiet ${pattern} ${bucketUri}
 }
