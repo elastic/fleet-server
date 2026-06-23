@@ -27,10 +27,9 @@ steps:
     # as prereleases are only intended to be used with staging; details in https://github.com/elastic/ingest-dev/issues/4855
     if: "build.env('VERSION_QUALIFIER') == null"
     key: "package-x86-64-snapshot"
-    command: ".buildkite/scripts/package.sh"
+    command: ".buildkite/scripts/package.sh snapshot"
     env:
       PLATFORMS: "linux/amd64,darwin/amd64,windows/amd64"
-      SNAPSHOT: "true"
     agents:
       provider: "gcp"
       image: "${IMAGE_UBUNTU_X86_64}"
@@ -44,7 +43,7 @@ steps:
     key: "package-x86-64-staging"
     command: |
       source .buildkite/scripts/version_qualifier.sh
-      .buildkite/scripts/package.sh
+      .buildkite/scripts/package.sh staging
     env:
       PLATFORMS: "linux/amd64,darwin/amd64,windows/amd64"
     agents:
@@ -60,9 +59,8 @@ steps:
   - label: "Package FIPS x86_64 snapshot"
     if: "build.env('VERSION_QUALIFIER') == null"
     key: "package-fips-x86-64-snapshot"
-    command: ".buildkite/scripts/package.sh"
+    command: ".buildkite/scripts/package.sh snapshot"
     env:
-      SNAPSHOT: "true"
       FIPS: "true"
       PLATFORMS: "linux/amd64,windows/amd64"
     agents:
@@ -79,7 +77,7 @@ steps:
     key: "package-fips-x86-64-staging"
     command: |
       source .buildkite/scripts/version_qualifier.sh
-      .buildkite/scripts/package.sh
+      .buildkite/scripts/package.sh staging
     env:
       FIPS: "true"
       PLATFORMS: "linux/amd64,windows/amd64"
@@ -96,9 +94,8 @@ steps:
   - label: "Package aarch64 snapshot"
     if: "build.env('VERSION_QUALIFIER') == null"
     key: "package-arm-snapshot"
-    command: ".buildkite/scripts/package.sh"
+    command: ".buildkite/scripts/package.sh snapshot"
     env:
-      SNAPSHOT: "true"
       PLATFORMS: "linux/arm64,darwin/arm64,windows/arm64"
     agents:
       provider: "aws"
@@ -114,7 +111,7 @@ steps:
     key: "package-arm-staging"
     command: |
       source .buildkite/scripts/version_qualifier.sh
-      .buildkite/scripts/package.sh
+      .buildkite/scripts/package.sh staging
     env:
       PLATFORMS: "linux/arm64,darwin/arm64,windows/arm64"
     agents:
@@ -130,9 +127,8 @@ steps:
   - label: "Package FIPS aarch64 snapshot"
     if: "build.env('VERSION_QUALIFIER') == null"
     key: "package-fips-arm-snapshot"
-    command: ".buildkite/scripts/package.sh"
+    command: ".buildkite/scripts/package.sh snapshot"
     env:
-      SNAPSHOT: "true"
       FIPS: "true"
       PLATFORMS: "linux/arm64,windows/arm64"
     agents:
@@ -149,7 +145,7 @@ steps:
     key: "package-fips-arm-staging"
     command: |
       source .buildkite/scripts/version_qualifier.sh
-      .buildkite/scripts/package.sh
+      .buildkite/scripts/package.sh staging
     env:
       FIPS: "true"
       PLATFORMS: "linux/arm64,windows/arm64"
