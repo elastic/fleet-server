@@ -4,16 +4,30 @@ set -euo pipefail
 
 source .buildkite/scripts/common.sh
 
+TYPE="$1"
 readonly VERSION_QUALIFIER="${VERSION_QUALIFIER:-""}"
 
-if [[ ${BUILDKITE_BRANCH} == "main" && -z ${VERSION_QUALIFIER} ]]; then
+if [[ ${BUILDKITE_BRANCH} == "main" && ${TYPE} == "staging" && -z ${VERSION_QUALIFIER} ]]; then
     echo "INFO: staging artifacts for the main branch are not required."
     exit 0
 fi
 
 add_bin_path
+
 with_go
 with_mage
 
-mage docker:release
-upload_mbp_packages_to_gcp_bucket "build/distributions/**/*"
+case "${TYPE}" in
+    "snapshot")
+        export SNAPSHOT=true
+        mage docker:release
+        ;;
+    "staging")
+        mage docker:release
+        ;;
+    *)
+    echo "The option is unsupported yet"
+    ;;
+esac
+
+upload_mbp_packages_to_gcp_bucket "build/distributions/**/*" "${TYPE}"
