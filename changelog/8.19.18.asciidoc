@@ -5,20 +5,4 @@
 
 Review important information about the  8.19.18 release.
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 // end 8.19.18 relnotes
