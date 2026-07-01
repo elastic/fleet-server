@@ -7,6 +7,7 @@ package policy
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -24,6 +25,8 @@ import (
 )
 
 const cloudPolicyID = "policy-elastic-agent-on-cloud"
+
+var ErrPolicyNotFound = errors.New("policy not found")
 
 /*
 Design should have the following properties
@@ -62,6 +65,16 @@ type Monitor interface {
 
 	// Unsubscribe removes the current subscription.
 	Unsubscribe(sub Subscription) error
+<<<<<<< HEAD
+=======
+
+	// LatestRev returns the latest revision idx for the specified policy.
+	LatestRev(ctx context.Context, policyID string) int64
+
+	// GetPolicy returns the cached policy for the given policy ID.
+	// If the policy is not in the cache, it forces a reload from Elasticsearch.
+	GetPolicy(ctx context.Context, policyID string) (*model.Policy, error)
+>>>>>>> caa8b2d (fix: enforce policy-based access control on artifact downloads (#7009))
 }
 
 type policyFetcher func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error)
@@ -519,3 +532,66 @@ func (m *monitorT) Unsubscribe(sub Subscription) error {
 
 	return nil
 }
+<<<<<<< HEAD
+=======
+
+// LatestRev returns the revision_idx for the passed policy ID.
+// If the policy does not exist in the map, then all policies are foribly reloaded.
+// On an error with the reload, or if the policy does not exist a 0 is returned.
+func (m *monitorT) LatestRev(ctx context.Context, id string) int64 {
+	if id == "" {
+		return 0
+	}
+
+	m.mut.Lock()
+	p, ok := m.policies[id]
+	m.mut.Unlock()
+
+	if !ok {
+		// We've not seen this policy before, force load.
+		err := m.loadPolicies(ctx)
+		if err != nil {
+			m.log.Error().Err(err).Str(ecs.PolicyID, id).Msg("Unable to load policies.")
+			return 0
+		}
+
+		m.mut.Lock()
+		p, ok = m.policies[id]
+		m.mut.Unlock()
+		if !ok {
+			m.log.Warn().Str(ecs.PolicyID, id).Msg("Unable to find policy after load.")
+			return 0
+		}
+	}
+	return p.pp.Policy.RevisionIdx
+}
+
+// GetPolicy returns the policy for the given policy ID from the in-memory cache.
+// If the policy is not found in cache, all policies are reloaded from Elasticsearch.
+func (m *monitorT) GetPolicy(ctx context.Context, policyID string) (*model.Policy, error) {
+	if policyID == "" {
+		return nil, errors.New("policy ID is empty")
+	}
+
+	m.mut.Lock()
+	p, ok := m.policies[policyID]
+	m.mut.Unlock()
+
+	if ok {
+		return &p.pp.Policy, nil
+	}
+
+	if err := m.loadPolicies(ctx); err != nil {
+		return nil, fmt.Errorf("loading policies: %w", err)
+	}
+
+	m.mut.Lock()
+	p, ok = m.policies[policyID]
+	m.mut.Unlock()
+
+	if !ok {
+		return nil, fmt.Errorf("%w: %s", ErrPolicyNotFound, policyID)
+	}
+	return &p.pp.Policy, nil
+}
+>>>>>>> caa8b2d (fix: enforce policy-based access control on artifact downloads (#7009))
