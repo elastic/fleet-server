@@ -34,6 +34,13 @@ type sliceT struct {
 	data []byte
 }
 
+// namedBytes pairs a token name with its marshaled value, used in renderPairs
+// to avoid map allocations on the hot render path.
+type namedBytes struct {
+	name string
+	data []byte
+}
+
 func NewTmpl() *Tmpl {
 	return &Tmpl{
 		tmap: make(map[string]Token),
@@ -99,7 +106,7 @@ func (t *Tmpl) Resolve(n *Node) error {
 			src = src[v:]
 		}
 
-		sum += len(src)
+		sum += len(slice.data)
 		sliceSeq = append(sliceSeq, slice)
 	}
 
@@ -128,21 +135,21 @@ func (t *Tmpl) MustResolve(n *Node) *Tmpl {
 	return t
 }
 
-// RenderOne is a convenience function to avoid map when only one token
+// RenderOne is a convenience function when only one token needs substitution.
+// It uses a stack-allocated [1]namedBytes to avoid a heap map allocation.
 func (t *Tmpl) RenderOne(name string, v any) ([]byte, error) {
 	d, err := json.Marshal(v)
 	if err != nil {
 		return nil, err
 	}
 
-	m := map[string][]byte{name: d}
-	return t.render(m, len(d))
+	var pair [1]namedBytes
+	pair[0] = namedBytes{name, d}
+	return t.renderPairs(pair[:], len(d))
 }
 
 func (t *Tmpl) Render(m map[string]any) ([]byte, error) {
-
-	// Marshal all targets, get byte count
-	marshalMap := make(map[string][]byte, len(m))
+	pairs := make([]namedBytes, 0, len(m)*2)
 	var sum int
 
 	for name, v := range m {
@@ -151,10 +158,10 @@ func (t *Tmpl) Render(m map[string]any) ([]byte, error) {
 			return nil, err
 		}
 		sum += len(d)
-		marshalMap[name] = d
+		pairs = append(pairs, namedBytes{name, d})
 	}
 
-	return t.render(marshalMap, sum)
+	return t.renderPairs(pairs, sum)
 }
 
 func (t *Tmpl) MustRender(m map[string]any) []byte {
@@ -165,24 +172,32 @@ func (t *Tmpl) MustRender(m map[string]any) []byte {
 	return b
 }
 
-func (t *Tmpl) render(m map[string][]byte, sum int) ([]byte, error) {
+// renderPairs writes the resolved template into a bytes.Buffer, substituting
+// named tokens via a linear scan over pairs (O(n*m) where n is the number of
+// template slices and m is the number of tokens; both are small for all
+// templates in this codebase).
+func (t *Tmpl) renderPairs(pairs []namedBytes, sum int) ([]byte, error) {
 	if t.sseq == nil {
 		return nil, ErrNotResolved
 	}
 
-	// Allocate buffer for result
 	var buf bytes.Buffer
 	buf.Grow(sum + t.bcnt)
 
-	// O(n) Iterate through sequences, render as expected
 	for _, s := range t.sseq {
 		buf.Write(s.data)
 		if s.name != "" {
-			d, ok := m[s.name]
-			if !ok {
+			var found bool
+			for _, p := range pairs {
+				if p.name == s.name {
+					buf.Write(p.data)
+					found = true
+					break
+				}
+			}
+			if !found {
 				return nil, ErrTokenNotFound
 			}
-			buf.Write(d)
 		}
 	}
 

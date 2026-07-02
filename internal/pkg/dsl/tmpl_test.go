@@ -46,9 +46,8 @@ func BenchmarkRenderOne(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	b.ResetTimer()
-	// run the RenderOne function b.N times
-	for n := 0; n < b.N; n++ {
+	b.ReportAllocs()
+	for b.Loop() {
 		if _, err := tmpl.RenderOne(kName, "2Ye0F3UByTc0c1e9OeMO"); err != nil {
 			b.Error(err)
 		}
@@ -68,9 +67,8 @@ func BenchmarkRender(b *testing.B) {
 
 	const v = "2Ye0F3UByTc0c1e9OeMO"
 
-	b.ResetTimer()
-	// run the RenderOne function b.N times
-	for n := 0; n < b.N; n++ {
+	b.ReportAllocs()
+	for b.Loop() {
 		if _, err := tmpl.Render(map[string]any{
 			kName: v,
 		}); err != nil {
@@ -80,12 +78,10 @@ func BenchmarkRender(b *testing.B) {
 }
 
 func BenchmarkMarshalNode(b *testing.B) {
-	// run the RenderOne function b.N times
 	query := makeQuery("2Ye0F3UByTc0c1e9OeMO")
 	var err error
 	var p []byte
-	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
+	for b.Loop() {
 		p, err = json.Marshal(query)
 	}
 	if len(p) == 0 || err != nil {
@@ -94,12 +90,10 @@ func BenchmarkMarshalNode(b *testing.B) {
 }
 
 func BenchmarkMarshalNode2(b *testing.B) {
-	// run the RenderOne function b.N times
 	query := makeQuery2("27e58fc0-09a2-11eb-a8cd-57e98f140de5", 3)
 	var err error
 	var p []byte
-	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
+	for b.Loop() {
 		p, err = json.Marshal(query)
 	}
 	if len(p) == 0 || err != nil {
@@ -115,8 +109,7 @@ func BenchmarkSprintf(b *testing.B) {
 
 	var s string
 	var ssprintres string
-	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
+	for b.Loop() {
 		s = fmt.Sprintf(queryTmpl, policyID, policyRev)
 	}
 	ssprintres = s
@@ -139,9 +132,8 @@ func BenchmarkRender2(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	// run the RenderOne function b.N times
-	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
+	b.ReportAllocs()
+	for b.Loop() {
 		if _, err := tmpl.Render(map[string]any{
 			kName1: "27e58fc0-09a2-11eb-a8cd-57e98f140de5",
 			kName2: 3,

@@ -18,10 +18,19 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 )
 
+// policyOutputsOnly is a minimal struct for scanning policy hits in
+// QueryOutputFromPolicy. Unmarshaling into this avoids deserializing the full
+// model.Policy (which includes large inputs/agent config) for non-matching hits.
+type policyOutputsOnly struct {
+	Data *struct {
+		Outputs map[string]json.RawMessage `json:"outputs"`
+	} `json:"data"`
+}
+
 var (
 	tmplQueryLatestPolicies = prepareQueryLatestPolicies()
 	ErrMissingAggregations  = errors.New("missing expected aggregation result")
-	tmplQueryPolicies       = prepareQueryPolicies()
+	queryPolicies           = prepareQueryPolicies()
 )
 
 func prepareQueryLatestPolicies() []byte {
@@ -77,22 +86,19 @@ func CreatePolicy(ctx context.Context, bulker bulk.Bulk, policy model.Policy, op
 	return bulker.Create(ctx, o.indexName, "", data, bulk.WithRefresh())
 }
 
-func prepareQueryPolicies() *dsl.Tmpl {
-	tmpl := dsl.NewTmpl()
+func prepareQueryPolicies() []byte {
 	root := dsl.NewRoot()
 	root.Size(100)
 	root.Sort().SortOrder("@timestamp", "desc")
 	root.Source().Includes("data.outputs")
-	tmpl.MustResolve(root)
-	return tmpl
+	return root.MustMarshalJSON()
 }
 
 // query policies last updated, find the one with matching output
 // can't filter on output in ES as the field is not mapped
 func QueryOutputFromPolicy(ctx context.Context, bulker bulk.Bulk, outputName string, opt ...Option) (*model.Policy, error) {
 	o := newOption(FleetPolicies, opt...)
-	params := map[string]any{}
-	res, err := Search(ctx, bulker, tmplQueryPolicies, o.indexName, params)
+	res, err := bulker.Search(ctx, o.indexName, queryPolicies)
 	if err != nil {
 		if errors.Is(err, es.ErrIndexNotFound) {
 			zerolog.Ctx(ctx).Debug().Str("index", o.indexName).Msg(es.ErrIndexNotFound.Error())
@@ -100,15 +106,19 @@ func QueryOutputFromPolicy(ctx context.Context, bulker bulk.Bulk, outputName str
 		}
 		return nil, err
 	}
-	var policy model.Policy
 	for _, hit := range res.Hits {
-		err = hit.Unmarshal(&policy)
-		if err != nil {
+		var probe policyOutputsOnly
+		if err = hit.Unmarshal(&probe); err != nil {
 			return nil, err
 		}
-		if policy.Data.Outputs[outputName] != nil {
-			return &policy, nil
+		if probe.Data == nil || probe.Data.Outputs[outputName] == nil {
+			continue
 		}
+		var policy model.Policy
+		if err = hit.Unmarshal(&policy); err != nil {
+			return nil, err
+		}
+		return &policy, nil
 	}
 	zerolog.Ctx(ctx).Debug().Str(ecs.PolicyOutputName, outputName).Msg("policy with output not found")
 	return nil, nil
