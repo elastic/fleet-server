@@ -26,12 +26,13 @@ type StatIncer interface {
 }
 
 type Limiter struct {
-	rateLimit *rate.Limiter
-	maxLimit  *semaphore.Weighted
+	rateLimit   *rate.Limiter
+	maxLimit    *semaphore.Weighted
+	releaseFunc ReleaseFunc
 }
 
 func NewLimiter(cfg *config.Limit) *Limiter {
-	l := &Limiter{}
+	l := &Limiter{releaseFunc: noop}
 
 	if cfg == nil {
 		return l
@@ -43,26 +44,22 @@ func NewLimiter(cfg *config.Limit) *Limiter {
 
 	if cfg.Max != 0 {
 		l.maxLimit = semaphore.NewWeighted(cfg.Max)
+		l.releaseFunc = l.release
 	}
 
 	return l
 }
 
 func (l *Limiter) Acquire() (ReleaseFunc, error) {
-	releaseFunc := noop
-
 	if l.rateLimit != nil && !l.rateLimit.Allow() {
 		return nil, ErrRateLimit
 	}
 
-	if l.maxLimit != nil {
-		if !l.maxLimit.TryAcquire(1) {
-			return nil, ErrMaxLimit
-		}
-		releaseFunc = l.release
+	if l.maxLimit != nil && !l.maxLimit.TryAcquire(1) {
+		return nil, ErrMaxLimit
 	}
 
-	return releaseFunc, nil
+	return l.releaseFunc, nil
 }
 
 func (l *Limiter) release() {

@@ -272,7 +272,7 @@ func (at ArtifactT) fetchArtifact(ctx context.Context, zlog zerolog.Logger, iden
 	span, ctx := apm.StartSpan(ctx, "fetchArtifact", "search")
 	defer span.End()
 	// Throttle prevents more than N outstanding requests to elastic globally and per sha2.
-	if token := at.esThrottle.Acquire(zlog, sha2, defaultThrottleTTL); token == nil {
+	if token, ok := at.esThrottle.Acquire(zlog, sha2, defaultThrottleTTL); !ok {
 		return nil, ErrorThrottle
 	} else {
 		defer token.Release(zlog)

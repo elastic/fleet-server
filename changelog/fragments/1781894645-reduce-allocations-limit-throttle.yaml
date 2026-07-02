@@ -1,0 +1,5 @@
+kind: enhancement
+
+summary: Reduce per-request allocations in limit and throttle packages
+
+component: fleet-server

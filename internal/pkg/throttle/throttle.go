@@ -45,9 +45,9 @@ func NewThrottle(max int) *Throttle {
 	}
 }
 
-// Acquire will return the token associated with passed key if possible or a nil.
-func (tt *Throttle) Acquire(log zerolog.Logger, key string, ttl time.Duration) *Token {
-	var token *Token
+// Acquire will return the token associated with passed key if possible.
+// The bool return indicates whether a token was acquired.
+func (tt *Throttle) Acquire(log zerolog.Logger, key string, ttl time.Duration) (Token, bool) {
 	tt.mut.Lock()
 	defer tt.mut.Unlock()
 
@@ -57,7 +57,7 @@ func (tt *Throttle) Acquire(log zerolog.Logger, key string, ttl time.Duration) *
 			Int("max", tt.maxParallel).
 			Int("szMap", len(tt.tokenMap)).
 			Msg("Throttle fail acquire on max pending")
-		return nil
+		return Token{}, false
 	}
 
 	// Is there already a pending request on this key?
@@ -68,7 +68,7 @@ func (tt *Throttle) Acquire(log zerolog.Logger, key string, ttl time.Duration) *
 	if !ok || state.expire.Before(now) {
 		tt.tokenCnt += 1
 
-		token = &Token{
+		token := Token{
 			id:       tt.tokenCnt,
 			key:      key,
 			throttle: tt,
@@ -87,14 +87,14 @@ func (tt *Throttle) Acquire(log zerolog.Logger, key string, ttl time.Duration) *
 			Time("expire", state.expire).
 			Msg("Throttle acquired")
 
-		return token
+		return token, true
 	}
 
 	log.Trace().
 		Str("key", key).
 		Msg("Throttle fail acquire on existing token")
 
-	return token
+	return Token{}, false
 }
 
 // WARNING:  Assumes mutex already held
