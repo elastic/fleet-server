@@ -23,19 +23,19 @@ type (
 	migrationFn       func(context.Context, bulk.Bulk) error
 	migrationBodyFn   func() (string, string, []byte, error)
 	migrationResponse struct {
+		Failures []json.RawMessage `json:"failures"`
+		Retries  struct {
+			Bulk   int `json:"bulk"`
+			Search int `json:"search"`
+		} `json:"retries"`
 		Took             int  `json:"took"`
-		TimedOut         bool `json:"timed_out"`
 		Total            int  `json:"total"`
 		Updated          int  `json:"updated"`
 		Deleted          int  `json:"deleted"`
 		Batches          int  `json:"batches"`
 		VersionConflicts int  `json:"version_conflicts"`
 		Noops            int  `json:"noops"`
-		Retries          struct {
-			Bulk   int `json:"bulk"`
-			Search int `json:"search"`
-		} `json:"retries"`
-		Failures []json.RawMessage `json:"failures"`
+		TimedOut         bool `json:"timed_out"`
 	}
 )
 

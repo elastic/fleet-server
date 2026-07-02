@@ -19,8 +19,8 @@ type LoggingFiles struct {
 	Name            string        `config:"name"`
 	MaxSize         uint          `config:"rotateeverybytes" validate:"min=1"`
 	MaxBackups      uint          `config:"keepfiles" validate:"max=1024"`
-	Permissions     uint32        `config:"permissions"`
 	Interval        time.Duration `config:"interval"`
+	Permissions     uint32        `config:"permissions"`
 	RotateOnStartup bool          `config:"rotateonstartup"`
 	RedirectStderr  bool          `config:"redirect_stderr"`
 }
@@ -44,15 +44,15 @@ func (c *LoggingFiles) InitDefaults() {
 
 // Logging configuration.
 type Logging struct {
+	Files    *LoggingFiles `config:"files"`
 	Level    string        `config:"level"`
 	ToStderr bool          `config:"to_stderr"`
 	ToFiles  bool          `config:"to_files"`
 	Pretty   bool          `config:"pretty"`
-	Files    *LoggingFiles `config:"files"`
 }
 
 func (c *Logging) EqualExcludeLevel(cfg Logging) bool {
-	if !(c.ToStderr == cfg.ToStderr && c.ToFiles == cfg.ToFiles && c.Pretty == cfg.Pretty) {
+	if c.ToStderr != cfg.ToStderr || c.ToFiles != cfg.ToFiles || c.Pretty != cfg.Pretty {
 		return false
 	}
 	af := c.Files

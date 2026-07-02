@@ -90,9 +90,9 @@ func init() {
 
 // metricsRegistry wraps libbeat and prometheus registries
 type metricsRegistry struct {
-	fullName string
 	registry *monitoring.Registry
 	promReg  *prometheus.Registry
+	fullName string
 }
 
 func newMetricsRegistry(name string) *metricsRegistry {

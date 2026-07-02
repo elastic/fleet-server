@@ -28,8 +28,8 @@ const (
 
 type apiKeyUpdateRequest struct {
 	ID        string          `json:"id,omitempty"`
-	Roles     json.RawMessage `json:"role_descriptors,omitempty"`
 	RolesHash string          `json:"role_hash,omitempty"`
+	Roles     json.RawMessage `json:"role_descriptors,omitempty"`
 }
 
 type esAPIKeyBulkUpdateRequest struct {

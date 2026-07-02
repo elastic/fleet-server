@@ -24,9 +24,9 @@ import (
 
 // Sub is an action subscription that will give a single agent all of it's actions.
 type Sub struct {
+	ch      chan []model.Action
 	agentID string
 	seqNo   sqn.SeqNo
-	ch      chan []model.Action
 }
 
 // Ch returns the emitter channel for actions.
@@ -37,11 +37,11 @@ func (s Sub) Ch() chan []model.Action {
 // Dispatcher tracks agent subscriptions and emits actions to the subscriptions.
 type Dispatcher struct {
 	am     monitor.SimpleMonitor
-	limit  *rate.Limiter
 	bulker bulk.Bulk
+	limit  *rate.Limiter
 
-	mx   sync.RWMutex
 	subs map[string]Sub
+	mx   sync.RWMutex // used to control access to subs map
 }
 
 // NewDispatcher creates a Dispatcher using the provided monitor.

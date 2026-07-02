@@ -17,9 +17,6 @@ type Limit struct {
 }
 
 type ServerLimits struct {
-	MaxAgents              int     `config:"max_agents"`
-	MaxHeaderByteSize      int     `config:"max_header_byte_size"`
-	MaxConnections         int     `config:"max_connections"`
 	MaxFileStorageByteSize *uint64 `config:"max_file_storage_size"`
 
 	ActionLimit        Limit `config:"action_limit"`
@@ -36,6 +33,9 @@ type ServerLimits struct {
 	DeliverFileLimit   Limit `config:"file_delivery_limit"`
 	GetPGPKey          Limit `config:"pgp_retrieval_limit"`
 	AuditUnenrollLimit Limit `config:"audit_unenroll_limit"`
+	MaxAgents          int   `config:"max_agents"`
+	MaxHeaderByteSize  int   `config:"max_header_byte_size"`
+	MaxConnections     int   `config:"max_connections"`
 }
 
 // InitDefaults initializes the defaults for the configuration.

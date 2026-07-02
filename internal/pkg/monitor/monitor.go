@@ -78,26 +78,28 @@ type SimpleMonitor interface {
 
 // simpleMonitorT monitors for new documents in an index
 type simpleMonitorT struct {
+	log zerolog.Logger
+
 	esCli     *elasticsearch.Client
 	monCli    *elasticsearch.Client
 	tracer    *apm.Tracer
 	tmplCheck *dsl.Tmpl
 	tmplQuery *dsl.Tmpl
 
-	index          string
-	pollTimeout    time.Duration
-	withExpiration bool
-	fetchSize      int
-	debounceTime   time.Duration
-
-	checkpoint sqn.SeqNo    // index global checkpoint
-	mx         sync.RWMutex // checkpoint mutex
-
-	log zerolog.Logger
-
 	outCh chan []es.HitT
 
 	readyCh chan error
+
+	index string
+
+	checkpoint   sqn.SeqNo // index global checkpoint
+	pollTimeout  time.Duration
+	fetchSize    int
+	debounceTime time.Duration
+
+	mx sync.RWMutex // checkpoint mutex
+
+	withExpiration bool
 }
 
 // Option is a functional configuration option.
@@ -141,7 +143,7 @@ func NewSimple(index string, esCli, monCli *elasticsearch.Client, opts ...Option
 func WithFetchSize(fetchSize int) Option {
 	return func(m SimpleMonitor) {
 		if fetchSize > 0 {
-			m.(*simpleMonitorT).fetchSize = fetchSize
+			m.(*simpleMonitorT).fetchSize = fetchSize //nolint:errcheck // underlying type is known
 		}
 	}
 }
@@ -149,33 +151,33 @@ func WithFetchSize(fetchSize int) Option {
 // WithPollTimeout sets the global checkpoint polling timeout
 func WithPollTimeout(to time.Duration) Option {
 	return func(m SimpleMonitor) {
-		m.(*simpleMonitorT).pollTimeout = to
+		m.(*simpleMonitorT).pollTimeout = to //nolint:errcheck // underlying type is known
 	}
 }
 
 // WithExpiration adds the expiration field to the monitor query.
 func WithExpiration(withExpiration bool) Option {
 	return func(m SimpleMonitor) {
-		m.(*simpleMonitorT).withExpiration = withExpiration
+		m.(*simpleMonitorT).withExpiration = withExpiration //nolint:errcheck // underlying type is known
 	}
 }
 
 // WithReadyChan allows to pass the channel that will signal when monitor is ready.
 func WithReadyChan(readyCh chan error) Option {
 	return func(m SimpleMonitor) {
-		m.(*simpleMonitorT).readyCh = readyCh
+		m.(*simpleMonitorT).readyCh = readyCh //nolint:errcheck // underlying type is known
 	}
 }
 
 func WithAPMTracer(tracer *apm.Tracer) Option {
 	return func(m SimpleMonitor) {
-		m.(*simpleMonitorT).tracer = tracer
+		m.(*simpleMonitorT).tracer = tracer //nolint:errcheck // underlying type is known
 	}
 }
 
 func WithDebounceTime(dur time.Duration) Option {
 	return func(m SimpleMonitor) {
-		m.(*simpleMonitorT).debounceTime = dur
+		m.(*simpleMonitorT).debounceTime = dur //nolint:errcheck // underlying type is known
 	}
 }
 

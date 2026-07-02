@@ -19,12 +19,12 @@ import (
 // Transaction options
 
 type optionsT struct {
-	Refresh            bool
 	RetryOnConflict    string
 	Indices            []string
 	WaitForCheckpoints []int64
-	IgnoreUnavailable  bool
 	spanLink           apm.SpanLink
+	Refresh            bool
+	IgnoreUnavailable  bool
 	hasSpanLink        bool
 }
 
@@ -67,6 +67,8 @@ func WithWaitForCheckpoints(checkpoints []int64) Opt {
 // Bulk API options
 
 type bulkOptT struct {
+	bi                       build.Info
+	policyTokens             []config.PolicyToken
 	flushInterval            time.Duration
 	flushThresholdCnt        int
 	flushThresholdSz         int
@@ -75,8 +77,6 @@ type bulkOptT struct {
 	apikeyMaxParallel        int
 	apikeyMaxReqSize         int
 	maxPendingBulkDispatches int64
-	policyTokens             []config.PolicyToken
-	bi                       build.Info
 }
 
 type BulkOpt func(*bulkOptT)

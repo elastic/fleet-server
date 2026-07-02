@@ -14,8 +14,8 @@ const (
 // GC is the configuration for the Fleet Server data garbage collection.
 // Currently manages the expired actions cleanup
 type GC struct {
-	ScheduleInterval            time.Duration `config:"schedule_interval"`
 	CleanupAfterExpiredInterval string        `config:"cleanup_after_expired_interval"`
+	ScheduleInterval            time.Duration `config:"schedule_interval"`
 }
 
 func (g *GC) InitDefaults() {

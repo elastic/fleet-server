@@ -21,22 +21,22 @@ const (
 // TODO: Why do we have both ErrElastic and ErrorT?  Very strange.
 
 type ErrElastic struct {
-	Status int
-	Type   string
-	Reason string
-	Cause  struct {
+	Cause struct {
 		Type   string
 		Reason string
 	}
+	Type   string
+	Reason string
+	Status int
 }
 
 func (e *ErrElastic) Unwrap() error {
-	if e.Type == indexNotFoundErrorType {
+	switch e.Type {
+	case indexNotFoundErrorType:
 		return ErrIndexNotFound
-	} else if e.Type == timeoutErrorType {
+	case timeoutErrorType:
 		return ErrTimeout
 	}
-
 	return nil
 }
 

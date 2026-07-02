@@ -20,8 +20,7 @@ import (
 
 // Instrumentation configures APM Tracing for the `fleet-server`.
 type Instrumentation struct {
-	Enabled bool               `config:"enabled"`
-	TLS     InstrumentationTLS `config:"tls"`
+	TLS InstrumentationTLS `config:"tls"`
 	// Environment specifies the environment name - may be specified with ELASTIC_APM_ENVIRONMENT
 	Environment string `config:"environment"`
 	// APIKey specifies the API key value - may be specified with ELASTIC_APM_API_KEY
@@ -32,21 +31,22 @@ type Instrumentation struct {
 	SecretToken string `config:"secret_token"`
 	// SecretTokenPath specifies the path to the secret token file
 	SecretTokenPath string `config:"secret_token_path"`
-	// Hosts specifies the APM server urls - may be specified with ELASTIC_APM_SERVER_URL
-	Hosts []string `config:"hosts"`
 	// GlobalLabels specifies apm global labels - may be specified with ELASTIC_APM_GLOBAL_LABELS
 	GlobalLabels string `config:"global_labels"`
 	// TransactionSampleRate sets the sample rate  - may be specified with ELASTIC_APM_TRANSACTION_SAMPLE_RATE
 	TransactionSampleRate string `config:"transaction_sample_rate"`
+	// Hosts specifies the APM server urls - may be specified with ELASTIC_APM_SERVER_URL
+	Hosts   []string `config:"hosts"`
+	Enabled bool     `config:"enabled"`
 }
 
 type InstrumentationTLS struct {
-	// APM certificate validation skip - may be specified with ELASTIC_APM_VERIFY_SERVER_CERT
-	SkipVerify bool `config:"skip_verify"`
 	// APM server certificate path - may be specified with ELASTIC_APM_SERVER_CERT
 	ServerCertificate string `config:"server_certificate"`
 	// APM server CA path - may be specified with ELASTIC_APM_SERVER_CA_CERT_FILE
 	ServerCA string `config:"server_ca"`
+	// APM certificate validation skip - may be specified with ELASTIC_APM_VERIFY_SERVER_CERT
+	SkipVerify bool `config:"skip_verify"`
 }
 
 // APMHTTPTransportOptions will return an APM HTTP transport options configuration specifier.
@@ -75,7 +75,7 @@ func (c *Instrumentation) APMHTTPTransportOptions() (apmtransport.HTTPTransportO
 			return apmtransport.HTTPTransportOptions{}, fmt.Errorf("unable to parse instrumentation certificate: %w", err)
 		}
 		tlsConfig.InsecureSkipVerify = true
-		tlsConfig.VerifyPeerCertificate = func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+		tlsConfig.VerifyPeerCertificate = func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error { //nolint:gosec // don't worry about resumed sessions here
 			return verifyPeerCertificate(rawCerts, cert)
 		}
 	}

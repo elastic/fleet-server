@@ -40,10 +40,10 @@ var (
 )
 
 type Output struct {
+	Role         *RoleT
 	Name         string
 	Type         string
 	ServiceToken string
-	Role         *RoleT
 }
 
 // Prepare prepares the output p to be sent to the elastic-agent

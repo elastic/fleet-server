@@ -22,8 +22,9 @@ import (
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger/zap"
 
-	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/rs/zerolog"
+
+	"github.com/elastic/go-elasticsearch/v8"
 )
 
 // The timeout would be driven by the server for long poll.
@@ -35,26 +36,26 @@ var hasScheme = regexp.MustCompile(`^([a-z][a-z0-9+\-.]*)://`)
 
 // Output is the output configuration to elasticsearch.
 type Output struct {
-	Elasticsearch Elasticsearch  `config:"elasticsearch"`
 	Extra         map[string]any `config:",inline"`
+	Elasticsearch Elasticsearch  `config:"elasticsearch"`
 }
 
 // Elasticsearch is the configuration for elasticsearch.
 type Elasticsearch struct {
-	Protocol         string            `config:"protocol"`
-	Hosts            []string          `config:"hosts"`
-	Path             string            `config:"path"`
 	Headers          map[string]string `config:"headers"`
+	ProxyHeaders     map[string]string `config:"proxy_headers"`
+	TLS              *tlscommon.Config `config:"ssl"`
+	Protocol         string            `config:"protocol"`
+	Path             string            `config:"path"`
 	ServiceToken     string            `config:"service_token"`
 	ServiceTokenPath string            `config:"service_token_path"`
 	ProxyURL         string            `config:"proxy_url"`
-	ProxyDisable     bool              `config:"proxy_disable"`
-	ProxyHeaders     map[string]string `config:"proxy_headers"`
-	TLS              *tlscommon.Config `config:"ssl"`
+	Hosts            []string          `config:"hosts"`
 	MaxRetries       int               `config:"max_retries"`
 	MaxConnPerHost   int               `config:"max_conn_per_host"`
 	Timeout          time.Duration     `config:"timeout"`
 	MaxContentLength int               `config:"max_content_length"`
+	ProxyDisable     bool              `config:"proxy_disable"`
 }
 
 // InitDefaults initializes the defaults for the configuration.
@@ -261,13 +262,13 @@ func (c *Elasticsearch) DiagRequests(ctx context.Context) []byte {
 		hostURL, err := makeURL(c.Protocol, "", host, 9200)
 		if err != nil {
 			zerolog.Ctx(ctx).Warn().Err(err).Str("host", host).Msg("Unable to transform host to url.URL")
-			res.WriteString(fmt.Sprintf("Unable to transform host %q to url.URL: %v\n", host, err))
+			fmt.Fprintf(&res, "Unable to transform host %q to url.URL: %v\n", host, err)
 			continue
 		}
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, hostURL, nil)
 		if err != nil {
 			zerolog.Ctx(ctx).Warn().Err(err).Str("host", host).Msg("Unable to create request to host")
-			res.WriteString(fmt.Sprintf("Unable to create request to host %q: %v\n", host, err))
+			fmt.Fprintf(&res, "Unable to create request to host %q: %v\n", host, err)
 			continue
 		}
 		req.Header = headers.Clone()

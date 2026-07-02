@@ -14,8 +14,8 @@ const ServiceName = "fleet-server"
 
 // Info contains build information.
 type Info struct {
-	Version, Commit string
 	BuildTime       time.Time
+	Version, Commit string
 }
 
 func (i Info) FullVersion() string {

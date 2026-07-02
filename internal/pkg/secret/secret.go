@@ -276,8 +276,8 @@ func replaceInlineSecretRefsInSlice(arr []any, secrets map[string]string) ([]any
 }
 
 type Secret struct {
-	Path []string
 	ID   string
+	Path []string
 }
 
 func getSecretIDAndPath(secret smap.Map) []Secret {

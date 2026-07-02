@@ -27,12 +27,12 @@ import (
 )
 
 type server struct {
-	cfg     *config.Server
-	addr    string
 	handler http.Handler
+	cfg     *config.Server
 	logger  *logp.Logger
 
 	connContext func(ctx context.Context, c net.Conn) context.Context // used by OpAMP, if feature is enabled
+	addr        string
 }
 
 // NewServer creates a new HTTP api for the passed addr.

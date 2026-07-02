@@ -100,10 +100,10 @@ type valueRange struct {
 }
 
 type envLimits struct {
-	Agents         valueRange           `config:"num_agents"`
-	RecommendedRAM uint64               `config:"recommended_min_ram"`
 	Server         *serverLimitDefaults `config:"server_limits"`
 	Cache          *cacheLimits         `config:"cache_limits"`
+	Agents         valueRange           `config:"num_agents"`
+	RecommendedRAM uint64               `config:"recommended_min_ram"`
 }
 
 func defaultEnvLimits() *envLimits {
@@ -152,24 +152,24 @@ type limit struct {
 }
 
 type serverLimitDefaults struct {
-	PolicyThrottle         time.Duration `config:"policy_throttle"` // deprecated: replaced by policy_limit
-	MaxConnections         int           `config:"max_connections"`
-	MaxFileStorageByteSize *uint64       `config:"max_file_storage_size"`
+	MaxFileStorageByteSize *uint64 `config:"max_file_storage_size"`
 
-	ActionLimit        limit `config:"action_limit"`
-	PolicyLimit        limit `config:"policy_limit"`
-	CheckinLimit       limit `config:"checkin_limit"`
-	ArtifactLimit      limit `config:"artifact_limit"`
-	EnrollLimit        limit `config:"enroll_limit"`
-	AckLimit           limit `config:"ack_limit"`
-	StatusLimit        limit `config:"status_limit"`
-	OpAMPLimit         limit `config:"opamp_limit"`
-	UploadStartLimit   limit `config:"upload_start_limit"`
-	UploadEndLimit     limit `config:"upload_end_limit"`
-	UploadChunkLimit   limit `config:"upload_chunk_limit"`
-	DeliverFileLimit   limit `config:"file_delivery_limit"`
-	GetPGPKeyLimit     limit `config:"pgp_retrieval_limit"`
-	AuditUnenrollLimit limit `config:"audit_unenroll_limit"`
+	ActionLimit        limit         `config:"action_limit"`
+	PolicyLimit        limit         `config:"policy_limit"`
+	CheckinLimit       limit         `config:"checkin_limit"`
+	ArtifactLimit      limit         `config:"artifact_limit"`
+	EnrollLimit        limit         `config:"enroll_limit"`
+	AckLimit           limit         `config:"ack_limit"`
+	StatusLimit        limit         `config:"status_limit"`
+	OpAMPLimit         limit         `config:"opamp_limit"`
+	UploadStartLimit   limit         `config:"upload_start_limit"`
+	UploadEndLimit     limit         `config:"upload_end_limit"`
+	UploadChunkLimit   limit         `config:"upload_chunk_limit"`
+	DeliverFileLimit   limit         `config:"file_delivery_limit"`
+	GetPGPKeyLimit     limit         `config:"pgp_retrieval_limit"`
+	AuditUnenrollLimit limit         `config:"audit_unenroll_limit"`
+	PolicyThrottle     time.Duration `config:"policy_throttle"` // deprecated: replaced by policy_limit
+	MaxConnections     int           `config:"max_connections"`
 }
 
 func defaultserverLimitDefaults() *serverLimitDefaults {

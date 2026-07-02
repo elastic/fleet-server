@@ -22,18 +22,18 @@ type ErrorT struct {
 
 // Acknowledgement response
 type AckResponse struct {
-	Acknowledged bool            `json:"acknowledged"`
 	Error        json.RawMessage `json:"error,omitempty"`
+	Acknowledged bool            `json:"acknowledged"`
 }
 
 type HitT struct {
-	ID      string          `json:"_id"`
-	SeqNo   int64           `json:"_seq_no"`
-	Version int64           `json:"version"`
-	Index   string          `json:"_index"`
-	Source  json.RawMessage `json:"_source"`
 	Score   *float64        `json:"_score"`
 	Fields  map[string]any  `json:"fields"`
+	ID      string          `json:"_id"`
+	Index   string          `json:"_index"`
+	Source  json.RawMessage `json:"_source"`
+	SeqNo   int64           `json:"_seq_no"`
+	Version int64           `json:"version"`
 }
 
 func (hit *HitT) Unmarshal(v any) error {
@@ -48,20 +48,20 @@ func (hit *HitT) Unmarshal(v any) error {
 }
 
 type HitsT struct {
-	Hits  []HitT `json:"hits"`
-	Total struct {
+	MaxScore *float64 `json:"max_score"`
+	Hits     []HitT   `json:"hits"`
+	Total    struct {
 		Relation string `json:"relation"`
 		Value    uint64 `json:"value"`
 	} `json:"total"`
-	MaxScore *float64 `json:"max_score"`
 }
 
 type Bucket struct {
+	Aggregations map[string]HitsT `json:"-"`
 	// any fields added here with json tags must also be added to the
 	// delete calls in the `UnmarshalJSON` function below
-	Key          string           `json:"key"`
-	DocCount     int64            `json:"doc_count"`
-	Aggregations map[string]HitsT `json:"-"`
+	Key      string `json:"key"`
+	DocCount int64  `json:"doc_count"`
 }
 
 type _bucket Bucket
@@ -108,35 +108,35 @@ func (b *Bucket) UnmarshalJSON(data []byte) error {
 }
 
 type Aggregation struct {
+	Buckets                 []Bucket `json:"buckets,omitempty"`
 	Value                   float64  `json:"value"`
 	DocCountErrorUpperBound int64    `json:"doc_count_error_upper_bound"`
 	SumOtherDocCount        int64    `json:"sum_other_doc_count"`
-	Buckets                 []Bucket `json:"buckets,omitempty"`
 }
 
 type Response struct {
-	Status   int    `json:"status"`
-	Took     uint64 `json:"took"`
-	TimedOut bool   `json:"timed_out"`
-	Shards   struct {
+	Hits         HitsT                  `json:"hits"`
+	Aggregations map[string]Aggregation `json:"aggregations,omitempty"`
+
+	Error  json.RawMessage `json:"error,omitempty"`
+	Shards struct {
 		Total      uint64 `json:"total"`
 		Successful uint64 `json:"successful"`
 		Skipped    uint64 `json:"skipped"`
 		Failed     uint64 `json:"failed"`
 	} `json:"_shards"`
-	Hits         HitsT                  `json:"hits"`
-	Aggregations map[string]Aggregation `json:"aggregations,omitempty"`
-
-	Error json.RawMessage `json:"error,omitempty"`
-}
-
-type DeleteByQueryResponse struct {
 	Status   int    `json:"status"`
 	Took     uint64 `json:"took"`
 	TimedOut bool   `json:"timed_out"`
-	Deleted  int64  `json:"deleted"`
+}
 
-	Error json.RawMessage `json:"error,omitempty"`
+type DeleteByQueryResponse struct {
+	Error   json.RawMessage `json:"error,omitempty"`
+	Status  int             `json:"status"`
+	Took    uint64          `json:"took"`
+	Deleted int64           `json:"deleted"`
+
+	TimedOut bool `json:"timed_out"`
 }
 
 type ResultT struct {

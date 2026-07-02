@@ -9,14 +9,13 @@ import (
 )
 
 type subT struct {
-	policyID string
-	agentID  string // not logically necessary; cached for logging
-	revIdx   int64
-
 	next *subT
 	prev *subT
 
-	ch chan *ParsedPolicy
+	ch       chan *ParsedPolicy
+	policyID string
+	agentID  string // not logically necessary; cached for logging
+	revIdx   int64
 }
 
 func NewSub(policyID, agentID string, revIdx int64) *subT {

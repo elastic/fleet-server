@@ -28,8 +28,8 @@ var SupportedVersions = []string{DefaultVersion}
 var isValidVersionRegex = regexp.MustCompile(`^[0-9]{4}-[0-9]{2}-[0-9]{2}$`)
 
 type apiVersion struct {
-	supportedVersions []string
 	defaultVersion    string
+	supportedVersions []string
 }
 
 func NewAPIVersion() *apiVersion {

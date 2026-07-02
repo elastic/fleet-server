@@ -26,18 +26,18 @@ type WorkFunc func(ctx context.Context) error
 
 // Schedule tracks when to execute a WorkFunc.
 type Schedule struct {
+	WorkFn   WorkFunc
 	Name     string
 	Interval time.Duration // Time between executions
-	WorkFn   WorkFunc
 }
 
 // Scheduler tracks scheduled functions.
 type Scheduler struct {
+	rand          *rand.Rand
+	schedules     []Schedule
 	splayPercent  int
 	firstRunDelay time.Duration // Interval to run the scheduled function for the first time since the scheduler started, splayed as well.
 
-	rand      *rand.Rand
-	schedules []Schedule
 }
 
 // OptFunc is a functional option used to configure a scheduler.
@@ -50,7 +50,7 @@ func WithSplayPercent(splayPercent uint) OptFunc {
 		if splayPercent >= 100 {
 			return errors.New("invalid splay value, expected < 100")
 		}
-		s.splayPercent = int(splayPercent) //nolint:gosec // disable G115
+		s.splayPercent = int(splayPercent)
 		return nil
 	}
 }

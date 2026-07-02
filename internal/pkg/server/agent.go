@@ -54,22 +54,23 @@ type clientUnit interface {
 // An Agent instance will retrieve connection information from the passed reader (normally stdin).
 // Agent uses client.StateInterface to gather config data and manage its lifecylce.
 type Agent struct {
-	cliCfg      *ucfg.Config
-	bi          build.Info
-	reloadables []reload.Reloadable
+	bi build.Info
 
 	agent client.V2
 
 	outputUnit clientUnit
 	inputUnit  clientUnit
 
+	srvCtx context.Context
+	cliCfg *ucfg.Config
+
 	srv          *Fleet
-	srvCtx       context.Context
 	srvCanceller context.CancelFunc
 	srvDone      chan struct{}
 
 	outputCheckCanceller context.CancelFunc
 	chReconfigure        chan struct{}
+	reloadables          []reload.Reloadable
 }
 
 // NewAgent returns an Agent that will gather connection information from the passed reader.

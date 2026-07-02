@@ -35,9 +35,9 @@ func (bi bulkStubItem) Choose() *BulkIndexerResponseItem {
 
 //easyjson:json
 type bulkIndexerResponse struct {
+	Items     []bulkStubItem `json:"items,omitempty"`
 	Took      int            `json:"took"`
 	HasErrors bool           `json:"errors"`
-	Items     []bulkStubItem `json:"items,omitempty"`
 }
 
 // BulkIndexerResponseItem has a subset of attributes from the response from Elasticsearch
@@ -45,7 +45,8 @@ type bulkIndexerResponse struct {
 // Comment out fields we don't use; no point decoding.
 type BulkIndexerResponseItem struct {
 	//	Index      string `json:"_index"`
-	DocumentID string `json:"_id"`
+	DocumentID string          `json:"_id"`
+	Error      json.RawMessage `json:"error,omitempty"`
 	//	Version    int64  `json:"_version"`
 	//	Result     string `json:"result"`
 	Status int `json:"status"`
@@ -58,7 +59,6 @@ type BulkIndexerResponseItem struct {
 	//		Failed     int `json:"failed"`
 	//	} `json:"_shards"`
 
-	Error json.RawMessage `json:"error,omitempty"`
 }
 
 func (b *BulkIndexerResponseItem) deriveError() error {
@@ -81,13 +81,13 @@ type MgetResponseItem struct {
 	//	Index      string          `json:"_index"`
 	//	Type       string          `json:"_type"`
 	DocumentID string `json:"_id"`
-	Version    int64  `json:"_version"`
-	SeqNo      int64  `json:"_seq_no"`
-	//	PrimTerm   int64           `json:"_primary_term"`
-	Found bool `json:"found"`
 	//	Routing    string          `json:"_routing"`
 	Source json.RawMessage `json:"_source"`
 	//	Fields     json.RawMessage `json:"_fields"`
+	Version int64 `json:"_version"`
+	SeqNo   int64 `json:"_seq_no"`
+	//	PrimTerm   int64           `json:"_primary_term"`
+	Found bool `json:"found"`
 }
 
 func (i *MgetResponseItem) deriveError() error {
@@ -98,19 +98,19 @@ func (i *MgetResponseItem) deriveError() error {
 }
 
 type MsearchResponseItem struct {
-	Status   int    `json:"status"`
-	Took     uint64 `json:"took"`
-	TimedOut bool   `json:"timed_out"`
-	Shards   struct {
+	Hits         es.HitsT                  `json:"hits"`
+	Aggregations map[string]es.Aggregation `json:"aggregations,omitempty"`
+
+	Error  json.RawMessage `json:"error,omitempty"`
+	Shards struct {
 		Total      uint64 `json:"total"`
 		Successful uint64 `json:"successful"`
 		Skipped    uint64 `json:"skipped"`
 		Failed     uint64 `json:"failed"`
 	} `json:"_shards"`
-	Hits         es.HitsT                  `json:"hits"`
-	Aggregations map[string]es.Aggregation `json:"aggregations,omitempty"`
-
-	Error json.RawMessage `json:"error,omitempty"`
+	Status   int    `json:"status"`
+	Took     uint64 `json:"took"`
+	TimedOut bool   `json:"timed_out"`
 }
 
 //easyjson:json

@@ -45,17 +45,17 @@ const kUAFleetServer = "Fleet-Server"
 
 // Fleet is an instance of the fleet-server.
 type Fleet struct {
-	standAlone bool
-	bi         build.Info
-	verCon     version.Constraints
-
-	cfgCh    chan *config.Config
+	bi       build.Info
 	cache    cache.Cache
 	reporter state.Reporter
 
+	cfgCh  chan *config.Config
+	cfg    *config.Config
+	verCon version.Constraints
+
 	// Used for diagnostics reporting
-	l   sync.RWMutex
-	cfg *config.Config
+	l          sync.RWMutex
+	standAlone bool
 }
 
 // NewFleet creates the actual fleet server service.

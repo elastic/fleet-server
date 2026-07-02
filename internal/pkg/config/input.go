@@ -28,8 +28,8 @@ type Policy struct {
 
 // ServerProfiler is the configuration for profiling the server.
 type ServerProfiler struct {
-	Enabled bool   `config:"enabled"`
 	Bind    string `config:"bind"`
+	Enabled bool   `config:"enabled"`
 }
 
 // InitDefaults initializes the defaults for the configuration.
@@ -62,30 +62,30 @@ func (c *ServerBulk) InitDefaults() {
 // Server is the configuration for the server
 type (
 	Server struct {
-		Host               string                  `config:"host"`
-		Port               uint16                  `config:"port"`
-		InternalPort       uint16                  `config:"internal_port"`
 		TLS                *tlscommon.ServerConfig `config:"ssl"`
-		Timeouts           ServerTimeouts          `config:"timeouts"`
+		Instrumentation    Instrumentation         `config:"instrumentation"`
+		PGP                PGP                     `config:"pgp"`
 		Profiler           ServerProfiler          `config:"profiler"`
+		GC                 GC                      `config:"gc"`
+		Host               string                  `config:"host"`
+		StaticPolicyTokens StaticPolicyTokens      `config:"static_policy_tokens"`
+		Limits             ServerLimits            `config:"limits"`
+		Timeouts           ServerTimeouts          `config:"timeouts"`
+		Bulk               ServerBulk              `config:"bulk"`
+		PDKDF2             PBKDF2                  `config:"pdkdf2"`
+		Runtime            Runtime                 `config:"runtime"`
 		CompressionLevel   int                     `config:"compression_level"`
 		CompressionThresh  int                     `config:"compression_threshold"`
-		Limits             ServerLimits            `config:"limits"`
-		Runtime            Runtime                 `config:"runtime"`
-		Bulk               ServerBulk              `config:"bulk"`
-		GC                 GC                      `config:"gc"`
-		Instrumentation    Instrumentation         `config:"instrumentation"`
-		StaticPolicyTokens StaticPolicyTokens      `config:"static_policy_tokens"`
-		PGP                PGP                     `config:"pgp"`
-		PDKDF2             PBKDF2                  `config:"pdkdf2"`
+		Port               uint16                  `config:"port"`
+		InternalPort       uint16                  `config:"internal_port"`
 		Features           FeatureFlags            `config:"feature_flags"`
 	}
 
 	StaticPolicyTokens struct {
-		// Enabled is a flag to enable static policy tokens
-		Enabled bool `config:"enabled"`
 		// PolicyTokens is a list of policy tokens
 		PolicyTokens []PolicyToken `config:"policy_tokens"`
+		// Enabled is a flag to enable static policy tokens
+		Enabled bool `config:"enabled"`
 	}
 
 	// PolicyToken is a static token for single policy

@@ -37,10 +37,10 @@ type WriterSync interface {
 // Logger will manage the zerolog/log.Logger variable.
 // An instance with TraceLevel is always created and log level is controlled through zerolog.GlobalLevel.
 type Logger struct {
-	cfg  *config.Config
-	sync WriterSync
-	name string
 	log  zerolog.Logger
+	sync WriterSync
+	cfg  *config.Config
+	name string
 }
 
 // Reload reloads the logger configuration.

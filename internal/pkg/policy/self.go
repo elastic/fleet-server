@@ -11,8 +11,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"go.elastic.co/apm/v2"
+
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 
 	"github.com/rs/zerolog"
 
@@ -44,23 +45,25 @@ type SelfMonitor interface {
 type selfMonitorT struct {
 	log zerolog.Logger
 
-	mut     sync.Mutex
-	fleet   config.Fleet
 	bulker  bulk.Bulk
 	monitor monitor.Monitor
 
-	policyID string
-	state    client.UnitState
 	reporter state.Reporter
 
 	policy *model.Policy
 
 	policyF          policyFetcher
-	policiesIndex    string
 	enrollmentTokenF enrollmentTokenFetcher
-	checkTime        time.Duration
 
 	startCh chan struct{}
+	fleet   config.Fleet
+
+	policyID      string
+	policiesIndex string
+	checkTime     time.Duration
+
+	mut   sync.Mutex // state mutex
+	state client.UnitState
 }
 
 // NewSelfMonitor creates the self policy monitor.

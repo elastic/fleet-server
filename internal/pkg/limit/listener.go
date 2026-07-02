@@ -35,9 +35,9 @@ func Listener(l net.Listener, n int, log *zerolog.Logger) net.Listener {
 type limitListener struct {
 	net.Listener
 	sem       chan struct{}
-	closeOnce sync.Once     // ensures the done chan is only closed once
 	done      chan struct{} // no values sent; closed when Close is called
 	log       *zerolog.Logger
+	closeOnce sync.Once // ensures the done chan is only closed once
 }
 
 func (l *limitListener) acquire() bool {
@@ -87,8 +87,8 @@ func (l *limitListener) Close() error {
 
 type limitListenerConn struct {
 	net.Conn
-	releaseOnce sync.Once
 	release     func()
+	releaseOnce sync.Once
 }
 
 func (l *limitListenerConn) Close() error {

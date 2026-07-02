@@ -33,11 +33,11 @@ const (
 )
 
 type FileData struct {
-	Size      int64  `json:"size"`
-	ChunkSize int64  `json:"ChunkSize"`
+	Hash      *Hash  `json:"hash,omitempty"`
 	Status    string `json:"Status"`
 	MimeType  string `json:"mime_type,omitempty"`
-	Hash      *Hash  `json:"hash,omitempty"`
+	Size      int64  `json:"size"`
+	ChunkSize int64  `json:"ChunkSize"`
 }
 
 type Hash struct {
@@ -72,41 +72,41 @@ func (m *MetaDoc) UnmarshalJSON(b []byte) error {
 }
 
 type ChunkInfo struct {
-	Pos        int  // Ordered chunk position in file
-	Last       bool // Is this the final chunk in the file
 	SHA2       string
-	Size       int
 	BID        string // base id, matches metadata doc's _id
 	Index      string
 	ID         string // chunk _id
 	Namespaces []string
+	Pos        int // Ordered chunk position in file
+	Size       int
+	Last       bool // Is this the final chunk in the file
 }
 
 type Info struct {
+	Start      time.Time
 	ID         string // upload operation identifier. Used to identify the upload process
 	DocID      string // document ID of the uploaded file and chunks
 	Source     string // which integration is performing the upload
 	AgentID    string
 	ActionID   string
+	Status     Status
 	Namespaces []string
 	ChunkSize  int64
 	Total      int64
 	Count      int
-	Start      time.Time
-	Status     Status
 }
 
 // convenience functions for computing current "Status" based on the fields
 func (i Info) Expired(timeout time.Duration) bool { return time.Now().After(i.Start.Add(timeout)) }
 func (i Info) StatusCanUpload() bool { // returns true if more chunks can be uploaded. False if the upload process has completed (with or without error)
-	return !(i.Status == StatusFail || i.Status == StatusDone || i.Status == StatusDel)
+	return i.Status != StatusFail && i.Status != StatusDone && i.Status != StatusDel
 }
 
 type Chunk struct {
+	BID  string `json:"bid"`
+	SHA2 string `json:"sha2"`
+	Data []byte `json:"data"`
 	model.ESDocument
 
-	BID  string `json:"bid"`
-	Data []byte `json:"data"`
-	Last bool   `json:"last"`
-	SHA2 string `json:"sha2"`
+	Last bool `json:"last"`
 }
