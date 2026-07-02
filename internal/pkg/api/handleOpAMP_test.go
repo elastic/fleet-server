@@ -244,9 +244,10 @@ func TestEnrollAgentWithAgentToServerMessage(t *testing.T) {
 	bulker := ftesting.NewMockBulk()
 
 	enrollKey := model.EnrollmentAPIKey{ //nolint:gosec // fake api key used in test
-		APIKeyID: "enroll-key-id",
-		PolicyID: "policy-123",
-		Active:   true,
+		APIKeyID:   "enroll-key-id",
+		PolicyID:   "policy-123",
+		Namespaces: []string{"my-space"},
+		Active:     true,
 	}
 	enrollKeyBytes, err := json.Marshal(enrollKey) //nolint:gosec // fake api key used in test
 	require.NoError(t, err)
@@ -321,6 +322,8 @@ func TestEnrollAgentWithAgentToServerMessage(t *testing.T) {
 
 	require.Equal(t, agent.Id, createdAgent.Agent.ID)
 	require.Equal(t, agent.PolicyID, createdAgent.PolicyID)
+	require.Equal(t, []string{"my-space"}, agent.Namespaces)
+	require.Equal(t, []string{"my-space"}, createdAgent.Namespaces)
 	bulker.AssertExpectations(t)
 }
 

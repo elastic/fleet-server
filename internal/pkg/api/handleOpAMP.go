@@ -386,6 +386,7 @@ func (oa *OpAMPT) enrollAgent(ctx context.Context, zlog zerolog.Logger, uid uuid
 		Active:     true,
 		EnrolledAt: now.UTC().Format(time.RFC3339),
 		PolicyID:   rec.PolicyID,
+		Namespaces: rec.Namespaces,
 		Agent: &model.AgentMetadata{
 			ID:      instanceUID,
 			Version: meta.Elastic.Agent.Version,
