@@ -95,13 +95,13 @@ func (d *Deliverer) LocateChunks(ctx context.Context, zlog zerolog.Logger, fileI
 	return infos, nil
 }
 
-func (d *Deliverer) SendFile(ctx context.Context, zlog zerolog.Logger, w io.Writer, chunks []file.ChunkInfo, fileID string) error {
+func (d *Deliverer) SendChunks(ctx context.Context, zlog zerolog.Logger, w io.Writer, chunks []file.ChunkInfo, fileID string, startOffset *uint64, endOffset *uint64) error {
 	span, ctx := apm.StartSpan(ctx, "response", "write")
 	defer span.End()
 	sort.SliceStable(chunks, func(i, j int) bool {
 		return chunks[i].Pos < chunks[j].Pos
 	})
-	for _, chunkInfo := range chunks {
+	for i, chunkInfo := range chunks {
 		body, err := readChunkStream(ctx, d.client, chunkInfo.Index, chunkInfo.ID)
 		if err != nil {
 			zlog.Error().Err(err).Str("fileID", fileID).Str("chunkID", chunkInfo.ID).Msg("error reading chunk stream")
@@ -115,7 +115,12 @@ func (d *Deliverer) SendFile(ctx context.Context, zlog zerolog.Logger, w io.Writ
 			zlog.Error().Err(err).Str("fileID", fileID).Str("chunkID", chunkInfo.ID).Msg("error decoding chunk")
 			return err
 		}
-
+		if i == len(chunks)-1 && endOffset != nil {
+			chunk = chunk[:*endOffset]
+		}
+		if i == 0 && startOffset != nil {
+			chunk = chunk[*startOffset:]
+		}
 		n, err := w.Write(chunk)
 		if err != nil {
 			zlog.Error().Err(err).Str("fileID", fileID).Str("chunkID", chunkInfo.ID).Msg("error writing chunk to output")

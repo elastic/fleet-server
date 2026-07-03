@@ -8,7 +8,9 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/textproto"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -24,6 +26,7 @@ import (
 )
 
 var (
+	ErrBadRange                = errors.New("range not satisfiable")
 	ErrClientFileForbidden     = errors.New("agent not authorized for library")
 	ErrFileForDeliveryNotFound = errors.New("unable to retrieve file")
 	ErrLibraryFileNotFound     = fmt.Errorf("%w from library", ErrFileForDeliveryNotFound)
@@ -94,7 +97,27 @@ func (ft *FileDeliveryT) handleSendFile(zlog zerolog.Logger, w http.ResponseWrit
 	if err != nil {
 		return err
 	}
+	w.Header().Set("Accept-Ranges", "bytes")
 
+	// Send partial content if Range is requested
+	ranges, err := parseRange(r.Header.Get("Range"), info.File.Size)
+	if err != nil {
+		w.Header().Set("Content-Range", "bytes */"+strconv.FormatInt(info.File.Size, 10))
+		return fmt.Errorf("%w: %w", ErrBadRange, err)
+	}
+	if sumRangesSize(ranges) > info.File.Size {
+		// ignore bad-math or bad-acting client range requests, serve as normal
+		ranges = nil
+	}
+
+	if len(ranges) > 0 {
+		return ft.sendFileAsRanges(zlog, w, r, fileID, info, chunks, ranges)
+	}
+	// no ranges requested, send 200 response with all content
+	return ft.sendFullFile(zlog, w, r, fileID, info, chunks)
+}
+
+func (ft *FileDeliveryT) sendFullFile(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, fileID string, info file.MetaDoc, chunks []file.ChunkInfo) error {
 	// set headers before writing any chunks!
 
 	// if mime_type was provided, set as Content-Type, otherwise fall back to octet-stream
@@ -112,10 +135,145 @@ func (ft *FileDeliveryT) handleSendFile(zlog zerolog.Logger, w http.ResponseWrit
 	}
 
 	// stream the chunks out
-	return ft.deliverer.SendFile(r.Context(), zlog, w, chunks, fileID)
+	return ft.deliverer.SendChunks(r.Context(), zlog, w, chunks, fileID, nil, nil)
 }
 
 func sanitizedIndexInput(s string) string {
 	r := regexp.MustCompile(`[*?"<>\\/,|#]`) // bad characters
 	return r.ReplaceAllString(strings.ToLower(strings.TrimSpace(s)), "")
+}
+
+func (ft *FileDeliveryT) sendFileAsRanges(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, fileID string, info file.MetaDoc, chunks []file.ChunkInfo, ranges []httpRange) error {
+	if len(ranges) > 1 {
+		return errors.New("multipart ranges not supported")
+	}
+	ra := ranges[0]
+
+	sort.SliceStable(chunks, func(i, j int) bool {
+		return chunks[i].Pos < chunks[j].Pos
+	})
+
+	// reduce to fetch only required chunks.
+	// Int64 Floor division used intentionally for index math
+	chunkIdxStart := ra.start / info.File.ChunkSize
+	chunkIdxStop := (ra.start + ra.length - 1) / info.File.ChunkSize
+	chunks = chunks[chunkIdxStart : chunkIdxStop+1]
+
+	// if supporting multiple ranges, this becomes multipart/byteranges !
+	w.Header().Set("Content-Type", "application/octet-stream")
+	if info.File.MimeType != "" {
+		w.Header().Set("Content-Type", info.File.MimeType)
+	}
+	w.Header().Set("Content-Range", ra.contentRange(info.File.Size))
+	w.Header().Set("Content-Length", strconv.FormatInt(ra.length, 10))
+
+	w.WriteHeader(http.StatusPartialContent)
+
+	startOffset := uint64(ra.start % info.File.ChunkSize)
+	endOffset := uint64(((ra.start + ra.length - 1) % info.File.ChunkSize) + 1)
+	return ft.deliverer.SendChunks(r.Context(), zlog, w, chunks, fileID, &startOffset, &endOffset)
+}
+
+/*
+ * HTTP Range parsing
+ *
+ * modified from Go source http/fs.go
+ * see NOTICE.txt for license
+ */
+
+// errNoOverlap is returned by serveContent's parseRange if first-byte-pos of
+// all of the byte-range-spec values is greater than the content size.
+var errNoOverlap = errors.New("invalid range: failed to overlap")
+
+// httpRange specifies the byte range to be sent to the client.
+type httpRange struct {
+	start, length int64
+}
+
+func (r httpRange) contentRange(size int64) string {
+	return fmt.Sprintf("bytes %d-%d/%d", r.start, r.start+r.length-1, size)
+}
+
+// parseRange parses a Range header string as per RFC 7233.
+// errNoOverlap is returned if none of the ranges overlap.
+func parseRange(s string, size int64) ([]httpRange, error) {
+	if s == "" {
+		return nil, nil // header not present
+	}
+	const b = "bytes="
+	if !strings.HasPrefix(s, b) {
+		return nil, errors.New("invalid range")
+	}
+	var ranges []httpRange
+	noOverlap := false
+	for ra := range strings.SplitSeq(s[len(b):], ",") {
+		ra = textproto.TrimString(ra)
+		if ra == "" {
+			continue
+		}
+		start, end, ok := strings.Cut(ra, "-")
+		if !ok {
+			return nil, errors.New("invalid range")
+		}
+		start, end = textproto.TrimString(start), textproto.TrimString(end)
+		var r httpRange
+		if start == "" {
+			// If no start is specified, end specifies the
+			// range start relative to the end of the file,
+			// and we are dealing with <suffix-length>
+			// which has to be a non-negative integer as per
+			// RFC 7233 Section 2.1 "Byte-Ranges".
+			if end == "" || end[0] == '-' {
+				return nil, errors.New("invalid range")
+			}
+			i, err := strconv.ParseInt(end, 10, 64)
+			if i < 0 || err != nil {
+				return nil, errors.New("invalid range")
+			}
+			if i > size {
+				i = size
+			}
+			r.start = size - i
+			r.length = size - r.start
+		} else {
+			i, err := strconv.ParseInt(start, 10, 64)
+			if err != nil || i < 0 {
+				return nil, errors.New("invalid range")
+			}
+			if i >= size {
+				// If the range begins after the size of the content,
+				// then it does not overlap.
+				noOverlap = true
+				continue
+			}
+			r.start = i
+			if end == "" {
+				// If no end is specified, range extends to end of the file.
+				r.length = size - r.start
+			} else {
+				i, err := strconv.ParseInt(end, 10, 64)
+				if err != nil || r.start > i {
+					return nil, errors.New("invalid range")
+				}
+				if i >= size {
+					i = size - 1
+				}
+				r.length = i - r.start + 1
+			}
+		}
+		ranges = append(ranges, r)
+	}
+	if noOverlap && len(ranges) == 0 {
+		// The specified ranges did not overlap with the content.
+		return nil, errNoOverlap
+	}
+	return ranges, nil
+}
+
+func sumRangesSize(ranges []httpRange) int64 {
+	var size int64 = 0
+	for _, ra := range ranges {
+		size += ra.length
+	}
+	return size
 }
