@@ -407,7 +407,27 @@ func TestRangeParsing(t *testing.T) {
 			assert.Equal(t, httpRange{tc.expectedStartByte, tc.expectedLength}, ranges[0])
 		})
 	}
+}
 
+func TestRangeParsingErrs(t *testing.T) {
+
+	cases := []string{
+		"bytes=100-40",
+		"bytes=40",
+		"bytes 9-99",
+		"400-500",
+		"bytes=start-end",
+		"bytes=--400",
+		"bytes=-100-400",
+		"bytes=20--100",
+	}
+
+	for _, tc := range cases {
+		t.Run(tc, func(t *testing.T) {
+			_, err := parseRange(tc, 1024)
+			assert.Error(t, err)
+		})
+	}
 }
 
 func TestFileDeliveryRangeSupport(t *testing.T) {

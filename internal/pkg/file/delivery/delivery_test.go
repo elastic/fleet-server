@@ -352,8 +352,8 @@ func TestSendChunkRanges(t *testing.T) {
 		return sendBodyBytes(mockChunkCBOR(parts[3], chunkBody)), nil
 	}
 
-	startOffset := uint64(100)
-	endOffset := uint64(50)
+	startOffset := int64(100)
+	endOffset := int64(50)
 
 	d := New(esClient, fakeBulk, nil)
 	err := d.SendChunks(t.Context(), zerolog.Logger{}, buf, chunks, fileID, &startOffset, &endOffset)
@@ -421,6 +421,6 @@ func hexDecode(s string) []byte {
 
 func mockChunkCBOR(docid string, data []byte) []byte {
 	dlen := make([]byte, 4)
-	binary.BigEndian.PutUint32(dlen, uint32(len(data)))
+	binary.BigEndian.PutUint32(dlen, uint32(len(data))) //nolint:gosec // disable G115, lengths cannot be negative
 	return hexDecode(fmt.Sprintf("A7665F696E64657878212E666C6565742D66696C6564656C69766572792D646174612D656E64706F696E74635F6964%02X%02X685F76657273696F6E01675F7365715F6E6F016D5F7072696D6172795F7465726D0165666F756E64F5666669656C6473A16464617461815A%02X%02X", len(docid)+0x60, docid, dlen, data))
 }

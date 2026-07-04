@@ -95,7 +95,10 @@ func (d *Deliverer) LocateChunks(ctx context.Context, zlog zerolog.Logger, fileI
 	return infos, nil
 }
 
-func (d *Deliverer) SendChunks(ctx context.Context, zlog zerolog.Logger, w io.Writer, chunks []file.ChunkInfo, fileID string, startOffset *uint64, endOffset *uint64) error {
+func (d *Deliverer) SendChunks(ctx context.Context, zlog zerolog.Logger, w io.Writer, chunks []file.ChunkInfo, fileID string, startOffset *int64, endOffset *int64) error {
+	if (startOffset != nil && *startOffset < 0) || (endOffset != nil && *endOffset < 0) {
+		return errors.New("invalid range offset")
+	}
 	span, ctx := apm.StartSpan(ctx, "response", "write")
 	defer span.End()
 	sort.SliceStable(chunks, func(i, j int) bool {

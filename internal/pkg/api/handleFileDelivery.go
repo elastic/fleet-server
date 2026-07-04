@@ -169,8 +169,8 @@ func (ft *FileDeliveryT) sendFileAsRanges(zlog zerolog.Logger, w http.ResponseWr
 
 	w.WriteHeader(http.StatusPartialContent)
 
-	startOffset := uint64(ra.start % info.File.ChunkSize)
-	endOffset := uint64(((ra.start + ra.length - 1) % info.File.ChunkSize) + 1)
+	startOffset := ra.start % info.File.ChunkSize
+	endOffset := ((ra.start + ra.length - 1) % info.File.ChunkSize) + 1
 	return ft.deliverer.SendChunks(r.Context(), zlog, w, chunks, fileID, &startOffset, &endOffset)
 }
 
