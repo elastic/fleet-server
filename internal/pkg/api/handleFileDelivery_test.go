@@ -420,6 +420,8 @@ func TestRangeParsingErrs(t *testing.T) {
 		"bytes=--400",
 		"bytes=-100-400",
 		"bytes=20--100",
+		"bytes=-0",
+		"bytes=0",
 	}
 
 	for _, tc := range cases {
@@ -428,6 +430,22 @@ func TestRangeParsingErrs(t *testing.T) {
 			assert.Error(t, err)
 		})
 	}
+}
+
+// empty range requests that should not produce any ranges
+func TestIgnoredRangeRequests(t *testing.T) {
+	cases := []string{
+		"",
+		"bytes=",
+	}
+	for _, tc := range cases {
+		t.Run(tc, func(t *testing.T) {
+			ranges, err := parseRange(tc, 1024)
+			assert.NoError(t, err)
+			assert.Nil(t, ranges)
+		})
+	}
+
 }
 
 func TestFileDeliveryRangeSupport(t *testing.T) {
