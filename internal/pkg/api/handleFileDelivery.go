@@ -158,6 +158,9 @@ func (ft *FileDeliveryT) sendFileAsRanges(zlog zerolog.Logger, w http.ResponseWr
 	// Int64 Floor division used intentionally for index math
 	chunkIdxStart := ra.start / info.File.ChunkSize
 	chunkIdxStop := (ra.start + ra.length - 1) / info.File.ChunkSize
+	if chunkIdxStart >= int64(len(chunks)) || chunkIdxStart > chunkIdxStop || chunkIdxStop >= int64(len(chunks)) {
+		return ErrBadRange
+	}
 	chunks = chunks[chunkIdxStart : chunkIdxStop+1]
 
 	// if supporting multiple ranges, this becomes multipart/byteranges !
@@ -168,11 +171,17 @@ func (ft *FileDeliveryT) sendFileAsRanges(zlog zerolog.Logger, w http.ResponseWr
 	w.Header().Set("Content-Range", ra.contentRange(info.File.Size))
 	w.Header().Set("Content-Length", strconv.FormatInt(ra.length, 10))
 
-	w.WriteHeader(http.StatusPartialContent)
-
 	startOffset := ra.start % info.File.ChunkSize
 	endOffset := ((ra.start + ra.length - 1) % info.File.ChunkSize) + 1
-	return ft.deliverer.SendChunks(r.Context(), zlog, w, chunks, fileID, &startOffset, &endOffset)
+
+	// Status code must be written before any calls to w.Write. But we cannot return any HTTP errors after this.
+	// So errors are logged, but not returned from this point forward
+	w.WriteHeader(http.StatusPartialContent)
+	if err := ft.deliverer.SendChunks(r.Context(), zlog, w, chunks, fileID, &startOffset, &endOffset); err != nil {
+		zlog.Error().Err(err).Msg("error streaming file range after response began")
+		// intentionally do not return the error
+	}
+	return nil
 }
 
 /*
