@@ -489,6 +489,7 @@ func TestFileDeliveryInvalidRangeReq(t *testing.T) {
 	}{
 		{"900-1200", http.StatusRequestedRangeNotSatisfiable},
 		{"100-20", http.StatusRequestedRangeNotSatisfiable},
+		{"0-50, 100-150", http.StatusRequestedRangeNotSatisfiable}, // multipart range should give 416
 	}
 
 	for _, tc := range cases {

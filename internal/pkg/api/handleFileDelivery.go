@@ -27,6 +27,7 @@ import (
 
 var (
 	ErrBadRange                = errors.New("range not satisfiable")
+	ErrMultiRangeNotSupported  = errors.New("multipart ranges not supported")
 	ErrClientFileForbidden     = errors.New("agent not authorized for library")
 	ErrFileForDeliveryNotFound = errors.New("unable to retrieve file")
 	ErrLibraryFileNotFound     = fmt.Errorf("%w from library", ErrFileForDeliveryNotFound)
@@ -145,7 +146,7 @@ func sanitizedIndexInput(s string) string {
 
 func (ft *FileDeliveryT) sendFileAsRanges(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, fileID string, info file.MetaDoc, chunks []file.ChunkInfo, ranges []httpRange) error {
 	if len(ranges) > 1 {
-		return errors.New("multipart ranges not supported")
+		return ErrMultiRangeNotSupported
 	}
 	ra := ranges[0]
 

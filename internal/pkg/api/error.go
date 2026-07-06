@@ -516,6 +516,15 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 			},
 		},
 		{
+			ErrMultiRangeNotSupported,
+			HTTPErrResp{
+				http.StatusRequestedRangeNotSatisfiable,
+				"ErrRangeNotSatisfiable",
+				"Multipart ranges not satisfiable",
+				zerolog.InfoLevel,
+			},
+		},
+		{
 			file.ErrInvalidID,
 			HTTPErrResp{
 				http.StatusBadRequest,
