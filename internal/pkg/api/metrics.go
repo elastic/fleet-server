@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -149,6 +150,14 @@ func (g *statsGauge) Dec() {
 	g.gauge.Dec()
 }
 
+// Set overwrites the gauge's current value. Used for values that are computed
+// out-of-band (e.g. a rate sampled on an interval) rather than incremented in
+// the request path.
+func (g *statsGauge) Set(v uint64) {
+	g.metric.Set(v)
+	g.gauge.Set(float64(v))
+}
+
 // statsCounter wraps counters for internal libbeat and prometheus
 type statsCounter struct {
 	metric  *monitoring.Uint
@@ -177,16 +186,28 @@ func (g *statsCounter) Inc() {
 	g.counter.Inc()
 }
 
+// Get returns the counter's current value. Used by out-of-band samplers (e.g.
+// a rate computation) that need to read a counter without incrementing it.
+func (g *statsCounter) Get() uint64 {
+	return g.metric.Get()
+}
+
 // routeStats is the generic collection metrics that we collect per API route.
 type routeStats struct {
 	active    *statsGauge
 	total     *statsCounter
 	rateLimit *statsCounter
 	maxLimit  *statsCounter
-	failure   *statsCounter
-	drop      *statsCounter
-	bodyIn    *statsCounter
-	bodyOut   *statsCounter
+	// maxLimitRate is a rolling per-interval rate (rejections/sec) derived from
+	// maxLimit. Unlike maxLimit (a monotonically increasing counter), this is a
+	// point-in-time gauge suitable for use as an autoscaling trigger: it reflects
+	// current saturation rather than lifetime totals. Populated out-of-band by a
+	// sampler (see RunCheckinRejectionRateSampler); zero until sampled.
+	maxLimitRate *statsGauge
+	failure      *statsCounter
+	drop         *statsCounter
+	bodyIn       *statsCounter
+	bodyOut      *statsCounter
 }
 
 func (rt *routeStats) Register(registry *metricsRegistry) {
@@ -194,6 +215,7 @@ func (rt *routeStats) Register(registry *metricsRegistry) {
 	rt.total = newCounter(registry, "total")
 	rt.rateLimit = newCounter(registry, "limit_rate")
 	rt.maxLimit = newCounter(registry, "limit_max")
+	rt.maxLimitRate = newGauge(registry, "limit_max_rate")
 	rt.failure = newCounter(registry, "fail")
 	rt.drop = newCounter(registry, "drop")
 	rt.bodyIn = newCounter(registry, "body_in")
@@ -302,4 +324,48 @@ func attachPrometheusEndpoint(router metricsRouter, reg *prometheus.Registry, bi
 
 	h := promhttp.HandlerFor(reg, promhttp.HandlerOpts{})
 	router.AddRoute("/metrics", promhttp.InstrumentMetricHandler(reg, h).ServeHTTP)
+}
+
+// CheckinRateSampleInterval is how often RunCheckinRejectionRateSampler recomputes
+// the checkin capacity-rejection rate.
+const CheckinRateSampleInterval = 10 * time.Second
+
+// computeRate returns the non-negative per-second rate of change between prev and
+// cur over the elapsed duration dt, rounded to the nearest integer. It returns 0
+// if dt is non-positive or if cur < prev (e.g. a process restart reset the
+// underlying counter to zero), since a rejection rate can never be negative.
+func computeRate(prev, cur uint64, dt time.Duration) uint64 {
+	if dt <= 0 || cur < prev {
+		return 0
+	}
+	return uint64(float64(cur-prev)/dt.Seconds() + 0.5)
+}
+
+// RunCheckinRejectionRateSampler periodically samples the checkin route's
+// limit_max counter (checkins rejected because Fleet Server was at capacity) and
+// publishes the resulting rate as the limit_max_rate gauge.
+//
+// Unlike checkin volume (which a client can inflate), limit_max only increments
+// when Fleet Server itself rejects a checkin due to the per-route concurrency
+// limit, so the resulting rate is a server-side signal of saturation suitable for
+// use as an autoscaling trigger. It complements http_server.tcp_active, which can
+// understate demand when connections are being turned away rather than accepted.
+//
+// Run blocks until ctx is canceled, following the same lifecycle contract as the
+// other subsystems started in Fleet.runSubsystems.
+func RunCheckinRejectionRateSampler(ctx context.Context, interval time.Duration) error {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	prev, prevT := cntCheckin.maxLimit.Get(), time.Now()
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case now := <-ticker.C:
+			cur := cntCheckin.maxLimit.Get()
+			cntCheckin.maxLimitRate.Set(computeRate(prev, cur, now.Sub(prevT)))
+			prev, prevT = cur, now
+		}
+	}
 }
