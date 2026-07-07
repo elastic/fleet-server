@@ -170,6 +170,9 @@ func (ft *FileDeliveryT) sendFileAsRanges(zlog zerolog.Logger, w http.ResponseWr
 	}
 	w.Header().Set("Content-Range", ra.contentRange(info.File.Size))
 	w.Header().Set("Content-Length", strconv.FormatInt(ra.length, 10))
+	if info.File.Hash != nil && info.File.Hash.SHA2 != "" {
+		w.Header().Set("X-File-SHA2", info.File.Hash.SHA2)
+	}
 
 	startOffset := ra.start % info.File.ChunkSize
 	endOffset := ((ra.start + ra.length - 1) % info.File.ChunkSize) + 1
