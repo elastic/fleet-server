@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -73,7 +72,7 @@ func TestComputeRate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, computeRate(tt.prev, tt.cur, tt.dt))
+			require.Equal(t, tt.want, computeRate(tt.prev, tt.cur, tt.dt))
 		})
 	}
 }
@@ -94,7 +93,6 @@ func TestRunCheckinRejectionRateSampler(t *testing.T) {
 	cntCheckin.Register(registry.newRegistry(fmt.Sprintf("test_checkin_rejection_rate_sampler_%d", testRegistrySeq.Add(1))))
 
 	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
 
 	const interval = 10 * time.Millisecond
 	done := make(chan error, 1)
@@ -124,25 +122,20 @@ func TestRunCheckinRejectionRateSampler(t *testing.T) {
 		}
 	}()
 
-	var sawPositiveRate atomic.Bool
-	deadline := time.After(20 * interval)
-poll:
-	for {
-		select {
-		case <-deadline:
-			break poll
-		default:
-			if cntCheckin.maxLimitRate.metric.Get() > 0 {
-				sawPositiveRate.Store(true)
-				break poll
-			}
-			time.Sleep(interval / 4)
-		}
-	}
+	// Stop both goroutines and wait for them to actually exit before this test
+	// returns -- registered as Cleanup, like the cntCheckin restoration above, so
+	// it still runs if require.Eventually below fails (which unwinds via
+	// runtime.Goexit, skipping any code after it). Cleanup funcs run in LIFO
+	// order, so this (registered second) runs before the cntCheckin restoration
+	// (registered first) -- otherwise that restoration could race with either
+	// goroutine still running and mutating the shared cntCheckin global.
+	t.Cleanup(func() {
+		cancel()
+		require.NoError(t, <-done)
+		<-injectorDone
+	})
 
-	cancel()
-	require.NoError(t, <-done)
-	<-injectorDone
-
-	assert.True(t, sawPositiveRate.Load(), "expected the rejection rate gauge to become positive while rejections were ongoing")
+	require.Eventually(t, func() bool {
+		return cntCheckin.maxLimitRate.metric.Get() > 0
+	}, 20*interval, interval/4, "expected the rejection rate gauge to become positive while rejections were ongoing")
 }

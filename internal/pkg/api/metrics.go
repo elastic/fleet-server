@@ -330,10 +330,21 @@ func attachPrometheusEndpoint(router metricsRouter, reg *prometheus.Registry, bi
 // the checkin capacity-rejection rate.
 const CheckinRateSampleInterval = 10 * time.Second
 
-// computeRate returns the non-negative per-second rate of change between prev and
-// cur over the elapsed duration dt, rounded to the nearest integer. It returns 0
-// if dt is non-positive or if cur < prev (e.g. a process restart reset the
-// underlying counter to zero), since a rejection rate can never be negative.
+// computeRate returns the count of rejections (cur-prev) divided by an elapsed
+// time (dt), rounded to the nearest integer. It returns 0 if dt is non-positive
+// or if cur < prev: a count of rejections can only increase, so a computed
+// decrease means the counter was reset or wrapped around rather than a genuine
+// negative rate, which wouldn't be meaningful for a count of events.
+//
+// The raw rate (cur-prev)/dt.Seconds() is usually fractional (e.g. 2.5
+// rejections/sec), but converting a float64 to uint64 in Go truncates toward
+// zero rather than rounding, which would silently bias every result down (2.5
+// would become 2, and a real but small rate like 0.6 would floor to 0 and look
+// like no rejections at all). Adding 0.5 before truncating is the standard
+// "round half up" trick: floor(x+0.5) lands on the nearest integer instead of
+// always the one below it (e.g. 2.5+0.5=3.0 truncates to 3; 0.6+0.5=1.1
+// truncates to 1). This only rounds correctly for non-negative x, which the
+// dt<=0 || cur<prev guard above guarantees.
 func computeRate(prev, cur uint64, dt time.Duration) uint64 {
 	if dt <= 0 || cur < prev {
 		return 0
