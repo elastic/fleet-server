@@ -7,6 +7,7 @@ package policy
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -24,6 +25,8 @@ import (
 )
 
 const cloudPolicyID = "policy-elastic-agent-on-cloud"
+
+var ErrPolicyNotFound = errors.New("policy not found")
 
 /*
 Design should have the following properties
@@ -62,6 +65,10 @@ type Monitor interface {
 
 	// Unsubscribe removes the current subscription.
 	Unsubscribe(sub Subscription) error
+
+	// GetPolicy returns the cached policy for the given policy ID.
+	// If the policy is not in the cache, it forces a reload from Elasticsearch.
+	GetPolicy(ctx context.Context, policyID string) (*model.Policy, error)
 }
 
 type policyFetcher func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error)
@@ -518,4 +525,33 @@ func (m *monitorT) Unsubscribe(sub Subscription) error {
 		Msg("unsubscribe")
 
 	return nil
+}
+
+// GetPolicy returns the policy for the given policy ID from the in-memory cache.
+// If the policy is not found in cache, all policies are reloaded from Elasticsearch.
+func (m *monitorT) GetPolicy(ctx context.Context, policyID string) (*model.Policy, error) {
+	if policyID == "" {
+		return nil, errors.New("policy ID is empty")
+	}
+
+	m.mut.Lock()
+	p, ok := m.policies[policyID]
+	m.mut.Unlock()
+
+	if ok {
+		return &p.pp.Policy, nil
+	}
+
+	if err := m.loadPolicies(ctx); err != nil {
+		return nil, fmt.Errorf("loading policies: %w", err)
+	}
+
+	m.mut.Lock()
+	p, ok = m.policies[policyID]
+	m.mut.Unlock()
+
+	if !ok {
+		return nil, fmt.Errorf("%w: %s", ErrPolicyNotFound, policyID)
+	}
+	return &p.pp.Policy, nil
 }
