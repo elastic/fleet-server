@@ -41,8 +41,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-<<<<<<< HEAD
-=======
 type mockPolicyMonitor struct {
 	mock.Mock
 }
@@ -73,7 +71,6 @@ func (m *mockPolicyMonitor) GetPolicy(ctx context.Context, policyID string) (*mo
 	return p, args.Error(1)
 }
 
->>>>>>> caa8b2d (fix: enforce policy-based access control on artifact downloads (#7009))
 func TestConvertActionData(t *testing.T) {
 	tests := []struct {
 		name   string

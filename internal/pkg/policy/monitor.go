@@ -65,8 +65,6 @@ type Monitor interface {
 
 	// Unsubscribe removes the current subscription.
 	Unsubscribe(sub Subscription) error
-<<<<<<< HEAD
-=======
 
 	// LatestRev returns the latest revision idx for the specified policy.
 	LatestRev(ctx context.Context, policyID string) int64
@@ -74,7 +72,6 @@ type Monitor interface {
 	// GetPolicy returns the cached policy for the given policy ID.
 	// If the policy is not in the cache, it forces a reload from Elasticsearch.
 	GetPolicy(ctx context.Context, policyID string) (*model.Policy, error)
->>>>>>> caa8b2d (fix: enforce policy-based access control on artifact downloads (#7009))
 }
 
 type policyFetcher func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error)
@@ -532,8 +529,6 @@ func (m *monitorT) Unsubscribe(sub Subscription) error {
 
 	return nil
 }
-<<<<<<< HEAD
-=======
 
 // LatestRev returns the revision_idx for the passed policy ID.
 // If the policy does not exist in the map, then all policies are foribly reloaded.
@@ -551,7 +546,7 @@ func (m *monitorT) LatestRev(ctx context.Context, id string) int64 {
 		// We've not seen this policy before, force load.
 		err := m.loadPolicies(ctx)
 		if err != nil {
-			m.log.Error().Err(err).Str(ecs.PolicyID, id).Msg("Unable to load policies.")
+			m.log.Error().Err(err).Str(logger.PolicyID, id).Msg("Unable to load policies.")
 			return 0
 		}
 
@@ -559,7 +554,7 @@ func (m *monitorT) LatestRev(ctx context.Context, id string) int64 {
 		p, ok = m.policies[id]
 		m.mut.Unlock()
 		if !ok {
-			m.log.Warn().Str(ecs.PolicyID, id).Msg("Unable to find policy after load.")
+			m.log.Warn().Str(logger.PolicyID, id).Msg("Unable to find policy after load.")
 			return 0
 		}
 	}
@@ -594,4 +589,3 @@ func (m *monitorT) GetPolicy(ctx context.Context, policyID string) (*model.Polic
 	}
 	return &p.pp.Policy, nil
 }
->>>>>>> caa8b2d (fix: enforce policy-based access control on artifact downloads (#7009))

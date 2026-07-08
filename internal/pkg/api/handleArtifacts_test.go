@@ -182,7 +182,7 @@ func TestAuthorizeArtifact(t *testing.T) {
 	}{
 		{
 			name:  "authorized: artifact in policy",
-			agent: &model.Agent{AgentPolicyID: policyID},
+			agent: &model.Agent{PolicyID: policyID},
 			setupMock: func(pm *mockPolicyMonitor) {
 				pm.On("GetPolicy", context.Background(), policyID).Return(policyWithArtifact, nil)
 			},
@@ -190,7 +190,7 @@ func TestAuthorizeArtifact(t *testing.T) {
 		},
 		{
 			name:  "unauthorized: artifact not in policy",
-			agent: &model.Agent{AgentPolicyID: policyID},
+			agent: &model.Agent{PolicyID: policyID},
 			setupMock: func(pm *mockPolicyMonitor) {
 				pm.On("GetPolicy", context.Background(), policyID).Return(&model.Policy{
 					Data: &model.PolicyData{},
@@ -200,7 +200,7 @@ func TestAuthorizeArtifact(t *testing.T) {
 		},
 		{
 			name:  "unauthorized: policy not found maps to 403",
-			agent: &model.Agent{AgentPolicyID: policyID},
+			agent: &model.Agent{PolicyID: policyID},
 			setupMock: func(pm *mockPolicyMonitor) {
 				pm.On("GetPolicy", context.Background(), policyID).Return(nil, policy.ErrPolicyNotFound)
 			},
@@ -208,19 +208,11 @@ func TestAuthorizeArtifact(t *testing.T) {
 		},
 		{
 			name:  "error: GetPolicy returns unexpected error",
-			agent: &model.Agent{AgentPolicyID: policyID},
+			agent: &model.Agent{PolicyID: policyID},
 			setupMock: func(pm *mockPolicyMonitor) {
 				pm.On("GetPolicy", context.Background(), policyID).Return(nil, errors.New("elasticsearch unavailable"))
 			},
 			wantErr: nil, // wrapped, so we check IsUnauthorized is false
-		},
-		{
-			name:  "authorized: uses PolicyID when AgentPolicyID is empty (pre-checkin)",
-			agent: &model.Agent{PolicyID: policyID},
-			setupMock: func(pm *mockPolicyMonitor) {
-				pm.On("GetPolicy", context.Background(), policyID).Return(policyWithArtifact, nil)
-			},
-			wantErr: nil,
 		},
 		{
 			name:      "forbidden: agent has no policy ID",
