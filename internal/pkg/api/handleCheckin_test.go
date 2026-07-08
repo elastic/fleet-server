@@ -60,11 +60,6 @@ func (m *mockPolicyMonitor) Unsubscribe(sub policy.Subscription) error {
 	return args.Error(0)
 }
 
-func (m *mockPolicyMonitor) LatestRev(ctx context.Context, id string) int64 {
-	args := m.Called(ctx, id)
-	return args.Get(0).(int64)
-}
-
 func (m *mockPolicyMonitor) GetPolicy(ctx context.Context, policyID string) (*model.Policy, error) {
 	args := m.Called(ctx, policyID)
 	p, _ := args.Get(0).(*model.Policy)

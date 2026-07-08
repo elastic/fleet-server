@@ -25,8 +25,7 @@ func (s *stubPolicyMonitor) Run(_ context.Context) error { return nil }
 func (s *stubPolicyMonitor) Subscribe(_, _ string, _ int64) (policy.Subscription, error) {
 	return nil, nil
 }
-func (s *stubPolicyMonitor) Unsubscribe(_ policy.Subscription) error     { return nil }
-func (s *stubPolicyMonitor) LatestRev(_ context.Context, _ string) int64 { return 0 }
+func (s *stubPolicyMonitor) Unsubscribe(_ policy.Subscription) error { return nil }
 func (s *stubPolicyMonitor) GetPolicy(ctx context.Context, policyID string) (*model.Policy, error) {
 	return s.getPolicy(ctx, policyID)
 }
