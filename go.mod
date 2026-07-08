@@ -7,7 +7,7 @@ require (
 	github.com/dgraph-io/ristretto v0.2.0
 	github.com/docker/go-units v0.5.0
 	github.com/elastic/elastic-agent-client/v7 v7.18.1
-	github.com/elastic/elastic-agent-libs v0.43.1
+	github.com/elastic/elastic-agent-libs v0.44.0
 	github.com/elastic/elastic-agent-system-metrics v0.14.4
 	github.com/elastic/go-elasticsearch/v8 v8.19.6
 	github.com/elastic/go-ucfg v0.9.1
@@ -39,7 +39,7 @@ require (
 	golang.org/x/net v0.56.0
 	golang.org/x/sync v0.21.0
 	golang.org/x/time v0.15.0
-	google.golang.org/grpc v1.81.1
+	google.golang.org/grpc v1.82.0
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -95,7 +95,7 @@ require (
 	golang.org/x/crypto v0.53.0 // indirect
 	golang.org/x/sys v0.46.0 // indirect
 	golang.org/x/text v0.38.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260226221140-a57be14db171 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260414002931-afd174a4e478 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	howett.net/plist v1.0.1 // indirect
 )
