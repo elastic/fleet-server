@@ -1669,8 +1669,11 @@ func checkFIPSBinary(path string) error {
 				return fmt.Errorf("GOFIPS140 is empty")
 			}
 		case "DefaultGODEBUG":
-			if strings.Contains(setting.Value, "fips140=on") {
-				foundFIPSDefault = true
+			for _, entry := range strings.Split(setting.Value, ",") {
+				if key, val, ok := strings.Cut(entry, "="); ok && key == "fips140" && val == "on" {
+					foundFIPSDefault = true
+					break
+				}
 			}
 		}
 	}
