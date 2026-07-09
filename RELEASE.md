@@ -350,13 +350,23 @@ git stash  # or commit your changes
 
 ## Architecture
 
-Fleet-server follows the same architecture as elastic-agent but is simpler:
+Fleet-server follows the same architecture as elastic-agent and beats:
 
 **Key Differences from elastic-agent:**
-- Fewer files to update (only 1: `version/version.go`)
+- Fewer files to update (only `version/version.go` and `.mergify.yml`)
 - No docs/K8s manifest updates needed
-- All code in `magefile.go` (no separate package)
-- Simpler implementation (~540 lines vs ~2000+ in elastic-agent)
+
+**File structure:**
+```
+dev-tools/mage/release/
+├── release.go      # Version/mergify updates and workflow orchestration
+├── git.go          # Git operations (branch, commit, push)
+├── github.go       # GitHub API integration (PR creation)
+├── release_test.go
+└── git_test.go
+```
+
+`magefile.go` exposes thin `mage release:*` wrappers that delegate to this package.
 
 **Libraries used:**
 - `github.com/go-git/go-git/v5` - Git operations
@@ -442,14 +452,14 @@ git push
 Run unit tests for release functions:
 
 ```bash
-go test -v -tags=mage -run "TestUpdate|TestLoad|TestPrepare" .
+cd dev-tools && go test ./mage/release/... -count=1
 ```
 
 Check test coverage:
 
 ```bash
-go test -v -tags=mage -coverprofile=coverage.out .
-go tool cover -func=coverage.out | grep -E "(UpdateVersion|UpdateMergify)"
+cd dev-tools && go test ./mage/release/... -coverprofile=coverage.out
+go tool cover -func=coverage.out
 ```
 
 ## Migration from Makefile
@@ -474,7 +484,7 @@ This replaces the old Makefile-based release process:
 
 - **Issues**: https://github.com/elastic/fleet-server/issues
 - **Documentation**: This file and migration plan
-- **Code**: `magefile.go` (search for "Release Automation")
+- **Code**: `dev-tools/mage/release/` and `magefile.go` release wrappers
 
 ---
 

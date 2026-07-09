@@ -2,18 +2,13 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-//go:build mage
-
-package main
+package release
 
 import (
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
 func TestUpdateVersion(t *testing.T) {
@@ -49,10 +44,9 @@ func TestUpdateVersion(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create temp directory and file
 			tmpDir := t.TempDir()
 			versionDir := filepath.Join(tmpDir, "version")
-			err := os.Mkdir(versionDir, 0755)
+			err := os.Mkdir(versionDir, 0o755)
 			if err != nil {
 				t.Fatalf("failed to create version dir: %v", err)
 			}
@@ -64,19 +58,20 @@ package version
 
 ` + tt.initial + `
 `
-			err = os.WriteFile(versionFile, []byte(initialContent), 0644)
+			err = os.WriteFile(versionFile, []byte(initialContent), 0o644)
 			if err != nil {
 				t.Fatalf("failed to write initial file: %v", err)
 			}
 
-			// Save current dir and change to temp dir
 			origDir, _ := os.Getwd()
-			defer os.Chdir(origDir)
-			os.Chdir(tmpDir)
+			defer func() {
+				_ = os.Chdir(origDir)
+			}()
+			if err := os.Chdir(tmpDir); err != nil {
+				t.Fatalf("failed to change to temp directory: %v", err)
+			}
 
-			// Run UpdateVersion
-			r := Release{}
-			err = r.UpdateVersion(tt.newVersion)
+			err = UpdateVersion(tt.newVersion)
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("UpdateVersion() error = %v, wantErr %v", err, tt.wantErr)
@@ -84,7 +79,6 @@ package version
 			}
 
 			if !tt.wantErr {
-				// Verify file content
 				content, err := os.ReadFile(versionFile)
 				if err != nil {
 					t.Fatalf("failed to read updated file: %v", err)
@@ -98,10 +92,10 @@ package version
 	}
 }
 
-func TestUpdateVersion_Idempotent(t *testing.T) {
+func TestUpdateVersionIdempotent(t *testing.T) {
 	tmpDir := t.TempDir()
 	versionDir := filepath.Join(tmpDir, "version")
-	err := os.Mkdir(versionDir, 0755)
+	err := os.Mkdir(versionDir, 0o755)
 	if err != nil {
 		t.Fatalf("failed to create version dir: %v", err)
 	}
@@ -111,17 +105,20 @@ func TestUpdateVersion_Idempotent(t *testing.T) {
 
 const DefaultVersion = "9.4.0"
 `
-	err = os.WriteFile(versionFile, []byte(initialContent), 0644)
+	err = os.WriteFile(versionFile, []byte(initialContent), 0o644)
 	if err != nil {
 		t.Fatalf("failed to write initial file: %v", err)
 	}
 
 	origDir, _ := os.Getwd()
-	defer os.Chdir(origDir)
-	os.Chdir(tmpDir)
+	defer func() {
+		_ = os.Chdir(origDir)
+	}()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("failed to change to temp directory: %v", err)
+	}
 
-	r := Release{}
-	err = r.UpdateVersion("9.5.0")
+	err = UpdateVersion("9.5.0")
 	if err != nil {
 		t.Fatalf("first UpdateVersion() failed: %v", err)
 	}
@@ -131,7 +128,7 @@ const DefaultVersion = "9.4.0"
 		t.Fatalf("failed to read file after first update: %v", err)
 	}
 
-	err = r.UpdateVersion("9.5.0")
+	err = UpdateVersion("9.5.0")
 	if err != nil {
 		t.Fatalf("second UpdateVersion() failed: %v", err)
 	}
@@ -146,10 +143,10 @@ const DefaultVersion = "9.4.0"
 	}
 }
 
-func TestUpdateVersion_AlreadyAtVersion(t *testing.T) {
+func TestUpdateVersionAlreadyAtVersion(t *testing.T) {
 	tmpDir := t.TempDir()
 	versionDir := filepath.Join(tmpDir, "version")
-	err := os.Mkdir(versionDir, 0755)
+	err := os.Mkdir(versionDir, 0o755)
 	if err != nil {
 		t.Fatalf("failed to create version dir: %v", err)
 	}
@@ -159,17 +156,20 @@ func TestUpdateVersion_AlreadyAtVersion(t *testing.T) {
 
 const DefaultVersion = "9.5.0"
 `
-	err = os.WriteFile(versionFile, []byte(initialContent), 0644)
+	err = os.WriteFile(versionFile, []byte(initialContent), 0o644)
 	if err != nil {
 		t.Fatalf("failed to write initial file: %v", err)
 	}
 
 	origDir, _ := os.Getwd()
-	defer os.Chdir(origDir)
-	os.Chdir(tmpDir)
+	defer func() {
+		_ = os.Chdir(origDir)
+	}()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("failed to change to temp directory: %v", err)
+	}
 
-	r := Release{}
-	err = r.UpdateVersion("9.5.0")
+	err = UpdateVersion("9.5.0")
 	if err != nil {
 		t.Fatalf("UpdateVersion() failed when version already set: %v", err)
 	}
@@ -180,106 +180,6 @@ const DefaultVersion = "9.5.0"
 	}
 	if string(content) != initialContent {
 		t.Errorf("UpdateVersion() modified file when already at target version")
-	}
-}
-
-func createTestGitRepo(t *testing.T) (*GitRepo, string) {
-	t.Helper()
-
-	tmpDir := t.TempDir()
-	repo, err := git.PlainInit(tmpDir, false)
-	if err != nil {
-		t.Fatalf("failed to init repo: %v", err)
-	}
-
-	w, err := repo.Worktree()
-	if err != nil {
-		t.Fatalf("failed to get worktree: %v", err)
-	}
-
-	testFile := filepath.Join(tmpDir, "README.md")
-	err = os.WriteFile(testFile, []byte("# Test Repo"), 0644)
-	if err != nil {
-		t.Fatalf("failed to write test file: %v", err)
-	}
-
-	_, err = w.Add("README.md")
-	if err != nil {
-		t.Fatalf("failed to add file: %v", err)
-	}
-
-	_, err = w.Commit("Initial commit", &git.CommitOptions{
-		Author: &object.Signature{
-			Name:  "Test User",
-			Email: "test@example.com",
-		},
-	})
-	if err != nil {
-		t.Fatalf("failed to create initial commit: %v", err)
-	}
-
-	return &GitRepo{repo: repo}, tmpDir
-}
-
-func TestCreateBranch_Idempotent(t *testing.T) {
-	gitRepo, _ := createTestGitRepo(t)
-
-	err := gitRepo.createBranch("9.5")
-	if err != nil {
-		t.Fatalf("first createBranch() failed: %v", err)
-	}
-
-	branch, err := gitRepo.getCurrentBranch()
-	if err != nil {
-		t.Fatalf("getCurrentBranch() failed: %v", err)
-	}
-	if branch != "9.5" {
-		t.Fatalf("expected branch 9.5, got %s", branch)
-	}
-
-	err = gitRepo.createBranch("9.5")
-	if err != nil {
-		t.Fatalf("second createBranch() failed: %v", err)
-	}
-
-	branch, err = gitRepo.getCurrentBranch()
-	if err != nil {
-		t.Fatalf("getCurrentBranch() after second call failed: %v", err)
-	}
-	if branch != "9.5" {
-		t.Errorf("createBranch() is not idempotent - on branch %s, want 9.5", branch)
-	}
-}
-
-func TestCommitAll_NoChanges(t *testing.T) {
-	gitRepo, _ := createTestGitRepo(t)
-
-	err := gitRepo.commitAll("Empty commit", "Test Author", "test@example.com")
-	if err != nil {
-		t.Errorf("commitAll() with no changes error = %v", err)
-	}
-}
-
-func TestSetRemoteURL_Idempotent(t *testing.T) {
-	gitRepo, _ := createTestGitRepo(t)
-	remoteURL := "https://github.com/test/repo.git"
-
-	err := gitRepo.setRemoteURL("origin", remoteURL)
-	if err != nil {
-		t.Fatalf("first setRemoteURL() failed: %v", err)
-	}
-
-	err = gitRepo.setRemoteURL("origin", remoteURL)
-	if err != nil {
-		t.Fatalf("second setRemoteURL() failed: %v", err)
-	}
-
-	remote, err := gitRepo.repo.Remote("origin")
-	if err != nil {
-		t.Fatalf("failed to get remote: %v", err)
-	}
-	if len(remote.Config().URLs) == 0 || remote.Config().URLs[0] != remoteURL {
-		t.Errorf("setRemoteURL() URL = %v, want %s", remote.Config().URLs, remoteURL)
 	}
 }
 
@@ -317,7 +217,6 @@ func TestUpdateMergify(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create temp directory and file
 			tmpDir := t.TempDir()
 			mergifyFile := filepath.Join(tmpDir, ".mergify.yml")
 
@@ -331,19 +230,20 @@ func TestUpdateMergify(t *testing.T) {
         branches:
           - "9.3"
 `
-			err := os.WriteFile(mergifyFile, []byte(initialContent), 0644)
+			err := os.WriteFile(mergifyFile, []byte(initialContent), 0o644)
 			if err != nil {
 				t.Fatalf("failed to write initial file: %v", err)
 			}
 
-			// Save current dir and change to temp dir
 			origDir, _ := os.Getwd()
-			defer os.Chdir(origDir)
-			os.Chdir(tmpDir)
+			defer func() {
+				_ = os.Chdir(origDir)
+			}()
+			if err := os.Chdir(tmpDir); err != nil {
+				t.Fatalf("failed to change to temp directory: %v", err)
+			}
 
-			// Run UpdateMergify
-			r := Release{}
-			err = r.UpdateMergify(tt.version)
+			err = UpdateMergify(tt.version)
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("UpdateMergify() error = %v, wantErr %v", err, tt.wantErr)
@@ -351,7 +251,6 @@ func TestUpdateMergify(t *testing.T) {
 			}
 
 			if !tt.wantErr && tt.shouldAppend {
-				// Verify file content
 				content, err := os.ReadFile(mergifyFile)
 				if err != nil {
 					t.Fatalf("failed to read updated file: %v", err)
@@ -359,7 +258,6 @@ func TestUpdateMergify(t *testing.T) {
 
 				contentStr := string(content)
 
-				// Check that the new rule was added
 				expectedName := "backport patches to " + tt.wantBranch + " branch"
 				if !strings.Contains(contentStr, expectedName) {
 					t.Errorf("UpdateMergify() missing rule name: %s", expectedName)
@@ -373,7 +271,6 @@ func TestUpdateMergify(t *testing.T) {
 					t.Errorf("UpdateMergify() missing branch: %s", tt.wantBranch)
 				}
 
-				// Verify old rule is still there
 				if !strings.Contains(contentStr, "9.3") {
 					t.Error("UpdateMergify() removed existing rules")
 				}
@@ -382,8 +279,7 @@ func TestUpdateMergify(t *testing.T) {
 	}
 }
 
-func TestUpdateMergify_Idempotent(t *testing.T) {
-	// Create temp directory and file
+func TestUpdateMergifyIdempotent(t *testing.T) {
 	tmpDir := t.TempDir()
 	mergifyFile := filepath.Join(tmpDir, ".mergify.yml")
 
@@ -397,40 +293,37 @@ func TestUpdateMergify_Idempotent(t *testing.T) {
         branches:
           - "9.5"
 `
-	err := os.WriteFile(mergifyFile, []byte(initialContent), 0644)
+	err := os.WriteFile(mergifyFile, []byte(initialContent), 0o644)
 	if err != nil {
 		t.Fatalf("failed to write initial file: %v", err)
 	}
 
-	// Save current dir and change to temp dir
 	origDir, _ := os.Getwd()
-	defer os.Chdir(origDir)
-	os.Chdir(tmpDir)
+	defer func() {
+		_ = os.Chdir(origDir)
+	}()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("failed to change to temp directory: %v", err)
+	}
 
-	// Run UpdateMergify twice with same version
-	r := Release{}
-	err = r.UpdateMergify("9.5.0")
+	err = UpdateMergify("9.5.0")
 	if err != nil {
 		t.Fatalf("first UpdateMergify() failed: %v", err)
 	}
 
-	// Get content after first run
 	content1, _ := os.ReadFile(mergifyFile)
 
-	err = r.UpdateMergify("9.5.0")
+	err = UpdateMergify("9.5.0")
 	if err != nil {
 		t.Fatalf("second UpdateMergify() failed: %v", err)
 	}
 
-	// Get content after second run
 	content2, _ := os.ReadFile(mergifyFile)
 
-	// Content should be identical (idempotent)
 	if string(content1) != string(content2) {
 		t.Error("UpdateMergify() is not idempotent - content changed on second run")
 	}
 
-	// Should only have one rule for 9.5
 	count := strings.Count(string(content2), "backport patches to 9.5 branch")
 	if count != 1 {
 		t.Errorf("UpdateMergify() created %d rules for 9.5, want 1", count)
@@ -499,16 +392,15 @@ func TestLoadReleaseConfigFromEnv(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Clear env and set test values
 			os.Clearenv()
 			for k, v := range tt.envVars {
 				os.Setenv(k, v)
 			}
 
-			cfg, err := loadReleaseConfigFromEnv()
+			cfg, err := LoadReleaseConfigFromEnv()
 
 			if (err != nil) != tt.wantErr {
-				t.Errorf("loadReleaseConfigFromEnv() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("LoadReleaseConfigFromEnv() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 
@@ -519,11 +411,10 @@ func TestLoadReleaseConfigFromEnv(t *testing.T) {
 	}
 }
 
-func TestPrepareNext(t *testing.T) {
-	// Create temp directory and file
+func TestPrepareNextRelease(t *testing.T) {
 	tmpDir := t.TempDir()
 	versionDir := filepath.Join(tmpDir, "version")
-	err := os.Mkdir(versionDir, 0755)
+	err := os.Mkdir(versionDir, 0o755)
 	if err != nil {
 		t.Fatalf("failed to create version dir: %v", err)
 	}
@@ -533,27 +424,24 @@ func TestPrepareNext(t *testing.T) {
 
 const DefaultVersion = "9.4.0"
 `
-	err = os.WriteFile(versionFile, []byte(initialContent), 0644)
+	err = os.WriteFile(versionFile, []byte(initialContent), 0o644)
 	if err != nil {
 		t.Fatalf("failed to write initial file: %v", err)
 	}
 
-	// Save current dir and change to temp dir
 	origDir, _ := os.Getwd()
-	defer os.Chdir(origDir)
-	os.Chdir(tmpDir)
-
-	// Set env var
-	os.Setenv("CURRENT_RELEASE", "9.4.0")
-
-	// Run PrepareNext
-	r := Release{}
-	err = r.PrepareNext()
-	if err != nil {
-		t.Fatalf("PrepareNext() failed: %v", err)
+	defer func() {
+		_ = os.Chdir(origDir)
+	}()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("failed to change to temp directory: %v", err)
 	}
 
-	// Verify version was incremented
+	err = PrepareNextRelease("9.4.0")
+	if err != nil {
+		t.Fatalf("PrepareNextRelease() failed: %v", err)
+	}
+
 	content, err := os.ReadFile(versionFile)
 	if err != nil {
 		t.Fatalf("failed to read updated file: %v", err)
@@ -561,6 +449,6 @@ const DefaultVersion = "9.4.0"
 
 	expectedVersion := "9.5.0"
 	if !strings.Contains(string(content), expectedVersion) {
-		t.Errorf("PrepareNext() = %s, want %s", string(content), expectedVersion)
+		t.Errorf("PrepareNextRelease() = %s, want %s", string(content), expectedVersion)
 	}
 }
