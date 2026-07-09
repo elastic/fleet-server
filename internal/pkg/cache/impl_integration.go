@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 //go:build integration
 
@@ -18,15 +18,15 @@ func newCache(_ config.Cache) (Cacher, error) {
 
 type NoCache struct{}
 
-func (c *NoCache) Get(_ interface{}) (interface{}, bool) {
+func (c *NoCache) Get(_ any) (any, bool) {
 	return nil, false
 }
 
-func (c *NoCache) Set(_ interface{}, _ interface{}, _ int64) bool {
+func (c *NoCache) Set(_ any, _ any, _ int64) bool {
 	return true
 }
 
-func (c *NoCache) SetWithTTL(_, _ interface{}, _ int64, _ time.Duration) bool {
+func (c *NoCache) SetWithTTL(_, _ any, _ int64, _ time.Duration) bool {
 	return true
 }
 

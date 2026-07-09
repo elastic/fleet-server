@@ -49,7 +49,7 @@ server_limits:
     interval: 100ms
     burst: 10
     max: 20
-  pgp_retieval_limit:
+  pgp_retrieval_limit:
     interval: 5ms
     burst: 500
     max: 1000

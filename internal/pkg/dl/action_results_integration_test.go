@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 //go:build integration
 
@@ -31,8 +31,8 @@ func createRandomActionResults() ([]model.ActionResult, error) {
 
 	results := make([]model.ActionResult, sz)
 
-	for i := 0; i < sz; i++ {
-		payload := map[string]interface{}{
+	for i := range sz {
+		payload := map[string]any{
 			uuid.Must(uuid.NewV4()).String(): uuid.Must(uuid.NewV4()).String(),
 		}
 

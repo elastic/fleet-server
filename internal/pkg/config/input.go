@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package config
 
@@ -45,10 +45,11 @@ type ServerTLS struct {
 }
 
 type ServerBulk struct {
-	FlushInterval       time.Duration `config:"flush_interval"`
-	FlushThresholdCount int           `config:"flush_threshold_cnt"`
-	FlushThresholdSize  int           `config:"flush_threshold_size"`
-	FlushMaxPending     int           `config:"flush_max_pending"`
+	FlushInterval            time.Duration `config:"flush_interval"`
+	FlushThresholdCount      int           `config:"flush_threshold_cnt"`
+	FlushThresholdSize       int           `config:"flush_threshold_size"`
+	FlushMaxPending          int           `config:"flush_max_pending"`
+	MaxPendingBulkDispatches int64         `config:"max_pending_bulk_dispatches"`
 }
 
 func (c *ServerBulk) InitDefaults() {
@@ -99,7 +100,7 @@ type (
 		// This setting restores previous behaviour where all POLICY_CHANGE actions need an explicit ack.
 		IgnoreCheckinPolicyID bool `config:"ignore_checkin_policy_id"`
 
-		// EnableOpAMP when true will enable the OpAMP endpoint.
+		// EnableOpAMP controls whether the OpAMP endpoint is enabled. Defaults to true.
 		EnableOpAMP bool `config:"enable_opamp"`
 	}
 )
@@ -119,6 +120,7 @@ func (c *Server) InitDefaults() {
 	c.GC.InitDefaults()
 	c.PGP.InitDefaults()
 	c.PDKDF2.InitDefaults()
+	c.Features.EnableOpAMP = true
 }
 
 // BindEndpoints returns the binding address for the all HTTP server listeners.

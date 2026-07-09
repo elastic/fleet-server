@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package delivery
 
@@ -20,9 +20,13 @@ import (
 )
 
 const (
-	// integration name is substituted in
+	// Agent-targeted ephemeral files. Integration name is substituted in
 	FileHeaderIndexPattern = ".fleet-fileds-tohost-meta-%s"
 	FileDataIndexPattern   = ".fleet-fileds-tohost-data-%s"
+
+	// Long-lived library files, owned by integrations. Integration & target library substituted in
+	LibraryFileHeaderIndexPattern = ".%s-fleetfiles-%s-meta"
+	LibraryFileDataIndexPattern   = ".%s-fleetfiles-%s-data"
 
 	FieldDocID        = "_id"
 	FieldTargetAgents = "file.Meta.target_agents"
@@ -45,7 +49,7 @@ func prepareQueryMetaByIDAndAgent() *dsl.Tmpl {
 }
 
 func findFileForAgent(ctx context.Context, bulker bulk.Bulk, fileID string, agentID string) (*es.ResultT, error) {
-	q, err := MetaByIDAndAgent.Render(map[string]interface{}{
+	q, err := MetaByIDAndAgent.Render(map[string]any{
 		FieldDocID:      fileID,
 		"target_agents": agentID,
 	})
@@ -60,6 +64,16 @@ func findFileForAgent(ctx context.Context, bulker bulk.Bulk, fileID string, agen
 		return nil, err
 	}
 
+	return result, nil
+}
+
+func findFileInLibrary(ctx context.Context, bulker bulk.Bulk, fileID string, index string) ([]byte, error) {
+	span, ctx := apm.StartSpan(ctx, "searchFile", "search")
+	defer span.End()
+	result, err := bulker.Read(ctx, index, fileID)
+	if err != nil {
+		return nil, err
+	}
 	return result, nil
 }
 

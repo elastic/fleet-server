@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package uploader
 
@@ -80,7 +80,7 @@ func UpdateFileDoc(ctx context.Context, bulker bulk.Bulk, source string, fileID 
 	defer span.End()
 	client := bulker.Client()
 
-	q, err := UpdateMetaDocByID.Render(map[string]interface{}{
+	q, err := UpdateMetaDocByID.Render(map[string]any{
 		"_id":    fileID,
 		"status": string(status),
 		"hash":   hash,
@@ -165,7 +165,7 @@ type ChunkUploadResponse struct {
 func DeleteChunk(ctx context.Context, bulker bulk.Bulk, source string, fileID string, chunkNum int) error {
 	span, ctx := apm.StartSpan(ctx, "deleteChunk", "delete_by_query")
 	defer span.End()
-	q, err := MatchChunkByDocument.Render(map[string]interface{}{
+	q, err := MatchChunkByDocument.Render(map[string]any{
 		"_id": fmt.Sprintf("%s.%d", fileID, chunkNum),
 	})
 	if err != nil {
@@ -177,7 +177,7 @@ func DeleteChunk(ctx context.Context, bulker bulk.Bulk, source string, fileID st
 }
 
 func DeleteAllChunksForFile(ctx context.Context, bulker bulk.Bulk, source string, baseID string) error {
-	q, err := MatchChunkByBID.Render(map[string]interface{}{
+	q, err := MatchChunkByBID.Render(map[string]any{
 		file.FieldBaseID: baseID,
 	})
 	if err != nil {

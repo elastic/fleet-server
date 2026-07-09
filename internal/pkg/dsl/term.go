@@ -1,18 +1,18 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package dsl
 
-func (n *Node) Term(field string, value interface{}, boost *float64) *Node {
+func (n *Node) Term(field string, value any, boost *float64) *Node {
 	childNode := n.appendOrSetChildNode(kKeywordTerm)
 
 	leaf := value
 
 	if boost != nil {
 		leaf = &struct {
-			Value interface{} `json:"value"`
-			Boost *float64    `json:"boost,omitempty"`
+			Value any      `json:"value"`
+			Boost *float64 `json:"boost,omitempty"`
 		}{
 			value,
 			boost,
@@ -25,7 +25,7 @@ func (n *Node) Term(field string, value interface{}, boost *float64) *Node {
 	return childNode
 }
 
-func (n *Node) Terms(field string, value interface{}, boost *float64) *Node {
+func (n *Node) Terms(field string, value any, boost *float64) *Node {
 	childNode := n.appendOrSetChildNode(kKeywordTerms)
 
 	childNode.nodeMap = nodeMapT{

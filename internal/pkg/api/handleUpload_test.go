@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 //go:build !integration
 
@@ -13,7 +13,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
+
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -299,7 +299,7 @@ func TestUploadBeginWritesTimestampToMeta(t *testing.T) {
 		mock.MatchedBy(func(idx string) bool { return strings.HasPrefix(idx, ".fleet-fileds-fromhost-meta") }), // index
 		mock.Anything, // file document ID -- generated, so can be any value
 		mock.MatchedBy(func(body []byte) bool {
-			doc := make(map[string]interface{})
+			doc := make(map[string]any)
 
 			err := json.Unmarshal(body, &doc)
 			require.NoError(t, err)
@@ -387,6 +387,75 @@ func TestUploadBeginFileSize(t *testing.T) {
 /*
   Chunk data upload route
 */
+
+func TestChunkUploadRequiresMatchingAuth(t *testing.T) {
+	data := []byte("filedata")
+	hasher := sha256.New()
+	_, err := hasher.Write(data)
+	require.NoError(t, err)
+	hash := hex.EncodeToString(hasher.Sum(nil))
+	mockUploadID := "abc123"
+
+	tests := []struct {
+		Name              string
+		AuthSuccess       bool
+		AgentFromAPIKey   string
+		AgentInFileRecord string
+		ExpectStatus      int
+	}{
+		{"Agent ID matching API Key succeeds", true, "foo", "foo", http.StatusOK},
+		{"Agent ID in upload not matching API Key should reject", true, "oneID", "differentID", http.StatusForbidden},
+		{"Bad auth should reject request", false, "", "foo", http.StatusUnauthorized},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.Name, func(t *testing.T) {
+			hr, rt, fakebulk, _ := prepareUploaderMock(t)
+			mockUploadInfoResult(fakebulk, file.Info{
+				DocID:     "bar." + tc.AgentInFileRecord,
+				ID:        mockUploadID,
+				ChunkSize: file.MaxChunkSize,
+				Total:     10,
+				Count:     1,
+				Start:     time.Now(),
+				Status:    file.StatusProgress,
+				Source:    "agent",
+				AgentID:   tc.AgentInFileRecord,
+				ActionID:  "bar",
+			})
+
+			if !tc.AuthSuccess {
+				rt.ut.authAPIKey = func(r *http.Request, b bulk.Bulk, c cache.Cache) (*apikey.APIKey, error) {
+					return nil, apikey.ErrInvalidToken
+				}
+				rt.ut.authAgent = func(r *http.Request, s *string, b bulk.Bulk, c cache.Cache) (*model.Agent, error) {
+					return nil, apikey.ErrInvalidToken
+				}
+			} else {
+				rt.ut.authAgent = func(r *http.Request, s *string, b bulk.Bulk, c cache.Cache) (*model.Agent, error) {
+					if *s != tc.AgentFromAPIKey {
+						return nil, ErrAgentIdentity
+					}
+					return &model.Agent{
+						ESDocument: model.ESDocument{
+							Id: tc.AgentFromAPIKey,
+						},
+						Agent: &model.AgentMetadata{
+							ID: tc.AgentFromAPIKey,
+						},
+					}, nil
+				}
+			}
+
+			rec := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodPut, "/api/fleet/uploads/"+mockUploadID+"/0", bytes.NewReader(data))
+			req.Header.Set("X-Chunk-SHA2", hash)
+			hr.ServeHTTP(rec, req)
+
+			assert.Equal(t, tc.ExpectStatus, rec.Code)
+		})
+	}
+}
 
 func TestChunkUploadRouteParams(t *testing.T) {
 	data := []byte("filedata")
@@ -1175,11 +1244,11 @@ func mockStartBodyWithAgent(agent string) string {
 func mockUploadInfoResult(bulker *itesting.MockBulk, info file.Info) {
 
 	// convert info into how it's stored/returned in ES
-	out, _ := json.Marshal(map[string]interface{}{
+	out, _ := json.Marshal(map[string]any{
 		"action_id": info.ActionID,
 		"agent_id":  info.AgentID,
 		"src":       info.Source,
-		"file": map[string]interface{}{
+		"file": map[string]any{
 			"size":      info.Total,
 			"ChunkSize": info.ChunkSize,
 			"Status":    info.Status,
@@ -1213,11 +1282,11 @@ func mockChunkResult(bulker *itesting.MockBulk, chunks []file.ChunkInfo) string 
 	for i, chunk := range chunks {
 		results[i] = es.HitT{
 			ID: chunk.BID + "." + strconv.Itoa(chunk.Pos),
-			Fields: map[string]interface{}{
-				file.FieldBaseID: []interface{}{chunk.BID},
-				file.FieldSHA2:   []interface{}{chunk.SHA2},
-				file.FieldLast:   []interface{}{chunk.Last},
-				"size":           []interface{}{chunk.Size},
+			Fields: map[string]any{
+				file.FieldBaseID: []any{chunk.BID},
+				file.FieldSHA2:   []any{chunk.SHA2},
+				file.FieldLast:   []any{chunk.Last},
+				"size":           []any{chunk.Size},
 			},
 		}
 	}
@@ -1288,7 +1357,7 @@ func sendBodyBytes(body []byte) *http.Response  { return sendBody(bytes.NewReade
 func sendBody(body io.Reader) *http.Response {
 	return &http.Response{
 		StatusCode: http.StatusOK,
-		Body:       ioutil.NopCloser(body),
+		Body:       io.NopCloser(body),
 		Header: http.Header{
 			"X-Elastic-Product": []string{"Elasticsearch"},
 			"Content-Type":      []string{"application/cbor"},

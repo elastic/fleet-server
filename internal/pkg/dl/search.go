@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package dl
 
@@ -12,7 +12,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 )
 
-func Search(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, index string, params map[string]interface{}, opts ...bulk.Opt) (*es.HitsT, error) {
+func Search(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, index string, params map[string]any, opts ...bulk.Opt) (*es.HitsT, error) {
 	query, err := tmpl.Render(params)
 	if err != nil {
 		return nil, err
@@ -26,7 +26,7 @@ func Search(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, index string,
 	return &res.HitsT, nil
 }
 
-func SearchWithOneParam(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, index string, name string, v interface{}) (*es.HitsT, error) {
+func SearchWithOneParam(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, index string, name string, v any) (*es.HitsT, error) {
 	query, err := tmpl.RenderOne(name, v)
 	if err != nil {
 		return nil, err

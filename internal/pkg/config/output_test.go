@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 //go:build !integration
 
@@ -8,7 +8,6 @@
 package config
 
 import (
-	"context"
 	"crypto/tls"
 	"net"
 	"net/http"
@@ -392,8 +391,7 @@ func Test_Elasticsearch_DiagRequests(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	t.Run("scheme included", func(t *testing.T) {
 		es := &Elasticsearch{}

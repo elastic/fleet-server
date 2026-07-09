@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 // Licensed to Elasticsearch B.V. under one or more contributor
 // license agreements. See the NOTICE file distributed with
 // this work for additional information regarding copyright
@@ -239,7 +239,7 @@ func (tester *ClientAPITester) FullFileUpload(ctx context.Context, apiKey, agent
 
 	chunkCount := int(math.Ceil(float64(size) / float64(chunkSize)))
 	tHash := sha256.New()
-	for i := 0; i < chunkCount; i++ {
+	for i := range chunkCount {
 		var body bytes.Buffer
 		n := int64(math.Min(float64(chunkSize), float64(size)))
 		size = size - n
@@ -320,19 +320,19 @@ func (tester *ClientAPITester) AuditUnenroll(ctx context.Context, apiKey, id str
 }
 
 func (tester *ClientAPITester) TestStatus_Unauthenticated() {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(tester.T().Context())
 	defer cancel()
 	tester.Status(ctx, "")
 }
 
 func (tester *ClientAPITester) TestStatus_Authenticated() {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(tester.T().Context())
 	defer cancel()
 	tester.Status(ctx, tester.enrollmentKey)
 }
 
 func (tester *ClientAPITester) TestEnrollCheckinAck() {
-	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
+	ctx, cancel := context.WithTimeout(tester.T().Context(), 4*time.Minute)
 	defer cancel()
 
 	tester.T().Log("test enrollment")
@@ -358,7 +358,7 @@ func (tester *ClientAPITester) TestEnrollCheckinAck() {
 }
 
 func (tester *ClientAPITester) TestCheckinWithBadRequest() {
-	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
+	ctx, cancel := context.WithTimeout(tester.T().Context(), 4*time.Minute)
 	defer cancel()
 
 	tester.T().Log("test enrollment")
@@ -372,7 +372,7 @@ func (tester *ClientAPITester) TestCheckinWithBadRequest() {
 }
 
 func (tester *ClientAPITester) TestCheckinWithActionNotFound() {
-	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
+	ctx, cancel := context.WithTimeout(tester.T().Context(), 4*time.Minute)
 	defer cancel()
 
 	// enroll agent
@@ -395,7 +395,7 @@ func (tester *ClientAPITester) TestCheckinWithActionNotFound() {
 }
 
 func (tester *ClientAPITester) TestFullFileUpload() {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(tester.T().Context())
 	defer cancel()
 
 	agentID, agentKey := tester.Enroll(ctx, tester.enrollmentKey)
@@ -405,25 +405,59 @@ func (tester *ClientAPITester) TestFullFileUpload() {
 }
 
 func (tester *ClientAPITester) TestArtifact() {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	ctx, cancel := context.WithTimeout(tester.T().Context(), 5*time.Minute)
 	defer cancel()
 
-	_, agentKey := tester.Enroll(ctx, tester.enrollmentKey)
+	// Elastic Defend (endpoint) artifacts are only authorized for agents enrolled under a
+	// policy that has the Elastic Defend integration (security-policy). dummy-policy has no
+	// Elastic Defend input and therefore no artifact_manifest, so agents enrolled there
+	// would get 403 when downloading endpoint artifacts.
+	securityPolicyKey := tester.GetEnrollmentTokenForPolicyID(ctx, "security-policy")
+	_, agentKey := tester.Enroll(ctx, securityPolicyKey)
 	tester.AddSecurityContainer(ctx)
 	tester.AddSecurityContainerItem(ctx)
 
 	hits := tester.FleetHasArtifacts(ctx)
-	tester.Artifact(ctx, agentKey, hits[0].Source.Identifier, hits[0].Source.DecodedSHA256, hits[0].Source.EncodedSHA256)
+	id, sha2, encodedSHA := hits[0].Source.Identifier, hits[0].Source.DecodedSHA256, hits[0].Source.EncodedSHA256
+	// Wait for the policy document in ES to reference the artifact. This also gives the
+	// fleet-server policy monitor time to refresh its cache before we attempt the download.
+	tester.FleetPolicyHasArtifact(ctx, "security-policy", id, sha2)
+	// Retry on 403: even after the ES policy is updated, the in-memory cache in fleet-server
+	// may not have caught up yet. The monitor refreshes quickly but retrying is more robust.
+	for {
+		if err := ctx.Err(); err != nil {
+			tester.Require().NoError(err, "context expired before artifact download succeeded")
+		}
+		client, err := api.NewClientWithResponses(tester.endpoint, api.WithHTTPClient(tester.Client), api.WithRequestEditorFn(func(_ context.Context, req *http.Request) error {
+			req.Header.Set("Authorization", "ApiKey "+agentKey)
+			return nil
+		}))
+		tester.Require().NoError(err)
+		resp, err := client.ArtifactWithResponse(ctx, id, sha2, &api.ArtifactParams{})
+		tester.Require().NoError(err)
+		if resp.StatusCode() == http.StatusForbidden {
+			select {
+			case <-ctx.Done():
+				tester.Require().NoError(ctx.Err(), "context expired while retrying artifact download")
+			case <-time.After(time.Second):
+			}
+			continue
+		}
+		tester.Require().Equal(http.StatusOK, resp.StatusCode())
+		hash := sha256.Sum256(resp.Body)
+		tester.Require().Equal(encodedSHA, fmt.Sprintf("%x", hash[:]))
+		break
+	}
 }
 
 func (tester *ClientAPITester) TestGetPGPKey() {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(tester.T().Context())
 	defer cancel()
 	tester.GetPGPKey(ctx)
 }
 
 func (tester *ClientAPITester) TestEnrollAuditUnenroll() {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(tester.T().Context())
 	defer cancel()
 	now := time.Now().UTC()
 
@@ -459,7 +493,7 @@ func (tester *ClientAPITester) TestEnrollAuditUnenroll() {
 			return false
 		}
 		var obj struct {
-			Source map[string]interface{} `json:"_source"`
+			Source map[string]any `json:"_source"`
 		}
 		err = json.NewDecoder(res.Body).Decode(&obj)
 		tester.Require().NoError(err)
@@ -608,11 +642,12 @@ func (tester *ClientAPITester) TestCheckinWithPolicyIDRevision() {
 	tester.Require().Equal(policyID, policyChange.Policy.Id)
 	tester.Require().Equal(revIDX, int64(policyChange.Policy.Revision))
 
+	// Wait longer than the checkin bulk flush interval (10s default) since checkin 3 returns immediately.
 	tester.Require().EventuallyWithT(func(c *assert.CollectT) {
 		agent := tester.GetAgent(ctx, agentID)
 		assert.Equal(c, policyID, agent.AgentPolicyID)
 		assert.Equal(c, newRevIDX, int64(agent.Revision))
-	}, time.Second*10, time.Second)
+	}, time.Second*20, time.Second)
 
 	// Update policy
 	// Get the policy then "update" it without changing anything - revision ID should increment
@@ -721,11 +756,12 @@ func (tester *ClientAPITester) TestCheckinWithPolicyIDRevision() {
 	checkin = resp.JSON200
 	tester.Require().NotEmpty(checkin.Actions, "Expected action in response")
 
+	// Wait longer than the checkin bulk flush interval (10s default) since checkin 6 returns immediately.
 	tester.Require().EventuallyWithT(func(c *assert.CollectT) {
 		agent := tester.GetAgent(ctx, agentID)
 		require.Equal(c, policyID, agent.AgentPolicyID)
 		require.Equal(c, prevRev, int64(agent.Revision))
-	}, time.Second*10, time.Second)
+	}, time.Second*20, time.Second)
 
 	// agent is now recorded as on a previous revision - check to make sure a checkin without AgentPolicyId and revision result in a POLICY_CHANGE action
 	tester.T().Logf("test checkin 7: agent %s with no policy or revision", agentID)

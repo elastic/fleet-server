@@ -1,18 +1,18 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package dsl
 
 type RangeOpt func(nodeMapT)
 
-func WithRangeGT(v interface{}) RangeOpt {
+func WithRangeGT(v any) RangeOpt {
 	return func(nmap nodeMapT) {
 		nmap[kKeywordGreaterThan] = &Node{leaf: v}
 	}
 }
 
-func WithRangeLTE(v interface{}) RangeOpt {
+func WithRangeLTE(v any) RangeOpt {
 	return func(nmap nodeMapT) {
 		nmap[kKeywordLessThanEq] = &Node{leaf: v}
 	}

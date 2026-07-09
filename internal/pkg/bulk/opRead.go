@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package bulk
 
@@ -22,9 +22,14 @@ const (
 )
 
 func (b *Bulker) ReadRaw(ctx context.Context, index, id string, opts ...Opt) (*MgetResponseItem, error) {
-	span, ctx := apm.StartSpan(ctx, "Bulker: readRaw", "bulker")
+	span, ctx := apm.StartSpan(ctx, bulkSpanNames[ActionRead], "bulker")
 	defer span.End()
-	opt := b.parseOpts(append(opts, withAPMLinkedContext(ctx))...)
+	opt := b.parseOpts(opts...)
+	if tx := apm.TransactionFromContext(ctx); tx != nil {
+		tCtx := tx.TraceContext()
+		opt.spanLink = apm.SpanLink{Trace: tCtx.Trace, Span: tCtx.Span}
+		opt.hasSpanLink = true
+	}
 	blk := b.newBlk(ActionRead, opt)
 
 	// Serialize request
@@ -53,8 +58,6 @@ func (b *Bulker) ReadRaw(ctx context.Context, index, id string, opts ...Opt) (*M
 }
 
 func (b *Bulker) Read(ctx context.Context, index, id string, opts ...Opt) ([]byte, error) {
-	span, ctx := apm.StartSpan(ctx, "Bulker: read", "bulker")
-	defer span.End()
 	r, err := b.ReadRaw(ctx, index, id, opts...)
 	if err != nil {
 		return nil, err
@@ -68,28 +71,28 @@ func (b *Bulker) flushRead(ctx context.Context, queue queueT) error {
 
 	const kRoughEstimatePerItem = 256
 
-	bufSz := queue.cnt * kRoughEstimatePerItem
-	if bufSz < queue.pending+len(rSuffix) {
-		bufSz = queue.pending + len(rSuffix)
-	}
+	bufSz := max(queue.cnt*kRoughEstimatePerItem, queue.pending+len(rSuffix))
 
-	buf := bytes.NewBufferString(rPrefix)
-	buf.Grow(bufSz)
+	buf := b.flushBufPool.Get().(*bytes.Buffer) //nolint:errcheck // we control what is placed in the pool
+	buf.Reset()
+	buf.Grow(bufSz + len(rPrefix))
+	buf.WriteString(rPrefix)
+	defer b.flushBufPool.Put(buf)
 
 	// Each item a JSON array element followed by comma
 	queueCnt := 0
-	links := []apm.SpanLink{}
+	links := make([]apm.SpanLink, 0, queue.cnt)
 	for n := queue.head; n != nil; n = n.next {
 		buf.Write(n.buf.Bytes())
 		queueCnt += 1
-		if n.spanLink != nil {
-			links = append(links, *n.spanLink)
+		if n.hasSpanLink {
+			links = append(links, n.spanLink)
 		}
 	}
 	if len(links) == 0 {
 		links = nil
 	}
-	span, ctx := apm.StartSpanOptions(ctx, "Flush: read", "read", apm.SpanOptions{
+	span, ctx := apm.StartSpanOptions(ctx, flushSpanNames[queue.ty], queue.Type(), apm.SpanOptions{
 		Links: links,
 	})
 	defer span.End()

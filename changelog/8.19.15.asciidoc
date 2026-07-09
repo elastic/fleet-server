@@ -1,0 +1,41 @@
+// begin 8.19.15 relnotes
+
+[[release-notes-8.19.15]]
+==  8.19.15
+
+Review important information about the  8.19.15 release.
+
+
+
+
+
+
+
+
+
+
+
+
+[discrete]
+[[enhancements-8.19.15]]
+=== Enhancements
+
+
+
+
+* Update go to v1.26.2. https://github.com/elastic/fleet-server/pull/6800[#6800]
+
+
+
+
+[discrete]
+[[bug-fixes-8.19.15]]
+=== Bug fixes
+
+
+
+
+* Retry Elasticsearch requests on TLS handshake errors so multi-host outputs can fail over. https://github.com/elastic/fleet-server/pull/6767[#6767]
+* Fix typos in default rate limit YAML keys that prevented PGP retrieval and policy limits from loading. https://github.com/elastic/fleet-server/pull/6835[#6835] 
+
+// end 8.19.15 relnotes

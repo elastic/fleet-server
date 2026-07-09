@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package dl
 
@@ -91,7 +91,7 @@ func prepareQueryPolicies() *dsl.Tmpl {
 // can't filter on output in ES as the field is not mapped
 func QueryOutputFromPolicy(ctx context.Context, bulker bulk.Bulk, outputName string, opt ...Option) (*model.Policy, error) {
 	o := newOption(FleetPolicies, opt...)
-	params := map[string]interface{}{}
+	params := map[string]any{}
 	res, err := Search(ctx, bulker, tmplQueryPolicies, o.indexName, params)
 	if err != nil {
 		if errors.Is(err, es.ErrIndexNotFound) {

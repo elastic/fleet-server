@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package zap
 
@@ -62,7 +62,7 @@ func (z zapStub) Sync() error {
 
 func (z zapStub) Write(p []byte) (n int, err error) {
 	// Unwrap the zap object for logging
-	m := make(map[string]interface{})
+	m := make(map[string]any)
 	if err := json.Unmarshal(p, &m); err != nil {
 		return 0, err
 	}

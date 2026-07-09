@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package bulk
 
@@ -16,13 +16,14 @@ type Buf = danger.Buf
 // However, the multiOp API's will allocate directly in large blocks.
 
 type bulkT struct {
-	action   actionT    // requested actions
-	flags    flagsT     // execution flags
-	idx      int32      // idx of originating request, used in mulitOp
-	ch       chan respT // response channel, caller is waiting synchronously
-	buf      Buf        // json payload to be sent to elastic
-	next     *bulkT     // pointer to next bulkT, used for fast internal queueing
-	spanLink *apm.SpanLink
+	action      actionT    // requested actions
+	flags       flagsT     // execution flags
+	idx         int32      // idx of originating request, used in mulitOp
+	ch          chan respT // response channel, caller is waiting synchronously
+	buf         Buf        // json payload to be sent to elastic
+	next        *bulkT     // pointer to next bulkT, used for fast internal queueing
+	spanLink    apm.SpanLink
+	hasSpanLink bool
 }
 
 type flagsT int8
@@ -67,17 +68,21 @@ func (a actionT) String() string {
 	return actionStrings[a]
 }
 
+// reset zeros blk's fields so it can be reused from the pool. Only freeBlk
+// should call this; tests rely on this invariant to use reset as a proxy
+// for observing that freeBlk ran.
 func (blk *bulkT) reset() {
 	blk.action = 0
 	blk.flags = 0
 	blk.idx = 0
 	blk.buf.Reset()
 	blk.next = nil
-	blk.spanLink = nil
+	blk.spanLink = apm.SpanLink{}
+	blk.hasSpanLink = false
 }
 
 type respT struct {
 	err  error
 	idx  int32
-	data interface{}
+	data any
 }

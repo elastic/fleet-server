@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package bulk
 
@@ -8,6 +8,8 @@ import (
 	"context"
 	"errors"
 	"math"
+
+	"go.elastic.co/apm/v2"
 )
 
 // TODO: Are multi requests used by anything? a quick grep shows no hits outside the bulk package.
@@ -37,7 +39,17 @@ func (b *Bulker) multiWaitBulkOp(ctx context.Context, action actionT, ops []Mult
 		return nil, errors.New("too many bulk ops")
 	}
 
-	opt := b.parseOpts(append(opts, withAPMLinkedContext(ctx))...)
+	span, ctx := apm.StartSpan(ctx, bulkSpanNames[action], "bulker")
+	defer span.End()
+	opt := b.parseOpts(opts...)
+
+	var spanLink apm.SpanLink
+	hasSpanLink := false
+	if tx := apm.TransactionFromContext(ctx); tx != nil {
+		tCtx := tx.TraceContext()
+		spanLink = apm.SpanLink{Trace: tCtx.Trace, Span: tCtx.Span}
+		hasSpanLink = true
+	}
 
 	// Contract is that consumer never blocks, so must preallocate.
 	// Could consider making the response channel *respT to limit memory usage.
@@ -79,9 +91,11 @@ func (b *Bulker) multiWaitBulkOp(ctx context.Context, action actionT, ops []Mult
 
 		bulk := &bulks[i]
 		bulk.ch = ch
-		bulk.idx = int32(i) //nolint:gosec // disable G115
+		bulk.idx = int32(i)
 		bulk.action = action
 		bulk.buf.Set(bodySlice)
+		bulk.spanLink = spanLink
+		bulk.hasSpanLink = hasSpanLink
 		if opt.Refresh {
 			bulk.flags.Set(flagRefresh)
 		}
@@ -96,14 +110,14 @@ func (b *Bulker) multiWaitBulkOp(ctx context.Context, action actionT, ops []Mult
 	var lastErr error
 	items := make([]BulkIndexerResponseItem, len(ops))
 
-	for i := 0; i < len(ops); i++ {
+	for range ops {
 		select {
 		case r := <-ch:
 			if r.err != nil {
 				lastErr = r.err
 			}
 			if r.data != nil {
-				items[r.idx] = *r.data.(*BulkIndexerResponseItem)
+				items[r.idx] = *r.data.(*BulkIndexerResponseItem) //nolint:errcheck // response data type is guaranteed by the bulk engine
 			}
 		case <-ctx.Done():
 			return nil, ctx.Err()

@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package api
 
@@ -17,6 +17,7 @@ import (
 	"go.elastic.co/apm/v2"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
+	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/file"
@@ -142,6 +143,24 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 			},
 		},
 		{
+			ErrUnauthorizedArtifact,
+			HTTPErrResp{
+				http.StatusForbidden,
+				"Forbidden",
+				"agent not authorized for artifact",
+				zerolog.WarnLevel,
+			},
+		},
+		{
+			ErrAgentPolicyIDMissing,
+			HTTPErrResp{
+				http.StatusForbidden,
+				"Forbidden",
+				"agent has no policy ID",
+				zerolog.WarnLevel,
+			},
+		},
+		{
 			ErrorThrottle,
 			HTTPErrResp{
 				http.StatusTooManyRequests,
@@ -174,6 +193,15 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 				http.StatusTooManyRequests,
 				"ElasticsearchAPIKeyAuthLimit",
 				"exceeded the elasticsearch api key auth limit",
+				zerolog.WarnLevel,
+			},
+		},
+		{
+			bulk.ErrTooManyBulkDispatches,
+			HTTPErrResp{
+				http.StatusTooManyRequests,
+				"TooManyBulkDispatches",
+				"too many pending bulk dispatches",
 				zerolog.WarnLevel,
 			},
 		},
@@ -479,11 +507,47 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 			},
 		},
 		{
+			ErrBadRange,
+			HTTPErrResp{
+				http.StatusRequestedRangeNotSatisfiable,
+				"ErrRangeNotSatisfiable",
+				"range not satisfiable",
+				zerolog.InfoLevel,
+			},
+		},
+		{
+			ErrMultiRangeNotSupported,
+			HTTPErrResp{
+				http.StatusRequestedRangeNotSatisfiable,
+				"ErrRangeNotSatisfiable",
+				"Multipart ranges not satisfiable",
+				zerolog.InfoLevel,
+			},
+		},
+		{
 			file.ErrInvalidID,
 			HTTPErrResp{
 				http.StatusBadRequest,
 				"ErrInvalidFileID",
 				"ErrInvalidID",
+				zerolog.InfoLevel,
+			},
+		},
+		{
+			ErrClientFileForbidden,
+			HTTPErrResp{
+				http.StatusForbidden,
+				"ErrClientFileForbidden",
+				"client forbidden",
+				zerolog.InfoLevel,
+			},
+		},
+		{
+			ErrFileForDeliveryNotFound,
+			HTTPErrResp{
+				http.StatusNotFound,
+				"ErrFileForDeliveryNotFound",
+				"file not found",
 				zerolog.InfoLevel,
 			},
 		},

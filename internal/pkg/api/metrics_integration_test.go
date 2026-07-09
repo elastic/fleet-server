@@ -1,13 +1,12 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 //go:build integration
 
 package api
 
 import (
-	"context"
 	"net/http"
 	"testing"
 
@@ -29,8 +28,7 @@ func TestMetricsEndpoints(t *testing.T) {
 			Port:    8080,
 		},
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	srv, err := InitMetrics(ctx, cfg, bi, nil)

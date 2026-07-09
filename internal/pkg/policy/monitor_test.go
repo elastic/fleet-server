@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 //go:build !integration
 
@@ -33,8 +33,8 @@ import (
 )
 
 var policyDataDefault = &model.PolicyData{
-	Outputs: map[string]map[string]interface{}{
-		"default": map[string]interface{}{
+	Outputs: map[string]map[string]any{
+		"default": map[string]any{
 			"type": "elasticsearch",
 		},
 	},
@@ -92,11 +92,9 @@ func TestMonitor_NewPolicy(t *testing.T) {
 
 	var merr error
 	var mwg sync.WaitGroup
-	mwg.Add(1)
-	go func() {
-		defer mwg.Done()
+	mwg.Go(func() {
 		merr = monitor.Run(ctx)
-	}()
+	})
 
 	err := monitor.(*monitorT).waitStart(ctx)
 	require.NoError(t, err)
@@ -171,11 +169,9 @@ func TestMonitor_SamePolicy(t *testing.T) {
 
 	var merr error
 	var mwg sync.WaitGroup
-	mwg.Add(1)
-	go func() {
-		defer mwg.Done()
+	mwg.Go(func() {
 		merr = monitor.Run(ctx)
-	}()
+	})
 
 	err := monitor.(*monitorT).waitStart(ctx)
 	require.NoError(t, err)
@@ -337,11 +333,9 @@ func Test_Monitor_Limit_Delay(t *testing.T) {
 
 	var merr error
 	var mwg sync.WaitGroup
-	mwg.Add(1)
-	go func() {
-		defer mwg.Done()
+	mwg.Go(func() {
 		merr = monitor.Run(ctx)
-	}()
+	})
 
 	err := monitor.(*monitorT).waitStart(ctx)
 	require.NoError(t, err)
@@ -510,11 +504,9 @@ func Test_Monitor_cancel_pending(t *testing.T) {
 	// start monitor
 	var merr error
 	var mwg sync.WaitGroup
-	mwg.Add(1)
-	go func() {
-		defer mwg.Done()
+	mwg.Go(func() {
 		merr = monitor.Run(ctx)
-	}()
+	})
 	err = monitor.(*monitorT).waitStart(ctx)
 	require.NoError(t, err)
 

@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package logger
 
@@ -40,8 +40,7 @@ func TestMiddleware(t *testing.T) {
 	}
 	srv.Start()
 	defer srv.Close()
-	reqCtx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	reqCtx := t.Context()
 	req, err := http.NewRequestWithContext(reqCtx, "GET", srv.URL, nil)
 	require.NoError(t, err)
 

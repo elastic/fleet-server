@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 //go:build integration
 
@@ -29,8 +29,7 @@ import (
 )
 
 func TestSimpleMonitorEmptyIndex(t *testing.T) {
-	ctx, cn := context.WithCancel(context.Background())
-	defer cn()
+	ctx := t.Context()
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, dl.FleetActions)
@@ -39,8 +38,7 @@ func TestSimpleMonitorEmptyIndex(t *testing.T) {
 }
 
 func TestSimpleMonitorNonEmptyIndex(t *testing.T) {
-	ctx, cn := context.WithCancel(context.Background())
-	defer cn()
+	ctx := t.Context()
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	index, bulker, _ := ftesting.SetupActions(ctx, t, 1, 12)

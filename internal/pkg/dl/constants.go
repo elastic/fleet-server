@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package dl
 
@@ -65,10 +65,12 @@ const (
 	FieldAuditUnenrolledTime   = "audit_unenrolled_time"
 	FieldAuditUnenrolledReason = "audit_unenrolled_reason"
 
-	FieldDecodedSha256 = "decoded_sha256"
-	FieldIdentifier    = "identifier"
-	FieldSharedID      = "shared_id"
-	FieldEnrollmentID  = "enrollment_id"
+	FieldArtifactManifest = "artifact_manifest"
+	FieldArtifacts        = "artifacts"
+	FieldDecodedSha256    = "decoded_sha256"
+	FieldIdentifier       = "identifier"
+	FieldSharedID         = "shared_id"
+	FieldEnrollmentID     = "enrollment_id"
 )
 
 // Private constants

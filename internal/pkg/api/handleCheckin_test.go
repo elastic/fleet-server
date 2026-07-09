@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 //go:build !integration
 
@@ -62,6 +62,12 @@ func (m *mockPolicyMonitor) Unsubscribe(sub policy.Subscription) error {
 func (m *mockPolicyMonitor) LatestRev(ctx context.Context, id string) int64 {
 	args := m.Called(ctx, id)
 	return args.Get(0).(int64)
+}
+
+func (m *mockPolicyMonitor) GetPolicy(ctx context.Context, policyID string) (*model.Policy, error) {
+	args := m.Called(ctx, policyID)
+	p, _ := args.Get(0).(*model.Policy)
+	return p, args.Error(1)
 }
 
 func TestConvertActionData(t *testing.T) {
@@ -358,8 +364,7 @@ func TestResolveSeqNo(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// setup mock CheckinT
 			logger := testlog.SetLogger(t)
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 			verCon := mustBuildConstraints("8.0.0")
 			cfg := &config.Server{}
 			c, _ := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
@@ -415,7 +420,7 @@ func TestProcessUpgradeDetails(t *testing.T) {
 			mBulk := ftesting.NewMockBulk()
 			mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.MatchedBy(func(p []byte) bool {
 				doc := struct {
-					Doc map[string]interface{} `json:"doc"`
+					Doc map[string]any `json:"doc"`
 				}{}
 				if err := json.Unmarshal(p, &doc); err != nil {
 					t.Logf("bulk match unmarshal error: %v", err)
@@ -1092,7 +1097,7 @@ func TestParseComponents(t *testing.T) {
 	}
 }
 
-func requireMarshalJSON(t *testing.T, obj interface{}) json.RawMessage {
+func requireMarshalJSON(t *testing.T, obj any) json.RawMessage {
 	data, err := json.Marshal(obj)
 	require.NoError(t, err)
 	return data
@@ -1244,6 +1249,30 @@ func TestValidateCheckinRequest(t *testing.T) {
 			},
 			expErr:   &BadRequestErr{msg: "unable to create gzip reader for request body", nextErr: gzip.ErrHeader},
 			expValid: validatedCheckin{},
+		},
+		{
+			name: "gzip compressed request body exceeds max agent doc size limit",
+			req: func() *http.Request {
+				var buf bytes.Buffer
+				gz := gzip.NewWriter(&buf)
+				_, _ = gz.Write([]byte(`{"status": "online", "message": "`))
+				_, _ = gz.Write(bytes.Repeat([]byte("a"), 1024))
+				_, _ = gz.Write([]byte(`"}`))
+				_ = gz.Close()
+				return &http.Request{
+					Header: http.Header{"Content-Encoding": []string{"gzip"}},
+					Body:   io.NopCloser(&buf),
+				}
+			}(),
+			cfg: &config.Server{
+				Limits: config.ServerLimits{
+					CheckinLimit: config.Limit{
+						MaxBody:             512, // compressed body is lower than doc size
+						MaxBodyDecompressed: 1024,
+					},
+				},
+			},
+			expErr: &BadRequestErr{msg: "unable to decode checkin request", nextErr: &http.MaxBytesError{Limit: 1024}},
 		},
 	}
 

@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 //go:build e2e && !requirefips
 
@@ -114,7 +114,7 @@ func (suite *StandAloneContainerSuite) startFleetServer(ctx context.Context, opt
 }
 
 func (suite *StandAloneContainerSuite) TestHTTP() {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(suite.T().Context(), 3*time.Minute)
 	defer cancel()
 
 	suite.startFleetServer(ctx, standaloneContainerOptions{
@@ -134,7 +134,7 @@ func (suite *StandAloneContainerSuite) TestHTTP() {
 // TestWithElasticsearchConnectionFailures checks the behaviour of stand alone Fleet Server
 // when Elasticsearch is not reachable.
 func (suite *StandAloneContainerSuite) TestWithElasticsearchConnectionFailures() {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(suite.T().Context(), 3*time.Minute)
 	defer cancel()
 
 	proxyContainer := suite.StartToxiproxy(ctx)
@@ -171,7 +171,7 @@ func (suite *StandAloneContainerSuite) TestWithElasticsearchConnectionFailures()
 }
 
 func (suite *StandAloneContainerSuite) TestAPMInstrumentation() {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*3)
+	ctx, cancel := context.WithTimeout(suite.T().Context(), time.Minute*3)
 	defer cancel()
 
 	suite.startFleetServer(ctx, standaloneContainerOptions{

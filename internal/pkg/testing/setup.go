@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 //go:build integration
 
@@ -102,7 +102,7 @@ func CleanIndex(ctx context.Context, t *testing.T, bulker bulk.Bulk, index strin
 	root.Query().MatchAll()
 	q := tmpl.MustResolve(root)
 
-	query, err := q.Render(make(map[string]interface{}))
+	query, err := q.Render(make(map[string]any))
 	if err != nil {
 		t.Fatalf("could not clean index: failed to render query template: %v", err)
 	}

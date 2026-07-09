@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package uploader
 
@@ -57,7 +57,7 @@ func TestUploadCompletePerformsRefreshBeforeChunkSearch(t *testing.T) {
 		"action_id": "actionID",
 		"agent_id":  "agentID",
 		"src":       fakeIntegrationSrc,
-		"file": map[string]interface{}{
+		"file": map[string]any{
 			"size":      size,
 			"ChunkSize": file.MaxChunkSize,
 			"Status":    file.StatusProgress,
@@ -94,9 +94,9 @@ func TestUploadCompletePerformsRefreshBeforeChunkSearch(t *testing.T) {
 
 	fakeBulk.On("Search",
 		mock.MatchedBy(func(_ context.Context) bool { return true }), // match context.Context
-		".fleet-fileds-fromhost-data-*",                              // *DATA* (chunk) search
-		mock.Anything,                                                // query bytes
-		mock.Anything,                                                // bulk opts
+		".fleet-fileds-fromhost-data-"+fakeIntegrationSrc,            // *DATA* (chunk) search
+		mock.Anything, // query bytes
+		mock.Anything, // bulk opts
 
 	).Run(func(args mock.Arguments) {
 		// runs during execution, before return

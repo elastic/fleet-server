@@ -10,7 +10,7 @@ server_limits:
   action_limit:
     interval: 1ms
     burst: 10
-  policy_interval:
+  policy_limit:
     interval: 5ms
     burst: 1
   checkin_limit:
@@ -49,7 +49,7 @@ server_limits:
     interval: 100ms
     burst: 40
     max: 80
-  pgp_retieval_limit:
+  pgp_retrieval_limit:
     interval: 1ms
     burst: 2000
     max: 4000

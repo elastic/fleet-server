@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package apikey
 
@@ -17,12 +17,12 @@ import (
 )
 
 // Create generates a new APIKey in Elasticsearch using the given client.
-func Create(ctx context.Context, client *elasticsearch.Client, name, ttl, refresh string, roles []byte, meta interface{}) (*APIKey, error) {
+func Create(ctx context.Context, client *elasticsearch.Client, name, ttl, refresh string, roles []byte, meta any) (*APIKey, error) {
 	payload := struct {
 		Name       string          `json:"name,omitempty"`
 		Expiration string          `json:"expiration,omitempty"`
 		Roles      json.RawMessage `json:"role_descriptors,omitempty"`
-		Metadata   interface{}     `json:"metadata"`
+		Metadata   any             `json:"metadata"`
 	}{
 		Name:       name,
 		Expiration: ttl,

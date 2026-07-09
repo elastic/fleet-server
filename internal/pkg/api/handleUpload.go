@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package api
 
@@ -137,6 +137,11 @@ func (ut *UploadT) handleUploadChunk(zlog zerolog.Logger, w http.ResponseWriter,
 	upinfo, chunkInfo, err := ut.uploader.Chunk(r.Context(), uplID, chunkID, chunkHash)
 	if err != nil {
 		return err
+	}
+
+	// Validate that the requesting agent owns this upload session
+	if _, err := ut.authAgent(r, &upinfo.AgentID, ut.bulker, ut.cache); err != nil {
+		return fmt.Errorf("error authenticating for chunk upload: %w", err)
 	}
 
 	// prevent over-sized chunks

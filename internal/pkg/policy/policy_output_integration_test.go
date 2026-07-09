@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 //go:build integration
 
@@ -102,7 +102,7 @@ func TestRenderUpdatePainlessScript(t *testing.T) {
 				ctx, index, agentID, body, bulk.WithRefresh())
 			require.NoError(t, err)
 
-			fields := map[string]interface{}{
+			fields := map[string]any{
 				dl.FieldPolicyOutputAPIKey:          outputAPIKey.Agent(),
 				dl.FieldPolicyOutputAPIKeyID:        outputAPIKey.ID,
 				dl.FieldPolicyOutputPermissionsHash: outputPermissionSha,
@@ -150,8 +150,8 @@ func TestPolicyOutputESPrepareRealES(t *testing.T) {
 			Raw:  TestPayload,
 		},
 	}
-	policyMap := map[string]map[string]interface{}{
-		"test output": map[string]interface{}{},
+	policyMap := map[string]map[string]any{
+		"test output": map[string]any{},
 	}
 
 	err = output.prepareElasticsearch(
@@ -224,9 +224,9 @@ func TestPolicyOutputESPrepareRemoteES(t *testing.T) {
 			Raw:  TestPayload,
 		},
 	}
-	policyMap := map[string]map[string]interface{}{
-		"test remote output": map[string]interface{}{
-			"hosts": []interface{}{"http://localhost:9200"},
+	policyMap := map[string]map[string]any{
+		"test remote output": map[string]any{
+			"hosts": []any{"http://localhost:9200"},
 		},
 	}
 
@@ -278,8 +278,8 @@ func TestPolicyOutputESPrepareESRetireRemoteAPIKeys(t *testing.T) {
 			Raw:  TestPayload,
 		},
 	}
-	policyMap := map[string]map[string]interface{}{
-		"test output": map[string]interface{}{},
+	policyMap := map[string]map[string]any{
+		"test output": map[string]any{},
 	}
 
 	err = output.prepareElasticsearch(

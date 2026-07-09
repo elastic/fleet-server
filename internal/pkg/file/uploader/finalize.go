@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package uploader
 
@@ -49,7 +49,7 @@ func (u *Uploader) Complete(ctx context.Context, id string, transitHash string) 
 		return info, fmt.Errorf("unable to refresh chunk data index: %w", err)
 	}
 
-	chunks, err := file.GetChunkInfos(ctx, u.bulker, UploadDataIndexPattern, info.DocID, file.GetChunkInfoOpt{IncludeSize: true, RequireHash: true})
+	chunks, err := file.GetChunkInfos(ctx, u.bulker, fmt.Sprintf(UploadDataIndexPattern, info.Source), info.DocID, file.GetChunkInfoOpt{IncludeSize: true, RequireHash: true})
 	if err != nil {
 		return info, err
 	}

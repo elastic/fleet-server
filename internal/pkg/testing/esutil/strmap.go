@@ -1,10 +1,10 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package esutil
 
-type stringMap map[string]interface{}
+type stringMap map[string]any
 
 func (m stringMap) GetMap(k string) stringMap {
 	if m == nil {
@@ -13,7 +13,7 @@ func (m stringMap) GetMap(k string) stringMap {
 
 	v := m[k]
 	if v != nil {
-		if m, ok := v.(map[string]interface{}); ok {
+		if m, ok := v.(map[string]any); ok {
 			return m
 		}
 	}

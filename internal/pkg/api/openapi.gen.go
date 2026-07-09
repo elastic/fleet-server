@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 // Package api provides primitives to interact with the openapi HTTP API.
 //
@@ -62,10 +62,11 @@ const (
 
 // Defines values for CheckinRequestStatus.
 const (
-	CheckinRequestStatusDegraded CheckinRequestStatus = "degraded"
-	CheckinRequestStatusError    CheckinRequestStatus = "error"
-	CheckinRequestStatusOnline   CheckinRequestStatus = "online"
-	CheckinRequestStatusStarting CheckinRequestStatus = "starting"
+	CheckinRequestStatusDegraded     CheckinRequestStatus = "degraded"
+	CheckinRequestStatusDisconnected CheckinRequestStatus = "disconnected"
+	CheckinRequestStatusError        CheckinRequestStatus = "error"
+	CheckinRequestStatusOnline       CheckinRequestStatus = "online"
+	CheckinRequestStatusStarting     CheckinRequestStatus = "starting"
 )
 
 // Defines values for EnrollRequestType.
@@ -1058,6 +1059,9 @@ type ArtifactParams struct {
 
 // GetFileParams defines parameters for GetFile.
 type GetFileParams struct {
+	// Source Requests file from an alternate index pattern in elasticsearch. Requires specific integration support for creating the corresponding index and files. Supporting integration clients are allowlisted in fleet server.
+	Source *string `form:"source,omitempty" json:"source,omitempty"`
+
 	// ElasticApiVersion The API version to use, format should be "YYYY-MM-DD"
 	ElasticApiVersion *ApiVersion `json:"elastic-api-version,omitempty"`
 
@@ -2494,6 +2498,14 @@ func (siw *ServerInterfaceWrapper) GetFile(w http.ResponseWriter, r *http.Reques
 
 	// Parameter object where we will unmarshal all parameters from the context
 	var params GetFileParams
+
+	// ------------- Optional query parameter "source" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "source", r.URL.Query(), &params.Source)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "source", Err: err})
+		return
+	}
 
 	headers := r.Header
 

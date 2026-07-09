@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package file
 
@@ -39,9 +39,9 @@ func prepareChunkInfo(size bool) *dsl.Tmpl {
 	root.Query().Term(FieldBaseID, tmpl.Bind(FieldBaseID), nil)
 	root.Param("fields", []string{FieldSHA2, FieldLast, FieldBaseID})
 	if size {
-		root.Param("script_fields", map[string]interface{}{
-			"size": map[string]interface{}{
-				"script": map[string]interface{}{
+		root.Param("script_fields", map[string]any{
+			"size": map[string]any{
+				"script": map[string]any{
 					"lang":   "painless",
 					"source": "params._source.data.length",
 				},
@@ -64,7 +64,7 @@ func prepareFindMetaByUploadID() *dsl.Tmpl {
 func GetMetadata(ctx context.Context, bulker bulk.Bulk, indexPattern string, uploadID string) ([]es.HitT, error) {
 	span, ctx := apm.StartSpan(ctx, "getFileInfo", "search")
 	defer span.End()
-	query, err := QueryUploadID.Render(map[string]interface{}{
+	query, err := QueryUploadID.Render(map[string]any{
 		FieldUploadID: uploadID,
 	})
 	if err != nil {
@@ -76,7 +76,7 @@ func GetMetadata(ctx context.Context, bulker bulk.Bulk, indexPattern string, upl
 		return nil, err
 	}
 
-	return res.HitsT.Hits, nil
+	return res.Hits, nil
 }
 
 // Retrieves a file Metadata as an Info object
@@ -137,14 +137,14 @@ type GetChunkInfoOpt struct {
 // the chunk's ordered index position (Pos) is also parsed from the document ID.
 // Optionally adding the calculated field "size", that is the length, in bytes, of the Data field.
 // and optionally validating that a hash field is present
-func GetChunkInfos(ctx context.Context, bulker bulk.Bulk, indexPattern string, baseID string, opt GetChunkInfoOpt) ([]ChunkInfo, error) {
+func GetChunkInfos(ctx context.Context, bulker bulk.Bulk, index string, baseID string, opt GetChunkInfoOpt) ([]ChunkInfo, error) {
 	span, ctx := apm.StartSpan(ctx, "getChunksInfo", "process")
 	defer span.End()
 	tpl := QueryChunkInfo
 	if opt.IncludeSize {
 		tpl = QueryChunkInfoWithSize
 	}
-	query, err := tpl.Render(map[string]interface{}{
+	query, err := tpl.Render(map[string]any{
 		FieldBaseID: baseID,
 	})
 	if err != nil {
@@ -152,13 +152,13 @@ func GetChunkInfos(ctx context.Context, bulker bulk.Bulk, indexPattern string, b
 	}
 
 	bSpan, bCtx := apm.StartSpan(ctx, "searchChunksInfo", "search")
-	res, err := bulker.Search(bCtx, fmt.Sprintf(indexPattern, "*"), query)
+	res, err := bulker.Search(bCtx, index, query)
 	bSpan.End()
 	if err != nil {
 		return nil, err
 	}
 
-	chunks := make([]ChunkInfo, len(res.HitsT.Hits))
+	chunks := make([]ChunkInfo, len(res.Hits))
 
 	var (
 		bid  string
@@ -170,7 +170,7 @@ func GetChunkInfos(ctx context.Context, bulker bulk.Bulk, indexPattern string, b
 
 	vSpan, _ := apm.StartSpan(ctx, "validateChunksInfo", "validate")
 	defer vSpan.End()
-	for i, h := range res.HitsT.Hits {
+	for i, h := range res.Hits {
 		if bid, ok = getResultsFieldString(h.Fields, FieldBaseID); !ok {
 			return nil, fmt.Errorf("unable to retrieve %s field from chunk document", FieldBaseID)
 		}
@@ -206,18 +206,18 @@ func GetChunkInfos(ctx context.Context, bulker bulk.Bulk, indexPattern string, b
 
 // convenience function for translating the elasticsearch "field" response format
 // of "field": { "a": [value], "b": [value] }
-func getResultField(fields map[string]interface{}, key string) (interface{}, bool) {
-	array, ok := fields[key].([]interface{})
+func getResultField(fields map[string]any, key string) (any, bool) {
+	array, ok := fields[key].([]any)
 	if !ok {
 		return nil, false
 	}
-	if array == nil || len(array) < 1 {
+	if len(array) < 1 {
 		return nil, false
 	}
 	return array[0], true
 }
 
-func getResultsFieldString(fields map[string]interface{}, key string) (string, bool) {
+func getResultsFieldString(fields map[string]any, key string) (string, bool) {
 	val, ok := getResultField(fields, key)
 	if !ok {
 		return "", false
@@ -225,7 +225,7 @@ func getResultsFieldString(fields map[string]interface{}, key string) (string, b
 	str, ok := val.(string)
 	return str, ok
 }
-func getResultsFieldBool(fields map[string]interface{}, key string) (bool, bool) {
+func getResultsFieldBool(fields map[string]any, key string) (bool, bool) {
 	val, ok := getResultField(fields, key)
 	if !ok {
 		return false, false
@@ -233,7 +233,7 @@ func getResultsFieldBool(fields map[string]interface{}, key string) (bool, bool)
 	b, ok := val.(bool)
 	return b, ok
 }
-func getResultsFieldInt(fields map[string]interface{}, key string) (int, bool) {
+func getResultsFieldInt(fields map[string]any, key string) (int, bool) {
 	val, ok := getResultField(fields, key)
 	if !ok {
 		return 0, false

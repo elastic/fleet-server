@@ -8,8 +8,6 @@ fleet.agent.id: e2e-test-id
 inputs:
 - type: fleet-server
   server:
-    feature_flags:
-      enable_opamp: true
     static_policy_tokens:
       enabled: true
       policy_tokens:

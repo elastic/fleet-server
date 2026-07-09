@@ -1,16 +1,14 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 //go:build e2e && !requirefips
 
 package e2e
 
 import (
-	"bytes"
 	"context"
 	"html/template"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -68,7 +66,6 @@ type StandAloneAPIBase struct {
 
 	cancel   context.CancelFunc
 	cmd      *exec.Cmd
-	stderr   io.Reader
 	endpoint string
 	key      string
 }
@@ -80,6 +77,9 @@ func (suite *StandAloneAPIBase) SetupSuite() {
 	// make sure we can bind to port
 	portFree := suite.IsFleetServerPortFree()
 	suite.Require().True(portFree, "port 8220 must not be in use for test to start")
+
+	// clean up agents from previous test suites so fleet-server initializes quickly
+	suite.DeleteAllAgents(suite.T().Context())
 
 	// Start fleet-server
 	dir := suite.T().TempDir()
@@ -96,15 +96,12 @@ func (suite *StandAloneAPIBase) SetupSuite() {
 	})
 	f.Close()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(suite.T().Context())
 	suite.cancel = cancel
 
 	// Run the fleet-server binary, cancelling context should stop process
 	cmd := exec.CommandContext(ctx, suite.binaryPath, "-c", filepath.Join(dir, "config.yml"))
-	// collect logs from stderr in case there is a failure
-	var errBuff bytes.Buffer
-	cmd.Stderr = &errBuff
-	suite.stderr = &errBuff
+	cmd.Stderr = os.Stderr
 
 	cmd.Cancel = func() error {
 		return cmd.Process.Signal(syscall.SIGTERM)
@@ -115,7 +112,7 @@ func (suite *StandAloneAPIBase) SetupSuite() {
 	suite.Require().NoError(err)
 	suite.cmd = cmd
 
-	rCtx, rCancel := context.WithTimeout(ctx, time.Minute)
+	rCtx, rCancel := context.WithTimeout(ctx, 3*time.Minute)
 	suite.FleetServerStatusOK(rCtx, "https://localhost:8220")
 	rCancel()
 
@@ -127,8 +124,4 @@ func (suite *StandAloneAPIBase) TearDownSuite() {
 	suite.T().Log("Stopping fleet-server process")
 	suite.cancel()
 	suite.cmd.Wait()
-	if suite.T().Failed() {
-		stderr, err := io.ReadAll(suite.stderr)
-		suite.T().Logf("Test failure detected, printing fleet-server stderr: %s\nread err: %v", string(stderr), err)
-	}
 }

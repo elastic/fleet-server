@@ -1,11 +1,10 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package bulk
 
 import (
-	"context"
 	"strconv"
 	"time"
 
@@ -25,7 +24,8 @@ type optionsT struct {
 	Indices            []string
 	WaitForCheckpoints []int64
 	IgnoreUnavailable  bool
-	spanLink           *apm.SpanLink
+	spanLink           apm.SpanLink
+	hasSpanLink        bool
 }
 
 type Opt func(*optionsT)
@@ -63,33 +63,20 @@ func WithWaitForCheckpoints(checkpoints []int64) Opt {
 	}
 }
 
-func withAPMLinkedContext(ctx context.Context) Opt {
-	return func(opt *optionsT) {
-		trace := apm.TransactionFromContext(ctx)
-		if trace == nil {
-			return
-		}
-		tCtx := trace.TraceContext()
-		opt.spanLink = &apm.SpanLink{
-			Trace: tCtx.Trace,
-			Span:  tCtx.Span,
-		}
-	}
-}
-
 //-----
 // Bulk API options
 
 type bulkOptT struct {
-	flushInterval     time.Duration
-	flushThresholdCnt int
-	flushThresholdSz  int
-	maxPending        int
-	blockQueueSz      int
-	apikeyMaxParallel int
-	apikeyMaxReqSize  int
-	policyTokens      []config.PolicyToken
-	bi                build.Info
+	flushInterval            time.Duration
+	flushThresholdCnt        int
+	flushThresholdSz         int
+	maxPending               int
+	blockQueueSz             int
+	apikeyMaxParallel        int
+	apikeyMaxReqSize         int
+	maxPendingBulkDispatches int64
+	policyTokens             []config.PolicyToken
+	bi                       build.Info
 }
 
 type BulkOpt func(*bulkOptT)
@@ -129,6 +116,14 @@ func WithBlockQueueSize(sz int) BulkOpt {
 	}
 }
 
+// WithMaxPendingBulkDispatches sets the upper bound on concurrent bulk dispatch goroutines.
+// When the limit is reached, new bulk dispatches are rejected immediately. 0 means no limit.
+func WithMaxPendingBulkDispatches(max int64) BulkOpt {
+	return func(opt *bulkOptT) {
+		opt.maxPendingBulkDispatches = max
+	}
+}
+
 // WithAPIKeyMaxParallel sets the number of api key operations outstanding
 func WithAPIKeyMaxParallel(max int) BulkOpt {
 	return func(opt *bulkOptT) {
@@ -160,14 +155,15 @@ func WithBi(bi build.Info) BulkOpt {
 
 func parseBulkOpts(opts ...BulkOpt) bulkOptT {
 	bopt := bulkOptT{
-		flushInterval:     defaultFlushInterval,
-		flushThresholdCnt: defaultFlushThresholdCnt,
-		flushThresholdSz:  defaultFlushThresholdSz,
-		maxPending:        defaultMaxPending,
-		apikeyMaxParallel: defaultAPIKeyMaxParallel,
-		blockQueueSz:      defaultBlockQueueSz,
-		apikeyMaxReqSize:  defaultApikeyMaxReqSize,
-		policyTokens:      []config.PolicyToken{}, // default is empty
+		flushInterval:            defaultFlushInterval,
+		flushThresholdCnt:        defaultFlushThresholdCnt,
+		flushThresholdSz:         defaultFlushThresholdSz,
+		maxPending:               defaultMaxPending,
+		apikeyMaxParallel:        defaultAPIKeyMaxParallel,
+		blockQueueSz:             defaultBlockQueueSz,
+		apikeyMaxReqSize:         defaultApikeyMaxReqSize,
+		maxPendingBulkDispatches: defaultMaxPendingBulkDispatches,
+		policyTokens:             []config.PolicyToken{}, // default is empty
 	}
 
 	for _, f := range opts {
@@ -185,6 +181,7 @@ func (o *bulkOptT) MarshalZerologObject(e *zerolog.Event) {
 	e.Int("blockQueueSz", o.blockQueueSz)
 	e.Int("apikeyMaxParallel", o.apikeyMaxParallel)
 	e.Int("apikeyMaxReqSize", o.apikeyMaxReqSize)
+	e.Int64("maxPendingBulkDispatches", o.maxPendingBulkDispatches)
 }
 
 // BulkOptsFromCfg transforms config to a slize of BulkOpt
@@ -208,6 +205,7 @@ func BulkOptsFromCfg(cfg *config.Config) []BulkOpt {
 		WithMaxPending(bulkCfg.FlushMaxPending),
 		WithAPIKeyMaxParallel(maxKeyParallel),
 		WithAPIKeyMaxRequestSize(cfg.Output.Elasticsearch.MaxContentLength),
+		WithMaxPendingBulkDispatches(bulkCfg.MaxPendingBulkDispatches),
 		WithPolicyTokens(policyTokens),
 	}
 }

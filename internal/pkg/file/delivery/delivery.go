@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package delivery
 
@@ -39,28 +39,48 @@ func New(client *elasticsearch.Client, bulker bulk.Bulk, sizeLimit *uint64) *Del
 	}
 }
 
-func (d *Deliverer) FindFileForAgent(ctx context.Context, fileID string, agentID string) (file.MetaDoc, error) {
+// returns  file Metadata, the search index for the data chunks for the file, and err
+func (d *Deliverer) FindFileForAgent(ctx context.Context, fileID string, agentID string) (file.MetaDoc, string, error) {
 	span, ctx := apm.StartSpan(ctx, "findFile", "process")
 	defer span.End()
 	result, err := findFileForAgent(ctx, d.bulker, fileID, agentID)
 	if err != nil {
-		return file.MetaDoc{}, err
+		return file.MetaDoc{}, "", err
 	}
 	if result == nil || len(result.Hits) == 0 {
-		return file.MetaDoc{}, ErrNoFile
+		return file.MetaDoc{}, "", ErrNoFile
 	}
 
 	var fi file.MetaDoc
 	if err := json.Unmarshal(result.Hits[0].Source, &fi); err != nil {
-		return file.MetaDoc{}, fmt.Errorf("file meta doc parsing error: %w", err)
+		return file.MetaDoc{}, "", fmt.Errorf("file meta doc parsing error: %w", err)
 	}
 
-	return fi, nil
+	return fi, fmt.Sprintf(FileDataIndexPattern, "*"), nil
 }
 
-func (d *Deliverer) LocateChunks(ctx context.Context, zlog zerolog.Logger, fileID string) ([]file.ChunkInfo, error) {
+func (d *Deliverer) FindLibraryFile(ctx context.Context, fileID string, integration string, libsrc string) (file.MetaDoc, string, error) {
+	span, ctx := apm.StartSpan(ctx, "findFile", "process")
+	defer span.End()
+	result, err := findFileInLibrary(ctx, d.bulker, fileID, fmt.Sprintf(LibraryFileHeaderIndexPattern, integration, libsrc))
+	if err != nil {
+		return file.MetaDoc{}, "", err
+	}
+	if len(result) == 0 {
+		return file.MetaDoc{}, "", ErrNoFile
+	}
+
+	var fi file.MetaDoc
+	if err := json.Unmarshal(result, &fi); err != nil {
+		return file.MetaDoc{}, "", fmt.Errorf("file meta doc parsing error: %w", err)
+	}
+
+	return fi, fmt.Sprintf(LibraryFileDataIndexPattern, integration, libsrc), nil
+}
+
+func (d *Deliverer) LocateChunks(ctx context.Context, zlog zerolog.Logger, fileID string, dataIndex string) ([]file.ChunkInfo, error) {
 	// find chunk indices behind alias, doc IDs
-	infos, err := file.GetChunkInfos(ctx, d.bulker, FileDataIndexPattern, fileID, file.GetChunkInfoOpt{})
+	infos, err := file.GetChunkInfos(ctx, d.bulker, dataIndex, fileID, file.GetChunkInfoOpt{})
 	if err != nil {
 		zlog.Error().Err(err).Msg("problem getting infos")
 		return nil, err
@@ -75,13 +95,16 @@ func (d *Deliverer) LocateChunks(ctx context.Context, zlog zerolog.Logger, fileI
 	return infos, nil
 }
 
-func (d *Deliverer) SendFile(ctx context.Context, zlog zerolog.Logger, w io.Writer, chunks []file.ChunkInfo, fileID string) error {
+func (d *Deliverer) SendChunks(ctx context.Context, zlog zerolog.Logger, w io.Writer, chunks []file.ChunkInfo, fileID string, startOffset *int64, endOffset *int64) error {
+	if (startOffset != nil && *startOffset < 0) || (endOffset != nil && *endOffset < 0) {
+		return errors.New("invalid range offset")
+	}
 	span, ctx := apm.StartSpan(ctx, "response", "write")
 	defer span.End()
 	sort.SliceStable(chunks, func(i, j int) bool {
 		return chunks[i].Pos < chunks[j].Pos
 	})
-	for _, chunkInfo := range chunks {
+	for i, chunkInfo := range chunks {
 		body, err := readChunkStream(ctx, d.client, chunkInfo.Index, chunkInfo.ID)
 		if err != nil {
 			zlog.Error().Err(err).Str("fileID", fileID).Str("chunkID", chunkInfo.ID).Msg("error reading chunk stream")
@@ -95,7 +118,12 @@ func (d *Deliverer) SendFile(ctx context.Context, zlog zerolog.Logger, w io.Writ
 			zlog.Error().Err(err).Str("fileID", fileID).Str("chunkID", chunkInfo.ID).Msg("error decoding chunk")
 			return err
 		}
-
+		if i == len(chunks)-1 && endOffset != nil {
+			chunk = chunk[:*endOffset]
+		}
+		if i == 0 && startOffset != nil {
+			chunk = chunk[*startOffset:]
+		}
 		n, err := w.Write(chunk)
 		if err != nil {
 			zlog.Error().Err(err).Str("fileID", fileID).Str("chunkID", chunkInfo.ID).Msg("error writing chunk to output")

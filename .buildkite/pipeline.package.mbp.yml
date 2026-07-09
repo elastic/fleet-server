@@ -28,6 +28,8 @@ steps:
     if: "build.env('VERSION_QUALIFIER') == null"
     key: "package-x86-64-snapshot"
     command: ".buildkite/scripts/package.sh snapshot"
+    env:
+      PLATFORMS: "linux/amd64,darwin/amd64,windows/amd64"
     agents:
       provider: "gcp"
       image: "${IMAGE_UBUNTU_X86_64}"
@@ -42,6 +44,8 @@ steps:
     command: |
       source .buildkite/scripts/version_qualifier.sh
       .buildkite/scripts/package.sh staging
+    env:
+      PLATFORMS: "linux/amd64,darwin/amd64,windows/amd64"
     agents:
       provider: "gcp"
       image: "${IMAGE_UBUNTU_X86_64}"
@@ -58,6 +62,7 @@ steps:
     command: ".buildkite/scripts/package.sh snapshot"
     env:
       FIPS: "true"
+      PLATFORMS: "linux/amd64,windows/amd64"
     agents:
       provider: "gcp"
       image: "${IMAGE_UBUNTU_X86_64}"
@@ -75,6 +80,7 @@ steps:
       .buildkite/scripts/package.sh staging
     env:
       FIPS: "true"
+      PLATFORMS: "linux/amd64,windows/amd64"
     agents:
       provider: "gcp"
       image: "${IMAGE_UBUNTU_X86_64}"
@@ -89,6 +95,8 @@ steps:
     if: "build.env('VERSION_QUALIFIER') == null"
     key: "package-arm-snapshot"
     command: ".buildkite/scripts/package.sh snapshot"
+    env:
+      PLATFORMS: "linux/arm64,darwin/arm64,windows/arm64"
     agents:
       provider: "aws"
       imagePrefix: "${IMAGE_UBUNTU_ARM_64}"
@@ -104,6 +112,8 @@ steps:
     command: |
       source .buildkite/scripts/version_qualifier.sh
       .buildkite/scripts/package.sh staging
+    env:
+      PLATFORMS: "linux/arm64,darwin/arm64,windows/arm64"
     agents:
       provider: "aws"
       imagePrefix: "${IMAGE_UBUNTU_ARM_64}"
@@ -120,6 +130,7 @@ steps:
     command: ".buildkite/scripts/package.sh snapshot"
     env:
       FIPS: "true"
+      PLATFORMS: "linux/arm64,windows/arm64"
     agents:
       provider: "aws"
       imagePrefix: "${IMAGE_UBUNTU_ARM_64}"
@@ -137,6 +148,7 @@ steps:
       .buildkite/scripts/package.sh staging
     env:
       FIPS: "true"
+      PLATFORMS: "linux/arm64,windows/arm64"
     agents:
       provider: "aws"
       imagePrefix: "${IMAGE_UBUNTU_ARM_64}"

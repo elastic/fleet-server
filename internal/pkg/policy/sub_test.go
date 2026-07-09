@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 //go:build !integration
 
@@ -124,7 +124,7 @@ func TestSub_PushRandom(t *testing.T) {
 	N := rand.Intn(4096) + 1
 
 	nodes := make([]*subT, 0, N)
-	for i := 0; i < N; i++ {
+	for i := range N {
 		name := fmt.Sprintf("policy%d", i)
 		nn := NewSub(name, "", 0)
 
@@ -160,7 +160,7 @@ func TestSub_UnlinkRandomN(t *testing.T) {
 	N := rand.Intn(4096) + 1
 
 	nodes := make([]*subT, 0, N)
-	for i := 0; i < N; i++ {
+	for i := range N {
 		name := fmt.Sprintf("policy%d", i)
 		nn := NewSub(name, "", 0)
 		head.pushBack(nn)
@@ -171,7 +171,7 @@ func TestSub_UnlinkRandomN(t *testing.T) {
 		t.Error("head should not be empty after push")
 	}
 
-	for i := 0; i < N; i++ {
+	for range N {
 		idx := rand.Intn(len(nodes))
 		sub := nodes[idx]
 		sub.unlink()
@@ -216,7 +216,7 @@ func BenchmarkSubs(b *testing.B) {
 		b.Run(fmt.Sprintf("%d", bm), func(b *testing.B) {
 			b.StopTimer()
 			subs := make([]*subT, 0, bm)
-			for i := 0; i < bm; i++ {
+			for i := range bm {
 				name := fmt.Sprintf("policy%d", i)
 				nn := NewSub(name, "", 0)
 				subs = append(subs, nn)
@@ -226,11 +226,11 @@ func BenchmarkSubs(b *testing.B) {
 			b.StartTimer()
 
 			for i := 0; i < b.N; i++ {
-				for j := 0; j < bm; j++ {
+				for j := range bm {
 					head.pushBack(subs[j])
 				}
 
-				for j := 0; j < bm; j++ {
+				for j := range bm {
 					subs[j].unlink()
 				}
 			}

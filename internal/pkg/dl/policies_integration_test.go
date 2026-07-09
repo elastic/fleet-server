@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 //go:build integration
 
@@ -24,13 +24,13 @@ import (
 func createRandomPolicy(id string, revisionIdx int) model.Policy {
 	now := time.Now().UTC()
 	var policyData = model.PolicyData{
-		Outputs: map[string]map[string]interface{}{
+		Outputs: map[string]map[string]any{
 			"default": {
 				"type": "elasticsearch",
 			},
 		},
 		OutputPermissions: json.RawMessage(`{"default": {}}`),
-		Inputs:            []map[string]interface{}{},
+		Inputs:            []map[string]any{},
 	}
 	return model.Policy{
 		PolicyID:           id,
@@ -175,13 +175,13 @@ func TestQueryOutputFromPolicy(t *testing.T) {
 
 	now := time.Now().UTC()
 	var policyData = model.PolicyData{
-		Outputs: map[string]map[string]interface{}{
+		Outputs: map[string]map[string]any{
 			"remote": {
 				"type": "remote_elasticsearch",
 			},
 		},
 		OutputPermissions: json.RawMessage(`{"default": {}}`),
-		Inputs:            []map[string]interface{}{},
+		Inputs:            []map[string]any{},
 	}
 	rec := model.Policy{
 		PolicyID:           "policy1",
@@ -200,5 +200,5 @@ func TestQueryOutputFromPolicy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	require.Equal(t, map[string]interface{}{"type": "remote_elasticsearch"}, policy.Data.Outputs["remote"])
+	require.Equal(t, map[string]any{"type": "remote_elasticsearch"}, policy.Data.Outputs["remote"])
 }

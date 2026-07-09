@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package config
 
@@ -35,8 +35,8 @@ var hasScheme = regexp.MustCompile(`^([a-z][a-z0-9+\-.]*)://`)
 
 // Output is the output configuration to elasticsearch.
 type Output struct {
-	Elasticsearch Elasticsearch          `config:"elasticsearch"`
-	Extra         map[string]interface{} `config:",inline"`
+	Elasticsearch Elasticsearch  `config:"elasticsearch"`
+	Extra         map[string]any `config:",inline"`
 }
 
 // Elasticsearch is the configuration for elasticsearch.

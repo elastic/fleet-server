@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package bulk
 
@@ -20,9 +20,14 @@ import (
 )
 
 func (b *Bulker) Search(ctx context.Context, index string, body []byte, opts ...Opt) (*es.ResultT, error) {
-	span, ctx := apm.StartSpan(ctx, "Bulker: search", "bulker")
+	span, ctx := apm.StartSpan(ctx, bulkSpanNames[ActionSearch], "bulker")
 	defer span.End()
-	opt := b.parseOpts(append(opts, withAPMLinkedContext(ctx))...)
+	opt := b.parseOpts(opts...)
+	if tx := apm.TransactionFromContext(ctx); tx != nil {
+		tCtx := tx.TraceContext()
+		opt.spanLink = apm.SpanLink{Trace: tCtx.Trace, Span: tCtx.Span}
+		opt.hasSpanLink = true
+	}
 	action := ActionSearch
 
 	// Use /_fleet/_fleet_msearch fleet plugin endpoint if need to wait for checkpoints
@@ -74,7 +79,8 @@ func (b *Bulker) writeMsearchMeta(buf *Buf, index string, moreIndices []string, 
 			return err
 		}
 
-		indices := []string{index}
+		indices := make([]string, 0, 1+len(moreIndices))
+		indices = append(indices, index)
 		indices = append(indices, moreIndices...)
 
 		_, _ = buf.WriteString(`"index": `)
@@ -125,27 +131,26 @@ func (b *Bulker) flushSearch(ctx context.Context, queue queueT) error {
 
 	const kRoughEstimatePerItem = 256
 
-	bufSz := queue.cnt * kRoughEstimatePerItem
-	if bufSz < queue.pending {
-		bufSz = queue.pending
-	}
+	bufSz := max(queue.cnt*kRoughEstimatePerItem, queue.pending)
 
-	var buf bytes.Buffer
+	buf := b.flushBufPool.Get().(*bytes.Buffer) //nolint:errcheck // we control what is placed in the pool
+	buf.Reset()
 	buf.Grow(bufSz)
+	defer b.flushBufPool.Put(buf)
 
 	queueCnt := 0
-	links := []apm.SpanLink{}
+	links := make([]apm.SpanLink, 0, queue.cnt)
 	for n := queue.head; n != nil; n = n.next {
 		buf.Write(n.buf.Bytes())
 		queueCnt += 1
-		if n.spanLink != nil {
-			links = append(links, *n.spanLink)
+		if n.hasSpanLink {
+			links = append(links, n.spanLink)
 		}
 	}
 	if len(links) == 0 {
 		links = nil
 	}
-	span, ctx := apm.StartSpanOptions(ctx, "Flush: search", "search", apm.SpanOptions{
+	span, ctx := apm.StartSpanOptions(ctx, flushSpanNames[queue.ty], queue.Type(), apm.SpanOptions{
 		Links: links,
 	})
 	defer span.End()

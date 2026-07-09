@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 //go:build integration
 
@@ -123,7 +123,7 @@ func TestSearchEnrollmentAPIKeyByPolicyIDWithInactiveIDs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unable to store enrollment key: %v", err)
 	}
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		_, err = storeRandomEnrollmentAPIKey(ctx, bulker, index, uuid.Must(uuid.NewV4()).String(), false)
 		if err != nil {
 			t.Fatalf("unable to store enrollment key: %v", err)

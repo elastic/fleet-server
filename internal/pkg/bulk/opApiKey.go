@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package bulk
 
@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"math"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
@@ -51,7 +52,7 @@ func (b *Bulker) APIKeyAuth(ctx context.Context, key APIKey) (*SecurityInfo, err
 	return key.Authenticate(ctx, b.Client())
 }
 
-func (b *Bulker) APIKeyCreate(ctx context.Context, name, ttl string, roles []byte, meta interface{}) (*APIKey, error) {
+func (b *Bulker) APIKeyCreate(ctx context.Context, name, ttl string, roles []byte, meta any) (*APIKey, error) {
 	span, ctx := apm.StartSpan(ctx, "createAPIKey", "auth")
 	defer span.End()
 	if err := b.apikeyLimit.Acquire(ctx, 1); err != nil {
@@ -110,30 +111,25 @@ func (b *Bulker) APIKeyUpdate(ctx context.Context, id, outputPolicyHash string, 
 // Even if the order was incorrect we end up with just a bit broader permission set, never too strict, so agent does not
 // end up with fewer permissions than it needs
 func (b *Bulker) flushUpdateAPIKey(ctx context.Context, queue queueT) error {
-	idsPerRole := make(map[string][]string)
-	roles := make(map[string]json.RawMessage)
-	rolePerID := make(map[string]string)
-	responses := make(map[int]int)
-	idxToID := make(map[int32]string)
-	IDToResponse := make(map[string]int)
+	idsPerRole := make(map[string][]string, queue.cnt)
+	roles := make(map[string]json.RawMessage, queue.cnt)
+	rolePerID := make(map[string]string, queue.cnt)
+	responses := make(map[int]int, queue.cnt)
+	idxToID := make(map[int32]string, queue.cnt)
+	IDToResponse := make(map[string]int, queue.cnt)
 	maxKeySize := 0
-	links := []apm.SpanLink{}
+	links := make([]apm.SpanLink, 0, queue.cnt)
 
 	// merge ids
 	for n := queue.head; n != nil; n = n.next {
 		content := n.buf.Bytes()
-		metaMap := make(map[string]interface{})
-		dec := json.NewDecoder(bytes.NewReader(content))
-		if err := dec.Decode(&metaMap); err != nil {
-			zerolog.Ctx(ctx).Error().
-				Err(err).
-				Str("mod", kModBulk).
-				Msg("Failed to unmarshal api key update meta map")
-			return err
+		_, body, ok := bytes.Cut(content, []byte("\n"))
+		if !ok {
+			return fmt.Errorf("invalid APIKeyUpdate buffer: missing meta separator")
 		}
 
-		var req *apiKeyUpdateRequest
-		if err := dec.Decode(&req); err != nil {
+		var req apiKeyUpdateRequest
+		if err := json.Unmarshal(body, &req); err != nil {
 			zerolog.Ctx(ctx).Error().
 				Err(err).
 				Str("mod", kModBulk).
@@ -152,8 +148,8 @@ func (b *Bulker) flushUpdateAPIKey(ctx context.Context, queue queueT) error {
 		if maxKeySize < len(req.ID) {
 			maxKeySize = len(req.ID)
 		}
-		if n.spanLink != nil {
-			links = append(links, *n.spanLink)
+		if n.hasSpanLink {
+			links = append(links, n.spanLink)
 		}
 	}
 
@@ -190,12 +186,9 @@ func (b *Bulker) flushUpdateAPIKey(ctx context.Context, queue queueT) error {
 		batches := int(math.Ceil(float64(len(ids)) / float64(idsPerBatch)))
 
 		// batch ids into batches of meaningful size
-		for batch := 0; batch < batches; batch++ {
+		for batch := range batches {
 			// guard against indexing out of range
-			to := (batch + 1) * idsPerBatch
-			if to > len(ids) {
-				to = len(ids)
-			}
+			to := min((batch+1)*idsPerBatch, len(ids))
 
 			// handle ids in batch, we put them into single request
 			// and assign response index to the id so we can notify caller

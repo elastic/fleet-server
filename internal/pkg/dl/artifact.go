@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package dl
 
@@ -31,7 +31,7 @@ func prepareQueryArtifact() *dsl.Tmpl {
 
 func FindArtifact(ctx context.Context, bulker bulk.Bulk, ident, sha2 string) (*model.Artifact, error) {
 
-	params := map[string]interface{}{
+	params := map[string]any{
 		FieldDecodedSha256: sha2,
 		FieldIdentifier:    ident,
 	}

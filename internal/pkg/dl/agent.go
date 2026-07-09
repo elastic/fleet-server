@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package dl
 
@@ -39,7 +39,7 @@ func prepareAgentFindByEnrollmentID() *dsl.Tmpl {
 }
 
 func prepareAgentFindByField(field string) *dsl.Tmpl {
-	return prepareFindByField(field, map[string]interface{}{"version": true})
+	return prepareFindByField(field, map[string]any{"version": true})
 }
 
 func GetAgent(ctx context.Context, bulker bulk.Bulk, agentID string, opt ...Option) (model.Agent, error) {
@@ -65,7 +65,7 @@ func GetAgent(ctx context.Context, bulker bulk.Bulk, agentID string, opt ...Opti
 	return agent, err
 }
 
-func FindAgent(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, name string, v interface{}, opt ...Option) (model.Agent, error) {
+func FindAgent(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, name string, v any, opt ...Option) (model.Agent, error) {
 	o := newOption(FleetAgents, opt...)
 	res, err := SearchWithOneParam(ctx, bulker, tmpl, o.indexName, name, v)
 	if err != nil {
