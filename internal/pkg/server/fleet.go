@@ -524,6 +524,12 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 	bc := checkin.NewBulk(bulker)
 	g.Go(loggedRunFunc(ctx, "Bulk checkin", bc.Run))
 
+	// Samples the checkin capacity-rejection counter into a rate gauge, exposed via
+	// /stats for use as an autoscaling signal. See api.RunCheckinRejectionRateSampler.
+	g.Go(loggedRunFunc(ctx, "Checkin rejection rate sampler", func(ctx context.Context) error {
+		return api.RunCheckinRejectionRateSampler(ctx, api.CheckinRateSampleInterval)
+	}))
+
 	ct, err := api.NewCheckinT(f.verCon, &cfg.Inputs[0].Server, f.cache, bc, pm, am, ad, bulker)
 	if err != nil {
 		return err
