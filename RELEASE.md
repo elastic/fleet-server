@@ -146,6 +146,21 @@ mage release:runMajorMinor
 - Discard changes with `git checkout .`
 - Or proceed with `DRY_RUN=false`
 
+## Idempotency
+
+All release automation steps are designed to be **idempotent** — safe to re-run after a partial failure or CI retry:
+
+| Step | Re-run behavior |
+|------|-----------------|
+| `updateVersion` | No-op if `DefaultVersion` already matches |
+| `updateMergify` | No-op if backport rule already exists |
+| `createBranch` | Checks out existing branch instead of failing |
+| `commitAll` | Skips commit when there are no changes |
+| `push` | Succeeds when remote is already up to date |
+| `createPR` | Returns existing open PR for the same head/base |
+
+This means `mage release:runMajorMinor` and `mage release:runPatch` can be safely retried without manual cleanup when a step has already completed.
+
 ## Testing on a Fork
 
 Before using the release automation in production, it's **highly recommended** to test on your personal fork first. This allows you to verify the workflow end-to-end without affecting the official repository.
@@ -273,14 +288,16 @@ mage release:runMajorMinor
 - Verify: `gh auth status`
 
 **Issue: "branch already exists"**
-- Delete the existing branch first:
+- The automation checks out the existing branch automatically on re-run
+- To start fresh, delete the branch manually:
   ```bash
   git branch -D 9.5
   git push origin --delete 9.5
   ```
 
 **Issue: "PR already exists"**
-- Close or merge the existing PR first
+- The automation returns the existing open PR on re-run
+- To create a new PR, close the existing one first
 - Or use a different version number (e.g., `9.5.0-test2`)
 
 ### Best Practices

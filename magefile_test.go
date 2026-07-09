@@ -11,6 +11,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
 func TestUpdateVersion(t *testing.T) {
@@ -92,6 +95,191 @@ package version
 				}
 			}
 		})
+	}
+}
+
+func TestUpdateVersion_Idempotent(t *testing.T) {
+	tmpDir := t.TempDir()
+	versionDir := filepath.Join(tmpDir, "version")
+	err := os.Mkdir(versionDir, 0755)
+	if err != nil {
+		t.Fatalf("failed to create version dir: %v", err)
+	}
+
+	versionFile := filepath.Join(versionDir, "version.go")
+	initialContent := `package version
+
+const DefaultVersion = "9.4.0"
+`
+	err = os.WriteFile(versionFile, []byte(initialContent), 0644)
+	if err != nil {
+		t.Fatalf("failed to write initial file: %v", err)
+	}
+
+	origDir, _ := os.Getwd()
+	defer os.Chdir(origDir)
+	os.Chdir(tmpDir)
+
+	r := Release{}
+	err = r.UpdateVersion("9.5.0")
+	if err != nil {
+		t.Fatalf("first UpdateVersion() failed: %v", err)
+	}
+
+	content1, err := os.ReadFile(versionFile)
+	if err != nil {
+		t.Fatalf("failed to read file after first update: %v", err)
+	}
+
+	err = r.UpdateVersion("9.5.0")
+	if err != nil {
+		t.Fatalf("second UpdateVersion() failed: %v", err)
+	}
+
+	content2, err := os.ReadFile(versionFile)
+	if err != nil {
+		t.Fatalf("failed to read file after second update: %v", err)
+	}
+
+	if string(content1) != string(content2) {
+		t.Error("UpdateVersion() is not idempotent - content changed on second run")
+	}
+}
+
+func TestUpdateVersion_AlreadyAtVersion(t *testing.T) {
+	tmpDir := t.TempDir()
+	versionDir := filepath.Join(tmpDir, "version")
+	err := os.Mkdir(versionDir, 0755)
+	if err != nil {
+		t.Fatalf("failed to create version dir: %v", err)
+	}
+
+	versionFile := filepath.Join(versionDir, "version.go")
+	initialContent := `package version
+
+const DefaultVersion = "9.5.0"
+`
+	err = os.WriteFile(versionFile, []byte(initialContent), 0644)
+	if err != nil {
+		t.Fatalf("failed to write initial file: %v", err)
+	}
+
+	origDir, _ := os.Getwd()
+	defer os.Chdir(origDir)
+	os.Chdir(tmpDir)
+
+	r := Release{}
+	err = r.UpdateVersion("9.5.0")
+	if err != nil {
+		t.Fatalf("UpdateVersion() failed when version already set: %v", err)
+	}
+
+	content, err := os.ReadFile(versionFile)
+	if err != nil {
+		t.Fatalf("failed to read file: %v", err)
+	}
+	if string(content) != initialContent {
+		t.Errorf("UpdateVersion() modified file when already at target version")
+	}
+}
+
+func createTestGitRepo(t *testing.T) (*GitRepo, string) {
+	t.Helper()
+
+	tmpDir := t.TempDir()
+	repo, err := git.PlainInit(tmpDir, false)
+	if err != nil {
+		t.Fatalf("failed to init repo: %v", err)
+	}
+
+	w, err := repo.Worktree()
+	if err != nil {
+		t.Fatalf("failed to get worktree: %v", err)
+	}
+
+	testFile := filepath.Join(tmpDir, "README.md")
+	err = os.WriteFile(testFile, []byte("# Test Repo"), 0644)
+	if err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	_, err = w.Add("README.md")
+	if err != nil {
+		t.Fatalf("failed to add file: %v", err)
+	}
+
+	_, err = w.Commit("Initial commit", &git.CommitOptions{
+		Author: &object.Signature{
+			Name:  "Test User",
+			Email: "test@example.com",
+		},
+	})
+	if err != nil {
+		t.Fatalf("failed to create initial commit: %v", err)
+	}
+
+	return &GitRepo{repo: repo}, tmpDir
+}
+
+func TestCreateBranch_Idempotent(t *testing.T) {
+	gitRepo, _ := createTestGitRepo(t)
+
+	err := gitRepo.createBranch("9.5")
+	if err != nil {
+		t.Fatalf("first createBranch() failed: %v", err)
+	}
+
+	branch, err := gitRepo.getCurrentBranch()
+	if err != nil {
+		t.Fatalf("getCurrentBranch() failed: %v", err)
+	}
+	if branch != "9.5" {
+		t.Fatalf("expected branch 9.5, got %s", branch)
+	}
+
+	err = gitRepo.createBranch("9.5")
+	if err != nil {
+		t.Fatalf("second createBranch() failed: %v", err)
+	}
+
+	branch, err = gitRepo.getCurrentBranch()
+	if err != nil {
+		t.Fatalf("getCurrentBranch() after second call failed: %v", err)
+	}
+	if branch != "9.5" {
+		t.Errorf("createBranch() is not idempotent - on branch %s, want 9.5", branch)
+	}
+}
+
+func TestCommitAll_NoChanges(t *testing.T) {
+	gitRepo, _ := createTestGitRepo(t)
+
+	err := gitRepo.commitAll("Empty commit", "Test Author", "test@example.com")
+	if err != nil {
+		t.Errorf("commitAll() with no changes error = %v", err)
+	}
+}
+
+func TestSetRemoteURL_Idempotent(t *testing.T) {
+	gitRepo, _ := createTestGitRepo(t)
+	remoteURL := "https://github.com/test/repo.git"
+
+	err := gitRepo.setRemoteURL("origin", remoteURL)
+	if err != nil {
+		t.Fatalf("first setRemoteURL() failed: %v", err)
+	}
+
+	err = gitRepo.setRemoteURL("origin", remoteURL)
+	if err != nil {
+		t.Fatalf("second setRemoteURL() failed: %v", err)
+	}
+
+	remote, err := gitRepo.repo.Remote("origin")
+	if err != nil {
+		t.Fatalf("failed to get remote: %v", err)
+	}
+	if len(remote.Config().URLs) == 0 || remote.Config().URLs[0] != remoteURL {
+		t.Errorf("setRemoteURL() URL = %v, want %s", remote.Config().URLs, remoteURL)
 	}
 }
 

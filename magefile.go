@@ -2370,9 +2370,16 @@ func (Release) UpdateVersion(newVersion string) error {
 	// Replace the version string
 	// Pattern: const DefaultVersion = "X.Y.Z"
 	re := regexp.MustCompile(`(const\s+DefaultVersion\s*=\s*)"[^"]+"`)
-	newContent := re.ReplaceAllString(string(content), `${1}"`+newVersion+`"`)
+	contentStr := string(content)
+	alreadyAtVersion := regexp.MustCompile(`const\s+DefaultVersion\s*=\s*"` + regexp.QuoteMeta(newVersion) + `"`)
+	if alreadyAtVersion.MatchString(contentStr) {
+		fmt.Printf("  Version already set to %s in %s\n", newVersion, versionFile)
+		return nil
+	}
 
-	if newContent == string(content) {
+	newContent := re.ReplaceAllString(contentStr, `${1}"`+newVersion+`"`)
+
+	if newContent == contentStr {
 		return fmt.Errorf("version pattern not found in %s", versionFile)
 	}
 
@@ -2454,6 +2461,22 @@ func (g *GitRepo) createBranch(branchName string) error {
 		return fmt.Errorf("failed to get worktree: %w", err)
 	}
 
+	refName := plumbing.NewBranchReferenceName(branchName)
+	_, err = g.repo.Reference(refName, true)
+	if err == nil {
+		err = w.Checkout(&git.CheckoutOptions{
+			Branch: refName,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to checkout existing branch: %w", err)
+		}
+		fmt.Printf("✓ Checked out existing branch: %s\n", branchName)
+		return nil
+	}
+	if !errors.Is(err, plumbing.ErrReferenceNotFound) {
+		return fmt.Errorf("failed to check branch: %w", err)
+	}
+
 	// Get current HEAD reference
 	headRef, err := g.repo.Head()
 	if err != nil {
@@ -2461,7 +2484,6 @@ func (g *GitRepo) createBranch(branchName string) error {
 	}
 
 	// Create new branch reference
-	refName := plumbing.NewBranchReferenceName(branchName)
 	ref := plumbing.NewHashReference(refName, headRef.Hash())
 
 	err = g.repo.Storer.SetReference(ref)
@@ -2486,6 +2508,15 @@ func (g *GitRepo) commitAll(message, authorName, authorEmail string) error {
 	w, err := g.repo.Worktree()
 	if err != nil {
 		return fmt.Errorf("failed to get worktree: %w", err)
+	}
+
+	status, err := w.Status()
+	if err != nil {
+		return fmt.Errorf("failed to get worktree status: %w", err)
+	}
+	if status.IsClean() {
+		fmt.Println("  No changes to commit")
+		return nil
 	}
 
 	// Add all changes
@@ -2550,7 +2581,7 @@ func (g *GitRepo) getCurrentBranch() (string, error) {
 
 // setRemoteURL sets the URL for a remote
 func (g *GitRepo) setRemoteURL(remoteName, url string) error {
-	_, err := g.repo.Remote(remoteName)
+	remote, err := g.repo.Remote(remoteName)
 	if errors.Is(err, git.ErrRemoteNotFound) {
 		// Remote doesn't exist, create it
 		_, err = g.repo.CreateRemote(&config.RemoteConfig{
@@ -2564,6 +2595,10 @@ func (g *GitRepo) setRemoteURL(remoteName, url string) error {
 		return nil
 	} else if err != nil {
 		return fmt.Errorf("failed to get remote: %w", err)
+	}
+
+	if len(remote.Config().URLs) > 0 && remote.Config().URLs[0] == url {
+		return nil
 	}
 
 	// Update remote URL
@@ -2595,6 +2630,23 @@ func newGitHubClient() (*github.Client, error) {
 	return client, nil
 }
 
+// findExistingPR returns an open pull request for the given head and base branches, if one exists.
+func findExistingPR(ctx context.Context, client *github.Client, owner, repo, head, base string) (*github.PullRequest, error) {
+	opts := &github.PullRequestListOptions{
+		State: "open",
+		Head:  fmt.Sprintf("%s:%s", owner, head),
+		Base:  base,
+	}
+	prs, _, err := client.PullRequests.List(ctx, owner, repo, opts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list pull requests: %w", err)
+	}
+	if len(prs) > 0 {
+		return prs[0], nil
+	}
+	return nil, nil
+}
+
 // createPR creates a pull request on GitHub
 func createPR(client *github.Client, cfg *ReleaseConfig, title, body, head, base string, dryRun bool) (*github.PullRequest, error) {
 	if dryRun {
@@ -2605,13 +2657,34 @@ func createPR(client *github.Client, cfg *ReleaseConfig, title, body, head, base
 		return nil, nil
 	}
 
-	pr, _, err := client.PullRequests.Create(context.Background(), cfg.Owner, cfg.Repo, &github.NewPullRequest{
+	ctx := context.Background()
+	existingPR, err := findExistingPR(ctx, client, cfg.Owner, cfg.Repo, head, base)
+	if err != nil {
+		return nil, err
+	}
+	if existingPR != nil {
+		fmt.Printf("  Pull request already exists: #%d %s\n", existingPR.GetNumber(), existingPR.GetHTMLURL())
+		return existingPR, nil
+	}
+
+	pr, _, err := client.PullRequests.Create(ctx, cfg.Owner, cfg.Repo, &github.NewPullRequest{
 		Title: github.String(title),
 		Head:  github.String(head),
 		Base:  github.String(base),
 		Body:  github.String(body),
 	})
 	if err != nil {
+		var ghErr *github.ErrorResponse
+		if errors.As(err, &ghErr) && ghErr.Response.StatusCode == 422 {
+			existingPR, listErr := findExistingPR(ctx, client, cfg.Owner, cfg.Repo, head, base)
+			if listErr != nil {
+				return nil, fmt.Errorf("failed to create PR: %w", err)
+			}
+			if existingPR != nil {
+				fmt.Printf("  Pull request already exists: #%d %s\n", existingPR.GetNumber(), existingPR.GetHTMLURL())
+				return existingPR, nil
+			}
+		}
 		return nil, fmt.Errorf("failed to create PR: %w", err)
 	}
 
