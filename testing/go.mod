@@ -10,7 +10,11 @@ replace (
 require (
 	github.com/Shopify/toxiproxy/v2 v2.12.0
 	github.com/elastic/elastic-agent-client/v7 v7.18.1
+<<<<<<< HEAD
 	github.com/elastic/elastic-agent-libs v0.46.2
+=======
+	github.com/elastic/elastic-agent-libs v0.46.0
+>>>>>>> 7c9e4eb (Bump elastic-agent-libs and enforce fips140=on at runtime for FIPS builds (#7332))
 	github.com/elastic/fleet-server/pkg/api v0.0.0-00010101000000-000000000000
 	github.com/elastic/fleet-server/v7 v7.0.0-00010101000000-000000000000
 	github.com/gofrs/uuid/v5 v5.4.0
