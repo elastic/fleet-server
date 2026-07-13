@@ -1631,7 +1631,11 @@ func checkFIPSBinary(path string) error {
 	if err != nil {
 		return fmt.Errorf("unable to read buildinfo: %w", err)
 	}
+<<<<<<< HEAD
 	var checkLinks, foundTags, foundExperiment bool
+=======
+	var foundTags, foundFIPS140, foundFIPSDefault bool
+>>>>>>> 7c9e4eb (Bump elastic-agent-libs and enforce fips140=on at runtime for FIPS builds (#7332))
 
 	for _, setting := range info.Settings {
 		switch setting.Key {
@@ -1652,6 +1656,13 @@ func checkFIPSBinary(path string) error {
 				checkLinks = true
 				continue
 			}
+		case "DefaultGODEBUG":
+			for _, entry := range strings.Split(setting.Value, ",") {
+				if key, val, ok := strings.Cut(entry, "="); ok && key == "fips140" && val == "on" {
+					foundFIPSDefault = true
+					break
+				}
+			}
 		}
 	}
 
@@ -1670,6 +1681,9 @@ func checkFIPSBinary(path string) error {
 		if runtime.GOOS == "linux" && !strings.Contains(output, "OpenSSL_version") { // TODO may need different check for windows/darwin
 			return fmt.Errorf("failed to find OpenSSL symbol links within binary")
 		}
+	}
+	if !foundFIPSDefault {
+		return fmt.Errorf("did not find fips140=on in DefaultGODEBUG — binary will not enforce FIPS mode at runtime")
 	}
 	return nil
 }
