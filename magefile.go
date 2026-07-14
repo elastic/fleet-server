@@ -1644,7 +1644,7 @@ func checkFIPSBinary(path string) error {
 	if err != nil {
 		return fmt.Errorf("unable to read buildinfo: %w", err)
 	}
-	var foundTags, foundFIPS140 bool
+	var foundTags, foundFIPS140, foundFIPSDefault bool
 
 	for _, setting := range info.Settings {
 		switch setting.Key {
@@ -1672,6 +1672,13 @@ func checkFIPSBinary(path string) error {
 			if setting.Value == "" {
 				return fmt.Errorf("GOFIPS140 is empty")
 			}
+		case "DefaultGODEBUG":
+			for _, entry := range strings.Split(setting.Value, ",") {
+				if key, val, ok := strings.Cut(entry, "="); ok && key == "fips140" && val == "on" {
+					foundFIPSDefault = true
+					break
+				}
+			}
 		}
 	}
 
@@ -1680,6 +1687,9 @@ func checkFIPSBinary(path string) error {
 	}
 	if !foundFIPS140 {
 		return fmt.Errorf("did not find GOFIPS140 in build settings")
+	}
+	if !foundFIPSDefault {
+		return fmt.Errorf("did not find fips140=on in DefaultGODEBUG — binary will not enforce FIPS mode at runtime")
 	}
 	return nil
 }

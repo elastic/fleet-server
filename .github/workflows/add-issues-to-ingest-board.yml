@@ -11,6 +11,9 @@ env:
   AREA_FIELD_ID: 'PVTSSF_lADOAGc3Zs4AEzn4zgEgZSo'
   FLEET_SERVER_OPTION_ID: 'ea828bb4'
 
+permissions:
+  contents: none
+
 jobs:
   add_to_ingest_project:
     runs-on: ubuntu-latest

@@ -2,8 +2,9 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-package version
+//go:build requirefips
 
-// DefaultVersion is the current release version of Fleet-server, this version must match the
-// Elastic Agent version.
-const DefaultVersion = "9.6.0"
+// Enforce FIPS 140-3 mode at runtime so the binary rejects non-compliant crypto.
+//go:debug fips140=on
+
+package main
