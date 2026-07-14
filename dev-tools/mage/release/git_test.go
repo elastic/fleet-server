@@ -7,6 +7,7 @@ package release
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/go-git/go-git/v5"
@@ -49,45 +50,46 @@ func createTestGitRepo(t *testing.T) (*GitRepo, string) {
 		t.Fatalf("failed to create initial commit: %v", err)
 	}
 
-	return &GitRepo{repo: repo}, tmpDir
+	return &GitRepo{repo: repo, path: tmpDir}, tmpDir
 }
 
-func TestCreateBranchIdempotent(t *testing.T) {
-	gitRepo, _ := createTestGitRepo(t)
+func TestEnsureBranchFrom(t *testing.T) {
+	gitRepo, tmpDir := createTestGitRepo(t)
 
-	err := gitRepo.CreateBranch("9.5")
-	if err != nil {
-		t.Fatalf("first CreateBranch() failed: %v", err)
+	origDir, _ := os.Getwd()
+	defer func() {
+		_ = os.Chdir(origDir)
+	}()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("failed to change to temp directory: %v", err)
+	}
+
+	if err := gitRepo.EnsureBranchFrom("master", "9.6"); err != nil {
+		t.Fatalf("EnsureBranchFrom() failed: %v", err)
 	}
 
 	branch, err := gitRepo.GetCurrentBranch()
 	if err != nil {
 		t.Fatalf("GetCurrentBranch() failed: %v", err)
 	}
-	if branch != "9.5" {
-		t.Fatalf("expected branch 9.5, got %s", branch)
+	if branch != "9.6" {
+		t.Fatalf("expected branch 9.6, got %s", branch)
 	}
 
-	err = gitRepo.CreateBranch("9.5")
-	if err != nil {
-		t.Fatalf("second CreateBranch() failed: %v", err)
-	}
-
-	branch, err = gitRepo.GetCurrentBranch()
-	if err != nil {
-		t.Fatalf("GetCurrentBranch() after second call failed: %v", err)
-	}
-	if branch != "9.5" {
-		t.Errorf("CreateBranch() is not idempotent - on branch %s, want 9.5", branch)
+	if err := gitRepo.EnsureBranchFrom("master", "9.6"); err != nil {
+		t.Fatalf("second EnsureBranchFrom() failed: %v", err)
 	}
 }
 
 func TestCommitAllNoChanges(t *testing.T) {
 	gitRepo, _ := createTestGitRepo(t)
 
-	err := gitRepo.CommitAll("Empty commit", "Test Author", "test@example.com")
+	committed, err := gitRepo.CommitAll("Empty commit", "Test Author", "test@example.com")
 	if err != nil {
 		t.Errorf("CommitAll() with no changes error = %v", err)
+	}
+	if committed {
+		t.Error("CommitAll() should not commit when there are no changes")
 	}
 }
 
@@ -111,5 +113,48 @@ func TestSetRemoteURLIdempotent(t *testing.T) {
 	}
 	if len(remote.Config().URLs) == 0 || remote.Config().URLs[0] != remoteURL {
 		t.Errorf("SetRemoteURL() URL = %v, want %s", remote.Config().URLs, remoteURL)
+	}
+}
+
+func TestBranchNameHelpers(t *testing.T) {
+	if got := bumpVersionBranchName("9.7.0"); got != "bump-version-9.7.0" {
+		t.Fatalf("bumpVersionBranchName() = %q", got)
+	}
+	if got := nextVersionBranchName("9.6.1"); got != "update-version-next-9.6.1" {
+		t.Fatalf("nextVersionBranchName() = %q", got)
+	}
+	if got := backportNextBranchName("9.7.0"); got != "add-backport-next-9.7.0" {
+		t.Fatalf("backportNextBranchName() = %q", got)
+	}
+	if got := patchDocsBranchName("9.6.2"); got != "update-docs-version-9.6.2" {
+		t.Fatalf("patchDocsBranchName() = %q", got)
+	}
+}
+
+func TestIsReleaseWritablePath(t *testing.T) {
+	if !isReleaseWritablePath("version/version.go") {
+		t.Fatal("version/version.go should be writable")
+	}
+	if isReleaseWritablePath("main.go") {
+		t.Fatal("main.go should not be writable")
+	}
+}
+
+func TestBranchNameHelpersUnique(t *testing.T) {
+	names := []string{
+		bumpVersionBranchName("9.7.0"),
+		nextVersionBranchName("9.6.1"),
+		backportNextBranchName("9.7.0"),
+		patchDocsBranchName("9.6.2"),
+	}
+	seen := make(map[string]struct{}, len(names))
+	for _, name := range names {
+		if _, ok := seen[name]; ok {
+			t.Fatalf("duplicate branch helper name: %s", name)
+		}
+		seen[name] = struct{}{}
+		if strings.TrimSpace(name) == "" {
+			t.Fatal("branch helper returned empty name")
+		}
 	}
 }

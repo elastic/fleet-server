@@ -2309,69 +2309,29 @@ func (Release) UpdateMergify(version string) error {
 	return release.UpdateMergify(version)
 }
 
-// PrepareMajorMinor prepares files for a major/minor release.
-func (Release) PrepareMajorMinor() error {
-	cfg, err := release.LoadReleaseConfigFromEnv()
-	if err != nil {
-		return err
-	}
-	return release.PrepareMajorMinorRelease(cfg)
-}
-
-// CreateBranch creates a release branch with all changes committed.
-func (Release) CreateBranch() error {
-	cfg, err := release.LoadReleaseConfigFromEnv()
-	if err != nil {
-		return err
-	}
-	return release.CreateReleaseBranch(cfg, ".", os.Getenv("DRY_RUN") == "true")
-}
-
-// CreatePR creates a pull request for the release.
-func (Release) CreatePR() error {
-	cfg, err := release.LoadReleaseConfigFromEnv()
-	if err != nil {
-		return err
-	}
-	ghClient, err := release.NewGitHubClientFromEnv()
-	if err != nil {
-		return err
-	}
-	return release.CreateReleasePR(cfg, ghClient, os.Getenv("DRY_RUN") == "true")
-}
-
-// RunMajorMinor orchestrates the complete major/minor release workflow.
+// RunMajorMinor orchestrates the major/minor release workflow after feature freeze.
 func (Release) RunMajorMinor() error {
-	cfg, err := release.LoadReleaseConfigFromEnv()
+	cfg, err := release.LoadConfigFromEnv()
 	if err != nil {
 		return err
 	}
-	return release.RunMajorMinorRelease(cfg, os.Getenv("DRY_RUN") == "true")
+	return release.RunMajorMinorRelease(cfg)
 }
 
-// PreparePatch prepares files for a patch release.
-func (Release) PreparePatch() error {
-	cfg, err := release.LoadReleaseConfigFromEnv()
+// RunNextRelease opens next-release and backport PRs onto the release branch.
+func (Release) RunNextRelease() error {
+	cfg, err := release.LoadConfigFromEnv()
 	if err != nil {
 		return err
 	}
-	return release.PreparePatchRelease(cfg)
+	return release.RunNextRelease(cfg)
 }
 
 // RunPatch orchestrates the complete patch release workflow.
 func (Release) RunPatch() error {
-	cfg, err := release.LoadReleaseConfigFromEnv()
+	cfg, err := release.LoadConfigFromEnv()
 	if err != nil {
 		return err
 	}
-	return release.RunPatchRelease(cfg, os.Getenv("DRY_RUN") == "true")
-}
-
-// PrepareNext prepares files for the next development cycle.
-func (Release) PrepareNext() error {
-	currentVersion := os.Getenv("CURRENT_RELEASE")
-	if currentVersion == "" {
-		return fmt.Errorf("CURRENT_RELEASE environment variable not set")
-	}
-	return release.PrepareNextRelease(currentVersion)
+	return release.RunPatchRelease(cfg)
 }
