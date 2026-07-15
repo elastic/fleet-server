@@ -12,13 +12,8 @@ require (
 	github.com/elastic/go-elasticsearch/v8 v8.19.6
 	github.com/elastic/go-ucfg v0.9.1
 	github.com/fxamacker/cbor/v2 v2.9.2
-<<<<<<< HEAD
-	github.com/go-chi/chi/v5 v5.2.5
-	github.com/gofrs/uuid v4.4.0+incompatible
-=======
 	github.com/go-chi/chi/v5 v5.3.1
-	github.com/gofrs/uuid/v5 v5.4.0
->>>>>>> 50ae76b (build(deps): bump github.com/go-chi/chi/v5 from 5.3.0 to 5.3.1 (#7324))
+	github.com/gofrs/uuid v4.4.0+incompatible
 	github.com/google/go-cmp v0.7.0
 	github.com/hashicorp/go-cleanhttp v0.5.2
 	github.com/hashicorp/go-version v1.9.0
