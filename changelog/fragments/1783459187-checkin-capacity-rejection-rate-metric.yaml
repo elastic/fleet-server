@@ -1,0 +1,17 @@
+kind: enhancement
+
+summary: Expose a checkin capacity-rejection rate metric for use as an autoscaling signal
+
+description: |
+  Adds a new http_server.routes.checkin.limit_max_rate gauge to the internal
+  /stats endpoint. It is a rolling, server-computed rate (rejections/sec) of the
+  existing http_server.routes.checkin.limit_max counter, which tracks checkins
+  rejected because Fleet Server was at capacity (the per-route concurrency limit
+  was reached).
+
+  Unlike checkin volume, this counter can only be incremented by Fleet Server
+  itself, so it can't be inflated by a client checking in unusually often. This
+  makes the rate a safer signal than raw checkin throughput for driving
+  autoscaling decisions elsewhere (e.g. fleet-controller's EPA configuration).
+
+component: fleet-server
