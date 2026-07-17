@@ -497,6 +497,61 @@ func (Check) DetectFIPSCryptoImports() error {
 	return err
 }
 
+// FIPSComplianceGate checks that every Go module in the repository (except
+// tool-only modules with no Go packages) contains a fips_compliance_test.go file.
+// Fails if any module is missing the file, preventing new modules from silently
+// escaping the golang.org/x/crypto compliance gate.
+func (Check) FIPSComplianceGate() error {
+	// Modules with no Go packages of their own (only tool directives).
+	skipModules := map[string]struct{}{
+		"dev-tools": {},
+	}
+
+	var moduleRoots []string
+	if err := filepath.WalkDir(".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !d.IsDir() && d.Name() == "go.mod" {
+			dir := filepath.Dir(path)
+			if _, skip := skipModules[filepath.Base(dir)]; !skip {
+				moduleRoots = append(moduleRoots, dir)
+			}
+		}
+		return nil
+	}); err != nil {
+		return fmt.Errorf("walking repo: %w", err)
+	}
+
+	var missing []string
+	for _, root := range moduleRoots {
+		found := false
+		_ = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+			if err != nil || found {
+				return err
+			}
+			if d.IsDir() && path != root {
+				if _, statErr := os.Stat(filepath.Join(path, "go.mod")); statErr == nil {
+					return filepath.SkipDir
+				}
+			}
+			if !d.IsDir() && d.Name() == "fips_compliance_test.go" {
+				found = true
+			}
+			return nil
+		})
+		if !found {
+			missing = append(missing, root)
+		}
+	}
+
+	if len(missing) > 0 {
+		return fmt.Errorf("modules missing fips_compliance_test.go (add one per the FIPS compliance conventions):\n  %s",
+			strings.Join(missing, "\n  "))
+	}
+	return nil
+}
+
 // genNotice generates the NOTICE.txt or the NOTICE-fips.txt file.
 func genNotice(fips bool) error {
 	tags := []string{}
