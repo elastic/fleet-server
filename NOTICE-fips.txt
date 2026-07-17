@@ -661,11 +661,11 @@ SOFTWARE
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/elastic-agent-libs
-Version: v0.46.2-0.20260716090421-96c295ad197f
+Version: v0.46.2-0.20260717072702-02294d812c7d
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-libs@v0.46.2-0.20260716090421-96c295ad197f/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-libs@v0.46.2-0.20260717072702-02294d812c7d/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
