@@ -75,7 +75,7 @@ func (c *Instrumentation) APMHTTPTransportOptions() (apmtransport.HTTPTransportO
 		if err != nil {
 			return apmtransport.HTTPTransportOptions{}, fmt.Errorf("unable to parse instrumentation certificate: %w", err)
 		}
-		tlsConfig.InsecureSkipVerify = true //nolint:gosec // certificate pinning via VerifyPeerCertificate and VerifyConnection replaces standard validation
+		tlsConfig.InsecureSkipVerify = true
 		tlsConfig.VerifyPeerCertificate = func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
 			return verifyPeerCertificate(rawCerts, cert)
 		}
