@@ -317,3 +317,33 @@ func TestProcessOutputSecret(t *testing.T) {
 		})
 	}
 }
+
+func TestParseSecretReference(t *testing.T) {
+	tests := []struct {
+		name       string
+		input      string
+		wantID     string
+		wantParsed bool
+	}{
+		{"valid reference", "$co.elastic.secret{abc123}", "abc123", true},
+		{"plaintext api key", "keyid:keysecret", "", false},
+		{"empty string", "", "", false},
+		{"partial match", "prefix$co.elastic.secret{abc}", "abc", true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			id, ok := ParseSecretReference(tc.input)
+			assert.Equal(t, tc.wantParsed, ok)
+			assert.Equal(t, tc.wantID, id)
+		})
+	}
+}
+
+func TestMakeSecretReference(t *testing.T) {
+	ref := MakeSecretReference("abc123")
+	assert.Equal(t, "$co.elastic.secret{abc123}", ref)
+
+	id, ok := ParseSecretReference(ref)
+	assert.True(t, ok)
+	assert.Equal(t, "abc123", id)
+}

@@ -801,3 +801,47 @@ func TestValidateAckRequest(t *testing.T) {
 		})
 	}
 }
+
+func TestDeleteRetiredSecrets(t *testing.T) {
+	logger := testlog.SetLogger(t)
+	_ = logger
+
+	t.Run("deletes secrets for items with a SecretID", func(t *testing.T) {
+		bulker := ftesting.NewMockBulk()
+		bulker.On("DeleteSecret", mock.Anything, "secret-1").Return(nil).Once()
+		bulker.On("DeleteSecret", mock.Anything, "secret-2").Return(nil).Once()
+
+		items := []model.ToRetireAPIKeyIdsItems{
+			{ID: "key-1", SecretID: "secret-1"},
+			{ID: "key-2", SecretID: "secret-2"},
+			{ID: "key-3"}, // no SecretID — plaintext key, no cleanup needed
+		}
+
+		deleteRetiredSecrets(context.Background(), testlog.SetLogger(t), bulker, items)
+		bulker.AssertExpectations(t)
+		bulker.AssertNotCalled(t, "DeleteSecret", mock.Anything, "")
+	})
+
+	t.Run("logs warning on delete failure but does not return error", func(t *testing.T) {
+		bulker := ftesting.NewMockBulk()
+		bulker.On("DeleteSecret", mock.Anything, "secret-bad").Return(errors.New("delete failed")).Once()
+
+		items := []model.ToRetireAPIKeyIdsItems{
+			{ID: "key-1", SecretID: "secret-bad"},
+		}
+
+		// Should not panic or propagate the error.
+		deleteRetiredSecrets(context.Background(), testlog.SetLogger(t), bulker, items)
+		bulker.AssertExpectations(t)
+	})
+
+	t.Run("no-op when all items lack a SecretID", func(t *testing.T) {
+		bulker := ftesting.NewMockBulk()
+		items := []model.ToRetireAPIKeyIdsItems{
+			{ID: "key-1"},
+			{ID: "key-2"},
+		}
+		deleteRetiredSecrets(context.Background(), testlog.SetLogger(t), bulker, items)
+		bulker.AssertNotCalled(t, "DeleteSecret", mock.Anything, mock.Anything)
+	})
+}
