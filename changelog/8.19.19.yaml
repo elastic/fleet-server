@@ -1,0 +1,19 @@
+version: 8.19.19
+entries:
+    - kind: security
+      summary: Enforce policy-based access control on artifact downloads
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/7336
+        - https://github.com/elastic/fleet-server/pull/7324
+        - https://github.com/elastic/fleet-server/pull/7350
+        - https://github.com/elastic/fleet-server/pull/7386
+        - https://github.com/elastic/fleet-server/pull/7399
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1778540235
+      file:
+        name: 1778540235-fix-artifact-access-control.yaml
+        checksum: edad22f9232befcd82915193120bb892a3fc4c6c

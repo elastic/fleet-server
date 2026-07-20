@@ -1,0 +1,31 @@
+// begin 8.19.19 relnotes
+
+[[release-notes-8.19.19]]
+==  8.19.19
+
+Review important information about the  8.19.19 release.
+
+[discrete]
+[[security-updates-8.19.19]]
+=== Security updates
+
+
+
+
+* Enforce policy-based access control on artifact downloads. https://github.com/elastic/fleet-server/pull/7336[#7336] https://github.com/elastic/fleet-server/pull/7324[#7324] https://github.com/elastic/fleet-server/pull/7350[#7350] https://github.com/elastic/fleet-server/pull/7386[#7386] https://github.com/elastic/fleet-server/pull/7399[#7399] 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// end 8.19.19 relnotes
