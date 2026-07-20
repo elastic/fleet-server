@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"os"
 
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 
 	apmtransport "go.elastic.co/apm/v2/transport"
@@ -81,7 +82,7 @@ func (c *Instrumentation) APMHTTPTransportOptions() (apmtransport.HTTPTransportO
 	}
 
 	if c.TLS.ServerCA != "" {
-		pool, errs := tlscommon.LoadCertificateAuthorities([]string{c.TLS.ServerCA})
+		pool, errs := tlscommon.LoadCertificateAuthorities([]string{c.TLS.ServerCA}, logp.NewLogger("config"))
 		// FIXME once we update elastic-agent-libs to go 1.20 we can return multiple errors directly with errors.Join()
 		if len(errs) != 0 {
 			return apmtransport.HTTPTransportOptions{}, fmt.Errorf("unable to load instrumentation cas: %w", errors.Join(errs...))
