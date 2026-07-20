@@ -142,6 +142,24 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 			},
 		},
 		{
+			ErrUnauthorizedArtifact,
+			HTTPErrResp{
+				http.StatusForbidden,
+				"Forbidden",
+				"agent not authorized for artifact",
+				zerolog.WarnLevel,
+			},
+		},
+		{
+			ErrAgentPolicyIDMissing,
+			HTTPErrResp{
+				http.StatusForbidden,
+				"Forbidden",
+				"agent has no policy ID",
+				zerolog.WarnLevel,
+			},
+		},
+		{
 			ErrorThrottle,
 			HTTPErrResp{
 				http.StatusTooManyRequests,

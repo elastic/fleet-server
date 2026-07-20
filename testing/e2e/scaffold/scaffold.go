@@ -605,6 +605,78 @@ func (s *Scaffold) FleetHasArtifacts(ctx context.Context) []ArtifactHit {
 	}
 }
 
+// FleetPolicyHasArtifact polls .fleet-policies until the most recent revision for the
+// given policyID has the specified artifact (by identifier and decoded SHA256) in at
+// least one input's artifact_manifest. This ensures the policy monitor will have
+// up-to-date data before the caller attempts an artifact download.
+func (s *Scaffold) FleetPolicyHasArtifact(ctx context.Context, policyID, identifier, decodedSha256 string) {
+	timer := time.NewTimer(time.Second)
+	for {
+		query := fmt.Sprintf(`{"query":{"term":{"policy_id":"%s"}},"sort":[{"revision_idx":{"order":"desc"}}],"size":1}`, policyID)
+		req, err := http.NewRequestWithContext(ctx, "POST", "http://localhost:9200/.fleet-policies/_search", strings.NewReader(query))
+		s.Require().NoError(err)
+		req.SetBasicAuth(s.ElasticUser, s.ElasticPass)
+		req.Header.Set("Content-Type", "application/json")
+		select {
+		case <-ctx.Done():
+			s.Require().NoError(ctx.Err(), "context expired before policy artifact_manifest was updated")
+			return
+		case <-timer.C:
+			resp, err := s.Client.Do(req)
+			s.Require().NoError(err)
+			if resp.StatusCode != http.StatusOK {
+				resp.Body.Close()
+				timer.Reset(time.Second)
+				continue
+			}
+
+			var result struct {
+				Hits struct {
+					Hits []struct {
+						Source struct {
+							Data struct {
+								Inputs []map[string]any `json:"inputs"`
+							} `json:"data"`
+						} `json:"_source"`
+					} `json:"hits"`
+					Total struct {
+						Value int `json:"value"`
+					} `json:"total"`
+				} `json:"hits"`
+			}
+			err = json.NewDecoder(resp.Body).Decode(&result)
+			resp.Body.Close()
+			s.Require().NoError(err)
+
+			if result.Hits.Total.Value > 0 {
+				for _, input := range result.Hits.Hits[0].Source.Data.Inputs {
+					if inputHasArtifact(input, identifier, decodedSha256) {
+						return
+					}
+				}
+			}
+			timer.Reset(time.Second)
+		}
+	}
+}
+
+func inputHasArtifact(input map[string]any, identifier, decodedSha256 string) bool {
+	manifestRaw, ok := input["artifact_manifest"].(map[string]any)
+	if !ok {
+		return false
+	}
+	artifacts, ok := manifestRaw["artifacts"].(map[string]any)
+	if !ok {
+		return false
+	}
+	entry, ok := artifacts[identifier].(map[string]any)
+	if !ok {
+		return false
+	}
+	sha, _ := entry["decoded_sha256"].(string)
+	return sha == decodedSha256
+}
+
 type logger struct {
 	*testing.T
 }
