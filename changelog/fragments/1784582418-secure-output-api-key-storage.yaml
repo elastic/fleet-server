@@ -12,5 +12,3 @@ description: |
   until the next key rotation.
 
 component: fleet-server
-
-issue: https://github.com/elastic/security/issues/12225
