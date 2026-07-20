@@ -503,6 +503,7 @@ func updateAPIKey(ctx context.Context,
 			}
 		}
 		invalidateAPIKeys(ctx, zlog, bulk, toRetireAPIKeyIDs, apiKeyID)
+		deleteRetiredSecrets(ctx, zlog, bulk, toRetireAPIKeyIDs)
 	}
 
 	return nil
@@ -737,6 +738,17 @@ func invalidateAPIKeys(ctx context.Context, zlog zerolog.Logger, bulk bulk.Bulk,
 			if err := outputBulk.APIKeyInvalidate(ctx, outputIds...); err != nil {
 				zlog.Info().Err(err).Strs("ids", outputIds).Str(ecs.PolicyOutputName, outputName).Msg("Failed to invalidate API keys")
 			}
+		}
+	}
+}
+
+func deleteRetiredSecrets(ctx context.Context, zlog zerolog.Logger, bulk bulk.Bulk, toRetireAPIKeyIDs []model.ToRetireAPIKeyIdsItems) {
+	for _, k := range toRetireAPIKeyIDs {
+		if k.SecretID == "" {
+			continue
+		}
+		if err := bulk.DeleteSecret(ctx, k.SecretID); err != nil {
+			zlog.Warn().Err(err).Str("secret_id", k.SecretID).Msg("Failed to delete retired output API key secret")
 		}
 	}
 }

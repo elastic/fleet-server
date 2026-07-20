@@ -116,6 +116,16 @@ func (m *MockBulk) ReadSecrets(ctx context.Context, secretIds []string) (map[str
 	return result, nil
 }
 
+func (m *MockBulk) WriteSecret(ctx context.Context, value string) (string, error) {
+	args := m.Called(ctx, value)
+	return args.String(0), args.Error(1)
+}
+
+func (m *MockBulk) DeleteSecret(ctx context.Context, secretID string) error {
+	args := m.Called(ctx, secretID)
+	return args.Error(0)
+}
+
 func (m *MockBulk) APIKeyCreate(ctx context.Context, name, ttl string, roles []byte, meta any) (*bulk.APIKey, error) {
 	args := m.Called(ctx, name, ttl, roles, meta)
 	return args.Get(0).(*bulk.APIKey), args.Error(1)
