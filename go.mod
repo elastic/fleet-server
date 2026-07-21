@@ -12,13 +12,8 @@ require (
 	github.com/elastic/elastic-agent-system-metrics v0.14.4
 	github.com/elastic/go-elasticsearch/v8 v8.19.5
 	github.com/elastic/go-ucfg v0.9.1
-<<<<<<< HEAD
-	github.com/fxamacker/cbor/v2 v2.9.1
-	github.com/go-chi/chi/v5 v5.3.0
-=======
 	github.com/fxamacker/cbor/v2 v2.9.2
 	github.com/go-chi/chi/v5 v5.3.1
->>>>>>> 50ae76b (build(deps): bump github.com/go-chi/chi/v5 from 5.3.0 to 5.3.1 (#7324))
 	github.com/gofrs/uuid/v5 v5.4.0
 	github.com/google/go-cmp v0.7.0
 	github.com/hashicorp/go-cleanhttp v0.5.2
@@ -47,7 +42,7 @@ require (
 	golang.org/x/net v0.56.0
 	golang.org/x/sync v0.21.0
 	golang.org/x/time v0.15.0
-	google.golang.org/grpc v1.82.0
+	google.golang.org/grpc v1.82.1
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/yaml.v3 v3.0.1
 )
