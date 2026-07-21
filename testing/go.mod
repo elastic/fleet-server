@@ -10,11 +10,7 @@ replace (
 require (
 	github.com/Shopify/toxiproxy/v2 v2.12.0
 	github.com/elastic/elastic-agent-client/v7 v7.18.1
-<<<<<<< HEAD
-	github.com/elastic/elastic-agent-libs v0.45.0
-=======
 	github.com/elastic/elastic-agent-libs v0.46.1
->>>>>>> c33bee0 (build(deps): bump github.com/elastic/elastic-agent-libs in /testing (#7386))
 	github.com/elastic/fleet-server/pkg/api v0.0.0-00010101000000-000000000000
 	github.com/elastic/fleet-server/v7 v7.0.0-00010101000000-000000000000
 	github.com/gofrs/uuid/v5 v5.4.0
