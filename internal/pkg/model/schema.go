@@ -204,6 +204,9 @@ type Agent struct {
 	// The policy ID that the Elastic Agent should run.
 	PolicyID string `json:"policy_id,omitempty"`
 
+	// The base policy ID (policy_id without version suffix) for efficient querying.
+	PolicyBaseID string `json:"policy_base_id,omitempty"`
+
 	// Deprecated. Use Outputs instead. The policy output permissions hash
 	PolicyOutputPermissionsHash string `json:"policy_output_permissions_hash,omitempty"`
 
