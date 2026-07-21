@@ -400,6 +400,7 @@ func (et *EnrollerT) _enroll(
 		agent = model.Agent{
 			Active:         true,
 			PolicyID:       policyID,
+			PolicyBaseID:   policyBaseID(policyID),
 			Namespaces:     namespaces,
 			Type:           string(req.Type),
 			EnrolledAt:     now.UTC().Format(time.RFC3339),
@@ -771,4 +772,13 @@ func hashReplaceToken(token string, cfg config.PBKDF2) (string, error) {
 	// $pbkdf2-sha512${iterations}${salt]${encoded}
 	// ${salt} and ${encoded} are stored base64 encoded
 	return fmt.Sprintf("$pbkdf2-sha512$%d$%s$%s", cfg.Iterations, salt, encoded), nil
+}
+
+// policyBaseID strips the version suffix from a policy ID.
+// e.g. "my-policy#9.2" -> "my-policy", "my-policy" -> "my-policy"
+func policyBaseID(policyID string) string {
+	if idx := strings.LastIndexByte(policyID, '#'); idx >= 0 {
+		return policyID[:idx]
+	}
+	return policyID
 }
