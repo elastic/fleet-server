@@ -1,0 +1,29 @@
+ctx._source.last_checkin = params.TS;
+ctx._source.updated_at = params.Now;
+ctx._source.last_checkin_status = params.Status;
+ctx._source.last_checkin_message = params.Message;
+ctx._source.unhealthy_reason = params.UnhealthyReason;
+ctx._source.sequence_num = params.OpAMPSequenceNum;
+if (params.PolicyID != "") {
+  ctx._source.agent_policy_id = params.PolicyID;
+  ctx._source.policy_revision_idx = params.RevisionIDX;
+}
+if (params.Ver != "") {
+  ctx._source.agent.version = params.Ver;
+}
+if (params.Meta != null) {
+  ctx._source.local_metadata = params.Meta;
+}
+if (params.Components != null) {
+  ctx._source.components = params.Components;
+}
+if (params.OpAMPHealth != null) {
+  ctx._source.health = params.OpAMPHealth;
+}
+if (params.OpAMPCapabilities != null) {
+  ctx._source.capabilities = params.OpAMPCapabilities;
+}
+ctx._source.effective_config = params.OpAMPEffectiveConfig;
+if (params.SeqNoSet) {
+  ctx._source.action_seq_no = params.SeqNo;
+}

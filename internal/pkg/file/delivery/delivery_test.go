@@ -1,12 +1,13 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package delivery
 
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -173,7 +174,7 @@ func TestSendFile(t *testing.T) {
 	// Chunk data from a tiny PNG, as a full CBOR document
 	esMock.Response = sendBodyBytes(hexDecode("bf665f696e64657878212e666c6565742d66696c6564656c69766572792d646174612d656e64706f696e74635f6964654142432e30685f76657273696f6e02675f7365715f6e6f016d5f7072696d6172795f7465726d0165666f756e64f5666669656c6473bf64646174619f586789504e470d0a1a0a0000000d494844520000010000000100010300000066bc3a2500000003504c5445b5d0d0630416ea0000001f494441546881edc1010d000000c2a0f74f6d0e37a00000000000000000be0d210000019a60e1d50000000049454e44ae426082ffffff")) //nolint:bodyclose // nopcloser is used, linter does not see it
 	d := New(esClient, fakeBulk, nil)
-	err := d.SendFile(context.Background(), zerolog.Logger{}, buf, chunks, fileID)
+	err := d.SendChunks(context.Background(), zerolog.Logger{}, buf, chunks, fileID, nil, nil)
 	require.NoError(t, err)
 
 	// the byte string is the bare PNG file data
@@ -209,7 +210,7 @@ func TestSendFileMultipleChunks(t *testing.T) {
 	}
 
 	d := New(esClient, fakeBulk, nil)
-	err := d.SendFile(context.Background(), zerolog.Logger{}, buf, chunks, fileID)
+	err := d.SendChunks(context.Background(), zerolog.Logger{}, buf, chunks, fileID, nil, nil)
 	require.NoError(t, err)
 
 	// the collective bytes sent (0xabcd in first chunk, 0xef01 in second)
@@ -250,7 +251,7 @@ func TestSendFileMultipleChunksUsesBackingIndex(t *testing.T) {
 	}
 
 	d := New(esClient, fakeBulk, nil)
-	err := d.SendFile(context.Background(), zerolog.Logger{}, buf, chunks, fileID)
+	err := d.SendChunks(context.Background(), zerolog.Logger{}, buf, chunks, fileID, nil, nil)
 	require.NoError(t, err)
 }
 
@@ -308,8 +309,65 @@ func TestSendFileHandlesDisorderedChunks(t *testing.T) {
 	}
 
 	d := New(esClient, fakeBulk, nil)
-	err := d.SendFile(context.Background(), zerolog.Logger{}, buf, chunks, fileID)
+	err := d.SendChunks(context.Background(), zerolog.Logger{}, buf, chunks, fileID, nil, nil)
 	require.NoError(t, err)
+}
+
+func TestSendChunkRanges(t *testing.T) {
+	buf := bytes.NewBuffer(nil)
+
+	fakeBulk := itesting.NewMockBulk()
+	esClient, esMock := mockESClient(t)
+
+	const fileID = "xyz"
+	idx := fmt.Sprintf(FileDataIndexPattern, "endpoint") + "-0001"
+
+	chunkLength := 200
+
+	chunkBody := make([]byte, chunkLength)
+	for i := range chunkBody {
+		chunkBody[i] = byte(i)
+	}
+
+	chunks := []file.ChunkInfo{
+		{Index: idx, ID: fileID + ".5", Pos: 5}, // lowest position, given a subset of file's chunks
+		{Index: idx, ID: fileID + ".6", Pos: 6},
+		{Index: idx, ID: fileID + ".7", Pos: 7},
+		{Index: idx, ID: fileID + ".8", Pos: 8},
+		{Index: idx, ID: fileID + ".9", Pos: 9},
+		{Index: idx, ID: fileID + ".10", Pos: 10},
+	}
+
+	expectedIdx := 5
+	esMock.RoundTripFn = func(req *http.Request) (*http.Response, error) {
+		// Parse out the chunk number requested
+		parts := strings.Split(req.URL.Path, "/") // ["", ".fleet-filedelivery-data-endpoint-0001", "_doc", "xyz.1"]
+		docIdx := strings.TrimPrefix(parts[3], fileID+".")
+		docnum, err := strconv.Atoi(docIdx)
+		require.NoError(t, err)
+
+		// should be our expected increasing counter
+		assert.Equal(t, expectedIdx, docnum)
+		expectedIdx += 1
+		return sendBodyBytes(mockChunkCBOR(parts[3], chunkBody)), nil
+	}
+
+	startOffset := int64(100)
+	endOffset := int64(50)
+
+	d := New(esClient, fakeBulk, nil)
+	err := d.SendChunks(t.Context(), zerolog.Logger{}, buf, chunks, fileID, &startOffset, &endOffset)
+	require.NoError(t, err)
+
+	expectedLength := (chunkLength - int(startOffset)) + // first chunk [startOffset:]
+		(len(chunks)-2)*chunkLength + // middle chunks, excluding first and last
+		int(endOffset) // last chunk:  [:endOffset]
+	assert.Equal(t, expectedLength, buf.Len())
+
+	output := buf.Bytes()
+
+	assert.Equal(t, chunkBody[startOffset:], output[:chunkLength-int(startOffset)])
+	assert.Equal(t, chunkBody, output[chunkLength-int(startOffset):chunkLength+int(startOffset)])
 }
 
 /*
@@ -359,4 +417,10 @@ func hexDecode(s string) []byte {
 		panic(err)
 	}
 	return data
+}
+
+func mockChunkCBOR(docid string, data []byte) []byte {
+	dlen := make([]byte, 4)
+	binary.BigEndian.PutUint32(dlen, uint32(len(data))) //nolint:gosec // disable G115, lengths cannot be negative
+	return hexDecode(fmt.Sprintf("A7665F696E64657878212E666C6565742D66696C6564656C69766572792D646174612D656E64706F696E74635F6964%02X%02X685F76657273696F6E01675F7365715F6E6F016D5F7072696D6172795F7465726D0165666F756E64F5666669656C6473A16464617461815A%02X%02X", len(docid)+0x60, docid, dlen, data))
 }

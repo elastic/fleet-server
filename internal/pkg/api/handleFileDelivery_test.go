@@ -1,17 +1,20 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 //go:build !integration
 
 package api
 
 import (
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -320,6 +323,7 @@ func TestFileDeliverySetsHeaders(t *testing.T) {
 	assert.Equal(t, "text/csv", rec.Header().Get("Content-Type"))
 	assert.Equal(t, "4", rec.Header().Get("Content-Length"))
 	assert.Empty(t, rec.Header().Get("X-File-SHA2"))
+	assert.Equal(t, "bytes", rec.Header().Get("Accept-Ranges"))
 }
 
 func TestFileDeliverySetsHashWhenPresent(t *testing.T) {
@@ -379,6 +383,166 @@ func TestFileDeliverySetsHashWhenPresent(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, rec.Code)
 	assert.Equal(t, "deadbeef", rec.Header().Get("X-File-SHA2"))
+}
+
+func TestRangeParsing(t *testing.T) {
+
+	cases := []struct {
+		header            string
+		expectedStartByte int64
+		expectedLength    int64
+		fileSize          int64
+	}{
+		{"bytes=0-209", 0, 210, 600},
+		{"bytes=50-499", 50, 450, 600},
+		{"bytes=-100", 500, 100, 600},
+		{"bytes=400-", 400, 200, 600},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.header, func(t *testing.T) {
+			ranges, err := parseRange(tc.header, tc.fileSize)
+			require.NoError(t, err)
+			assert.Equal(t, 1, len(ranges))
+			assert.Equal(t, httpRange{tc.expectedStartByte, tc.expectedLength}, ranges[0])
+		})
+	}
+}
+
+func TestRangeParsingErrs(t *testing.T) {
+
+	cases := []string{
+		"bytes=100-40",
+		"bytes=40",
+		"bytes 9-99",
+		"400-500",
+		"bytes=start-end",
+		"bytes=--400",
+		"bytes=-100-400",
+		"bytes=20--100",
+		"bytes=-0",
+		"bytes=0",
+	}
+
+	for _, tc := range cases {
+		t.Run(tc, func(t *testing.T) {
+			_, err := parseRange(tc, 1024)
+			assert.Error(t, err)
+		})
+	}
+}
+
+// empty range requests that should not produce any ranges
+func TestIgnoredRangeRequests(t *testing.T) {
+	cases := []string{
+		"",
+		"bytes=",
+	}
+	for _, tc := range cases {
+		t.Run(tc, func(t *testing.T) {
+			ranges, err := parseRange(tc, 1024)
+			assert.NoError(t, err)
+			assert.Nil(t, ranges)
+		})
+	}
+
+}
+
+func TestFileDeliveryRangeSupport(t *testing.T) {
+	hr, _, tx, bulk := prepareFileDeliveryMock(t)
+
+	mockChunkSize := 100
+	mockFileSize := 600
+
+	mockBodyBytes := mockChunkedFile(tx, bulk, int64(mockChunkSize), int64(mockFileSize), "X", true)
+
+	// Testing behaviors described in https://datatracker.ietf.org/doc/html/rfc9110#section-14.1.2
+	cases := []struct {
+		rangeReq      string // byte string as requested
+		expectedStart int
+		expectedEnd   int
+	}{
+		{"10-209", 10, 209},
+		{"103-443", 103, 443},
+		{"0-306", 0, 306},
+		{"7-30", 7, 30},                                // range within a single chunk
+		{"405-", 405, mockFileSize - 1},                // open-ended, goes to EOF
+		{"-150", mockFileSize - 150, mockFileSize - 1}, // last N bytes format
+		{"400-900", 400, mockFileSize - 1},             // if larger than end, server corrects it to be the file-end
+		{"-900", 0, mockFileSize - 1},                  // suffix spec greater than file size self-corrects and gives the whole file
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.rangeReq, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+
+			req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/fleet/file/X", nil)
+			req.Header.Set("Range", "bytes="+tc.rangeReq)
+
+			hr.ServeHTTP(rec, req)
+			require.Equal(t, http.StatusPartialContent, rec.Code)
+			assert.Equal(t, fmt.Sprintf("bytes %d-%d/%d", tc.expectedStart, tc.expectedEnd, mockFileSize), rec.Header().Get("Content-Range"))
+			assert.Equal(t, strconv.Itoa(tc.expectedEnd-tc.expectedStart+1), rec.Header().Get("Content-Length"))
+			assert.Equal(t, tc.expectedEnd-tc.expectedStart+1, rec.Body.Len())
+			assert.Equal(t, mockBodyBytes[tc.expectedStart:tc.expectedEnd+1], rec.Body.Bytes())
+
+		})
+	}
+}
+
+func TestFileDeliveryRangeSupportWithoutExplicitChunkSize(t *testing.T) {
+	hr, _, tx, bulk := prepareFileDeliveryMock(t)
+
+	mockChunkSize := file.MaxChunkSize // spec default when not explicitly provided
+	mockFileSize := 340
+
+	mockBodyBytes := mockChunkedFile(tx, bulk, int64(mockChunkSize), int64(mockFileSize), "X", false)
+
+	rec := httptest.NewRecorder()
+
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/fleet/file/X", nil)
+	req.Header.Set("Range", "bytes=100-110")
+
+	hr.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusPartialContent, rec.Code)
+	assert.Equal(t, fmt.Sprintf("bytes %d-%d/%d", 100, 110, mockFileSize), rec.Header().Get("Content-Range"))
+	assert.Equal(t, "11", rec.Header().Get("Content-Length"))
+	assert.Equal(t, 11, rec.Body.Len())
+	assert.Equal(t, mockBodyBytes[100:111], rec.Body.Bytes())
+
+}
+
+func TestFileDeliveryInvalidRangeReq(t *testing.T) {
+	hr, _, tx, bulk := prepareFileDeliveryMock(t)
+
+	mockChunkSize := 64
+	mockFileSize := 450
+
+	mockBodyBytes := mockChunkedFile(tx, bulk, int64(mockChunkSize), int64(mockFileSize), "X", true)
+	_ = mockBodyBytes
+
+	// invalid ranges
+	cases := []struct {
+		rangeReq         string // byte string as requested
+		expectedHTTPCode int
+	}{
+		{"900-1200", http.StatusRequestedRangeNotSatisfiable},
+		{"100-20", http.StatusRequestedRangeNotSatisfiable},
+		{"0-50, 100-150", http.StatusRequestedRangeNotSatisfiable}, // multipart range should give 416
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.rangeReq, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+
+			req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/fleet/file/X", nil)
+			req.Header.Set("Range", "bytes="+tc.rangeReq)
+
+			hr.ServeHTTP(rec, req)
+			require.Equal(t, tc.expectedHTTPCode, rec.Code)
+
+		})
+	}
 }
 
 func TestFileLibraryDeliveryStopsEmptyClients(t *testing.T) {
@@ -540,10 +704,105 @@ func prepareFileDeliveryMock(t *testing.T) (http.Handler, apiServer, *MockTransp
 	return Handler(&si), si, tx, fakebulk
 }
 
+func mockChunkedFile(tx *MockTransport, bulk *itesting.MockBulk, mockChunkSize int64, mockFileSize int64, fileID string, writeChunkSize bool) []byte {
+	mockBodyBytes := make([]byte, mockFileSize)
+	j := 0
+	for i := range mockFileSize {
+		mockBodyBytes[i] = byte(j)
+		j += 1
+		if j > 255 {
+			j = 0
+		}
+	}
+	chunkHits := make([]es.HitT, int(math.Ceil(float64(mockFileSize)/float64(mockChunkSize))))
+	for i := range chunkHits {
+		chunkHits[i] = es.HitT{
+			ID:      fmt.Sprintf("%s.%d", fileID, i),
+			SeqNo:   1,
+			Version: 1,
+			Index:   fmt.Sprintf(delivery.FileDataIndexPattern, "endpoint"),
+			Fields: map[string]any{
+				file.FieldBaseID: []any{fileID},
+			},
+		}
+		if i == len(chunkHits)-1 {
+			chunkHits[i].Fields[file.FieldLast] = []any{true}
+		}
+	}
+
+	chunkSizeField := ""
+	if writeChunkSize {
+		chunkSizeField = fmt.Sprintf(`,"ChunkSize": %d`, mockChunkSize)
+	}
+	bulk.On("Search", mock.Anything, isFileMetaSearch, mock.Anything, mock.Anything, mock.Anything).Return(
+		&es.ResultT{
+			HitsT: es.HitsT{
+				Hits: []es.HitT{{
+					ID:      fileID,
+					SeqNo:   1,
+					Version: 1,
+					Index:   fmt.Sprintf(delivery.FileHeaderIndexPattern, "endpoint"),
+					Source: fmt.Appendf(nil, `{
+						"file": {
+							"created": "2023-06-05T15:23:37.499Z",
+							"Status": "READY",
+							"Updated": "2023-06-05T15:23:37.499Z",
+							"name": "somefile",
+							"mime_type": "application/octet-stream",
+							"Meta": {
+								"target_agents": ["someagent"],
+								"action_id": ""
+							},
+							"size": %d
+							%s
+						}
+					}`, mockFileSize, chunkSizeField),
+				}},
+			},
+		}, nil,
+	)
+	bulk.On("Search", mock.Anything, isFileChunkSearch, mock.Anything, mock.Anything, mock.Anything).Return(
+		&es.ResultT{
+			HitsT: es.HitsT{
+				Hits: chunkHits,
+			},
+		}, nil,
+	)
+
+	mockChunks := make([][]byte, len(chunkHits))
+	for i := range chunkHits {
+		sliceTo := int64(math.Min(float64((int64(i)+1)*mockChunkSize), float64(mockFileSize)))
+		mockChunks[i] = mockChunkCBOR(fmt.Sprintf("%s.%d", fileID, i), mockBodyBytes[int64(i)*mockChunkSize:sliceTo])
+	}
+
+	tx.RoundTripFn = func(req *http.Request) (*http.Response, error) {
+		// Parse out the chunk number requested
+		parts := strings.Split(req.URL.Path, "/") // ["", ".fleet-filedelivery-data-endpoint-0001", "_doc", "xyz.1"]
+		docIdx := strings.TrimPrefix(parts[3], fileID+".")
+		docnum, err := strconv.Atoi(docIdx)
+		if err != nil {
+			return nil, err
+		}
+
+		if docnum < 0 || docnum > len(mockChunks)-1 {
+			return nil, errors.New("invalid chunk")
+		}
+		return sendBodyBytes(mockChunks[docnum]), nil
+	}
+
+	return mockBodyBytes
+}
+
 func hexDecode(s string) []byte {
 	data, err := hex.DecodeString(s)
 	if err != nil {
 		panic(err)
 	}
 	return data
+}
+
+func mockChunkCBOR(docid string, data []byte) []byte {
+	dlen := make([]byte, 4)
+	binary.BigEndian.PutUint32(dlen, uint32(len(data)))
+	return hexDecode(fmt.Sprintf("A7665F696E64657878212E666C6565742D66696C6564656C69766572792D646174612D656E64706F696E74635F6964%02X%02X685F76657273696F6E01675F7365715F6E6F016D5F7072696D6172795F7465726D0165666F756E64F5666669656C6473A16464617461815A%02X%02X", len(docid)+0x60, docid, dlen, data))
 }

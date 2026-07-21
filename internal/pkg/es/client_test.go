@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package es
 
@@ -174,12 +174,11 @@ func TestClientCerts(t *testing.T) {
 // TestConnectionTLS tries to connect to a test HTTPS server (pretending
 // to be an Elasticsearch cluster), that deliberately presents TLS options
 // that are not FIPS-compliant.
-// - If the test is running with a FIPS-capable build, the client, being FIPS-
-// capable, should fail the TLS handshake. Concretely, the conn.Connect() method
-// should return an error.
-// - If the test is not running with a FIPS-capable build, the client should
-// complete the TLS handshake successfully. Concretely, the conn.Connect() method
-// should not return an error.
+// - If FIPS crypto is enabled, the client should fail the TLS handshake.
+// Concretely, the conn.Connect() method should return an error.
+// - If FIPS crypto is not enabled, the client should complete the TLS
+// handshake successfully. Concretely, the conn.Connect() method should not
+// return an error.
 func TestConnectionTLS(t *testing.T) {
 	server := startTLSServer(t)
 	defer server.Close()
@@ -205,12 +204,7 @@ func TestConnectionTLS(t *testing.T) {
 
 	_, err = FetchESVersion(ctx, client)
 
-	if fips140.Enforced() {
-		// When FIPS 140 is enforced (GODEBUG=fips140=only), Go's crypto
-		// stack rejects signing with a 1024-bit RSA key. Note: fips140=on
-		// with microsoft/go's systemcrypto backend silently falls back to
-		// stdlib in test binaries (via UnreachableExceptTests), so only
-		// fips140=only reliably enforces this.
+	if fips140.Enabled() {
 		require.Error(t, err)
 	} else {
 		require.NoError(t, err)

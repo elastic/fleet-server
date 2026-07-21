@@ -1,11 +1,10 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package bulk
 
 import (
-	"context"
 	"strconv"
 	"time"
 
@@ -25,7 +24,8 @@ type optionsT struct {
 	Indices            []string
 	WaitForCheckpoints []int64
 	IgnoreUnavailable  bool
-	spanLink           *apm.SpanLink
+	spanLink           apm.SpanLink
+	hasSpanLink        bool
 }
 
 type Opt func(*optionsT)
@@ -60,20 +60,6 @@ func WithIndex(idx string) Opt {
 func WithWaitForCheckpoints(checkpoints []int64) Opt {
 	return func(opt *optionsT) {
 		opt.WaitForCheckpoints = checkpoints
-	}
-}
-
-func withAPMLinkedContext(ctx context.Context) Opt {
-	return func(opt *optionsT) {
-		trace := apm.TransactionFromContext(ctx)
-		if trace == nil {
-			return
-		}
-		tCtx := trace.TraceContext()
-		opt.spanLink = &apm.SpanLink{
-			Trace: tCtx.Trace,
-			Span:  tCtx.Span,
-		}
 	}
 }
 

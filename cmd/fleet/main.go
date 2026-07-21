@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 // Package fleet is the main entry point for fleet-server.
 package fleet
@@ -80,6 +80,11 @@ func getRunCommand(bi build.Info) func(cmd *cobra.Command, args []string) error 
 				return err
 			}
 
+			if err := validateEnv(); err != nil {
+				log.Error().Err(err).Msg("Failed to validate runtime")
+				return err
+			}
+
 			srv, err := server.NewAgent(cliCfg, os.Stdin, bi, l)
 			if err != nil {
 				return err
@@ -115,6 +120,11 @@ func getRunCommand(bi build.Info) func(cmd *cobra.Command, args []string) error 
 
 			l, err = initLogger(cfg, bi.Version, bi.Commit)
 			if err != nil {
+				return err
+			}
+
+			if err := validateEnv(); err != nil {
+				log.Error().Err(err).Msg("Failed to validate runtime")
 				return err
 			}
 

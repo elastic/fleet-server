@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package api
 
@@ -139,6 +139,24 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 				http.StatusNotFound,
 				"NotFound",
 				"not found",
+				zerolog.WarnLevel,
+			},
+		},
+		{
+			ErrUnauthorizedArtifact,
+			HTTPErrResp{
+				http.StatusForbidden,
+				"Forbidden",
+				"agent not authorized for artifact",
+				zerolog.WarnLevel,
+			},
+		},
+		{
+			ErrAgentPolicyIDMissing,
+			HTTPErrResp{
+				http.StatusForbidden,
+				"Forbidden",
+				"agent has no policy ID",
 				zerolog.WarnLevel,
 			},
 		},
@@ -485,6 +503,24 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 				http.StatusNotFound,
 				"ErrNoFile",
 				"file not found",
+				zerolog.InfoLevel,
+			},
+		},
+		{
+			ErrBadRange,
+			HTTPErrResp{
+				http.StatusRequestedRangeNotSatisfiable,
+				"ErrRangeNotSatisfiable",
+				"range not satisfiable",
+				zerolog.InfoLevel,
+			},
+		},
+		{
+			ErrMultiRangeNotSupported,
+			HTTPErrResp{
+				http.StatusRequestedRangeNotSatisfiable,
+				"ErrRangeNotSatisfiable",
+				"Multipart ranges not satisfiable",
 				zerolog.InfoLevel,
 			},
 		},

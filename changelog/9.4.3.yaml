@@ -1,0 +1,15 @@
+version: 9.4.3
+entries:
+    - kind: bug-fix
+      summary: Add limit for checkin request size after decompression
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/7135
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1780344932
+      file:
+        name: 1780344932-Add-limit-for-checkin-request-size-after-decompression.yaml
+        checksum: 061b380fcb2ca4f9737f68795ef189cb0dfa5911

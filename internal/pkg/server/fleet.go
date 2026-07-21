@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package server
 
@@ -524,6 +524,12 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 	bc := checkin.NewBulk(bulker)
 	g.Go(loggedRunFunc(ctx, "Bulk checkin", bc.Run))
 
+	// Samples the checkin capacity-rejection counter into a rate gauge, exposed via
+	// /stats for use as an autoscaling signal. See api.RunCheckinRejectionRateSampler.
+	g.Go(loggedRunFunc(ctx, "Checkin rejection rate sampler", func(ctx context.Context) error {
+		return api.RunCheckinRejectionRateSampler(ctx, api.CheckinRateSampleInterval)
+	}))
+
 	ct, err := api.NewCheckinT(f.verCon, &cfg.Inputs[0].Server, f.cache, bc, pm, am, ad, bulker)
 	if err != nil {
 		return err
@@ -533,7 +539,7 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 		return err
 	}
 
-	at := api.NewArtifactT(&cfg.Inputs[0].Server, bulker, f.cache)
+	at := api.NewArtifactT(&cfg.Inputs[0].Server, bulker, f.cache, pm)
 	ack := api.NewAckT(&cfg.Inputs[0].Server, bulker, f.cache)
 	st := api.NewStatusT(&cfg.Inputs[0].Server, bulker, f.cache, api.WithSelfMonitor(sm), api.WithBuildInfo(f.bi))
 	oa := api.NewOpAMPT(ctx, &cfg.Inputs[0].Server, bulker, f.cache, bc)

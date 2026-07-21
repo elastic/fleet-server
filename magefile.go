@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 //go:build mage
 
@@ -124,11 +124,7 @@ var (
 		"linux/amd64",
 		"linux/arm64",
 		"windows/amd64",
-	}
-	// plaformsFIPS is the list of all FIPS-capable platforms.
-	platformsFIPS = []string{
-		"linux/amd64",
-		"linux/arm64",
+		"windows/arm64",
 	}
 
 	// platformsDocker is the list of all platforms that are supported by docker multiplatform builds.
@@ -265,15 +261,11 @@ var (
 	// If a user specifies platforms through the env var, getPlatforms will filter out unsupported values.
 	// If as a result of this filtering no valid platforms are detected, the default list will be used.
 	getPlatforms = sync.OnceValue(func() []string {
-		list := platforms
-		if isFIPS() {
-			list = platformsFIPS
-		}
 		// If env var is used ensure values are supported.
 		if pList, ok := os.LookupEnv(envPlatforms); ok {
 			filtered := make([]string, 0)
 			for _, plat := range strings.Split(pList, ",") {
-				if slices.Contains(list, plat) {
+				if slices.Contains(platforms, plat) {
 					filtered = append(filtered, plat)
 				} else {
 					log.Printf("Skipping %q platform is not in the list of allowed platforms.", plat)
@@ -284,7 +276,7 @@ var (
 			}
 			log.Printf("%s env var detected but value %q does not contain valid platforms. Using default list.", envPlatforms, pList)
 		}
-		return list
+		return platforms
 	})
 
 	// getDockerPlatforms returns a list of supported docker multiplatform targets.
@@ -390,9 +382,7 @@ func environMap() map[string]string {
 
 // addFIPSEnvVars mutates the passed env map by adding settings needed to produce a FIPS-capable binary.
 func addFIPSEnvVars(env map[string]string) {
-	env["GOEXPERIMENT"] = "systemcrypto"
-	env["CGO_ENABLED"] = "1"
-	env["MS_GOTOOLCHAIN_TELEMETRY_ENABLED"] = "0"
+	env["GOFIPS140"] = "v1.0.0" // use a pinned version of the fips provider.
 }
 
 // teeCommand runs the specified command, stdout and stederr will be written to stdout and will be collected and returned.
@@ -416,14 +406,10 @@ func Platforms() {
 }
 
 // Multipass launches a mulitpass instance for development.
-// FIPS may be used  to provision microsoft/go in the VM.
 func Multipass() error {
 	params := map[string]string{
 		"Arch":        runtime.GOARCH,
 		"DownloadURL": fmt.Sprintf("https://go.dev/dl/go%s.linux-%s.tar.gz", getGoVersion(), runtime.GOARCH),
-	}
-	if isFIPS() {
-		params["DownloadURL"] = fmt.Sprintf("https://aka.ms/golang/release/latest/go%s.linux-%s.tar.gz", getGoVersion(), runtime.GOARCH)
 	}
 
 	// write the multipass-cloud-init.yml to launch the instance
@@ -478,7 +464,7 @@ func Generate() error {
 
 // Headers ensures files have copyright headers.
 func (Check) Headers() error {
-	return sh.Run("go", "tool", "-modfile", filepath.Join("dev-tools", "go.mod"), "github.com/elastic/go-licenser", "-license", "Elastic")
+	return sh.Run("go", "tool", "-modfile", filepath.Join("dev-tools", "go.mod"), "github.com/elastic/go-licenser", "-license", "Elasticv2")
 }
 
 // Notice generates the NOTICE.txt and NOTICE-fips.txt files.
@@ -964,7 +950,7 @@ func packageNix(osArg, archArg string) error {
 // Builder creates a docker image used to cross-compile binaries.
 // This image is only built locally and should not be pushed to remote registries.
 // Image produced is tagged as: fleet-server-builder:$GO_VERSION
-// FIPS is used to create ina image that has the microsoft/go tool available so FIPS binaries may be compiled.
+// FIPS is used to create an image that can compile FIPS-capable binaries.
 func (Docker) Builder() error {
 	suffix := dockerSuffix
 	if runtime.GOARCH == "arm64" {
@@ -973,7 +959,7 @@ func (Docker) Builder() error {
 
 	args := []string{"build", "-t", dockerBuilderName + ":" + getGoVersion(), "--build-arg", "GO_VERSION=" + getGoVersion()}
 	if isFIPS() {
-		args = append(args, "-f", dockerBuilderFIPS, "--build-arg", "SUFFIX="+suffix+"-fips", "--target", "base", ".")
+		args = append(args, "-f", dockerBuilderFIPS, "--build-arg", "SUFFIX="+suffix, "--target", "base", ".")
 	} else {
 		args = append(args, "-f", dockerBuilderFile, "--build-arg", "SUFFIX="+suffix, ".")
 	}
@@ -1060,7 +1046,6 @@ func (Docker) Image() error {
 	if isFIPS() {
 		dockerFile = dockerBuilderFIPS
 		image += "-fips"
-		suffix += "-fips"
 	}
 	if v, ok := os.LookupEnv(envDockerImage); ok && v != "" {
 		image = v
@@ -1104,7 +1089,6 @@ func (Docker) Publish() error {
 	if isFIPS() {
 		dockerFile = dockerBuilderFIPS
 		image += "-fips"
-		suffix += "-fips"
 	}
 	if v, ok := os.LookupEnv(envDockerImage); ok && v != "" {
 		image = v
@@ -1223,10 +1207,14 @@ func (Docker) CustomAgentImage() error {
 // Unit runs unit tests.
 // Produces a unit test output file, and test coverage file in the build directory.
 // SNAPSHOT adds the snapshot build tag.
-// FIPS adds the requirefips build tag.
+// FIPS adds the requirefips build tag and env GOFIPS140 env var.
 // TEST_RUN can be used to pass the value to go test -run.
 func (Test) Unit() error {
 	mg.Deps(mg.F(mkDir, "build"))
+	env := environMap()
+	if isFIPS() {
+		addFIPSEnvVars(env)
+	}
 	args := []string{
 		"test",
 		"-tags=" + getTagsString(),
@@ -1238,13 +1226,12 @@ func (Test) Unit() error {
 		args = append(args, "-run", v)
 	}
 	args = append(args, "./...")
-	output, err := teeCommand(environMap(), "go", args...)
+	output, err := teeCommand(env, "go", args...)
 	err = errors.Join(err, os.WriteFile(filepath.Join("build", "test-unit-"+runtime.GOOS+".out"), output, 0o644))
 	return err
 }
 
 // UnitFIPSOnly runs unit tests and injects GODEBUG=fips140=only into the environment.
-// This is done because mage may have issues when running with fips140=only set.
 // Produces a unit test output file, and test coverage file in the build directory.
 // SNAPSHOT adds the snapshot build tag.
 // FIPS adds the requirefips build tag.
@@ -1252,12 +1239,12 @@ func (Test) Unit() error {
 func (Test) UnitFIPSOnly() error {
 	mg.Deps(mg.F(mkDir, "build"))
 
-	// We also set GODEBUG=tlsmlkem=0 to disable the X25519MLKEM768 TLS key
-	// exchange mechanism; without this setting and with the GODEBUG=fips140=only
-	// setting, we get errors in tests like so:
-	// Failed to connect: crypto/ecdh: use of X25519 is not allowed in FIPS 140-only mode
-	// Note that we are only disabling this TLS key exchange mechanism in tests!
+	// GODEBUG=tlsmlkem=0 disables X25519MLKEM768; without it, GODEBUG=fips140=only
+	// causes test failures: crypto/ecdh: use of X25519 is not allowed in FIPS 140-only mode
 	env := environMap()
+	if isFIPS() {
+		addFIPSEnvVars(env)
+	}
 	env["GODEBUG"] = "fips140=only,tlsmlkem=0"
 	args := []string{
 		"test",
@@ -1321,6 +1308,9 @@ func (Test) IntegrationRun(ctx context.Context) error {
 	env["ELASTICSEARCH_SERVICE_TOKEN"] = esToken
 	env["REMOTE_ELASTICSEARCH_SERVICE_TOKEN"] = esRemoteToken
 	env["REMOTE_ELASTICSEARCH_CA_CRT_BASE64"] = remoteCA
+	if isFIPS() {
+		addFIPSEnvVars(env)
+	}
 	args := []string{
 		"test",
 		"-v",
@@ -1650,26 +1640,40 @@ func checkFIPSBinary(path string) error {
 	if err != nil {
 		return fmt.Errorf("unable to read buildinfo: %w", err)
 	}
-	var checkLinks, foundTags, foundExperiment bool
+	var foundTags, foundFIPS140, foundFIPSDefault bool
 
 	for _, setting := range info.Settings {
 		switch setting.Key {
 		case "-tags":
 			foundTags = true
-			if !strings.Contains(setting.Value, "requirefips") {
+			requireFipsTag := false
+			fips140Tag := false
+
+			for _, tag := range strings.Split(setting.Value, ",") {
+				switch tag {
+				case "requirefips":
+					requireFipsTag = true
+				case "fips140v1.0":
+					fips140Tag = true
+				}
+			}
+			if !requireFipsTag {
 				return fmt.Errorf("requirefips tag not found in %s", setting.Value)
 			}
-			continue
-		case "GOEXPERIMENT":
-			foundExperiment = true
-			if !strings.Contains(setting.Value, "systemcrypto") {
-				return fmt.Errorf("did not find GOEXPIRIMENT=systemcrypto")
+			if !fips140Tag {
+				return fmt.Errorf("fips140v1.0 tag not found in %s", setting.Value)
 			}
-			continue
-		case "-ldflags":
-			if !strings.Contains(setting.Value, "-s") {
-				checkLinks = true
-				continue
+		case "GOFIPS140":
+			foundFIPS140 = true
+			if setting.Value == "" {
+				return fmt.Errorf("GOFIPS140 is empty")
+			}
+		case "DefaultGODEBUG":
+			for _, entry := range strings.Split(setting.Value, ",") {
+				if key, val, ok := strings.Cut(entry, "="); ok && key == "fips140" && val == "on" {
+					foundFIPSDefault = true
+					break
+				}
 			}
 		}
 	}
@@ -1677,18 +1681,11 @@ func checkFIPSBinary(path string) error {
 	if !foundTags {
 		return fmt.Errorf("did not find build tags")
 	}
-	if !foundExperiment {
-		return fmt.Errorf("did not find GOEXPERIMENT")
+	if !foundFIPS140 {
+		return fmt.Errorf("did not find GOFIPS140 in build settings")
 	}
-	if checkLinks {
-		log.Println("Binary is not stripped, checking symbols table.")
-		output, err := sh.Output("go", "tool", "nm", path)
-		if err != nil {
-			return fmt.Errorf("go tool nm failed: %w", err)
-		}
-		if runtime.GOOS == "linux" && !strings.Contains(output, "OpenSSL_version") { // TODO may need different check for windows/darwin
-			return fmt.Errorf("failed to find OpenSSL symbol links within binary")
-		}
+	if !foundFIPSDefault {
+		return fmt.Errorf("did not find fips140=on in DefaultGODEBUG — binary will not enforce FIPS mode at runtime")
 	}
 	return nil
 }
@@ -2152,7 +2149,6 @@ func (Test) E2eRun(ctx context.Context) error {
 		"ELASTICSEARCH_SERVICE_TOKEN="+esToken,
 		"AGENT_E2E_IMAGE="+string(p),
 		"STANDALONE_E2E_IMAGE="+image+":"+tag,
-		"CGO_ENABLED=1",
 	)
 
 	var b bytes.Buffer
@@ -2191,22 +2187,6 @@ func (Test) E2eDown() error {
 // ConvertCoverage formats coverage data emitted by coverage-enabled binaries in e2e tests.
 func (Test) ConvertCoverage() error {
 	return sh.RunV("go", "tool", "covdata", "textfmt", "-i="+filepath.Join("build", "e2e-cover"), "-o="+filepath.Join("build", "e2e-coverage.out"))
-}
-
-// FipsProviderUnit runs unit tests with all FIPS env vars and tags.
-// It requires microsoft/go and a FIPS provider on the system.
-// Produces a unit test output file, and test coverage file in the build directory.
-func (Test) FipsProviderUnit() error {
-	mg.Deps(mg.F(mkDir, "build"))
-	os.Setenv(envFIPS, "true")
-	if !isFIPS() {
-		return fmt.Errorf("FIPS must be set to true.")
-	}
-	env := environMap()
-	addFIPSEnvVars(env)
-	output, err := teeCommand(env, "go", "test", "-tags="+getTagsString(), "-v", "-race", "-coverprofile="+filepath.Join("build", "coverage-fips-provider-"+runtime.GOOS+".out"), "./...")
-	err = errors.Join(err, os.WriteFile(filepath.Join("build", "test-unit-fips-provider-"+runtime.GOOS+".out"), output, 0o644))
-	return err
 }
 
 // CloudE2E provisions a cloud deployment, tests the remote fleet-server instance, then destroys the deployment.

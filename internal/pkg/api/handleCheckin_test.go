@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 //go:build !integration
 
@@ -62,6 +62,12 @@ func (m *mockPolicyMonitor) Unsubscribe(sub policy.Subscription) error {
 func (m *mockPolicyMonitor) LatestRev(ctx context.Context, id string) int64 {
 	args := m.Called(ctx, id)
 	return args.Get(0).(int64)
+}
+
+func (m *mockPolicyMonitor) GetPolicy(ctx context.Context, policyID string) (*model.Policy, error) {
+	args := m.Called(ctx, policyID)
+	p, _ := args.Get(0).(*model.Policy)
+	return p, args.Error(1)
 }
 
 func TestConvertActionData(t *testing.T) {
@@ -1243,6 +1249,30 @@ func TestValidateCheckinRequest(t *testing.T) {
 			},
 			expErr:   &BadRequestErr{msg: "unable to create gzip reader for request body", nextErr: gzip.ErrHeader},
 			expValid: validatedCheckin{},
+		},
+		{
+			name: "gzip compressed request body exceeds max agent doc size limit",
+			req: func() *http.Request {
+				var buf bytes.Buffer
+				gz := gzip.NewWriter(&buf)
+				_, _ = gz.Write([]byte(`{"status": "online", "message": "`))
+				_, _ = gz.Write(bytes.Repeat([]byte("a"), 1024))
+				_, _ = gz.Write([]byte(`"}`))
+				_ = gz.Close()
+				return &http.Request{
+					Header: http.Header{"Content-Encoding": []string{"gzip"}},
+					Body:   io.NopCloser(&buf),
+				}
+			}(),
+			cfg: &config.Server{
+				Limits: config.ServerLimits{
+					CheckinLimit: config.Limit{
+						MaxBody:             512, // compressed body is lower than doc size
+						MaxBodyDecompressed: 1024,
+					},
+				},
+			},
+			expErr: &BadRequestErr{msg: "unable to decode checkin request", nextErr: &http.MaxBytesError{Limit: 1024}},
 		},
 	}
 

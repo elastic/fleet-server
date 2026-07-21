@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package config
 
@@ -14,6 +14,7 @@ import (
 	"os"
 
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger/zap"
 
 	apmtransport "go.elastic.co/apm/v2/transport"
 )
@@ -78,10 +79,17 @@ func (c *Instrumentation) APMHTTPTransportOptions() (apmtransport.HTTPTransportO
 		tlsConfig.VerifyPeerCertificate = func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
 			return verifyPeerCertificate(rawCerts, cert)
 		}
+		tlsConfig.VerifyConnection = func(cs tls.ConnectionState) error {
+			rawCerts := make([][]byte, len(cs.PeerCertificates))
+			for i, c := range cs.PeerCertificates {
+				rawCerts[i] = c.Raw
+			}
+			return verifyPeerCertificate(rawCerts, cert)
+		}
 	}
 
 	if c.TLS.ServerCA != "" {
-		pool, errs := tlscommon.LoadCertificateAuthorities([]string{c.TLS.ServerCA})
+		pool, errs := tlscommon.LoadCertificateAuthorities([]string{c.TLS.ServerCA}, zap.NewStub("instrumentation"))
 		// FIXME once we update elastic-agent-libs to go 1.20 we can return multiple errors directly with errors.Join()
 		if len(errs) != 0 {
 			return apmtransport.HTTPTransportOptions{}, fmt.Errorf("unable to load instrumentation cas: %w", errors.Join(errs...))

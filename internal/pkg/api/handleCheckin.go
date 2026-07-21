@@ -1,6 +1,6 @@
 // Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
-// or more contributor license agreements. Licensed under the Elastic License;
-// you may not use this file except in compliance with the Elastic License.
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
 
 package api
 
@@ -197,6 +197,9 @@ func (ct *CheckinT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, 
 		}
 		defer gr.Close()
 		bodyReader = gr
+		if ct.cfg.Limits.CheckinLimit.MaxBodyDecompressed > 0 {
+			bodyReader = http.MaxBytesReader(w, gr, ct.cfg.Limits.CheckinLimit.MaxBodyDecompressed)
+		}
 	}
 
 	var val validatedCheckin
