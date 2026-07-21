@@ -1,1053 +1,1120 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "definitions": {
-    "action": {
-      "title": "Agent action",
-      "description": "An Elastic Agent action",
-      "type": "object",
-      "properties": {
-        "_id": {
-          "description": "The unique identifier for action document",
-          "type": "string"
-        },
-        "_seq_no": {
-          "description": "The action sequence number",
-          "type": "integer"
-        },
-        "namespaces": {
-          "description": "Namespaces",
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "action_id": {
-          "description": "The unique identifier for the Elastic Agent action. There could be multiple documents with the same action_id if the action is split into two separate documents.",
-          "type": "string",
-          "format": "uuid"
-        },
-        "@timestamp": {
-          "description": "Date/time the action was created",
-          "type": "string",
-          "format": "date-time"
-        },
-        "expiration": {
-          "description": "The action expiration date/time",
-          "type": "string",
-          "format": "date-time"
-        },
-        "start_time": {
-          "description": "The action start date/time",
-          "type": "string",
-          "format": "date-time"
-        },
-        "minimum_execution_duration": {
-          "description": "The minimum time (in seconds) provided for an action execution when scheduled by fleet-server.",
-          "type": "integer"
-        },
-        "rollout_duration_seconds": {
-          "description": "The rollout duration (in seconds) provided for an action execution when scheduled by fleet-server.",
-          "type": "integer"
-        },
-        "type": {
-          "description": "The action type. INPUT_ACTION is the value for the actions that suppose to be routed to the endpoints/beats.",
-          "type": "string"
-        },
-        "input_type": {
-          "description": "The input type the actions should be routed to.",
-          "type": "string"
-        },
-        "timeout": {
-          "description": "The optional action timeout in seconds",
-          "type": "integer"
-        },
-        "secret_references": {
-          "description": "A list of all secrets fleet-server needs to inject into the actions data before passing it to the agent. This attribute is removed when action data is send to an agent.",
-          "type": "array",
-          "items": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "definitions": {
+        "action": {
+            "title": "Agent action",
+            "description": "An Elastic Agent action",
             "type": "object",
             "properties": {
-              "id": {
-                "type": "string"
-              }
+                "_id": {
+                    "description": "The unique identifier for action document",
+                    "type": "string"
+                },
+                "_seq_no": {
+                    "description": "The action sequence number",
+                    "type": "integer"
+                },
+                "namespaces": {
+                    "description": "Namespaces",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "action_id": {
+                    "description": "The unique identifier for the Elastic Agent action. There could be multiple documents with the same action_id if the action is split into two separate documents.",
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "@timestamp": {
+                    "description": "Date/time the action was created",
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "expiration": {
+                    "description": "The action expiration date/time",
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "start_time": {
+                    "description": "The action start date/time",
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "minimum_execution_duration": {
+                    "description": "The minimum time (in seconds) provided for an action execution when scheduled by fleet-server.",
+                    "type": "integer"
+                },
+                "rollout_duration_seconds": {
+                    "description": "The rollout duration (in seconds) provided for an action execution when scheduled by fleet-server.",
+                    "type": "integer"
+                },
+                "type": {
+                    "description": "The action type. INPUT_ACTION is the value for the actions that suppose to be routed to the endpoints/beats.",
+                    "type": "string"
+                },
+                "input_type": {
+                    "description": "The input type the actions should be routed to.",
+                    "type": "string"
+                },
+                "timeout": {
+                    "description": "The optional action timeout in seconds",
+                    "type": "integer"
+                },
+                "secret_references": {
+                    "description": "A list of all secrets fleet-server needs to inject into the actions data before passing it to the agent. This attribute is removed when action data is send to an agent.",
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "id": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "id"
+                        ]
+                    }
+                },
+                "user_id": {
+                    "description": "The ID of the user who created the action.",
+                    "type": "string"
+                },
+                "traceparent": {
+                    "description": "APM traceparent for the action.",
+                    "type": "string"
+                },
+                "agents": {
+                    "description": "The Agent IDs the action is intended for. No support for json.RawMessage with the current generator. Could be useful to lazy parse the agent ids",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "data": {
+                    "description": "The opaque payload.",
+                    "format": "raw"
+                },
+                "signed": {
+                    "$ref": "#/definitions/signed"
+                }
             },
-            "required": ["id"]
-          }
-        },
-        "user_id": {
-          "description": "The ID of the user who created the action.",
-          "type": "string"
-        },
-        "traceparent": {
-          "description": "APM traceparent for the action.",
-          "type": "string"
-        },
-        "agents": {
-          "description": "The Agent IDs the action is intended for. No support for json.RawMessage with the current generator. Could be useful to lazy parse the agent ids",
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "data": {
-          "description": "The opaque payload.",
-          "format": "raw"
+            "required": [
+                "id"
+            ]
         },
         "signed": {
-          "$ref": "#/definitions/signed"
-        }
-      },
-      "required": ["id"]
-    },
-
-    "signed": {
-      "description": "The action signed data and signature.",
-      "type": "object",
-      "properties": {
-        "data": {
-          "description": "The base64 encoded, UTF-8 JSON serialized action bytes that are signed.",
-          "type": "string"
-        },
-        "signature": {
-          "description": "The base64 encoded signature.",
-          "type": "string"
-        }
-      },
-      "required": ["data", "signature"]
-    },
-
-    "action-result": {
-      "title": "Agent action results",
-      "description": "An Elastic Agent action results",
-      "type": "object",
-      "properties": {
-        "@timestamp": {
-          "description": "Date/time the action was created",
-          "type": "string",
-          "format": "date-time"
-        },
-        "agent_id": {
-          "description": "The agent id.",
-          "type": "string"
-        },
-        "action_id": {
-          "description": "The action id.",
-          "type": "string"
-        },
-        "action_input_type": {
-          "description": "The input type of the original action.",
-          "type": "string"
-        },
-        "namespaces": {
-          "description": "Namespaces",
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "started_at": {
-          "description": "Date/time the action was started",
-          "type": "string",
-          "format": "date-time"
-        },
-        "completed_at": {
-          "description": "Date/time the action was completed",
-          "type": "string",
-          "format": "date-time"
-        },
-        "action_data": {
-          "description": "The opaque payload.",
-          "format": "raw"
-        },
-        "action_response": {
-          "description": "The custom action response payload.",
-          "format": "raw"
-        },
-        "error": {
-          "description": "The action error message.",
-          "type": "string"
-        },
-        "data": {
-          "description": "The opaque payload.",
-          "format": "raw"
-        }
-      },
-      "required": ["id", "agent", "action"]
-    },
-
-    "agent-metadata": {
-      "title": "Agent Metadata",
-      "description": "An Elastic Agent metadata",
-      "type": "object",
-      "properties": {
-        "id": {
-          "description": "The unique identifier for the Elastic Agent",
-          "type": "string",
-          "format": "uuid"
-        },
-        "version": {
-          "description": "The version of the Elastic Agent",
-          "type": "string"
-        },
-        "type": {
-          "description": "The type of the Elastic Agent",
-          "type": "string"
-        }
-      },
-      "required": ["id", "version"]
-    },
-
-    "artifact": {
-      "title": "Artifact",
-      "description": "An artifact served by Fleet",
-      "type": "object",
-      "properties": {
-        "identifier": {
-          "description": "Human readable artifact identifier",
-          "type": "string"
-        },
-        "compression_algorithm": {
-          "description": "Name of compression algorithm applied to artifact",
-          "type": "string"
-        },
-        "encryption_algorithm": {
-          "description": "Name of encryption algorithm applied to artifact",
-          "type": "string"
-        },
-        "encoded_sha256": {
-          "description": "SHA256 of artifact after encoding has been applied",
-          "type": "string"
-        },
-        "encoded_size": {
-          "description": "Size of artifact after encoding has been applied",
-          "type": "integer"
-        },
-        "decoded_sha256": {
-          "description": "SHA256 of artifact before encoding has been applied",
-          "type": "string"
-        },
-        "decoded_size": {
-          "description": "Size of artifact before encoding has been applied",
-          "type": "integer"
-        },
-        "created": {
-          "description": "Timestamp artifact was created",
-          "type": "string",
-          "format": "date-time"
-        },
-        "body": {
-          "description": "Encoded artifact data",
-          "format": "raw"
-        },
-        "package_name": {
-          "description": "Name of the package that owns this artifact",
-          "type": "string"
-        }
-      },
-      "required": [
-        "identifier",
-        "compressionAlgorithm",
-        "encodedSha256",
-        "encodedSize",
-        "decodedSha256",
-        "decodedSize",
-        "created",
-        "body"
-      ]
-    },
-
-    "host-metadata": {
-      "title": "Host Metadata",
-      "description": "The host metadata for the Elastic Agent",
-      "type": "object",
-      "properties": {
-        "id": {
-          "description": "The ID of the host",
-          "type": "string"
-        },
-        "architecture": {
-          "description": "The architecture for the Elastic Agent",
-          "type": "string"
-        },
-        "name": {
-          "description": "The hostname of the Elastic Agent",
-          "type": "string"
-        },
-        "ip": {
-          "description": "The IP addresses of the Elastic Agent",
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        }
-      },
-      "required": ["id", "architecture", "name"]
-    },
-
-    "server-metadata": {
-      "title": "Server Metadata",
-      "description": "A Fleet Server metadata",
-      "type": "object",
-      "properties": {
-        "id": {
-          "description": "The unique identifier for the Fleet Server",
-          "type": "string",
-          "format": "uuid"
-        },
-        "version": {
-          "description": "The version of the Fleet Server",
-          "type": "string"
-        }
-      },
-      "required": ["id", "version"]
-    },
-
-    "server": {
-      "deprecated": true,
-      "title": "Server",
-      "description": "A Fleet Server",
-      "type": "object",
-      "properties": {
-        "@timestamp": {
-          "description": "Date/time the server was updated",
-          "type": "string",
-          "format": "date-time"
-        },
-        "agent": { "$ref": "#/definitions/agent-metadata" },
-        "host": { "$ref": "#/definitions/host-metadata" },
-        "server": { "$ref": "#/definitions/server-metadata" }
-      },
-      "required": ["agent", "host", "server"]
-    },
-
-    "policy": {
-      "title": "Policy",
-      "description": "A policy that an Elastic Agent is attached to",
-      "type": "object",
-      "properties": {
-        "@timestamp": {
-          "description": "Date/time the policy revision was created",
-          "type": "string",
-          "format": "date-time"
-        },
-        "policy_id": {
-          "description": "The ID of the policy",
-          "type": "string",
-          "format": "uuid"
-        },
-        "revision_idx": {
-          "description": "The revision index of the policy",
-          "type": "integer"
-        },
-        "coordinator_idx": {
-          "deprecated": true,
-          "description": "The coordinator index of the policy",
-          "type": "integer"
-        },
-        "namespaces": {
-          "description": "Namespaces",
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "data": {
-          "$ref": "#/definitions/policy-data"
-        },
-        "default_fleet_server": {
-          "description": "True when this policy is the default policy to start Fleet Server",
-          "type": "boolean"
-        },
-        "unenroll_timeout": {
-          "description": "Timeout (seconds) that an Elastic Agent should be un-enrolled.",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "policy_id",
-        "revision_idx",
-        "data",
-        "default_fleet_server"
-      ]
-    },
-
-    "policy-leader": {
-      "deprecated": true,
-      "title": "Policy Leader",
-      "description": "The current leader Fleet Server for a policy",
-      "type": "object",
-      "properties": {
-        "@timestamp": {
-          "description": "Date/time the leader was taken or held",
-          "type": "string",
-          "format": "date-time"
-        },
-        "server": { "$ref": "#/definitions/server-metadata" }
-      },
-      "required": ["server"]
-    },
-
-    "to_retire_api_key_ids": {
-      "type": "array",
-      "items": {
-        "description": "the Output API Keys that were replaced and should be retired",
-        "type": "object",
-        "properties": {
-          "id": {
-            "description": "API Key identifier",
-            "type": "string"
-          },
-          "retired_at": {
-            "description": "Date/time the API key was retired",
-            "type": "string",
-            "format": "date-time"
-          },
-          "output": {
-            "description": "Output name where the API Key belongs",
-            "type": "string"
-          }
-        }
-      }
-    },
-
-    "policy_output": {
-      "type": "object",
-      "description": "holds the needed data to manage the output API keys",
-      "properties": {
-        "api_key": {
-          "description": "API key the Elastic Agent uses to authenticate with elasticsearch",
-          "type": "string"
-        },
-        "to_retire_api_key_ids": {
-          "description": "API keys to be invalidated on next agent ack",
-          "$ref": "#/definitions/to_retire_api_key_ids"
-        },
-        "api_key_id": {
-          "description": "ID of the API key the Elastic Agent uses to authenticate with elasticsearch",
-          "type": "string"
-        },
-        "permissions_hash": {
-          "description": "The policy output permissions hash",
-          "type": "string"
-        },
-        "type": {
-          "description": "Type is the output type. Currently only Elasticsearch is supported.",
-          "type": "string"
-        }
-      },
-      "required": [
-        "api_key",
-        "api_key_history",
-        "api_key_id",
-        "permissions_hash",
-        "type"
-      ]
-    },
-
-    "output_health": {
-      "description": "Output health represents a health state of an output",
-      "type": "object",
-      "properties": {
-        "output": {
-          "type": "string",
-          "description": "Output ID"
-        },
-        "state": {
-          "type": "string",
-          "description": "Health state, can be HEALTHY or DEGRADED"
-        },
-        "message": {
-          "type": "string",
-          "description": "Long state message if unhealthy"
-        },
-        "@timestamp": {
-          "type": "string",
-          "description": "Timestamp of reported state"
-        },
-        "data_stream": {
-          "type": "object",
-          "properties": {
-            "dataset": {
-              "type": "string"
-            },
-            "type": {
-              "type": "string"
-            },
-            "namespace": {
-              "type": "string"
-            }
-          }
-        }
-      }
-    },
-
-    "components_items": {
-      "title": "Component Items",
-      "description": "Elastic Agent component detailed status information",
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "status": {
-          "type": "string"
-        },
-        "message": {
-          "type": "string"
-        },
-        "units": {
-          "type": "array",
-          "items": {
+            "description": "The action signed data and signature.",
             "type": "object",
             "properties": {
-              "id": {
-                "type": "string"
-              },
-              "type": {
-                "type": "string"
-              },
-              "status": {
-                "type": "string"
-              },
-              "message": {
-                "type": "string"
-              }
-            }
-          }
-        }
-      }
-    },
-
-    "available_rollback": {
-      "title": "AvailableRollback",
-      "type": "object",
-      "properties": {
-        "version": {
-          "type": "string"
+                "data": {
+                    "description": "The base64 encoded, UTF-8 JSON serialized action bytes that are signed.",
+                    "type": "string"
+                },
+                "signature": {
+                    "description": "The base64 encoded signature.",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "data",
+                "signature"
+            ]
         },
-        "valid_until": {
-          "type": "string",
-          "format": "date-time"
-        }
-      }
-    },
-
-    "agent": {
-      "title": "Agent",
-      "description": "An Elastic Agent that has enrolled into Fleet",
-      "type": "object",
-      "properties": {
-        "_id": {
-          "description": "The unique identifier for the Elastic Agent",
-          "type": "string",
-          "format": "uuid"
+        "action-result": {
+            "title": "Agent action results",
+            "description": "An Elastic Agent action results",
+            "type": "object",
+            "properties": {
+                "@timestamp": {
+                    "description": "Date/time the action was created",
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "agent_id": {
+                    "description": "The agent id.",
+                    "type": "string"
+                },
+                "action_id": {
+                    "description": "The action id.",
+                    "type": "string"
+                },
+                "action_input_type": {
+                    "description": "The input type of the original action.",
+                    "type": "string"
+                },
+                "namespaces": {
+                    "description": "Namespaces",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "started_at": {
+                    "description": "Date/time the action was started",
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "completed_at": {
+                    "description": "Date/time the action was completed",
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "action_data": {
+                    "description": "The opaque payload.",
+                    "format": "raw"
+                },
+                "action_response": {
+                    "description": "The custom action response payload.",
+                    "format": "raw"
+                },
+                "error": {
+                    "description": "The action error message.",
+                    "type": "string"
+                },
+                "data": {
+                    "description": "The opaque payload.",
+                    "format": "raw"
+                }
+            },
+            "required": [
+                "id",
+                "agent",
+                "action"
+            ]
         },
-        "_version": {
-          "description": "The version of the document in the index",
-          "type": "integer"
+        "agent-metadata": {
+            "title": "Agent Metadata",
+            "description": "An Elastic Agent metadata",
+            "type": "object",
+            "properties": {
+                "id": {
+                    "description": "The unique identifier for the Elastic Agent",
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "version": {
+                    "description": "The version of the Elastic Agent",
+                    "type": "string"
+                },
+                "type": {
+                    "description": "The type of the Elastic Agent",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "id",
+                "version"
+            ]
         },
-        "shared_id": {
-          "description": "Shared ID",
-          "type": "string"
+        "artifact": {
+            "title": "Artifact",
+            "description": "An artifact served by Fleet",
+            "type": "object",
+            "properties": {
+                "identifier": {
+                    "description": "Human readable artifact identifier",
+                    "type": "string"
+                },
+                "compression_algorithm": {
+                    "description": "Name of compression algorithm applied to artifact",
+                    "type": "string"
+                },
+                "encryption_algorithm": {
+                    "description": "Name of encryption algorithm applied to artifact",
+                    "type": "string"
+                },
+                "encoded_sha256": {
+                    "description": "SHA256 of artifact after encoding has been applied",
+                    "type": "string"
+                },
+                "encoded_size": {
+                    "description": "Size of artifact after encoding has been applied",
+                    "type": "integer"
+                },
+                "decoded_sha256": {
+                    "description": "SHA256 of artifact before encoding has been applied",
+                    "type": "string"
+                },
+                "decoded_size": {
+                    "description": "Size of artifact before encoding has been applied",
+                    "type": "integer"
+                },
+                "created": {
+                    "description": "Timestamp artifact was created",
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "body": {
+                    "description": "Encoded artifact data",
+                    "format": "raw"
+                },
+                "package_name": {
+                    "description": "Name of the package that owns this artifact",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "identifier",
+                "compressionAlgorithm",
+                "encodedSha256",
+                "encodedSize",
+                "decodedSha256",
+                "decodedSize",
+                "created",
+                "body"
+            ]
         },
-        "enrollment_id": {
-          "description": "Enrollment ID",
-          "type": "string"
+        "host-metadata": {
+            "title": "Host Metadata",
+            "description": "The host metadata for the Elastic Agent",
+            "type": "object",
+            "properties": {
+                "id": {
+                    "description": "The ID of the host",
+                    "type": "string"
+                },
+                "architecture": {
+                    "description": "The architecture for the Elastic Agent",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "The hostname of the Elastic Agent",
+                    "type": "string"
+                },
+                "ip": {
+                    "description": "The IP addresses of the Elastic Agent",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            },
+            "required": [
+                "id",
+                "architecture",
+                "name"
+            ]
         },
-        "namespaces": {
-          "description": "Namespaces",
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
+        "server-metadata": {
+            "title": "Server Metadata",
+            "description": "A Fleet Server metadata",
+            "type": "object",
+            "properties": {
+                "id": {
+                    "description": "The unique identifier for the Fleet Server",
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "version": {
+                    "description": "The version of the Fleet Server",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "id",
+                "version"
+            ]
         },
-        "type": {
-          "description": "Type",
-          "type": "string"
-        },
-        "active": {
-          "description": "Active flag",
-          "type": "boolean"
-        },
-        "enrolled_at": {
-          "description": "Date/time the Elastic Agent enrolled",
-          "type": "string",
-          "format": "date-time"
-        },
-        "unenrolled_at": {
-          "description": "Date/time the Elastic Agent unenrolled",
-          "type": "string",
-          "format": "date-time"
-        },
-        "unenrolled_reason": {
-          "description": "Reason the Elastic Agent was unenrolled",
-          "type": "string",
-          "enum": ["manual", "timeout"]
-        },
-        "unenrollment_started_at": {
-          "description": "Date/time the Elastic Agent unenrolled started",
-          "type": "string",
-          "format": "date-time"
-        },
-        "audit_unenrolled_time": {
-          "description": "Agent timestamp for audit unenroll/uninstall action",
-          "type": "string",
-          "format": "date-time"
-        },
-        "audit_unenrolled_reason": {
-          "description": "Agent reason for unenroll/uninstall annotation.",
-          "type": "string",
-          "enum": ["uninstall", "orphaned", "key_revoked", "migrated"]
-        },
-        "upgraded_at": {
-          "description": "Date/time the Elastic Agent was last upgraded",
-          "type": "string",
-          "format": "date-time"
-        },
-        "upgrade_started_at": {
-          "description": "Date/time the Elastic Agent started the current upgrade",
-          "type": "string",
-          "format": "date-time"
-        },
-        "upgrade_status": {
-          "description": "Upgrade status",
-          "type": "string"
-        },
-        "access_api_key_id": {
-          "description": "ID of the API key the Elastic Agent must used to contact Fleet Server",
-          "type": "string"
-        },
-        "agent": { "$ref": "#/definitions/agent-metadata" },
-        "user_provided_metadata": {
-          "description": "User provided metadata information for the Elastic Agent",
-          "format": "raw"
-        },
-        "tags": {
-          "description": "User provided tags for the Elastic Agent",
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "local_metadata": {
-          "description": "Local metadata information for the Elastic Agent",
-          "format": "raw"
-        },
-        "policy_id": {
-          "description": "The policy ID that the Elastic Agent should run.",
-          "type": "string",
-          "format": "uuid"
-        },
-        "agent_policy_id": {
-          "description": "The policy ID that the Elastic Agent is currently running.",
-          "type": "string",
-          "format": "uuid"
-        },
-        "policy_revision_idx": {
-          "description": "The current policy revision_idx for the Elastic Agent",
-          "type": "integer"
-        },
-        "policy_coordinator_idx": {
-          "deprecated": true,
-          "description": "The current policy coordinator for the Elastic Agent",
-          "type": "integer"
-        },
-        "policy_output_permissions_hash": {
-          "description": "Deprecated. Use Outputs instead. The policy output permissions hash",
-          "type": "string"
-        },
-        "last_updated": {
-          "description": "Date/time the Elastic Agent was last updated",
-          "type": "string",
-          "format": "date-time"
-        },
-        "last_checkin": {
-          "description": "Date/time the Elastic Agent checked in last time",
-          "type": "string",
-          "format": "date-time"
-        },
-        "last_checkin_status": {
-          "description": "Last checkin status",
-          "type": "string"
-        },
-        "last_checkin_message": {
-          "description": "Last checkin message",
-          "type": "string"
-        },
-        "unhealthy_reason": {
-          "description": "Unhealthy reason: input/output/other",
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "components": {
-          "description": "Elastic Agent components detailed status information",
-          "format": "raw"
-        },
-        "default_api_key_id": {
-          "description": "Deprecated. Use Outputs instead. ID of the API key the Elastic Agent uses to authenticate with elasticsearch",
-          "type": "string"
-        },
-        "default_api_key": {
-          "description": "Deprecated. Use Outputs instead. API key the Elastic Agent uses to authenticate with elasticsearch",
-          "type": "string"
-        },
-        "default_api_key_history": {
-          "description": "Deprecated. Use Outputs instead. Default API Key History",
-          "$ref": "#/definitions/to_retire_api_key_ids"
-        },
-        "outputs": {
-          "description": "Outputs is the policy output data, mapping the output name to its data",
-          "type": "object",
-          "additionalProperties": { "$ref": "#/definitions/policy_output" }
-        },
-        "updated_at": {
-          "description": "Date/time the Elastic Agent was last updated",
-          "type": "string",
-          "format": "date-time"
-        },
-        "packages": {
-          "description": "Packages array",
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "action_seq_no": {
-          "description": "The last acknowledged action sequence number for the Elastic Agent",
-          "type": "array",
-          "items": {
-            "type": "integer"
-          }
-        },
-        "upgrade_details": {
-          "description": "Additional upgrade status details.",
-          "type": "object"
-        },
-        "upgrade_attempts": {
-          "description": "List of timestamps of attempts of Elastic Agent automatic upgrades",
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "replace_token": {
-          "description": "hash of token provided during enrollment that allows replacement by another enrollment with same ID",
-          "type": "string"
-        },
-        "upgrade" : {
-          "description": "Container for upgrade-related agent data",
-          "type": "object",
-          "properties": {
-            "rollbacks": {
-              "description": "list of available rollbacks for the agent",
-              "type": "array",
-              "items": {
-                "$ref": "#/definitions/available_rollback"
-              }
-            }
-          }
-        },
-        "identifying_attributes": {
-          "description": "Identifying attributes of the collector",
-          "format": "raw"
-        },
-        "non_identifying_attributes": {
-          "description": "Non-identifying attributes of the collector",
-          "format": "raw"
-        },
-        "sequence_num": {
-          "description": "The sequence number of the last collector message",
-          "type": "integer"
-        },
-         "health": {
-          "description": "Health information of the collector",
-          "format": "raw"
-        },
-        "capabilities": {
-          "description": "List of capabilities of the collector",
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "effective_config": {
-          "description": "The effective config that the collector is running",
-          "format": "raw"
-        }
-      },
-      "required": ["_id", "type", "active", "enrolled_at", "status"]
-    },
-
-    "enrollment_api_key": {
-      "title": "Enrollment API key",
-      "description": "An Elastic Agent enrollment API key",
-      "type": "object",
-      "properties": {
-        "active": {
-          "description": "True when the key is active",
-          "type": "boolean"
-        },
-        "api_key_id": {
-          "description": "The unique identifier for the enrollment key, currently xid",
-          "type": "string"
-        },
-        "api_key": {
-          "description": "Api key",
-          "type": "string"
-        },
-        "namespaces": {
-          "description": "Namespaces",
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "name": {
-          "description": "Enrollment key name",
-          "type": "string"
-        },
-        "policy_id": {
-          "type": "string"
-        },
-        "expire_at": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "created_at": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "updated_at": {
-          "type": "string",
-          "format": "date-time"
-        }
-      },
-      "required": ["api_key_id", "api_key"]
-    },
-
-    "checkin": {
-      "title": "Checkin",
-      "description": "An Elastic Agent checkin to Fleet",
-      "type": "object",
-      "properties": {
-        "_id": {
-          "description": "The unique identifier for the Elastic Agent checkin",
-          "type": "string",
-          "format": "uuid"
-        },
-        "@timestamp": {
-          "description": "Date/time the checkin was created",
-          "type": "string",
-          "format": "date-time"
-        },
-        "agent": { "$ref": "#/definitions/agent-metadata" },
-        "host": { "$ref": "#/definitions/host-metadata" },
-        "server": { "$ref": "#/definitions/server-metadata" },
-        "status": {
-          "description": "The current overall status of the Elastic Agent",
-          "type": "string",
-          "enum": [
-            "enrolling",
-            "healthy",
-            "error",
-            "degraded",
-            "offline",
-            "unenrolling",
-            "upgrading"
-          ]
-        },
-        "message": {
-          "description": "The current overall status message of the Elastic Agent",
-          "type": "string"
+        "server": {
+            "deprecated": true,
+            "title": "Server",
+            "description": "A Fleet Server",
+            "type": "object",
+            "properties": {
+                "@timestamp": {
+                    "description": "Date/time the server was updated",
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "agent": {
+                    "$ref": "#/definitions/agent-metadata"
+                },
+                "host": {
+                    "$ref": "#/definitions/host-metadata"
+                },
+                "server": {
+                    "$ref": "#/definitions/server-metadata"
+                }
+            },
+            "required": [
+                "agent",
+                "host",
+                "server"
+            ]
         },
         "policy": {
-          "title": "Checkin Policy",
-          "description": "The current status of the applied policy",
-          "type": "object",
-          "properties": {
-            "id": {
-              "description": "The ID for the policy",
-              "type": "string",
-              "format": "uuid"
-            },
-            "revision": {
-              "description": "The revision of the policy",
-              "type": "integer"
-            },
-            "inputs": {
-              "title": "Checkin Policy Input",
-              "description": "The current input status per policy",
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "id": {
-                    "description": "The ID for the input",
-                    "type": "string",
-                    "format": "uuid"
-                  },
-                  "template_id": {
-                    "description": "The template ID for the input",
-                    "type": "string",
-                    "format": "uuid"
-                  },
-                  "status": {
-                    "description": "The current status of the input",
-                    "type": "string",
-                    "enum": ["healthy", "error", "degraded"]
-                  },
-                  "message": {
-                    "description": "The current status message of the intput",
-                    "type": "string"
-                  }
-                },
-                "required": ["id", "template_id", "status", "message"]
-              }
-            }
-          },
-          "required": ["id", "revision", "inputs"]
-        }
-      },
-      "required": [
-        "_id",
-        "agent",
-        "status",
-        "message",
-        "enrolled_at",
-        "updated_at"
-      ]
-    },
-
-    "policy-data": {
-      "title": "Policy Data",
-      "description": "The policy data that an agent needs to run",
-      "type": "object",
-      "properties": {
-        "id": {
-          "description": "The policy's ID",
-          "type": "string"
-        },
-        "outputs": {
-          "description": "A map of all outputs that the agent running the policy can use to send data to.",
-          "type": "object",
-          "additionalProperties": {
-            "type": "object",
-            "additionalProperties": {
-              "$comment": "results in map[string]map[string]interface{}. We use a dynamic output objects because it would be a larger task to define the properties we need to support for each output type, this may be done as future work"
-            }
-          }
-        },
-        "inputs": {
-          "description": "A list of all inputs the agent should run",
-          "type": "array",
-          "items": {
-            "type": "object",
-            "additionalProperties": {
-              "$comment": "embedded additionalProperties type results in `outputs map[string]interface{}`"
-            }
-          }
-        },
-        "extensions": {
-          "description": "OTel collector extensions",
-          "type": "object",
-          "additionalProperties": {}
-        },
-        "receivers": {
-          "description": "OTel collector receivers",
-          "type": "object",
-          "additionalProperties": {}
-        },
-        "processors": {
-          "description": "OTel collector processors",
-          "type": "object",
-          "additionalProperties": {}
-        },
-        "connectors": {
-          "description": "OTel collector connectors",
-          "type": "object",
-          "additionalProperties": {}
-        },
-        "exporters": {
-          "description": "OTel collector exporters",
-          "type": "object",
-          "additionalProperties": {}
-        },
-        "service": {
-          "description": "OTel collector pipelines setup",
-          "type": "object",
-          "properties": {
-            "extensions": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "pipelines": {
-              "type": "object",
-              "additionalProperties": {
-                "type": "object",
-                "properties": {
-                  "exporters": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  },
-                  "processors": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  },
-                  "receivers": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "secret_references": {
-          "description": "A list of all secrets fleet-server needs to inject into the policy before passing it to the agent. This attribute is removed when policy data is send to an agent.",
-          "type": "array",
-          "items": {
+            "title": "Policy",
+            "description": "A policy that an Elastic Agent is attached to",
             "type": "object",
             "properties": {
-              "id": {
-                "type": "string"
-              }
+                "@timestamp": {
+                    "description": "Date/time the policy revision was created",
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "policy_id": {
+                    "description": "The ID of the policy",
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "revision_idx": {
+                    "description": "The revision index of the policy",
+                    "type": "integer"
+                },
+                "coordinator_idx": {
+                    "deprecated": true,
+                    "description": "The coordinator index of the policy",
+                    "type": "integer"
+                },
+                "namespaces": {
+                    "description": "Namespaces",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "data": {
+                    "$ref": "#/definitions/policy-data"
+                },
+                "default_fleet_server": {
+                    "description": "True when this policy is the default policy to start Fleet Server",
+                    "type": "boolean"
+                },
+                "unenroll_timeout": {
+                    "description": "Timeout (seconds) that an Elastic Agent should be un-enrolled.",
+                    "type": "integer"
+                }
             },
-            "required": ["id"]
-          }
+            "required": [
+                "policy_id",
+                "revision_idx",
+                "data",
+                "default_fleet_server"
+            ]
         },
-        "revision": {
-          "description": "The policy revision number. Should match revision_idx",
-          "type": "integer"
+        "policy-leader": {
+            "deprecated": true,
+            "title": "Policy Leader",
+            "description": "The current leader Fleet Server for a policy",
+            "type": "object",
+            "properties": {
+                "@timestamp": {
+                    "description": "Date/time the leader was taken or held",
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "server": {
+                    "$ref": "#/definitions/server-metadata"
+                }
+            },
+            "required": [
+                "server"
+            ]
+        },
+        "to_retire_api_key_ids": {
+            "type": "array",
+            "items": {
+                "description": "the Output API Keys that were replaced and should be retired",
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "description": "API Key identifier",
+                        "type": "string"
+                    },
+                    "retired_at": {
+                        "description": "Date/time the API key was retired",
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "output": {
+                        "description": "Output name where the API Key belongs",
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "policy_output": {
+            "type": "object",
+            "description": "holds the needed data to manage the output API keys",
+            "properties": {
+                "api_key": {
+                    "description": "API key the Elastic Agent uses to authenticate with elasticsearch",
+                    "type": "string"
+                },
+                "to_retire_api_key_ids": {
+                    "description": "API keys to be invalidated on next agent ack",
+                    "$ref": "#/definitions/to_retire_api_key_ids"
+                },
+                "api_key_id": {
+                    "description": "ID of the API key the Elastic Agent uses to authenticate with elasticsearch",
+                    "type": "string"
+                },
+                "permissions_hash": {
+                    "description": "The policy output permissions hash",
+                    "type": "string"
+                },
+                "type": {
+                    "description": "Type is the output type. Currently only Elasticsearch is supported.",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "api_key",
+                "api_key_history",
+                "api_key_id",
+                "permissions_hash",
+                "type"
+            ]
+        },
+        "output_health": {
+            "description": "Output health represents a health state of an output",
+            "type": "object",
+            "properties": {
+                "output": {
+                    "type": "string",
+                    "description": "Output ID"
+                },
+                "state": {
+                    "type": "string",
+                    "description": "Health state, can be HEALTHY or DEGRADED"
+                },
+                "message": {
+                    "type": "string",
+                    "description": "Long state message if unhealthy"
+                },
+                "@timestamp": {
+                    "type": "string",
+                    "description": "Timestamp of reported state"
+                },
+                "data_stream": {
+                    "type": "object",
+                    "properties": {
+                        "dataset": {
+                            "type": "string"
+                        },
+                        "type": {
+                            "type": "string"
+                        },
+                        "namespace": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "components_items": {
+            "title": "Component Items",
+            "description": "Elastic Agent component detailed status information",
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "units": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "id": {
+                                "type": "string"
+                            },
+                            "type": {
+                                "type": "string"
+                            },
+                            "status": {
+                                "type": "string"
+                            },
+                            "message": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "available_rollback": {
+            "title": "AvailableRollback",
+            "type": "object",
+            "properties": {
+                "version": {
+                    "type": "string"
+                },
+                "valid_until": {
+                    "type": "string",
+                    "format": "date-time"
+                }
+            }
         },
         "agent": {
-          "description": "The policy's agent configuration details",
-          "type": "object",
-          "additionalProperties": {}
+            "title": "Agent",
+            "description": "An Elastic Agent that has enrolled into Fleet",
+            "type": "object",
+            "properties": {
+                "_id": {
+                    "description": "The unique identifier for the Elastic Agent",
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "_version": {
+                    "description": "The version of the document in the index",
+                    "type": "integer"
+                },
+                "shared_id": {
+                    "description": "Shared ID",
+                    "type": "string"
+                },
+                "enrollment_id": {
+                    "description": "Enrollment ID",
+                    "type": "string"
+                },
+                "namespaces": {
+                    "description": "Namespaces",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "type": {
+                    "description": "Type",
+                    "type": "string"
+                },
+                "active": {
+                    "description": "Active flag",
+                    "type": "boolean"
+                },
+                "enrolled_at": {
+                    "description": "Date/time the Elastic Agent enrolled",
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "unenrolled_at": {
+                    "description": "Date/time the Elastic Agent unenrolled",
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "unenrolled_reason": {
+                    "description": "Reason the Elastic Agent was unenrolled",
+                    "type": "string",
+                    "enum": [
+                        "manual",
+                        "timeout"
+                    ]
+                },
+                "unenrollment_started_at": {
+                    "description": "Date/time the Elastic Agent unenrolled started",
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "audit_unenrolled_time": {
+                    "description": "Agent timestamp for audit unenroll/uninstall action",
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "audit_unenrolled_reason": {
+                    "description": "Agent reason for unenroll/uninstall annotation.",
+                    "type": "string",
+                    "enum": [
+                        "uninstall",
+                        "orphaned",
+                        "key_revoked",
+                        "migrated"
+                    ]
+                },
+                "upgraded_at": {
+                    "description": "Date/time the Elastic Agent was last upgraded",
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "upgrade_started_at": {
+                    "description": "Date/time the Elastic Agent started the current upgrade",
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "upgrade_status": {
+                    "description": "Upgrade status",
+                    "type": "string"
+                },
+                "access_api_key_id": {
+                    "description": "ID of the API key the Elastic Agent must used to contact Fleet Server",
+                    "type": "string"
+                },
+                "agent": {
+                    "$ref": "#/definitions/agent-metadata"
+                },
+                "user_provided_metadata": {
+                    "description": "User provided metadata information for the Elastic Agent",
+                    "format": "raw"
+                },
+                "tags": {
+                    "description": "User provided tags for the Elastic Agent",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "local_metadata": {
+                    "description": "Local metadata information for the Elastic Agent",
+                    "format": "raw"
+                },
+                "policy_id": {
+                    "description": "The policy ID that the Elastic Agent should run.",
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "policy_base_id": {
+                    "description": "The base policy ID (policy_id without version suffix) for efficient querying.",
+                    "type": "string"
+                },
+                "agent_policy_id": {
+                    "description": "The policy ID that the Elastic Agent is currently running.",
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "policy_revision_idx": {
+                    "description": "The current policy revision_idx for the Elastic Agent",
+                    "type": "integer"
+                },
+                "policy_coordinator_idx": {
+                    "deprecated": true,
+                    "description": "The current policy coordinator for the Elastic Agent",
+                    "type": "integer"
+                },
+                "policy_output_permissions_hash": {
+                    "description": "Deprecated. Use Outputs instead. The policy output permissions hash",
+                    "type": "string"
+                },
+                "last_updated": {
+                    "description": "Date/time the Elastic Agent was last updated",
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "last_checkin": {
+                    "description": "Date/time the Elastic Agent checked in last time",
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "last_checkin_status": {
+                    "description": "Last checkin status",
+                    "type": "string"
+                },
+                "last_checkin_message": {
+                    "description": "Last checkin message",
+                    "type": "string"
+                },
+                "unhealthy_reason": {
+                    "description": "Unhealthy reason: input/output/other",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "components": {
+                    "description": "Elastic Agent components detailed status information",
+                    "format": "raw"
+                },
+                "default_api_key_id": {
+                    "description": "Deprecated. Use Outputs instead. ID of the API key the Elastic Agent uses to authenticate with elasticsearch",
+                    "type": "string"
+                },
+                "default_api_key": {
+                    "description": "Deprecated. Use Outputs instead. API key the Elastic Agent uses to authenticate with elasticsearch",
+                    "type": "string"
+                },
+                "default_api_key_history": {
+                    "description": "Deprecated. Use Outputs instead. Default API Key History",
+                    "$ref": "#/definitions/to_retire_api_key_ids"
+                },
+                "outputs": {
+                    "description": "Outputs is the policy output data, mapping the output name to its data",
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/policy_output"
+                    }
+                },
+                "updated_at": {
+                    "description": "Date/time the Elastic Agent was last updated",
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "packages": {
+                    "description": "Packages array",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "action_seq_no": {
+                    "description": "The last acknowledged action sequence number for the Elastic Agent",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "upgrade_details": {
+                    "description": "Additional upgrade status details.",
+                    "type": "object"
+                },
+                "upgrade_attempts": {
+                    "description": "List of timestamps of attempts of Elastic Agent automatic upgrades",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "replace_token": {
+                    "description": "hash of token provided during enrollment that allows replacement by another enrollment with same ID",
+                    "type": "string"
+                },
+                "upgrade": {
+                    "description": "Container for upgrade-related agent data",
+                    "type": "object",
+                    "properties": {
+                        "rollbacks": {
+                            "description": "list of available rollbacks for the agent",
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/available_rollback"
+                            }
+                        }
+                    }
+                },
+                "identifying_attributes": {
+                    "description": "Identifying attributes of the collector",
+                    "format": "raw"
+                },
+                "non_identifying_attributes": {
+                    "description": "Non-identifying attributes of the collector",
+                    "format": "raw"
+                },
+                "sequence_num": {
+                    "description": "The sequence number of the last collector message",
+                    "type": "integer"
+                },
+                "health": {
+                    "description": "Health information of the collector",
+                    "format": "raw"
+                },
+                "capabilities": {
+                    "description": "List of capabilities of the collector",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "effective_config": {
+                    "description": "The effective config that the collector is running",
+                    "format": "raw"
+                }
+            },
+            "required": [
+                "_id",
+                "type",
+                "active",
+                "enrolled_at",
+                "status"
+            ]
         },
-        "signed": {
-          "$ref": "#/definitions/signed"
+        "enrollment_api_key": {
+            "title": "Enrollment API key",
+            "description": "An Elastic Agent enrollment API key",
+            "type": "object",
+            "properties": {
+                "active": {
+                    "description": "True when the key is active",
+                    "type": "boolean"
+                },
+                "api_key_id": {
+                    "description": "The unique identifier for the enrollment key, currently xid",
+                    "type": "string"
+                },
+                "api_key": {
+                    "description": "Api key",
+                    "type": "string"
+                },
+                "namespaces": {
+                    "description": "Namespaces",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "name": {
+                    "description": "Enrollment key name",
+                    "type": "string"
+                },
+                "policy_id": {
+                    "type": "string"
+                },
+                "expire_at": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "created_at": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "updated_at": {
+                    "type": "string",
+                    "format": "date-time"
+                }
+            },
+            "required": [
+                "api_key_id",
+                "api_key"
+            ]
         },
-        "output_permissions": {
-          "description": "The Elasticsearch permissions needed to run the policy",
-          "format": "raw"
+        "checkin": {
+            "title": "Checkin",
+            "description": "An Elastic Agent checkin to Fleet",
+            "type": "object",
+            "properties": {
+                "_id": {
+                    "description": "The unique identifier for the Elastic Agent checkin",
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "@timestamp": {
+                    "description": "Date/time the checkin was created",
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "agent": {
+                    "$ref": "#/definitions/agent-metadata"
+                },
+                "host": {
+                    "$ref": "#/definitions/host-metadata"
+                },
+                "server": {
+                    "$ref": "#/definitions/server-metadata"
+                },
+                "status": {
+                    "description": "The current overall status of the Elastic Agent",
+                    "type": "string",
+                    "enum": [
+                        "enrolling",
+                        "healthy",
+                        "error",
+                        "degraded",
+                        "offline",
+                        "unenrolling",
+                        "upgrading"
+                    ]
+                },
+                "message": {
+                    "description": "The current overall status message of the Elastic Agent",
+                    "type": "string"
+                },
+                "policy": {
+                    "title": "Checkin Policy",
+                    "description": "The current status of the applied policy",
+                    "type": "object",
+                    "properties": {
+                        "id": {
+                            "description": "The ID for the policy",
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "revision": {
+                            "description": "The revision of the policy",
+                            "type": "integer"
+                        },
+                        "inputs": {
+                            "title": "Checkin Policy Input",
+                            "description": "The current input status per policy",
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "id": {
+                                        "description": "The ID for the input",
+                                        "type": "string",
+                                        "format": "uuid"
+                                    },
+                                    "template_id": {
+                                        "description": "The template ID for the input",
+                                        "type": "string",
+                                        "format": "uuid"
+                                    },
+                                    "status": {
+                                        "description": "The current status of the input",
+                                        "type": "string",
+                                        "enum": [
+                                            "healthy",
+                                            "error",
+                                            "degraded"
+                                        ]
+                                    },
+                                    "message": {
+                                        "description": "The current status message of the intput",
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "id",
+                                    "template_id",
+                                    "status",
+                                    "message"
+                                ]
+                            }
+                        }
+                    },
+                    "required": [
+                        "id",
+                        "revision",
+                        "inputs"
+                    ]
+                }
+            },
+            "required": [
+                "_id",
+                "agent",
+                "status",
+                "message",
+                "enrolled_at",
+                "updated_at"
+            ]
         },
-        "fleet": {
-          "description": "The policy's fleet configuration details",
-          "type": "object",
-          "additionalProperties": {}
+        "policy-data": {
+            "title": "Policy Data",
+            "description": "The policy data that an agent needs to run",
+            "type": "object",
+            "properties": {
+                "id": {
+                    "description": "The policy's ID",
+                    "type": "string"
+                },
+                "outputs": {
+                    "description": "A map of all outputs that the agent running the policy can use to send data to.",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "$comment": "results in map[string]map[string]interface{}. We use a dynamic output objects because it would be a larger task to define the properties we need to support for each output type, this may be done as future work"
+                        }
+                    }
+                },
+                "inputs": {
+                    "description": "A list of all inputs the agent should run",
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "$comment": "embedded additionalProperties type results in `outputs map[string]interface{}`"
+                        }
+                    }
+                },
+                "extensions": {
+                    "description": "OTel collector extensions",
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "receivers": {
+                    "description": "OTel collector receivers",
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "processors": {
+                    "description": "OTel collector processors",
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "connectors": {
+                    "description": "OTel collector connectors",
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "exporters": {
+                    "description": "OTel collector exporters",
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "service": {
+                    "description": "OTel collector pipelines setup",
+                    "type": "object",
+                    "properties": {
+                        "extensions": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "pipelines": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "object",
+                                "properties": {
+                                    "exporters": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "processors": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "receivers": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "secret_references": {
+                    "description": "A list of all secrets fleet-server needs to inject into the policy before passing it to the agent. This attribute is removed when policy data is send to an agent.",
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "id": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "id"
+                        ]
+                    }
+                },
+                "revision": {
+                    "description": "The policy revision number. Should match revision_idx",
+                    "type": "integer"
+                },
+                "agent": {
+                    "description": "The policy's agent configuration details",
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "signed": {
+                    "$ref": "#/definitions/signed"
+                },
+                "output_permissions": {
+                    "description": "The Elasticsearch permissions needed to run the policy",
+                    "format": "raw"
+                },
+                "fleet": {
+                    "description": "The policy's fleet configuration details",
+                    "type": "object",
+                    "additionalProperties": {}
+                }
+            },
+            "required": [
+                "id",
+                "revision",
+                "outputs"
+            ]
         }
-      },
-      "required": ["id", "revision", "outputs"]
     }
-  }
 }
