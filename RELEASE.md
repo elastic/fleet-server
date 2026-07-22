@@ -59,7 +59,7 @@ Use plain `X.Y.Z` semver for `CURRENT_RELEASE` (no `-test` or `-SNAPSHOT` suffix
 | `PROJECT_REPO` | no | `fleet-server` | GitHub repository |
 | `PROJECT_REVIEWERS` | no | `elastic/elastic-agent-control-plane` | PR reviewers |
 
-Derived (not env-overridable): `NEXT_RELEASE` (patch+1), `NEXT_PROJECT_MINOR_VERSION` (minor+1), `RELEASE_BRANCH` (`X.Y`), `LATEST_RELEASE` (patch−1 or GitHub lookup).
+Derived (not env-overridable): `NEXT_RELEASE` (patch+1), `NEXT_PROJECT_MINOR_VERSION` (minor+1), `RELEASE_BRANCH` (`X.Y`), `LATEST_RELEASE` (patch−1, or GitHub Releases lookup with git-tag fallback when releases are empty).
 
 ## Files updated
 

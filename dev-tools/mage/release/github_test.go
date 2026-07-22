@@ -101,6 +101,74 @@ func TestCreatePRIdempotent(t *testing.T) {
 	}
 }
 
+func TestLatestReleaseBeforeUsesReleasesWhenPresent(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/repos/elastic/fleet-server/releases":
+			w.Header().Set("Content-Type", "application/json")
+			releases := []*github.RepositoryRelease{
+				{TagName: github.Ptr("v9.5.1")},
+				{TagName: github.Ptr("v9.4.3")},
+				{TagName: github.Ptr("v8.19.1")},
+			}
+			if err := json.NewEncoder(w).Encode(releases); err != nil {
+				t.Errorf("failed to encode releases: %v", err)
+			}
+		case r.Method == http.MethodGet && r.URL.Path == "/repos/elastic/fleet-server/tags":
+			t.Errorf("ListTags should not be called when releases exist")
+			http.NotFound(w, r)
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			http.NotFound(w, r)
+		}
+	})
+
+	ghClient := newTestGitHubClient(t, handler)
+	got, err := ghClient.LatestReleaseBefore("elastic", "fleet-server", "9.6.0")
+	if err != nil {
+		t.Fatalf("LatestReleaseBefore() error = %v", err)
+	}
+	if got != "9.5.1" {
+		t.Errorf("LatestReleaseBefore() = %q, want 9.5.1", got)
+	}
+}
+
+func TestLatestReleaseBeforeFallsBackToTagsWhenReleasesEmpty(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/repos/elastic/fleet-server/releases":
+			w.Header().Set("Content-Type", "application/json")
+			if err := json.NewEncoder(w).Encode([]*github.RepositoryRelease{}); err != nil {
+				t.Errorf("failed to encode empty releases: %v", err)
+			}
+		case r.Method == http.MethodGet && r.URL.Path == "/repos/elastic/fleet-server/tags":
+			w.Header().Set("Content-Type", "application/json")
+			tags := []*github.RepositoryTag{
+				{Name: github.Ptr("v9.4.4")},
+				{Name: github.Ptr("v9.4.3")},
+				{Name: github.Ptr("v9.3.8")},
+				{Name: github.Ptr("v8.19.1")},
+				{Name: github.Ptr("not-a-version")},
+			}
+			if err := json.NewEncoder(w).Encode(tags); err != nil {
+				t.Errorf("failed to encode tags: %v", err)
+			}
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			http.NotFound(w, r)
+		}
+	})
+
+	ghClient := newTestGitHubClient(t, handler)
+	got, err := ghClient.LatestReleaseBefore("elastic", "fleet-server", "9.6.0")
+	if err != nil {
+		t.Fatalf("LatestReleaseBefore() error = %v", err)
+	}
+	if got != "9.4.4" {
+		t.Errorf("LatestReleaseBefore() = %q, want 9.4.4", got)
+	}
+}
+
 func TestCreatePRCreatesWhenNoneExists(t *testing.T) {
 	createCalls := 0
 	newPR := &github.PullRequest{

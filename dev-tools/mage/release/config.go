@@ -168,7 +168,8 @@ var fetchLatestReleaseBefore = func(token, owner, repo, current string) (string,
 	return NewGitHubClient(token).LatestReleaseBefore(owner, repo, current)
 }
 
-// EnsureLatestRelease sets LatestRelease when unset by querying elastic/fleet-server releases.
+// EnsureLatestRelease sets LatestRelease when unset by querying elastic/fleet-server
+// GitHub Releases, falling back to git tags when no releases are published.
 func (c *ReleaseConfig) EnsureLatestRelease() error {
 	if c.LatestRelease != "" {
 		return nil

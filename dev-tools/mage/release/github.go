@@ -447,10 +447,17 @@ const (
 
 // LatestReleaseBefore returns the highest published release version with the same major
 // that is strictly less than currentVersion (e.g. current 9.5.0 → 9.4.3).
+// When the repo has no GitHub Releases, it falls back to git tags (fleet-server's usual case).
 func (gh *GitHubClient) LatestReleaseBefore(owner, repo, currentVersion string) (string, error) {
 	versions, err := gh.listReleaseVersions(owner, repo)
 	if err != nil {
 		return "", err
+	}
+	if len(versions) == 0 {
+		versions, err = gh.listTagVersions(owner, repo)
+		if err != nil {
+			return "", err
+		}
 	}
 	return selectLatestReleaseBefore(versions, currentVersion)
 }
@@ -469,6 +476,29 @@ func (gh *GitHubClient) listReleaseVersions(owner, repo string) ([]string, error
 				continue
 			}
 			versions = append(versions, tag)
+		}
+		if resp.NextPage == 0 {
+			break
+		}
+		opts.Page = resp.NextPage
+	}
+	return versions, nil
+}
+
+func (gh *GitHubClient) listTagVersions(owner, repo string) ([]string, error) {
+	var versions []string
+	opts := &github.ListOptions{PerPage: 100}
+	for {
+		tags, resp, err := gh.client.Repositories.ListTags(gh.ctx, owner, repo, opts)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list tags for %s/%s: %w", owner, repo, err)
+		}
+		for _, tag := range tags {
+			name := tag.GetName()
+			if name == "" {
+				continue
+			}
+			versions = append(versions, name)
 		}
 		if resp.NextPage == 0 {
 			break
