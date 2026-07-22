@@ -14,6 +14,21 @@ import (
 
 const versionGoPath = "version/version.go"
 
+var defaultVersionPattern = regexp.MustCompile(`const DefaultVersion = "([^"]+)"`)
+
+// ReadFleetVersion returns DefaultVersion from version/version.go.
+func ReadFleetVersion() (string, error) {
+	content, err := os.ReadFile(versionGoPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read %s: %w", versionGoPath, err)
+	}
+	match := defaultVersionPattern.FindSubmatch(content)
+	if match == nil {
+		return "", fmt.Errorf("version pattern not found in %s", versionGoPath)
+	}
+	return string(match[1]), nil
+}
+
 func validateRepoRelativePath(path string) (string, error) {
 	if path == "" {
 		return "", fmt.Errorf("path must not be empty")

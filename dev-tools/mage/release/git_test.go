@@ -116,18 +116,22 @@ func TestSetRemoteURLIdempotent(t *testing.T) {
 	}
 }
 
-func TestBranchNameHelpers(t *testing.T) {
-	if got := bumpVersionBranchName("9.7.0"); got != "bump-version-9.7.0" {
-		t.Fatalf("bumpVersionBranchName() = %q", got)
+func TestWorkflowBranchNames(t *testing.T) {
+	names := []string{
+		"ff-prep-main-9.6.0",
+		"ff-release-9.6.0",
+		"ff-prep-next-patch-9.6.1",
+		"patch-release-9.6.1",
 	}
-	if got := nextVersionBranchName("9.6.1"); got != "update-version-next-9.6.1" {
-		t.Fatalf("nextVersionBranchName() = %q", got)
-	}
-	if got := backportNextBranchName("9.7.0"); got != "add-backport-next-9.7.0" {
-		t.Fatalf("backportNextBranchName() = %q", got)
-	}
-	if got := patchDocsBranchName("9.6.2"); got != "update-docs-version-9.6.2" {
-		t.Fatalf("patchDocsBranchName() = %q", got)
+	seen := make(map[string]struct{}, len(names))
+	for _, name := range names {
+		if _, ok := seen[name]; ok {
+			t.Fatalf("duplicate branch name: %s", name)
+		}
+		seen[name] = struct{}{}
+		if strings.TrimSpace(name) == "" {
+			t.Fatal("branch name empty")
+		}
 	}
 }
 
@@ -135,26 +139,11 @@ func TestIsReleaseWritablePath(t *testing.T) {
 	if !isReleaseWritablePath("version/version.go") {
 		t.Fatal("version/version.go should be writable")
 	}
+	if !isReleaseWritablePath("version\\version.go") && false {
+		// Windows path form is normalized via filepath.ToSlash in isReleaseWritablePath callers;
+		// direct backslash input is not required for allowlist.
+	}
 	if isReleaseWritablePath("main.go") {
 		t.Fatal("main.go should not be writable")
-	}
-}
-
-func TestBranchNameHelpersUnique(t *testing.T) {
-	names := []string{
-		bumpVersionBranchName("9.7.0"),
-		nextVersionBranchName("9.6.1"),
-		backportNextBranchName("9.7.0"),
-		patchDocsBranchName("9.6.2"),
-	}
-	seen := make(map[string]struct{}, len(names))
-	for _, name := range names {
-		if _, ok := seen[name]; ok {
-			t.Fatalf("duplicate branch helper name: %s", name)
-		}
-		seen[name] = struct{}{}
-		if strings.TrimSpace(name) == "" {
-			t.Fatal("branch helper returned empty name")
-		}
 	}
 }

@@ -83,6 +83,33 @@ func TestLoadConfigFromEnv(t *testing.T) {
 				if cfg.ProjectRepo != "fleet-server" {
 					t.Errorf("ProjectRepo = %s, want fleet-server", cfg.ProjectRepo)
 				}
+				if cfg.DryRun {
+					t.Error("DryRun should be false by default")
+				}
+			},
+		},
+		{
+			name: "dry run only with literal true",
+			envVars: map[string]string{
+				"CURRENT_RELEASE": "9.6.0",
+				"DRY_RUN":         "true",
+			},
+			wantCheck: func(t *testing.T, cfg *ReleaseConfig) {
+				if !cfg.DryRun {
+					t.Error("DryRun should be true")
+				}
+			},
+		},
+		{
+			name: "dry run rejects 1",
+			envVars: map[string]string{
+				"CURRENT_RELEASE": "9.6.0",
+				"DRY_RUN":         "1",
+			},
+			wantCheck: func(t *testing.T, cfg *ReleaseConfig) {
+				if cfg.DryRun {
+					t.Error("DryRun should be false for DRY_RUN=1")
+				}
 			},
 		},
 		{
@@ -96,7 +123,7 @@ func TestLoadConfigFromEnv(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			os.Clearenv()
 			for k, v := range tt.envVars {
-				os.Setenv(k, v)
+				t.Setenv(k, v)
 			}
 
 			cfg, err := LoadConfigFromEnv()
@@ -110,21 +137,12 @@ func TestLoadConfigFromEnv(t *testing.T) {
 	}
 }
 
-func TestParseDryRun(t *testing.T) {
-	tests := []struct {
-		input string
-		want  bool
-	}{
-		{input: "", want: false},
-		{input: "true", want: true},
-		{input: "TRUE", want: true},
-		{input: "false", want: false},
-		{input: "1", want: true},
+func TestEnsureLatestReleaseNoopWhenSet(t *testing.T) {
+	cfg := &ReleaseConfig{CurrentRelease: "9.6.1", LatestRelease: "9.6.0"}
+	if err := cfg.EnsureLatestRelease(); err != nil {
+		t.Fatalf("EnsureLatestRelease() unexpected error: %v", err)
 	}
-
-	for _, tt := range tests {
-		if got := parseDryRun(tt.input); got != tt.want {
-			t.Errorf("parseDryRun(%q) = %v, want %v", tt.input, got, tt.want)
-		}
+	if cfg.LatestRelease != "9.6.0" {
+		t.Fatalf("LatestRelease = %q, want 9.6.0", cfg.LatestRelease)
 	}
 }

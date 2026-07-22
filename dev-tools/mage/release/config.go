@@ -13,11 +13,11 @@ import (
 
 // ReleaseConfig holds the configuration for release operations.
 type ReleaseConfig struct {
-	CurrentRelease           string
-	LatestRelease            string
-	NextRelease              string
-	NextProjectMinorVersion  string
-	NextProjectMinorOnly     string
+	CurrentRelease          string
+	LatestRelease           string
+	NextRelease             string
+	NextProjectMinorVersion string
+	NextProjectMinorBranch  string
 
 	BaseBranch    string
 	ReleaseBranch string
@@ -42,50 +42,36 @@ func LoadConfigFromEnv() (*ReleaseConfig, error) {
 
 	latestRelease, err := inferLatestRelease(currentRelease)
 	if err != nil {
-		return nil, fmt.Errorf("failed to infer LATEST_RELEASE: %w", err)
+		return nil, fmt.Errorf("failed to infer LatestRelease: %w", err)
 	}
 
 	nextRelease, err := inferNextRelease(currentRelease)
 	if err != nil {
-		return nil, fmt.Errorf("failed to infer NEXT_RELEASE: %w", err)
-	}
-
-	nextProjectMinorVersion, err := inferNextProjectMinorVersion(currentRelease)
-	if err != nil {
-		return nil, fmt.Errorf("failed to infer next project minor version: %w", err)
+		return nil, fmt.Errorf("failed to infer NextRelease: %w", err)
 	}
 
 	releaseBranch := inferReleaseBranch(currentRelease)
 
-	if envLatest := os.Getenv("LATEST_RELEASE"); envLatest != "" {
-		latestRelease = envLatest
+	nextProjectMinorVersion, err := inferNextProjectMinorVersion(currentRelease)
+	if err != nil {
+		return nil, fmt.Errorf("failed to infer NextProjectMinorVersion: %w", err)
 	}
-	if envNext := os.Getenv("NEXT_RELEASE"); envNext != "" {
-		nextRelease = envNext
-	}
-	if envBranch := os.Getenv("RELEASE_BRANCH"); envBranch != "" {
-		releaseBranch = envBranch
-	}
-	if envNextMinor := os.Getenv("NEXT_PROJECT_MINOR_VERSION"); envNextMinor != "" {
-		nextProjectMinorVersion = envNextMinor
-	}
-
-	nextProjectMinorOnly := inferNextProjectMinorOnly(nextProjectMinorVersion)
+	nextProjectMinorBranch := inferNextProjectMinorBranch(currentRelease)
 
 	cfg := &ReleaseConfig{
 		CurrentRelease:          currentRelease,
 		LatestRelease:           latestRelease,
 		NextRelease:             nextRelease,
 		NextProjectMinorVersion: nextProjectMinorVersion,
-		NextProjectMinorOnly:    nextProjectMinorOnly,
+		NextProjectMinorBranch:  nextProjectMinorBranch,
 		BaseBranch:              getEnvOrDefault("BASE_BRANCH", "main"),
 		ReleaseBranch:           releaseBranch,
 		ProjectOwner:            getEnvOrDefault("PROJECT_OWNER", "elastic"),
 		ProjectRepo:             getEnvOrDefault("PROJECT_REPO", "fleet-server"),
 		GitHubToken:             os.Getenv("GITHUB_TOKEN"),
-		GitAuthorName:           getEnvOrDefault("GITHUB_USERNAME", getEnvOrDefault("GIT_AUTHOR_NAME", "elasticmachine")),
-		GitAuthorEmail:          getEnvOrDefault("GITHUB_EMAIL", getEnvOrDefault("GIT_AUTHOR_EMAIL", "infra-root+elasticmachine@elastic.co")),
-		DryRun:                  parseDryRun(os.Getenv("DRY_RUN")),
+		GitAuthorName:           getEnvOrDefault("GIT_AUTHOR_NAME", "elasticmachine"),
+		GitAuthorEmail:          getEnvOrDefault("GIT_AUTHOR_EMAIL", "infra-root+elasticmachine@elastic.co"),
+		DryRun:                  getEnvOrDefault("DRY_RUN", "false") == "true",
 	}
 
 	reviewers := getEnvOrDefault("PROJECT_REVIEWERS", "elastic/elastic-agent-control-plane")
@@ -106,16 +92,8 @@ func getEnvOrDefault(key, defaultValue string) string {
 	return defaultValue
 }
 
-func parseDryRun(value string) bool {
-	if value == "" {
-		return false
-	}
-	if parsed, err := strconv.ParseBool(value); err == nil {
-		return parsed
-	}
-	return strings.EqualFold(value, "true")
-}
-
+// inferLatestRelease calculates the previous release version (patch - 1).
+// For minor releases (patch == 0), returns empty string; callers may use EnsureLatestRelease.
 func inferLatestRelease(currentRelease string) (string, error) {
 	parts := strings.Split(currentRelease, ".")
 	if len(parts) < 3 {
@@ -148,6 +126,14 @@ func inferNextRelease(currentRelease string) (string, error) {
 	return fmt.Sprintf("%s.%s.%d", parts[0], parts[1], patch+1), nil
 }
 
+func inferReleaseBranch(currentRelease string) string {
+	parts := strings.Split(currentRelease, ".")
+	if len(parts) >= 2 {
+		return parts[0] + "." + parts[1]
+	}
+	return ""
+}
+
 func inferNextProjectMinorVersion(currentRelease string) (string, error) {
 	parts := strings.Split(currentRelease, ".")
 	if len(parts) < 3 {
@@ -162,20 +148,42 @@ func inferNextProjectMinorVersion(currentRelease string) (string, error) {
 	return fmt.Sprintf("%s.%d.0", parts[0], minor+1), nil
 }
 
-func inferNextProjectMinorOnly(nextProjectMinorVersion string) string {
-	parts := strings.Split(nextProjectMinorVersion, ".")
-	if len(parts) >= 2 {
-		return parts[0] + "." + parts[1]
+func inferNextProjectMinorBranch(currentRelease string) string {
+	parts := strings.Split(currentRelease, ".")
+	if len(parts) < 2 {
+		return ""
 	}
-	return nextProjectMinorVersion
+
+	minor, err := strconv.Atoi(parts[1])
+	if err != nil {
+		return ""
+	}
+
+	return fmt.Sprintf("%s.%d", parts[0], minor+1)
 }
 
-func inferReleaseBranch(currentRelease string) string {
-	parts := strings.Split(currentRelease, ".")
-	if len(parts) >= 2 {
-		return parts[0] + "." + parts[1]
+// fetchLatestReleaseBefore looks up the previous published release from GitHub.
+// Tests may replace this to avoid network calls.
+var fetchLatestReleaseBefore = func(token, owner, repo, current string) (string, error) {
+	return NewGitHubClient(token).LatestReleaseBefore(owner, repo, current)
+}
+
+// EnsureLatestRelease sets LatestRelease when unset by querying elastic/fleet-server releases.
+func (c *ReleaseConfig) EnsureLatestRelease() error {
+	if c.LatestRelease != "" {
+		return nil
 	}
-	return ""
+	if c.CurrentRelease == "" {
+		return fmt.Errorf("CurrentRelease is required to resolve LatestRelease")
+	}
+
+	latest, err := fetchLatestReleaseBefore(c.GitHubToken, releasesLookupOwner, releasesLookupRepo, c.CurrentRelease)
+	if err != nil {
+		return fmt.Errorf("failed to resolve LatestRelease from GitHub: %w", err)
+	}
+	c.LatestRelease = latest
+	fmt.Printf("Resolved LatestRelease from %s/%s: %s\n", releasesLookupOwner, releasesLookupRepo, latest)
+	return nil
 }
 
 // Validate checks if the configuration is valid.

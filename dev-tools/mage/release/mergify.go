@@ -12,23 +12,18 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const mergifyPath = ".mergify.yml"
-
 // UpdateMergify adds a new backport rule to .mergify.yml.
 func UpdateMergify(version string) error {
-	safePath, err := validateRepoRelativePath(mergifyPath)
-	if err != nil {
-		return err
-	}
+	mergifyFile := ".mergify.yml"
 
-	content, err := os.ReadFile(safePath)
+	content, err := os.ReadFile(mergifyFile)
 	if err != nil {
-		return fmt.Errorf("failed to read %s: %w", safePath, err)
+		return fmt.Errorf("failed to read %s: %w", mergifyFile, err)
 	}
 
 	var config map[string]interface{}
 	if err := yaml.Unmarshal(content, &config); err != nil {
-		return fmt.Errorf("failed to parse %s: %w", safePath, err)
+		return fmt.Errorf("failed to parse %s: %w", mergifyFile, err)
 	}
 
 	parts := strings.Split(version, ".")
@@ -76,10 +71,11 @@ func UpdateMergify(version string) error {
 		return fmt.Errorf("failed to marshal YAML: %w", err)
 	}
 
-	if err := writeRepoFile(safePath, output); err != nil {
-		return fmt.Errorf("failed to write %s: %w", safePath, err)
+	err = writeRepoFile(mergifyFile, output)
+	if err != nil {
+		return fmt.Errorf("failed to write %s: %w", mergifyFile, err)
 	}
 
-	fmt.Printf("Added backport rule for %s to %s\n", branchVersion, safePath)
+	fmt.Printf("Added backport rule for %s to %s\n", branchVersion, mergifyFile)
 	return nil
 }
