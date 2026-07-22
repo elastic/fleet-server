@@ -376,6 +376,7 @@ func (et *EnrollerT) _enroll(
 			dl.FieldAgent:                 json.RawMessage(agentField),
 			dl.FieldTags:                  agent.Tags,
 			dl.FieldPolicyRevisionIdx:     0,
+			dl.FieldPolicyBaseID:          policyBaseID(policyID),
 			dl.FieldAuditUnenrolledTime:   nil,
 			dl.FieldAuditUnenrolledReason: nil,
 			dl.FieldUnenrolledAt:          nil,
