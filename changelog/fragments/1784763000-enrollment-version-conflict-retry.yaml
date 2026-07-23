@@ -1,6 +1,6 @@
 kind: bug-fix
 
-summary: Retry enrollment agent-document write on ES 409 version conflict
+summary: Retry enrollment agent-document write on ES version conflict and write timeout
 
 component: fleet-server
 
