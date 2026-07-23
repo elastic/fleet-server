@@ -28,6 +28,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger/ecs"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
+	"github.com/elastic/fleet-server/v7/internal/pkg/secret"
 	"github.com/elastic/fleet-server/v7/internal/pkg/smap"
 )
 
@@ -581,6 +582,17 @@ func (ack *AckT) handleUnenroll(ctx context.Context, zlog zerolog.Logger, agent 
 	apiKeys := agent.APIKeyIDs()
 	zlog.Info().Any("fleet.policy.apiKeyIDsToRetire", apiKeys).Msg("handleUnenroll invalidate API keys")
 	ack.invalidateAPIKeys(ctx, zlog, apiKeys, "")
+
+	// Delete secrets for all output API keys: retired ones (carried in apiKeys via SecretID)
+	// and the current active ones (secret ID embedded in output.APIKey as a reference string).
+	allSecretItems := make([]model.ToRetireAPIKeyIdsItems, 0, len(apiKeys)+len(agent.Outputs))
+	allSecretItems = append(allSecretItems, apiKeys...)
+	for _, output := range agent.Outputs {
+		if secretID, ok := secret.ParseSecretReference(output.APIKey); ok {
+			allSecretItems = append(allSecretItems, model.ToRetireAPIKeyIdsItems{SecretID: secretID})
+		}
+	}
+	deleteRetiredSecrets(ctx, zlog, ack.bulk, allSecretItems)
 
 	now := time.Now().UTC().Format(time.RFC3339)
 	doc := bulk.UpdateFields{
