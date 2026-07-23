@@ -21,6 +21,15 @@ import (
 	"github.com/rs/zerolog"
 )
 
+const (
+	testDocID      = "test-id"
+	testHTTPStatus = "200 OK"
+	testHTTPProto  = "HTTP/1.1"
+
+	testESConflictBody = `{"took":1,"errors":true,"items":[{"create":{"_id":"test-id","status":409,"error":{"type":"version_conflict_engine_exception","reason":"version conflict"}}}]}`
+	testESSuccessBody  = `{"took":1,"errors":false,"items":[{"create":{"_id":"test-id","status":201}}]}`
+)
+
 // TODO:
 // WithREfresh() options
 // Delete not found?
@@ -34,15 +43,15 @@ type conflictThenSuccessTransport struct {
 func (m *conflictThenSuccessTransport) Perform(req *http.Request) (*http.Response, error) {
 	var body string
 	if m.calls.Add(1) == 1 {
-		body = `{"took":1,"errors":true,"items":[{"create":{"_id":"test-id","status":409,"error":{"type":"version_conflict_engine_exception","reason":"version conflict"}}}]}`
+		body = testESConflictBody
 	} else {
-		body = `{"took":1,"errors":false,"items":[{"create":{"_id":"test-id","status":201}}]}`
+		body = testESSuccessBody
 	}
 	return &http.Response{
 		Request:    req,
 		StatusCode: 200,
-		Status:     "200 OK",
-		Proto:      "HTTP/1.1",
+		Status:     testHTTPStatus,
+		Proto:      testHTTPProto,
 		ProtoMajor: 1,
 		ProtoMinor: 1,
 		Body:       io.NopCloser(bytes.NewBufferString(body)),
@@ -55,12 +64,12 @@ func TestCreateRetriesOnVersionConflict(t *testing.T) {
 	bulker := NewBulker(mock, nil, WithFlushThresholdCount(1))
 	go func() { _ = bulker.Run(t.Context()) }()
 
-	id, err := bulker.Create(t.Context(), "test-index", "test-id", []byte(`{"field":"value"}`))
+	id, err := bulker.Create(t.Context(), "test-index", testDocID, []byte(`{"field":"value"}`))
 	if err != nil {
 		t.Fatalf("expected Create to succeed after retry, got: %v", err)
 	}
-	if id != "test-id" {
-		t.Errorf("expected document ID %q, got %q", "test-id", id)
+	if id != testDocID {
+		t.Errorf("expected document ID %q, got %q", testDocID, id)
 	}
 	if calls := mock.calls.Load(); calls != 2 {
 		t.Errorf("expected 2 transport calls (1 conflict + 1 retry), got %d", calls)
@@ -70,22 +79,21 @@ func TestCreateRetriesOnVersionConflict(t *testing.T) {
 func TestCreateReturnsConflictAfterMaxRetries(t *testing.T) {
 	// Transport that always returns 409.
 	always409 := func(req *http.Request) (*http.Response, error) {
-		body := `{"took":1,"errors":true,"items":[{"create":{"_id":"test-id","status":409,"error":{"type":"version_conflict_engine_exception","reason":"version conflict"}}}]}`
 		return &http.Response{
 			Request:    req,
 			StatusCode: 200,
-			Status:     "200 OK",
-			Proto:      "HTTP/1.1",
+			Status:     testHTTPStatus,
+			Proto:      testHTTPProto,
 			ProtoMajor: 1,
 			ProtoMinor: 1,
-			Body:       io.NopCloser(bytes.NewBufferString(body)),
+			Body:       io.NopCloser(bytes.NewBufferString(testESConflictBody)),
 		}, nil
 	}
 
 	bulker := NewBulker(transportFunc(always409), nil, WithFlushThresholdCount(1))
 	go func() { _ = bulker.Run(t.Context()) }()
 
-	_, err := bulker.Create(t.Context(), "test-index", "test-id", []byte(`{"field":"value"}`))
+	_, err := bulker.Create(t.Context(), "test-index", testDocID, []byte(`{"field":"value"}`))
 	if !errors.Is(err, es.ErrElasticVersionConflict) {
 		t.Fatalf("expected ErrElasticVersionConflict after exhausting retries, got: %v", err)
 	}
@@ -97,27 +105,26 @@ func TestCreateRetriesOnDeadlineExceeded(t *testing.T) {
 		if calls.Add(1) == 1 {
 			return nil, context.DeadlineExceeded
 		}
-		body := `{"took":1,"errors":false,"items":[{"create":{"_id":"test-id","status":201}}]}`
 		return &http.Response{
 			Request:    req,
 			StatusCode: 200,
-			Status:     "200 OK",
-			Proto:      "HTTP/1.1",
+			Status:     testHTTPStatus,
+			Proto:      testHTTPProto,
 			ProtoMajor: 1,
 			ProtoMinor: 1,
-			Body:       io.NopCloser(bytes.NewBufferString(body)),
+			Body:       io.NopCloser(bytes.NewBufferString(testESSuccessBody)),
 		}, nil
 	})
 
 	bulker := NewBulker(transport, nil, WithFlushThresholdCount(1))
 	go func() { _ = bulker.Run(t.Context()) }()
 
-	id, err := bulker.Create(t.Context(), "test-index", "test-id", []byte(`{"field":"value"}`))
+	id, err := bulker.Create(t.Context(), "test-index", testDocID, []byte(`{"field":"value"}`))
 	if err != nil {
 		t.Fatalf("expected Create to succeed after retry, got: %v", err)
 	}
-	if id != "test-id" {
-		t.Errorf("expected document ID %q, got %q", "test-id", id)
+	if id != testDocID {
+		t.Errorf("expected document ID %q, got %q", testDocID, id)
 	}
 	if n := calls.Load(); n != 2 {
 		t.Errorf("expected 2 transport calls (1 timeout + 1 retry), got %d", n)
@@ -134,7 +141,7 @@ func TestCreateReturnsDeadlineExceededAfterMaxRetries(t *testing.T) {
 	bulker := NewBulker(transport, nil, WithFlushThresholdCount(1))
 	go func() { _ = bulker.Run(t.Context()) }()
 
-	_, err := bulker.Create(t.Context(), "test-index", "test-id", []byte(`{"field":"value"}`))
+	_, err := bulker.Create(t.Context(), "test-index", testDocID, []byte(`{"field":"value"}`))
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("expected context.DeadlineExceeded after exhausting retries, got: %v", err)
 	}
@@ -159,7 +166,7 @@ func TestCreateDoesNotRetryWhenCallerContextCanceled(t *testing.T) {
 
 	done := make(chan error, 1)
 	go func() {
-		_, err := bulker.Create(callerCtx, "test-index", "test-id", []byte(`{"field":"value"}`))
+		_, err := bulker.Create(callerCtx, "test-index", testDocID, []byte(`{"field":"value"}`))
 		done <- err
 	}()
 
