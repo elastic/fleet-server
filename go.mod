@@ -8,11 +8,7 @@ require (
 	github.com/dgraph-io/ristretto v0.2.0
 	github.com/docker/go-units v0.5.0
 	github.com/elastic/elastic-agent-client/v7 v7.18.1
-<<<<<<< HEAD
-	github.com/elastic/elastic-agent-libs v0.44.0
-=======
 	github.com/elastic/elastic-agent-libs v0.46.2
->>>>>>> 5e7a608 (build(deps): bump github.com/elastic/elastic-agent-libs from 0.46.1 to 0.46.2 (#7438))
 	github.com/elastic/elastic-agent-system-metrics v0.14.4
 	github.com/elastic/go-elasticsearch/v8 v8.19.5
 	github.com/elastic/go-ucfg v0.9.1
