@@ -603,6 +603,9 @@ type ToRetireAPIKeyIdsItems struct {
 
 	// Date/time the API key was retired
 	RetiredAt string `json:"retired_at,omitempty"`
+
+	// Fleet secret ID for the retired API key, if the key was stored in .fleet-secrets
+	SecretID string `json:"secret_id,omitempty"`
 }
 
 // UnitsItems

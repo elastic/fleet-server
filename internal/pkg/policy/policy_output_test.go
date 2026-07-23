@@ -259,6 +259,8 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 		bulker.On("APIKeyCreate",
 			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(&apiKey, nil).Once()
+		const secretID = "test-secret-id"
+		bulker.On("WriteSecret", mock.Anything, apiKey.Agent()).Return(secretID, nil).Once()
 
 		output := Output{
 			Type: OutputTypeElasticsearch,
@@ -281,10 +283,12 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 		key, ok := policyMap[output.Name]["api_key"].(string)
 		gotOutput := testAgent.Outputs[output.Name]
 
-		require.True(t, ok, "unable to case api key")
-		assert.Equal(t, apiKey.Agent(), key)
+		// The policy map receives the resolved secret value, not the reference.
+		require.True(t, ok, "unable to cast api key")
+		assert.Equal(t, secretID+"_value", key)
 
-		assert.Equal(t, apiKey.Agent(), gotOutput.APIKey)
+		// The agent document stores the secret reference, not the plaintext key.
+		assert.Equal(t, "$co.elastic.secret{"+secretID+"}", gotOutput.APIKey)
 		assert.Equal(t, apiKey.ID, gotOutput.APIKeyID)
 		assert.Equal(t, output.Role.Sha2, gotOutput.PermissionsHash)
 		assert.Equal(t, output.Type, gotOutput.Type)
@@ -296,6 +300,40 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 		assert.Empty(t, testAgent.DefaultAPIKeyHistory)
 		assert.Empty(t, testAgent.PolicyOutputPermissionsHash)
 
+		bulker.AssertExpectations(t)
+	})
+
+	t.Run("Existing plaintext key is delivered without modification", func(t *testing.T) {
+		logger := testlog.SetLogger(t)
+		bulker := ftesting.NewMockBulk()
+
+		apiKey := bulk.APIKey{ID: "existing-id", Key: "existing-key"}
+		hashPerm := "existing-hash"
+		output := Output{
+			Type: OutputTypeElasticsearch,
+			Name: "test output",
+			Role: &RoleT{Sha2: hashPerm, Raw: TestPayload},
+		}
+		policyMap := map[string]map[string]any{"test output": {}}
+		testAgent := &model.Agent{
+			Outputs: map[string]*model.PolicyOutput{
+				output.Name: {
+					APIKey:          apiKey.Agent(),
+					APIKeyID:        apiKey.ID,
+					PermissionsHash: hashPerm,
+					Type:            OutputTypeElasticsearch,
+				},
+			},
+		}
+
+		err := output.Prepare(context.Background(), logger, bulker, testAgent, policyMap)
+		require.NoError(t, err)
+
+		// Plaintext key is passed through directly — WriteSecret is not called.
+		key, ok := policyMap[output.Name]["api_key"].(string)
+		require.True(t, ok)
+		assert.Equal(t, apiKey.Agent(), key)
+		bulker.AssertNotCalled(t, "WriteSecret", mock.Anything, mock.Anything)
 		bulker.AssertExpectations(t)
 	})
 }
@@ -474,6 +512,8 @@ func TestPolicyRemoteESOutputPrepare(t *testing.T) {
 			}
 			return doc.Message == "" && doc.State == client.UnitStateHealthy.String()
 		}), mock.Anything).Return("", nil)
+		const secretID = "test-secret-id"
+		bulker.On("WriteSecret", mock.Anything, apiKey.Agent()).Return(secretID, nil).Once()
 
 		output := Output{
 			Type: OutputTypeRemoteElasticsearch,
@@ -499,10 +539,10 @@ func TestPolicyRemoteESOutputPrepare(t *testing.T) {
 		key, ok := policyMap[output.Name]["api_key"].(string)
 		gotOutput := testAgent.Outputs[output.Name]
 
-		require.True(t, ok, "unable to case api key")
-		assert.Equal(t, apiKey.Agent(), key)
+		require.True(t, ok, "unable to cast api key")
+		assert.Equal(t, secretID+"_value", key)
 
-		assert.Equal(t, apiKey.Agent(), gotOutput.APIKey)
+		assert.Equal(t, "$co.elastic.secret{"+secretID+"}", gotOutput.APIKey)
 		assert.Equal(t, apiKey.ID, gotOutput.APIKeyID)
 		assert.Equal(t, output.Role.Sha2, gotOutput.PermissionsHash)
 		assert.Empty(t, gotOutput.ToRetireAPIKeyIds)

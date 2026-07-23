@@ -401,6 +401,20 @@ func ProcessMapSecrets(m smap.Map, secretValues map[string]string) ([]string, er
 	return keys, nil
 }
 
+// ParseSecretReference returns the secret ID if value is a $co.elastic.secret{id} reference, otherwise returns ("", false).
+func ParseSecretReference(value string) (string, bool) {
+	matches := secretRegex.FindStringSubmatch(value)
+	if len(matches) > 1 {
+		return matches[1], true
+	}
+	return "", false
+}
+
+// MakeSecretReference formats a secret ID as a $co.elastic.secret{id} reference string.
+func MakeSecretReference(secretID string) string {
+	return "$co.elastic.secret{" + secretID + "}"
+}
+
 // replaceStringRef replaces values matching a secret ref regex, e.g. $co.elastic.secret{<secret ref>} -> <secret value>
 // and does this for multiple matches
 // returns the resulting string value, and if any replacements were made

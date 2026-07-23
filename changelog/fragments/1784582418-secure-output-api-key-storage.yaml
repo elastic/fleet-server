@@ -1,0 +1,14 @@
+kind: security
+
+summary: Store output API key secrets in .fleet-secrets instead of .fleet-agents
+
+description: |
+  Fleet Server now writes output API key material to .fleet-secrets via the Fleet
+  secrets API (POST /_fleet/secret) and stores only a $co.elastic.secret{id} reference
+  in .fleet-agents-7. Previously, the raw id:secret string was stored in plaintext in
+  outputs.{name}.api_key, which the kibana_system role could read and use to escalate
+  privileges to SIEM data stream write access. Retired secrets are deleted from
+  .fleet-secrets on ACK. Existing plaintext values continue to work transparently
+  until the next key rotation.
+
+component: fleet-server

@@ -405,6 +405,10 @@
           "output": {
             "description": "Output name where the API Key belongs",
             "type": "string"
+          },
+          "secret_id": {
+            "description": "Fleet secret ID for the retired API key, if the key was stored in .fleet-secrets",
+            "type": "string"
           }
         }
       }

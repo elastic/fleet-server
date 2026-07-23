@@ -22,6 +22,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger/ecs"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
+	"github.com/elastic/fleet-server/v7/internal/pkg/secret"
 	"github.com/elastic/fleet-server/v7/internal/pkg/smap"
 )
 
@@ -129,11 +130,15 @@ func (p *Output) prepareElasticsearch(
 		}
 		if !found {
 			zlog.Info().Str(ecs.APIKeyID, agentOutput.APIKeyID).Str(ecs.PolicyOutputName, agentOutputName).Msg("Output removed, will retire API key")
-			toRetireAPIKeys = &model.ToRetireAPIKeyIdsItems{
+			retiring := model.ToRetireAPIKeyIdsItems{
 				ID:        agentOutput.APIKeyID,
 				RetiredAt: time.Now().UTC().Format(time.RFC3339),
 				Output:    agentOutputName,
 			}
+			if secretID, ok := secret.ParseSecretReference(agentOutput.APIKey); ok {
+				retiring.SecretID = secretID
+			}
+			toRetireAPIKeys = &retiring
 			removedOutputName = agentOutputName
 			break
 		}
@@ -307,8 +312,14 @@ func (p *Output) prepareElasticsearch(
 			Str(ecs.DefaultOutputAPIKeyID, outputAPIKey.ID).
 			Msg("Updating agent record to pick up default output key.")
 
+		secretID, err := bulker.WriteSecret(ctx, outputAPIKey.Agent())
+		if err != nil {
+			return fmt.Errorf("failed writing output API key secret: %w", err)
+		}
+		apiKeyRef := secret.MakeSecretReference(secretID)
+
 		fields := map[string]any{
-			dl.FieldPolicyOutputAPIKey:          outputAPIKey.Agent(),
+			dl.FieldPolicyOutputAPIKey:          apiKeyRef,
 			dl.FieldPolicyOutputAPIKeyID:        outputAPIKey.ID,
 			dl.FieldPolicyOutputPermissionsHash: p.Role.Sha2,
 		}
@@ -317,11 +328,15 @@ func (p *Output) prepareElasticsearch(
 			fields[dl.FiledType] = OutputTypeElasticsearch
 		}
 		if output.APIKeyID != "" {
-			fields[dl.FieldPolicyOutputToRetireAPIKeyIDs] = model.ToRetireAPIKeyIdsItems{
+			retiring := model.ToRetireAPIKeyIdsItems{
 				ID:        output.APIKeyID,
 				RetiredAt: time.Now().UTC().Format(time.RFC3339),
 				Output:    p.Name,
 			}
+			if secretID, ok := secret.ParseSecretReference(output.APIKey); ok {
+				retiring.SecretID = secretID
+			}
+			fields[dl.FieldPolicyOutputToRetireAPIKeyIDs] = retiring
 		}
 
 		// Using painless script to append the old keys to the history
@@ -340,7 +355,7 @@ func (p *Output) prepareElasticsearch(
 		// data is correct and in sync with ES, so it can be safely used after
 		// this method returns.
 		output.Type = OutputTypeElasticsearch
-		output.APIKey = outputAPIKey.Agent()
+		output.APIKey = apiKeyRef
 		output.APIKeyID = outputAPIKey.ID
 		output.PermissionsHash = p.Role.Sha2 // for the sake of consistency
 	}
@@ -362,7 +377,19 @@ func (p *Output) prepareElasticsearch(
 	// in place to reduce number of agent policy allocation when sending the updated
 	// agent policy to multiple agents.
 	// See: https://github.com/elastic/fleet-server/issues/1301
-	outputMap[p.Name]["api_key"] = output.APIKey
+	apiKey := output.APIKey
+	if secretID, ok := secret.ParseSecretReference(apiKey); ok {
+		resolved, err := bulker.ReadSecrets(ctx, []string{secretID})
+		if err != nil {
+			return fmt.Errorf("failed resolving output API key secret: %w", err)
+		}
+		val, ok := resolved[secretID]
+		if !ok || val == "" {
+			return fmt.Errorf("output API key secret %q not found", secretID)
+		}
+		apiKey = val
+	}
+	outputMap[p.Name]["api_key"] = apiKey
 	return nil
 }
 
