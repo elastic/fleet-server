@@ -1631,11 +1631,7 @@ func checkFIPSBinary(path string) error {
 	if err != nil {
 		return fmt.Errorf("unable to read buildinfo: %w", err)
 	}
-<<<<<<< HEAD
-	var checkLinks, foundTags, foundExperiment bool
-=======
-	var foundTags, foundFIPS140, foundFIPSDefault bool
->>>>>>> 7c9e4eb (Bump elastic-agent-libs and enforce fips140=on at runtime for FIPS builds (#7332))
+	var checkLinks, foundTags, foundExperiment, foundFIPSDefault bool
 
 	for _, setting := range info.Settings {
 		switch setting.Key {
