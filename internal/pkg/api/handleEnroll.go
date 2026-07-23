@@ -28,7 +28,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
-	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/rollback"
@@ -648,44 +647,13 @@ func createFleetAgent(ctx context.Context, bulker bulk.Bulk, id string, agent mo
 	span, ctx := apm.StartSpan(ctx, "createAgent", "create")
 	defer span.End()
 
-	const maxConflictRetries = 3
-
 	data, err := json.Marshal(agent)
 	if err != nil {
 		return err
 	}
 
-	var lastErr error
-	for range maxConflictRetries {
-		_, lastErr = bulker.Create(ctx, dl.FleetAgents, id, data, bulk.WithRefresh())
-		if lastErr == nil {
-			return nil
-		}
-		if !errors.Is(lastErr, es.ErrElasticVersionConflict) {
-			return lastErr
-		}
-
-		// A 409 version conflict means the document may or may not have been committed
-		// before the conflict was reported (e.g. due to a primary shard relocation).
-		// Re-read the document to determine the current state before retrying.
-		existing, readErr := dl.GetAgent(ctx, bulker, id)
-		if readErr == nil {
-			// The document exists. If the access_api_key_id matches what we set,
-			// our Create was committed before the conflict was reported – treat as success.
-			if existing.AccessAPIKeyID == agent.AccessAPIKeyID {
-				return nil
-			}
-			// The document exists with different data: a concurrent writer created it.
-			return lastErr
-		}
-		if !errors.Is(readErr, dl.ErrNotFound) {
-			// Unexpected error reading the document.
-			return readErr
-		}
-		// Document not found – the Create was not committed. Retry.
-	}
-
-	return lastErr
+	_, err = bulker.Create(ctx, dl.FleetAgents, id, data, bulk.WithRefresh())
+	return err
 }
 
 func generateAccessAPIKey(ctx context.Context, bulk bulk.Bulk, agentID string) (*apikey.APIKey, error) {
