@@ -198,6 +198,9 @@ type Agent struct {
 	// Packages array
 	Packages []string `json:"packages,omitempty"`
 
+	// The base policy ID (policy_id without version suffix) for efficient querying.
+	PolicyBaseID string `json:"policy_base_id,omitempty"`
+
 	// The current policy coordinator for the Elastic Agent
 	PolicyCoordinatorIdx int64 `json:"policy_coordinator_idx,omitempty"`
 

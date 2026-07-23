@@ -71,7 +71,9 @@
                 "type": "string"
               }
             },
-            "required": ["id"]
+            "required": [
+              "id"
+            ]
           }
         },
         "user_id": {
@@ -97,9 +99,10 @@
           "$ref": "#/definitions/signed"
         }
       },
-      "required": ["id"]
+      "required": [
+        "id"
+      ]
     },
-
     "signed": {
       "description": "The action signed data and signature.",
       "type": "object",
@@ -113,9 +116,11 @@
           "type": "string"
         }
       },
-      "required": ["data", "signature"]
+      "required": [
+        "data",
+        "signature"
+      ]
     },
-
     "action-result": {
       "title": "Agent action results",
       "description": "An Elastic Agent action results",
@@ -172,9 +177,12 @@
           "format": "raw"
         }
       },
-      "required": ["id", "agent", "action"]
+      "required": [
+        "id",
+        "agent",
+        "action"
+      ]
     },
-
     "agent-metadata": {
       "title": "Agent Metadata",
       "description": "An Elastic Agent metadata",
@@ -194,9 +202,11 @@
           "type": "string"
         }
       },
-      "required": ["id", "version"]
+      "required": [
+        "id",
+        "version"
+      ]
     },
-
     "artifact": {
       "title": "Artifact",
       "description": "An artifact served by Fleet",
@@ -255,7 +265,6 @@
         "body"
       ]
     },
-
     "host-metadata": {
       "title": "Host Metadata",
       "description": "The host metadata for the Elastic Agent",
@@ -281,9 +290,12 @@
           }
         }
       },
-      "required": ["id", "architecture", "name"]
+      "required": [
+        "id",
+        "architecture",
+        "name"
+      ]
     },
-
     "server-metadata": {
       "title": "Server Metadata",
       "description": "A Fleet Server metadata",
@@ -299,9 +311,11 @@
           "type": "string"
         }
       },
-      "required": ["id", "version"]
+      "required": [
+        "id",
+        "version"
+      ]
     },
-
     "server": {
       "deprecated": true,
       "title": "Server",
@@ -313,13 +327,22 @@
           "type": "string",
           "format": "date-time"
         },
-        "agent": { "$ref": "#/definitions/agent-metadata" },
-        "host": { "$ref": "#/definitions/host-metadata" },
-        "server": { "$ref": "#/definitions/server-metadata" }
+        "agent": {
+          "$ref": "#/definitions/agent-metadata"
+        },
+        "host": {
+          "$ref": "#/definitions/host-metadata"
+        },
+        "server": {
+          "$ref": "#/definitions/server-metadata"
+        }
       },
-      "required": ["agent", "host", "server"]
+      "required": [
+        "agent",
+        "host",
+        "server"
+      ]
     },
-
     "policy": {
       "title": "Policy",
       "description": "A policy that an Elastic Agent is attached to",
@@ -370,7 +393,6 @@
         "default_fleet_server"
       ]
     },
-
     "policy-leader": {
       "deprecated": true,
       "title": "Policy Leader",
@@ -382,11 +404,14 @@
           "type": "string",
           "format": "date-time"
         },
-        "server": { "$ref": "#/definitions/server-metadata" }
+        "server": {
+          "$ref": "#/definitions/server-metadata"
+        }
       },
-      "required": ["server"]
+      "required": [
+        "server"
+      ]
     },
-
     "to_retire_api_key_ids": {
       "type": "array",
       "items": {
@@ -409,7 +434,6 @@
         }
       }
     },
-
     "policy_output": {
       "type": "object",
       "description": "holds the needed data to manage the output API keys",
@@ -443,7 +467,6 @@
         "type"
       ]
     },
-
     "output_health": {
       "description": "Output health represents a health state of an output",
       "type": "object",
@@ -480,7 +503,6 @@
         }
       }
     },
-
     "components_items": {
       "title": "Component Items",
       "description": "Elastic Agent component detailed status information",
@@ -517,7 +539,6 @@
         }
       }
     },
-
     "available_rollback": {
       "title": "AvailableRollback",
       "type": "object",
@@ -531,7 +552,6 @@
         }
       }
     },
-
     "agent": {
       "title": "Agent",
       "description": "An Elastic Agent that has enrolled into Fleet",
@@ -582,7 +602,10 @@
         "unenrolled_reason": {
           "description": "Reason the Elastic Agent was unenrolled",
           "type": "string",
-          "enum": ["manual", "timeout"]
+          "enum": [
+            "manual",
+            "timeout"
+          ]
         },
         "unenrollment_started_at": {
           "description": "Date/time the Elastic Agent unenrolled started",
@@ -597,7 +620,13 @@
         "audit_unenrolled_reason": {
           "description": "Agent reason for unenroll/uninstall annotation.",
           "type": "string",
-          "enum": ["uninstall", "orphaned", "key_revoked", "migrated", "reenrolled"]
+          "enum": [
+            "uninstall",
+            "orphaned",
+            "key_revoked",
+            "migrated",
+            "reenrolled"
+          ]
         },
         "upgraded_at": {
           "description": "Date/time the Elastic Agent was last upgraded",
@@ -617,7 +646,9 @@
           "description": "ID of the API key the Elastic Agent must used to contact Fleet Server",
           "type": "string"
         },
-        "agent": { "$ref": "#/definitions/agent-metadata" },
+        "agent": {
+          "$ref": "#/definitions/agent-metadata"
+        },
         "user_provided_metadata": {
           "description": "User provided metadata information for the Elastic Agent",
           "format": "raw"
@@ -637,6 +668,10 @@
           "description": "The policy ID that the Elastic Agent should run.",
           "type": "string",
           "format": "uuid"
+        },
+        "policy_base_id": {
+          "description": "The base policy ID (policy_id without version suffix) for efficient querying.",
+          "type": "string"
         },
         "agent_policy_id": {
           "description": "The policy ID that the Elastic Agent is currently running.",
@@ -700,7 +735,9 @@
         "outputs": {
           "description": "Outputs is the policy output data, mapping the output name to its data",
           "type": "object",
-          "additionalProperties": { "$ref": "#/definitions/policy_output" }
+          "additionalProperties": {
+            "$ref": "#/definitions/policy_output"
+          }
         },
         "updated_at": {
           "description": "Date/time the Elastic Agent was last updated",
@@ -736,7 +773,7 @@
           "description": "hash of token provided during enrollment that allows replacement by another enrollment with same ID",
           "type": "string"
         },
-        "upgrade" : {
+        "upgrade": {
           "description": "Container for upgrade-related agent data",
           "type": "object",
           "properties": {
@@ -761,7 +798,7 @@
           "description": "The sequence number of the last collector message",
           "type": "integer"
         },
-         "health": {
+        "health": {
           "description": "Health information of the collector",
           "format": "raw"
         },
@@ -777,9 +814,14 @@
           "format": "raw"
         }
       },
-      "required": ["_id", "type", "active", "enrolled_at", "status"]
+      "required": [
+        "_id",
+        "type",
+        "active",
+        "enrolled_at",
+        "status"
+      ]
     },
-
     "enrollment_api_key": {
       "title": "Enrollment API key",
       "description": "An Elastic Agent enrollment API key",
@@ -824,9 +866,11 @@
           "format": "date-time"
         }
       },
-      "required": ["api_key_id", "api_key"]
+      "required": [
+        "api_key_id",
+        "api_key"
+      ]
     },
-
     "checkin": {
       "title": "Checkin",
       "description": "An Elastic Agent checkin to Fleet",
@@ -842,9 +886,15 @@
           "type": "string",
           "format": "date-time"
         },
-        "agent": { "$ref": "#/definitions/agent-metadata" },
-        "host": { "$ref": "#/definitions/host-metadata" },
-        "server": { "$ref": "#/definitions/server-metadata" },
+        "agent": {
+          "$ref": "#/definitions/agent-metadata"
+        },
+        "host": {
+          "$ref": "#/definitions/host-metadata"
+        },
+        "server": {
+          "$ref": "#/definitions/server-metadata"
+        },
         "status": {
           "description": "The current overall status of the Elastic Agent",
           "type": "string",
@@ -896,18 +946,31 @@
                   "status": {
                     "description": "The current status of the input",
                     "type": "string",
-                    "enum": ["healthy", "error", "degraded"]
+                    "enum": [
+                      "healthy",
+                      "error",
+                      "degraded"
+                    ]
                   },
                   "message": {
                     "description": "The current status message of the intput",
                     "type": "string"
                   }
                 },
-                "required": ["id", "template_id", "status", "message"]
+                "required": [
+                  "id",
+                  "template_id",
+                  "status",
+                  "message"
+                ]
               }
             }
           },
-          "required": ["id", "revision", "inputs"]
+          "required": [
+            "id",
+            "revision",
+            "inputs"
+          ]
         }
       },
       "required": [
@@ -919,7 +982,6 @@
         "updated_at"
       ]
     },
-
     "policy-data": {
       "title": "Policy Data",
       "description": "The policy data that an agent needs to run",
@@ -1022,7 +1084,9 @@
                 "type": "string"
               }
             },
-            "required": ["id"]
+            "required": [
+              "id"
+            ]
           }
         },
         "revision": {
@@ -1047,7 +1111,11 @@
           "additionalProperties": {}
         }
       },
-      "required": ["id", "revision", "outputs"]
+      "required": [
+        "id",
+        "revision",
+        "outputs"
+      ]
     }
   }
 }

@@ -1,0 +1,7 @@
+kind: feature
+
+summary: Write policy_base_id field at agent enrollment
+
+component: fleet-server
+
+pr: https://github.com/elastic/fleet-server/pull/7422
