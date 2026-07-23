@@ -13,15 +13,179 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/rs/zerolog"
+)
+
+const (
+	testDocID      = "test-id"
+	testHTTPStatus = "200 OK"
+	testHTTPProto  = "HTTP/1.1"
+
+	testESConflictBody = `{"took":1,"errors":true,"items":[{"create":{"_id":"test-id","status":409,"error":{"type":"version_conflict_engine_exception","reason":"version conflict"}}}]}`
+	testESSuccessBody  = `{"took":1,"errors":false,"items":[{"create":{"_id":"test-id","status":201}}]}`
 )
 
 // TODO:
 // WithREfresh() options
 // Delete not found?
+
+// conflictThenSuccessTransport returns a 409 version conflict for the first
+// Create request and a 201 success for all subsequent requests.
+type conflictThenSuccessTransport struct {
+	calls atomic.Int32
+}
+
+func (m *conflictThenSuccessTransport) Perform(req *http.Request) (*http.Response, error) {
+	var body string
+	if m.calls.Add(1) == 1 {
+		body = testESConflictBody
+	} else {
+		body = testESSuccessBody
+	}
+	return &http.Response{
+		Request:    req,
+		StatusCode: 200,
+		Status:     testHTTPStatus,
+		Proto:      testHTTPProto,
+		ProtoMajor: 1,
+		ProtoMinor: 1,
+		Body:       io.NopCloser(bytes.NewBufferString(body)),
+	}, nil
+}
+
+func TestCreateRetriesOnVersionConflict(t *testing.T) {
+	mock := &conflictThenSuccessTransport{}
+
+	bulker := NewBulker(mock, nil, WithFlushThresholdCount(1))
+	go func() { _ = bulker.Run(t.Context()) }()
+
+	id, err := bulker.Create(t.Context(), "test-index", testDocID, []byte(`{"field":"value"}`))
+	if err != nil {
+		t.Fatalf("expected Create to succeed after retry, got: %v", err)
+	}
+	if id != testDocID {
+		t.Errorf("expected document ID %q, got %q", testDocID, id)
+	}
+	if calls := mock.calls.Load(); calls != 2 {
+		t.Errorf("expected 2 transport calls (1 conflict + 1 retry), got %d", calls)
+	}
+}
+
+func TestCreateReturnsConflictAfterMaxRetries(t *testing.T) {
+	// Transport that always returns 409.
+	always409 := func(req *http.Request) (*http.Response, error) {
+		return &http.Response{
+			Request:    req,
+			StatusCode: 200,
+			Status:     testHTTPStatus,
+			Proto:      testHTTPProto,
+			ProtoMajor: 1,
+			ProtoMinor: 1,
+			Body:       io.NopCloser(bytes.NewBufferString(testESConflictBody)),
+		}, nil
+	}
+
+	bulker := NewBulker(transportFunc(always409), nil, WithFlushThresholdCount(1))
+	go func() { _ = bulker.Run(t.Context()) }()
+
+	_, err := bulker.Create(t.Context(), "test-index", testDocID, []byte(`{"field":"value"}`))
+	if !errors.Is(err, es.ErrElasticVersionConflict) {
+		t.Fatalf("expected ErrElasticVersionConflict after exhausting retries, got: %v", err)
+	}
+}
+
+func TestCreateRetriesOnDeadlineExceeded(t *testing.T) {
+	var calls atomic.Int32
+	transport := transportFunc(func(req *http.Request) (*http.Response, error) {
+		if calls.Add(1) == 1 {
+			return nil, context.DeadlineExceeded
+		}
+		return &http.Response{
+			Request:    req,
+			StatusCode: 200,
+			Status:     testHTTPStatus,
+			Proto:      testHTTPProto,
+			ProtoMajor: 1,
+			ProtoMinor: 1,
+			Body:       io.NopCloser(bytes.NewBufferString(testESSuccessBody)),
+		}, nil
+	})
+
+	bulker := NewBulker(transport, nil, WithFlushThresholdCount(1))
+	go func() { _ = bulker.Run(t.Context()) }()
+
+	id, err := bulker.Create(t.Context(), "test-index", testDocID, []byte(`{"field":"value"}`))
+	if err != nil {
+		t.Fatalf("expected Create to succeed after retry, got: %v", err)
+	}
+	if id != testDocID {
+		t.Errorf("expected document ID %q, got %q", testDocID, id)
+	}
+	if n := calls.Load(); n != 2 {
+		t.Errorf("expected 2 transport calls (1 timeout + 1 retry), got %d", n)
+	}
+}
+
+func TestCreateReturnsDeadlineExceededAfterMaxRetries(t *testing.T) {
+	var calls atomic.Int32
+	transport := transportFunc(func(req *http.Request) (*http.Response, error) {
+		calls.Add(1)
+		return nil, context.DeadlineExceeded
+	})
+
+	bulker := NewBulker(transport, nil, WithFlushThresholdCount(1))
+	go func() { _ = bulker.Run(t.Context()) }()
+
+	_, err := bulker.Create(t.Context(), "test-index", testDocID, []byte(`{"field":"value"}`))
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("expected context.DeadlineExceeded after exhausting retries, got: %v", err)
+	}
+	if n := calls.Load(); n != 3 {
+		t.Errorf("expected 3 transport calls (max retries), got %d", n)
+	}
+}
+
+func TestCreateDoesNotRetryWhenCallerContextCanceled(t *testing.T) {
+	var calls atomic.Int32
+	ready := make(chan struct{})
+	transport := transportFunc(func(req *http.Request) (*http.Response, error) {
+		calls.Add(1)
+		close(ready) // signal that the transport was entered
+		<-req.Context().Done()
+		return nil, req.Context().Err()
+	})
+
+	callerCtx, cancel := context.WithCancel(t.Context())
+	bulker := NewBulker(transport, nil, WithFlushThresholdCount(1))
+	go func() { _ = bulker.Run(t.Context()) }()
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := bulker.Create(callerCtx, "test-index", testDocID, []byte(`{"field":"value"}`))
+		done <- err
+	}()
+
+	<-ready // wait until the transport is blocked, then cancel the caller
+	cancel()
+
+	err := <-done
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context.Canceled, got: %v", err)
+	}
+	if n := calls.Load(); n != 1 {
+		t.Errorf("expected exactly 1 transport call (no retry after caller cancel), got %d", n)
+	}
+}
+
+// transportFunc adapts a function to the esapi.Transport interface.
+type transportFunc func(*http.Request) (*http.Response, error)
+
+func (f transportFunc) Perform(req *http.Request) (*http.Response, error) { return f(req) }
 
 type mockBulkTransport struct {
 }

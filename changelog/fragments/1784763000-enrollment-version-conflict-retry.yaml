@@ -1,0 +1,7 @@
+kind: bug-fix
+
+summary: Retry enrollment agent-document write on ES version conflict and write timeout
+
+component: fleet-server
+
+pr: https://github.com/elastic/fleet-server/pull/7446
