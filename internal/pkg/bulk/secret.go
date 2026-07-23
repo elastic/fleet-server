@@ -8,6 +8,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 
 	"github.com/elastic/go-elasticsearch/v8"
@@ -38,6 +40,10 @@ func (c *ExtendedAPI) Read(ctx context.Context, secretID string) (*SecretRespons
 		return nil, err
 	}
 	defer res.Body.Close()
+	if res.StatusCode >= 400 {
+		body, _ := io.ReadAll(res.Body)
+		return nil, fmt.Errorf("unexpected status %d from fleet secret read: %s", res.StatusCode, body)
+	}
 	var secretResp SecretResponse
 
 	err = json.NewDecoder(res.Body).Decode(&secretResp)
@@ -69,6 +75,10 @@ func (c *ExtendedAPI) Write(ctx context.Context, value string) (string, error) {
 		return "", err
 	}
 	defer res.Body.Close()
+	if res.StatusCode >= 400 {
+		body, _ := io.ReadAll(res.Body)
+		return "", fmt.Errorf("unexpected status %d from fleet secret write: %s", res.StatusCode, body)
+	}
 
 	var resp struct {
 		ID string `json:"id"`
@@ -117,7 +127,11 @@ func (c *ExtendedAPI) Delete(ctx context.Context, secretID string) error {
 	if err != nil {
 		return err
 	}
-	res.Body.Close()
+	defer res.Body.Close()
+	if res.StatusCode >= 400 {
+		body, _ := io.ReadAll(res.Body)
+		return fmt.Errorf("unexpected status %d from fleet secret delete: %s", res.StatusCode, body)
+	}
 	return nil
 }
 
