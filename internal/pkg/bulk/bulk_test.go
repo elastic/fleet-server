@@ -13,15 +13,88 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/rs/zerolog"
 )
 
 // TODO:
 // WithREfresh() options
 // Delete not found?
+
+// conflictThenSuccessTransport returns a 409 version conflict for the first
+// Create request and a 201 success for all subsequent requests.
+type conflictThenSuccessTransport struct {
+	calls atomic.Int32
+}
+
+func (m *conflictThenSuccessTransport) Perform(req *http.Request) (*http.Response, error) {
+	var body string
+	if m.calls.Add(1) == 1 {
+		body = `{"took":1,"errors":true,"items":[{"create":{"_id":"test-id","status":409,"error":{"type":"version_conflict_engine_exception","reason":"version conflict"}}}]}`
+	} else {
+		body = `{"took":1,"errors":false,"items":[{"create":{"_id":"test-id","status":201}}]}`
+	}
+	return &http.Response{
+		Request:    req,
+		StatusCode: 200,
+		Status:     "200 OK",
+		Proto:      "HTTP/1.1",
+		ProtoMajor: 1,
+		ProtoMinor: 1,
+		Body:       io.NopCloser(bytes.NewBufferString(body)),
+	}, nil
+}
+
+func TestCreateRetriesOnVersionConflict(t *testing.T) {
+	mock := &conflictThenSuccessTransport{}
+
+	bulker := NewBulker(mock, nil, WithFlushThresholdCount(1))
+	go func() { _ = bulker.Run(t.Context()) }()
+
+	id, err := bulker.Create(t.Context(), "test-index", "test-id", []byte(`{"field":"value"}`))
+	if err != nil {
+		t.Fatalf("expected Create to succeed after retry, got: %v", err)
+	}
+	if id != "test-id" {
+		t.Errorf("expected document ID %q, got %q", "test-id", id)
+	}
+	if calls := mock.calls.Load(); calls != 2 {
+		t.Errorf("expected 2 transport calls (1 conflict + 1 retry), got %d", calls)
+	}
+}
+
+func TestCreateReturnsConflictAfterMaxRetries(t *testing.T) {
+	// Transport that always returns 409.
+	always409 := func(req *http.Request) (*http.Response, error) {
+		body := `{"took":1,"errors":true,"items":[{"create":{"_id":"test-id","status":409,"error":{"type":"version_conflict_engine_exception","reason":"version conflict"}}}]}`
+		return &http.Response{
+			Request:    req,
+			StatusCode: 200,
+			Status:     "200 OK",
+			Proto:      "HTTP/1.1",
+			ProtoMajor: 1,
+			ProtoMinor: 1,
+			Body:       io.NopCloser(bytes.NewBufferString(body)),
+		}, nil
+	}
+
+	bulker := NewBulker(transportFunc(always409), nil, WithFlushThresholdCount(1))
+	go func() { _ = bulker.Run(t.Context()) }()
+
+	_, err := bulker.Create(t.Context(), "test-index", "test-id", []byte(`{"field":"value"}`))
+	if !errors.Is(err, es.ErrElasticVersionConflict) {
+		t.Fatalf("expected ErrElasticVersionConflict after exhausting retries, got: %v", err)
+	}
+}
+
+// transportFunc adapts a function to the esapi.Transport interface.
+type transportFunc func(*http.Request) (*http.Response, error)
+
+func (f transportFunc) Perform(req *http.Request) (*http.Response, error) { return f(req) }
 
 type mockBulkTransport struct {
 }
