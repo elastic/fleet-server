@@ -656,7 +656,7 @@ func createFleetAgent(ctx context.Context, bulker bulk.Bulk, id string, agent mo
 	}
 
 	var lastErr error
-	for attempt := 0; attempt < maxConflictRetries; attempt++ {
+	for range maxConflictRetries {
 		_, lastErr = bulker.Create(ctx, dl.FleetAgents, id, data, bulk.WithRefresh())
 		if lastErr == nil {
 			return nil
