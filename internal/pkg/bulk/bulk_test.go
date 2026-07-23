@@ -163,7 +163,7 @@ func TestCreateDoesNotRetryWhenCallerContextCanceled(t *testing.T) {
 		done <- err
 	}()
 
-	<-ready  // wait until the transport is blocked, then cancel the caller
+	<-ready // wait until the transport is blocked, then cancel the caller
 	cancel()
 
 	err := <-done
