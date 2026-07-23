@@ -383,7 +383,11 @@ func (p *Output) prepareElasticsearch(
 		if err != nil {
 			return fmt.Errorf("failed resolving output API key secret: %w", err)
 		}
-		apiKey = resolved[secretID]
+		val, ok := resolved[secretID]
+		if !ok || val == "" {
+			return fmt.Errorf("output API key secret %q not found", secretID)
+		}
+		apiKey = val
 	}
 	outputMap[p.Name]["api_key"] = apiKey
 	return nil
