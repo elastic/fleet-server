@@ -6,7 +6,6 @@
 package build
 
 import (
-	"errors"
 	"fmt"
 	"time"
 )
