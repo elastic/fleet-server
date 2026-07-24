@@ -6,6 +6,7 @@
 package build
 
 import (
+	"errors"
 	"fmt"
 	"time"
 )
@@ -22,11 +23,11 @@ func (i Info) FullVersion() string {
 	return fmt.Sprintf("%s [%s built %s] (FIPS-distribution: %v)", i.Version, i.Commit, i.BuildTime, FIPSDistribution)
 }
 
-// Time parses the given string using RFC3339, or returns an empty time.Time.
-func Time(stime string) time.Time {
+// Time parses the given string using RFC3339, or returns an error if parsing fails.
+func Time(stime string) (time.Time, error) {
 	t, err := time.Parse(time.RFC3339, stime)
 	if err != nil {
-		return time.Time{}
+		return time.Time{}, err
 	}
-	return t
+	return t, nil
 }
