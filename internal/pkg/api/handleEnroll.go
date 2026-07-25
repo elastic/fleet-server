@@ -92,7 +92,7 @@ func (et *EnrollerT) handleEnroll(zlog zerolog.Logger, w http.ResponseWriter, r 
 	ctx := zlog.WithContext(r.Context())
 	r = r.WithContext(ctx)
 
-	ver, err := validateUserAgent(r.Context(), zlog, userAgent, et.verCon)
+	ver, err := validateUserAgent(r.Context(), zlog, userAgent, r.Header.Get("Elastic-Agent-Version"), et.verCon)
 	if err != nil {
 		return err
 	}
