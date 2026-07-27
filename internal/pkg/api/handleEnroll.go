@@ -656,6 +656,8 @@ func createFleetAgent(ctx context.Context, bulker bulk.Bulk, id string, agent mo
 	}
 
 	_, err = bulker.Create(ctx, dl.FleetAgents, id, data, bulk.WithRefresh())
+	// A 409 on op_type:create is a definitive signal the document already exists.
+	// Treat it as success per the Beats/Logstash convention.
 	if errors.Is(err, es.ErrElasticVersionConflict) {
 		return nil
 	}
