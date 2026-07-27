@@ -903,13 +903,20 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 	}
 
 	data := model.ClonePolicyData(pp.Policy.Data)
-	for _, policyOutput := range data.Outputs {
+	for name, policyOutput := range data.Outputs {
 		// NOTE: Not sure if output secret keys collected here include new entries, but they are collected for completeness
+		outputType, _ := policyOutput["type"].(string)
 		ks, err := secret.ProcessOutputSecret(policyOutput, secretValues)
 		if err != nil {
-			return nil, fmt.Errorf("failed to process output secret for output %q: %w", policyOutput["name"], err)
+			return nil, fmt.Errorf("failed to process output secret for output %q: %w", name, err)
 		}
-		pp.SecretKeys = append(pp.SecretKeys, ks...)
+		for _, key := range ks {
+			// Remote ES service_token is stripped in Prepare; omit from secret_paths
+			if outputType == policy.OutputTypeRemoteElasticsearch && key == policy.FieldOutputServiceToken {
+				continue
+			}
+			pp.SecretKeys = append(pp.SecretKeys, "outputs."+name+"."+key)
+		}
 	}
 	// Iterate through the policy outputs and prepare them
 	for _, policyOutput := range pp.Outputs {

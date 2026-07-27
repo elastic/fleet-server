@@ -31,6 +31,9 @@ var logstashOutputPolicy string
 //go:embed testdata/remote_es_policy.json
 var testPolicyRemoteES string
 
+//go:embed testdata/remote_es_policy_with_secrets.json
+var testPolicyRemoteESWithSecrets string
+
 //go:embed testdata/policy_with_secrets_mixed.json
 var policyWithSecretsMixed string
 
@@ -109,6 +112,32 @@ func TestNewParsedPolicyRemoteES(t *testing.T) {
 
 	// Validate that default was found
 	require.Equal(t, "remote", pp.Default.Name)
+}
+
+// TestNewParsedPolicyRemoteESServiceTokenSecret ensures that a remote Elasticsearch
+// output with secrets.service_token:
+//  1. Resolves the service_token value (needed by fleet-server to create API keys)
+//  2. Does NOT list outputs.<name>.service_token in SecretKeys — that field is
+//     stripped before the policy is sent to agents
+func TestNewParsedPolicyRemoteESServiceTokenSecret(t *testing.T) {
+	var m model.Policy
+	var d model.PolicyData
+	err := json.Unmarshal([]byte(testPolicyRemoteESWithSecrets), &d)
+	require.NoError(t, err)
+	m.Data = &d
+
+	bulker := ftesting.NewMockBulk()
+	pp, err := NewParsedPolicy(t.Context(), bulker, m)
+	require.NoError(t, err)
+
+	remote := pp.Policy.Data.Outputs["OUTPUT_ID"]
+	require.Equal(t, "SERVICE_TOKEN_ID_value", remote["service_token"])
+	require.Equal(t, "SSL_KEY_ID_value", remote["ssl"].(map[string]any)["key"])
+	_, hasSecrets := remote["secrets"]
+	require.False(t, hasSecrets, "secrets map should be removed after processing")
+
+	require.NotContains(t, pp.SecretKeys, "outputs.OUTPUT_ID.service_token")
+	require.Contains(t, pp.SecretKeys, "outputs.OUTPUT_ID.ssl.key")
 }
 
 // TestParsedPolicyMixedSecretsReplacement tests that secrets specified in a policy

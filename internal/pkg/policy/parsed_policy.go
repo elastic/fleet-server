@@ -77,11 +77,17 @@ func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*Pa
 		return nil, err
 	}
 	for name, policyOutput := range p.Data.Outputs {
+		outputType, _ := policyOutput[FieldOutputType].(string)
 		ks, err := secret.ProcessOutputSecret(policyOutput, secretValues)
 		if err != nil {
 			return nil, fmt.Errorf("failed to replace secrets in output section of policy '%s': %w", name, err)
 		}
 		for _, key := range ks {
+			// Do not advertise remote ES service_token in secret_paths; Prepare(...) deletes it
+			// before the policy is sent to agents
+			if outputType == OutputTypeRemoteElasticsearch && key == FieldOutputServiceToken {
+				continue
+			}
 			secretKeys = append(secretKeys, "outputs."+name+"."+key)
 		}
 	}
