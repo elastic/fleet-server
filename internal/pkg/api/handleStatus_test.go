@@ -34,15 +34,15 @@ func withAuthFunc(authfn AuthFunc) OptFunc {
 	}
 }
 
-type mockPolicyMonitor struct {
+type mockStatusPolicyMonitor struct {
 	state client.UnitState
 }
 
-func (pm *mockPolicyMonitor) Run(ctx context.Context) error {
+func (pm *mockStatusPolicyMonitor) Run(ctx context.Context) error {
 	return nil
 }
 
-func (pm *mockPolicyMonitor) State() client.UnitState {
+func (pm *mockStatusPolicyMonitor) State() client.UnitState {
 	return pm.state
 }
 
@@ -86,7 +86,7 @@ func TestHandleStatus(t *testing.T) {
 					ctx = logger.WithContext(ctx)
 					state := client.UnitState(k)
 					r := apiServer{
-						st: NewStatusT(cfg, nil, c, withAuthFunc(tc.AuthFn), WithSelfMonitor(&mockPolicyMonitor{state}), WithBuildInfo(fbuild.Info{
+						st: NewStatusT(cfg, nil, c, withAuthFunc(tc.AuthFn), WithSelfMonitor(&mockStatusPolicyMonitor{state}), WithBuildInfo(fbuild.Info{
 							Version:   "8.1.0",
 							Commit:    "4eff928",
 							BuildTime: time.Now(),

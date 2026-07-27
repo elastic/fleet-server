@@ -41,6 +41,31 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type mockPolicyMonitor struct {
+	mock.Mock
+}
+
+func (m *mockPolicyMonitor) Run(ctx context.Context) error {
+	args := m.Called(ctx)
+	return args.Error(0)
+}
+
+func (m *mockPolicyMonitor) Subscribe(agentID, policyID string, revIDX int64) (policy.Subscription, error) {
+	args := m.Called(agentID, policyID, revIDX)
+	return args.Get(0).(policy.Subscription), args.Error(1)
+}
+
+func (m *mockPolicyMonitor) Unsubscribe(sub policy.Subscription) error {
+	args := m.Called(sub)
+	return args.Error(0)
+}
+
+func (m *mockPolicyMonitor) GetPolicy(ctx context.Context, policyID string) (*model.Policy, error) {
+	args := m.Called(ctx, policyID)
+	p, _ := args.Get(0).(*model.Policy)
+	return p, args.Error(1)
+}
+
 func TestConvertActionData(t *testing.T) {
 	tests := []struct {
 		name   string
