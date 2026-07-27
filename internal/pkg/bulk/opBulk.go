@@ -27,19 +27,10 @@ func (b *Bulker) Create(ctx context.Context, index, id string, body []byte, opts
 		if err == nil {
 			return item.DocumentID, nil
 		}
-		if errors.Is(err, es.ErrElasticVersionConflict) {
-			lastErr = err
-			continue
+		if ctx.Err() != nil {
+			return "", ctx.Err()
 		}
-		// The ES client's internal context timed out (e.g. during SEARCH_ONLY shard
-		// bootstrap) while the caller's context is still live — retry the write.
-		// If ctx itself is done, the error came from the caller canceling and must
-		// not be retried.
-		if (errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled)) && ctx.Err() == nil {
-			lastErr = err
-			continue
-		}
-		return "", err
+		lastErr = err
 	}
 	return "", lastErr
 }
