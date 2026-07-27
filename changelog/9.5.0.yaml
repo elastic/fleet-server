@@ -1,7 +1,7 @@
 version: 9.5.0
 entries:
     - kind: enhancement
-      summary: OpAMP RequestInstanceUid flag always forces enrollment
+      summary: OpAMP `RequestInstanceUid` flag always forces enrollment
       description: ""
       component: fleet-server
       pr:
@@ -56,10 +56,7 @@ entries:
         checksum: 15806b7b0441c41aea5c6df5859258591706ff1a
     - kind: enhancement
       summary: Use go's FIPS module for fips artifacts
-      description: |
-        Use go's FIPS module instead of microsoft/go for creating FIPS artifacts.
-        Mechanically it sets GOFIPS140=v1.0.0 at compile time which enables
-        FIPS mode but does not force it.
+      description: ""
       component: fleet-server
       pr:
         - https://github.com/elastic/fleet-server/pull/7219
@@ -71,7 +68,7 @@ entries:
         name: 1781550341-Use-gos-FIPS-module-for-fips-artifacts.yaml
         checksum: 8cd2361f2ce7b1eb4df6aefb0cdd9a4a0fc77481
     - kind: enhancement
-      summary: Support HTTP Range in File Delivery
+      summary: Support HTTP range in file delivery
       description: ""
       component: fleet-server
       pr:
