@@ -4,7 +4,8 @@ entries:
       summary: OpAMP RequestInstanceUid flag always forces enrollment
       description: ""
       component: fleet-server
-      pr: []
+      pr:
+        - https://github.com/elastic/fleet-server/pull/6834
       issue:
         - https://github.com/elastic/fleet-server/issues/6789
       impact: ""
@@ -17,8 +18,10 @@ entries:
       summary: Allow Fleet Server to reload TLS certificates without restarting
       description: ""
       component: fleet-server
-      pr: []
-      issue: []
+      pr:
+        - https://github.com/elastic/fleet-server/pull/6838
+      issue:
+        - https://github.com/elastic/fleet-server/issues/6433
       impact: ""
       action: ""
       timestamp: 1776277335
@@ -29,7 +32,8 @@ entries:
       summary: Enforce policy-based access control on artifact downloads
       description: ""
       component: fleet-server
-      pr: []
+      pr:
+        - https://github.com/elastic/fleet-server/pull/7009
       issue: []
       impact: ""
       action: ""
@@ -41,7 +45,8 @@ entries:
       summary: Improve bulker performance
       description: ""
       component: fleet-server
-      pr: []
+      pr:
+        - https://github.com/elastic/fleet-server/pull/7190
       issue: []
       impact: ""
       action: ""
@@ -56,7 +61,8 @@ entries:
         Mechanically it sets GOFIPS140=v1.0.0 at compile time which enables
         FIPS mode but does not force it.
       component: fleet-server
-      pr: []
+      pr:
+        - https://github.com/elastic/fleet-server/pull/7219
       issue: []
       impact: ""
       action: ""
