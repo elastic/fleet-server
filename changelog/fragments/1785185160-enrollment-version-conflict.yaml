@@ -1,0 +1,7 @@
+kind: bug-fix
+
+summary: Treat 409 version conflict on agent CREATE as success during enrollment
+
+component: fleet-server
+
+pr: https://github.com/elastic/fleet-server/pull/7446

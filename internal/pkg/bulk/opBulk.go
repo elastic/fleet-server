@@ -20,19 +20,12 @@ import (
 )
 
 func (b *Bulker) Create(ctx context.Context, index, id string, body []byte, opts ...Opt) (string, error) {
-	const maxRetries = 3
-	var lastErr error
-	for range maxRetries {
-		item, err := b.waitBulkAction(ctx, ActionCreate, index, id, body, opts...)
-		if err == nil {
-			return item.DocumentID, nil
-		}
-		if ctx.Err() != nil {
-			return "", ctx.Err()
-		}
-		lastErr = err
+	item, err := b.waitBulkAction(ctx, ActionCreate, index, id, body, opts...)
+	if err != nil {
+		return "", err
 	}
-	return "", lastErr
+
+	return item.DocumentID, nil
 }
 
 func (b *Bulker) Index(ctx context.Context, index, id string, body []byte, opts ...Opt) (string, error) {
