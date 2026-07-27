@@ -1,6 +1,6 @@
 kind: bug-fix
 
-summary: Treat 409 version conflict on agent CREATE as success during enrollment
+summary: Fix agent enrollment failures caused by 409 version conflicts during `.fleet-agents` primary shard relocation
 
 component: fleet-server
 
