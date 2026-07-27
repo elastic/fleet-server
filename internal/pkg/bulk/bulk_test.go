@@ -19,6 +19,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -65,15 +66,9 @@ func TestCreateRetriesOnVersionConflict(t *testing.T) {
 	go func() { _ = bulker.Run(t.Context()) }()
 
 	id, err := bulker.Create(t.Context(), "test-index", testDocID, []byte(`{"field":"value"}`))
-	if err != nil {
-		t.Fatalf("expected Create to succeed after retry, got: %v", err)
-	}
-	if id != testDocID {
-		t.Errorf("expected document ID %q, got %q", testDocID, id)
-	}
-	if calls := mock.calls.Load(); calls != 2 {
-		t.Errorf("expected 2 transport calls (1 conflict + 1 retry), got %d", calls)
-	}
+	require.NoError(t, err, "expected Create to succeed after retry")
+	require.Equal(t, testDocID, id)
+	require.Equal(t, int32(2), mock.calls.Load(), "expected 2 transport calls (1 conflict + 1 retry)")
 }
 
 func TestCreateReturnsConflictAfterMaxRetries(t *testing.T) {
@@ -94,9 +89,7 @@ func TestCreateReturnsConflictAfterMaxRetries(t *testing.T) {
 	go func() { _ = bulker.Run(t.Context()) }()
 
 	_, err := bulker.Create(t.Context(), "test-index", testDocID, []byte(`{"field":"value"}`))
-	if !errors.Is(err, es.ErrElasticVersionConflict) {
-		t.Fatalf("expected ErrElasticVersionConflict after exhausting retries, got: %v", err)
-	}
+	require.ErrorIs(t, err, es.ErrElasticVersionConflict, "expected ErrElasticVersionConflict after exhausting retries")
 }
 
 func TestCreateRetriesOnDeadlineExceeded(t *testing.T) {
@@ -120,15 +113,9 @@ func TestCreateRetriesOnDeadlineExceeded(t *testing.T) {
 	go func() { _ = bulker.Run(t.Context()) }()
 
 	id, err := bulker.Create(t.Context(), "test-index", testDocID, []byte(`{"field":"value"}`))
-	if err != nil {
-		t.Fatalf("expected Create to succeed after retry, got: %v", err)
-	}
-	if id != testDocID {
-		t.Errorf("expected document ID %q, got %q", testDocID, id)
-	}
-	if n := calls.Load(); n != 2 {
-		t.Errorf("expected 2 transport calls (1 timeout + 1 retry), got %d", n)
-	}
+	require.NoError(t, err, "expected Create to succeed after retry")
+	require.Equal(t, testDocID, id)
+	require.Equal(t, int32(2), calls.Load(), "expected 2 transport calls (1 timeout + 1 retry)")
 }
 
 func TestCreateReturnsDeadlineExceededAfterMaxRetries(t *testing.T) {
@@ -142,12 +129,8 @@ func TestCreateReturnsDeadlineExceededAfterMaxRetries(t *testing.T) {
 	go func() { _ = bulker.Run(t.Context()) }()
 
 	_, err := bulker.Create(t.Context(), "test-index", testDocID, []byte(`{"field":"value"}`))
-	if !errors.Is(err, context.DeadlineExceeded) {
-		t.Fatalf("expected context.DeadlineExceeded after exhausting retries, got: %v", err)
-	}
-	if n := calls.Load(); n != 3 {
-		t.Errorf("expected 3 transport calls (max retries), got %d", n)
-	}
+	require.ErrorIs(t, err, context.DeadlineExceeded, "expected DeadlineExceeded after exhausting retries")
+	require.Equal(t, int32(3), calls.Load(), "expected 3 transport calls (max retries)")
 }
 
 func TestCreateDoesNotRetryWhenCallerContextCanceled(t *testing.T) {
@@ -174,12 +157,8 @@ func TestCreateDoesNotRetryWhenCallerContextCanceled(t *testing.T) {
 	cancel()
 
 	err := <-done
-	if !errors.Is(err, context.Canceled) {
-		t.Fatalf("expected context.Canceled, got: %v", err)
-	}
-	if n := calls.Load(); n != 1 {
-		t.Errorf("expected exactly 1 transport call (no retry after caller cancel), got %d", n)
-	}
+	require.ErrorIs(t, err, context.Canceled, "expected context.Canceled")
+	require.Equal(t, int32(1), calls.Load(), "expected exactly 1 transport call (no retry after caller cancel)")
 }
 
 // transportFunc adapts a function to the esapi.Transport interface.
