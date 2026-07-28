@@ -28,6 +28,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/rollback"
@@ -653,10 +654,12 @@ func createFleetAgent(ctx context.Context, bulker bulk.Bulk, id string, agent mo
 	}
 
 	_, err = bulker.Create(ctx, dl.FleetAgents, id, data, bulk.WithRefresh())
-	if err != nil {
-		return err
+	// A 409 on op_type:create is a definitive signal the document already exists; treat as success.
+	if errors.Is(err, es.ErrElasticVersionConflict) {
+		zerolog.Ctx(ctx).Debug().Str("agent_id", id).Msg("agent document already exists on enrollment create, treating as success")
+		return nil
 	}
-	return nil
+	return err
 }
 
 func generateAccessAPIKey(ctx context.Context, bulk bulk.Bulk, agentID string) (*apikey.APIKey, error) {
