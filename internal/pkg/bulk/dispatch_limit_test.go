@@ -80,7 +80,7 @@ func TestDispatchAllowsWhenUnderLimit(t *testing.T) { //nolint:dupl // temporary
 	require.Equal(t, int64(0), b.pendingBulkDispatches.Load())
 }
 
-func TestDispatchNoLimitWhenZero(t *testing.T) {
+func TestDispatchNoLimitWhenZero(t *testing.T) { //nolint:dupl // temporary: replaced by table-driven test once backport of #7493 merges
 	// With maxPendingBulkDispatches=0, there should be no limit enforced.
 	b := NewBulker(nil, nil, WithBlockQueueSize(1), WithMaxPendingBulkDispatches(0))
 
