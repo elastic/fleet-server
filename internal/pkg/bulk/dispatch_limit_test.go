@@ -58,42 +58,31 @@ func TestDispatchRejectsWhenLimitReached(t *testing.T) {
 	wg.Wait()
 }
 
-func TestDispatchAllowsWhenUnderLimit(t *testing.T) {
-	b := NewBulker(nil, nil, WithBlockQueueSize(1), WithMaxPendingBulkDispatches(10))
+func TestDispatchAllowsDispatch(t *testing.T) {
+	tests := []struct {
+		name  string
+		limit int64
+	}{
+		{name: "under limit", limit: 10},
+		{name: "no limit when zero", limit: 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := NewBulker(nil, nil, WithBlockQueueSize(1), WithMaxPendingBulkDispatches(tt.limit))
 
-	blk := b.newBlk(ActionSearch, optionsT{})
-	_, err := blk.buf.WriteString(`{"index":"test"}`)
-	require.NoError(t, err)
+			blk := b.newBlk(ActionSearch, optionsT{})
+			_, err := blk.buf.WriteString(`{"index":"test"}`)
+			require.NoError(t, err)
 
-	// Simulate the Run loop responding.
-	go func() {
-		item := <-b.ch
-		item.ch <- respT{}
-	}()
+			go func() {
+				item := <-b.ch
+				item.ch <- respT{}
+			}()
 
-	resp := b.dispatch(context.Background(), blk)
-	require.NoError(t, resp.err)
+			resp := b.dispatch(context.Background(), blk)
+			require.NoError(t, resp.err)
 
-	// Counter should be back to 0 after dispatch completes.
-	require.Equal(t, int64(0), b.pendingBulkDispatches.Load())
-}
-
-func TestDispatchNoLimitWhenZero(t *testing.T) {
-	// With maxPendingBulkDispatches=0, there should be no limit enforced.
-	b := NewBulker(nil, nil, WithBlockQueueSize(1), WithMaxPendingBulkDispatches(0))
-
-	blk := b.newBlk(ActionSearch, optionsT{})
-	_, err := blk.buf.WriteString(`{"index":"test"}`)
-	require.NoError(t, err)
-
-	go func() {
-		item := <-b.ch
-		item.ch <- respT{}
-	}()
-
-	resp := b.dispatch(context.Background(), blk)
-	require.NoError(t, resp.err)
-
-	// Counter should not have been touched (0 means disabled).
-	require.Equal(t, int64(0), b.pendingBulkDispatches.Load())
+			require.Equal(t, int64(0), b.pendingBulkDispatches.Load())
+		})
+	}
 }
