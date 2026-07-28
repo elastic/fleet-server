@@ -59,16 +59,13 @@ func TestDispatchRejectsWhenLimitReached(t *testing.T) {
 }
 
 func TestDispatchAllowsDispatch(t *testing.T) {
-	tests := []struct {
-		name  string
-		limit int64
-	}{
-		{name: "under limit", limit: 10},
-		{name: "no limit when zero", limit: 0},
+	tests := map[string]int64{
+		"under limit":      10,
+		"no limit when zero": 0,
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			b := NewBulker(nil, nil, WithBlockQueueSize(1), WithMaxPendingBulkDispatches(tt.limit))
+	for name, limit := range tests {
+		t.Run(name, func(t *testing.T) {
+			b := NewBulker(nil, nil, WithBlockQueueSize(1), WithMaxPendingBulkDispatches(limit))
 
 			blk := b.newBlk(ActionSearch, optionsT{})
 			_, err := blk.buf.WriteString(`{"index":"test"}`)
