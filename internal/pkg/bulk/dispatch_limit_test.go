@@ -60,7 +60,7 @@ func TestDispatchRejectsWhenLimitReached(t *testing.T) {
 
 func TestDispatchSucceedsWhenBelowLimit(t *testing.T) {
 	tests := map[string]int64{
-		"under limit":      10,
+		"under limit":        10,
 		"no limit when zero": 0,
 	}
 	for name, limit := range tests {
