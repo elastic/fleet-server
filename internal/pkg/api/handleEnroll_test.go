@@ -569,6 +569,38 @@ func TestEnrollerT_retrieveStaticTokenEnrollmentToken(t *testing.T) {
 	}
 }
 
+<<<<<<< HEAD
+=======
+func TestPolicyBaseID(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"my-policy#9.2", "my-policy"},
+		{"my-policy#9.2.1", "my-policy"},
+		{"my-policy", "my-policy"},
+		{"my-policy#", "my-policy"},
+		{"#versioned", ""},
+		{"a#b#c", "a#b"},
+		{"", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			assert.Equal(t, tt.want, policyBaseID(tt.input))
+		})
+	}
+}
+
+func TestCreateFleetAgentVersionConflictSucceeds(t *testing.T) {
+	bulker := ftesting.NewMockBulk()
+	bulker.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return("", es.ErrElasticVersionConflict)
+
+	err := createFleetAgent(t.Context(), bulker, "test-agent-id", model.Agent{})
+	assert.NoError(t, err)
+}
+
+>>>>>>> 44744ea (fix: treat enrollment CREATE 409 version conflict as success (#7446))
 func TestValidateEnrollRequest(t *testing.T) {
 	t.Run("invalid json", func(t *testing.T) {
 		req, err := validateRequest(context.Background(), strings.NewReader("not a json"))
