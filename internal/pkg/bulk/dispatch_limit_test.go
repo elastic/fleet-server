@@ -60,7 +60,7 @@ func TestDispatchRejectsWhenLimitReached(t *testing.T) {
 	wg.Wait()
 }
 
-func TestDispatchAllowsWhenUnderLimit(t *testing.T) {
+func TestDispatchAllowsWhenUnderLimit(t *testing.T) { //nolint:dupl // temporary: replaced by table-driven test once backport of #7493 merges
 	b := NewBulker(nil, nil, WithBlockQueueSize(1), WithMaxPendingBulkDispatches(10))
 
 	blk := b.newBlk(ActionSearch, optionsT{})
@@ -80,7 +80,7 @@ func TestDispatchAllowsWhenUnderLimit(t *testing.T) {
 	require.Equal(t, int64(0), b.pendingBulkDispatches.Load())
 }
 
-func TestDispatchNoLimitWhenZero(t *testing.T) { //nolint:dupl // temporary: replaced by table-driven test once backport of #7493 merges
+func TestDispatchNoLimitWhenZero(t *testing.T) {
 	// With maxPendingBulkDispatches=0, there should be no limit enforced.
 	b := NewBulker(nil, nil, WithBlockQueueSize(1), WithMaxPendingBulkDispatches(0))
 
