@@ -73,6 +73,8 @@ func (a *AckResponse) SetError(pos int, err error) {
 	var esErr *es.ErrElastic
 	if errors.As(err, &esErr) {
 		a.setMessage(pos, esErr.Status, esErr.Reason)
+	} else if errors.Is(err, bulk.ErrTooManyBulkDispatches) {
+		a.SetResult(pos, http.StatusTooManyRequests)
 	} else {
 		a.SetResult(pos, http.StatusInternalServerError)
 	}
@@ -230,6 +232,8 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 		var esErr *es.ErrElastic
 		if errors.As(err, &esErr) {
 			setResult(pos, esErr.Status)
+		} else if errors.Is(err, bulk.ErrTooManyBulkDispatches) {
+			setResult(pos, http.StatusTooManyRequests)
 		} else {
 			setResult(pos, http.StatusInternalServerError)
 		}
