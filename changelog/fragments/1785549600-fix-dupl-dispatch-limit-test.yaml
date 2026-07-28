@@ -1,0 +1,7 @@
+kind: other
+
+summary: Merge duplicate dispatch limit test functions into a table-driven test
+
+component: fleet-server
+
+pr: https://github.com/elastic/fleet-server/pull/7493
