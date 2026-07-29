@@ -19,6 +19,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
@@ -456,6 +457,38 @@ func TestHandleAckEvents(t *testing.T) {
 				return m
 			},
 			err: &HTTPError{Status: http.StatusNotFound},
+		},
+		{
+			name: "action find error, too many bulk dispatches",
+			events: []AckRequest_Events_Item{{
+				json.RawMessage(`{
+				"action_id": "2b12dcd8-bde0-4045-92dc-c4b27668d733"
+			    }`),
+			}},
+			res: newAckResponse(true, []AckResponseItem{newAckResponseItem(http.StatusTooManyRequests)}),
+			bulker: func(t *testing.T) *ftesting.MockBulk {
+				m := ftesting.NewMockBulk()
+				m.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{}, bulk.ErrTooManyBulkDispatches)
+				return m
+			},
+			err: &HTTPError{Status: http.StatusTooManyRequests},
+		},
+		{
+			// Policy action ID format: "policy:<policyID>:<revisionIdx>"
+			// Agent's PolicyID is "" and PolicyRevisionIdx is 0, so "policy::1" triggers an update.
+			name: "policy action, update agent too many bulk dispatches",
+			events: []AckRequest_Events_Item{{
+				json.RawMessage(`{
+				"action_id": "policy::1"
+			    }`),
+			}},
+			res: newAckResponse(true, []AckResponseItem{newAckResponseItem(http.StatusTooManyRequests)}),
+			bulker: func(t *testing.T) *ftesting.MockBulk {
+				m := ftesting.NewMockBulk()
+				m.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(bulk.ErrTooManyBulkDispatches)
+				return m
+			},
+			err: &HTTPError{Status: http.StatusTooManyRequests},
 		},
 		{
 			name: "upgrade action failed",
