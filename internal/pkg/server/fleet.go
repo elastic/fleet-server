@@ -529,6 +529,11 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 	g.Go(loggedRunFunc(ctx, "Checkin rejection rate sampler", func(ctx context.Context) error {
 		return api.RunCheckinRejectionRateSampler(ctx, api.CheckinRateSampleInterval)
 	}))
+	// Samples the connection-cap rejection counter into a rate gauge, exposed via
+	// /stats for use as an autoscaling signal. See api.RunConnRejectionRateSampler.
+	g.Go(loggedRunFunc(ctx, "Connection rejection rate sampler", func(ctx context.Context) error {
+		return api.RunConnRejectionRateSampler(ctx, api.ConnRejectionRateSampleInterval)
+	}))
 
 	ct, err := api.NewCheckinT(f.verCon, &cfg.Inputs[0].Server, f.cache, bc, pm, am, ad, bulker)
 	if err != nil {
