@@ -268,3 +268,69 @@ func TestAuthorizeArtifact(t *testing.T) {
 		})
 	}
 }
+
+// TestAuthorizeArtifact_CrossPolicyBypass exercises the cross-policy bypass:
+// an agent enrolled in policy A sets agent_policy_id to policy B at check-in,
+// then requests policy B's artifact.
+//
+// Before the fix, STEP 2 returned nil (200 OK). After the fix both steps return
+// ErrUnauthorizedArtifact (403) because authorization is anchored on PolicyID
+// (enrollment-derived) rather than AgentPolicyID (check-in-supplied).
+func TestAuthorizeArtifact_CrossPolicyBypass(t *testing.T) {
+	const (
+		victimPolicy  = "victim-policy-A"
+		targetPolicy  = "target-policy-B"
+		artifactID    = "endpoint-trustlist-windows-v1"
+		targetSHA2    = "044488cd5c93e311453951fba706bc78c83f295aff75c8a5a2e309656eb3ef2a"
+	)
+
+	policyBWithArtifact := &model.Policy{
+		Data: &model.PolicyData{
+			Inputs: []map[string]any{
+				{
+					"type": "endpoint",
+					"artifact_manifest": map[string]any{
+						"artifacts": map[string]any{
+							artifactID: map[string]any{
+								"decoded_sha256": targetSHA2,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	policyAWithoutArtifact := &model.Policy{Data: &model.PolicyData{}}
+
+	// STEP 1: agent enrolled in policy A, AgentPolicyID not yet set (pre-checkin).
+	// Baseline: policy A has no matching artifact → denied.
+	t.Run("STEP1: baseline denied before spoofed checkin", func(t *testing.T) {
+		pm := &mockPolicyMonitor{}
+		pm.On("GetPolicy", context.Background(), victimPolicy).Return(policyAWithoutArtifact, nil)
+		at := ArtifactT{pm: pm}
+
+		err := at.authorizeArtifact(context.Background(), &model.Agent{PolicyID: victimPolicy}, artifactID, targetSHA2)
+		require.ErrorIs(t, err, ErrUnauthorizedArtifact)
+		pm.AssertExpectations(t)
+	})
+
+	// STEP 2: same agent after a spoofed checkin sets AgentPolicyID to the target policy.
+	// Before the fix: authorizeArtifact used AgentPolicyID → queried policy B → returned nil (200).
+	// After the fix:  authorizeArtifact uses PolicyID     → queries policy A → returns 403.
+	t.Run("STEP2: denied after spoofed checkin sets AgentPolicyID to target", func(t *testing.T) {
+		pm := &mockPolicyMonitor{}
+		// Policy A (the real assignment) must be queried and must not contain the artifact.
+		pm.On("GetPolicy", context.Background(), victimPolicy).Return(policyAWithoutArtifact, nil)
+		// Policy B (the attacker's target) must never be queried.
+		_ = policyBWithArtifact // referenced to make the intent clear; must NOT appear in mock calls
+		at := ArtifactT{pm: pm}
+
+		agent := &model.Agent{
+			PolicyID:      victimPolicy, // set at enrollment, server-authoritative
+			AgentPolicyID: targetPolicy, // set by spoofed checkin, client-controlled
+		}
+		err := at.authorizeArtifact(context.Background(), agent, artifactID, targetSHA2)
+		require.ErrorIs(t, err, ErrUnauthorizedArtifact)
+		pm.AssertExpectations(t) // asserts policy B was never queried
+	})
+}
