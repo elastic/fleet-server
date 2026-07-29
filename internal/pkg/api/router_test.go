@@ -5,6 +5,7 @@
 package api
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -97,7 +98,7 @@ func TestLimiter(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			h := testStatusServer(t, tt.cfg)
 			w := httptest.NewRecorder()
-			r := httptest.NewRequest("GET", "/api/status", nil)
+			r := httptest.NewRequestWithContext(t.Context(), "GET", "/api/status", nil)
 
 			h.ServeHTTP(w, r)
 			resp := w.Result()
@@ -122,7 +123,7 @@ func TestThrottleWithCount(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 		}))
 		w := httptest.NewRecorder()
-		h.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/", nil))
+		h.ServeHTTP(w, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil))
 		require.Equal(t, http.StatusOK, w.Code)
 		require.Equal(t, before, cntHTTPRejected.Load())
 	})
@@ -136,11 +137,11 @@ func TestThrottleWithCount(t *testing.T) {
 			time.Sleep(100 * time.Millisecond)
 		}))
 
-		go h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil))
+		go h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil))
 		<-started // first request has acquired the connection slot
 
 		w := httptest.NewRecorder()
-		h.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/", nil))
+		h.ServeHTTP(w, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil))
 		require.Equal(t, http.StatusTooManyRequests, w.Code)
 		require.Equal(t, before+1, cntHTTPRejected.Load())
 	})
