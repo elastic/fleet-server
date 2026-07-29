@@ -503,29 +503,29 @@ func renderUpdatePainlessScript(outputName string, fields map[string]any) ([]byt
 	var source strings.Builder
 
 	// prepare agent.elasticsearch_outputs[OUTPUT_NAME]
-	source.WriteString(fmt.Sprintf(`
+	fmt.Fprintf(&source, `
 if (ctx._source['outputs']==null)
   {ctx._source['outputs']=new HashMap();}
 if (ctx._source['outputs']['%s']==null)
   {ctx._source['outputs']['%s']=new HashMap();}
-`, outputName, outputName))
+`, outputName, outputName)
 
 	for field := range fields {
 		if field == dl.FieldPolicyOutputToRetireAPIKeyIDs {
 			// dl.FieldPolicyOutputToRetireAPIKeyIDs is a special case.
 			// It's an array that gets deleted when the keys are invalidated.
 			// Thus, append the old API key ID, create the field if necessary.
-			source.WriteString(fmt.Sprintf(`
+			fmt.Fprintf(&source, `
 if (ctx._source['outputs']['%s'].%s==null)
   {ctx._source['outputs']['%s'].%s=new ArrayList();}
 if (!ctx._source['outputs']['%s'].%s.contains(params.%s))
   {ctx._source['outputs']['%s'].%s.add(params.%s);}
-`, outputName, field, outputName, field, outputName, field, field, outputName, field, field))
+`, outputName, field, outputName, field, outputName, field, field, outputName, field, field)
 		} else {
 			// Update the other fields
-			source.WriteString(fmt.Sprintf(`
+			fmt.Fprintf(&source, `
 ctx._source['outputs']['%s'].%s=params.%s;`,
-				outputName, field, field))
+				outputName, field, field)
 		}
 	}
 
