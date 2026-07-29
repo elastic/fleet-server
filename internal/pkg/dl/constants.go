@@ -36,6 +36,7 @@ const (
 	FieldComponents                    = "components"
 	FieldAgentPolicyID                 = "agent_policy_id"
 	FieldPolicyID                      = "policy_id"
+	FieldPolicyBaseID                  = "policy_base_id"
 	FieldPolicyOutputAPIKey            = "api_key"
 	FieldPolicyOutputAPIKeyID          = "api_key_id"
 	FieldPolicyOutputPermissionsHash   = "permissions_hash"
