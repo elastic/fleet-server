@@ -1,0 +1,9 @@
+kind: security
+
+# Anchor artifact authorization on enrollment-derived PolicyID, not the
+# check-in-supplied AgentPolicyID, to prevent cross-policy artifact download.
+summary: Anchor artifact authorization on enrollment-derived policy ID
+
+component: fleet-server
+
+issue: https://github.com/elastic/security/issues/12861

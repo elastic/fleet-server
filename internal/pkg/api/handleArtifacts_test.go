@@ -182,7 +182,7 @@ func TestAuthorizeArtifact(t *testing.T) {
 	}{
 		{
 			name:  "authorized: artifact in policy",
-			agent: &model.Agent{AgentPolicyID: policyID},
+			agent: &model.Agent{PolicyID: policyID},
 			setupMock: func(pm *mockPolicyMonitor) {
 				pm.On("GetPolicy", context.Background(), policyID).Return(policyWithArtifact, nil)
 			},
@@ -190,7 +190,7 @@ func TestAuthorizeArtifact(t *testing.T) {
 		},
 		{
 			name:  "unauthorized: artifact not in policy",
-			agent: &model.Agent{AgentPolicyID: policyID},
+			agent: &model.Agent{PolicyID: policyID},
 			setupMock: func(pm *mockPolicyMonitor) {
 				pm.On("GetPolicy", context.Background(), policyID).Return(&model.Policy{
 					Data: &model.PolicyData{},
@@ -200,7 +200,7 @@ func TestAuthorizeArtifact(t *testing.T) {
 		},
 		{
 			name:  "unauthorized: policy not found maps to 403",
-			agent: &model.Agent{AgentPolicyID: policyID},
+			agent: &model.Agent{PolicyID: policyID},
 			setupMock: func(pm *mockPolicyMonitor) {
 				pm.On("GetPolicy", context.Background(), policyID).Return(nil, policy.ErrPolicyNotFound)
 			},
@@ -208,19 +208,37 @@ func TestAuthorizeArtifact(t *testing.T) {
 		},
 		{
 			name:  "error: GetPolicy returns unexpected error",
-			agent: &model.Agent{AgentPolicyID: policyID},
+			agent: &model.Agent{PolicyID: policyID},
 			setupMock: func(pm *mockPolicyMonitor) {
 				pm.On("GetPolicy", context.Background(), policyID).Return(nil, errors.New("elasticsearch unavailable"))
 			},
 			wantErr: nil, // wrapped, so we check IsUnauthorized is false
 		},
 		{
-			name:  "authorized: uses PolicyID when AgentPolicyID is empty (pre-checkin)",
-			agent: &model.Agent{PolicyID: policyID},
+			name:  "authorized: uses AgentPolicyID when PolicyID is empty (legacy fallback)",
+			agent: &model.Agent{AgentPolicyID: policyID},
 			setupMock: func(pm *mockPolicyMonitor) {
 				pm.On("GetPolicy", context.Background(), policyID).Return(policyWithArtifact, nil)
 			},
 			wantErr: nil,
+		},
+		{
+			// Regression test: an attacker checks in with agent_policy_id=<victim-policy> to
+			// gain access to that policy's artifacts. authorizeArtifact must anchor on
+			// PolicyID (enrollment-derived, server-trusted), not AgentPolicyID (client-controlled).
+			name: "unauthorized: AgentPolicyID does not override PolicyID (cross-policy bypass)",
+			agent: &model.Agent{
+				PolicyID:      policyID,
+				AgentPolicyID: "attacker-chosen-policy",
+			},
+			setupMock: func(pm *mockPolicyMonitor) {
+				// Authorization must use PolicyID ("test-policy-id"), which has no artifact.
+				// "attacker-chosen-policy" must never be queried.
+				pm.On("GetPolicy", context.Background(), policyID).Return(&model.Policy{
+					Data: &model.PolicyData{},
+				}, nil)
+			},
+			wantErr: ErrUnauthorizedArtifact,
 		},
 		{
 			name:      "forbidden: agent has no policy ID",

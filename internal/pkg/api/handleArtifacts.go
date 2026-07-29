@@ -160,12 +160,13 @@ func (at ArtifactT) authorizeArtifact(ctx context.Context, agent *model.Agent, i
 	span, ctx := apm.StartSpan(ctx, "authorizeArtifacts", "auth")
 	defer span.End()
 
-	// AgentPolicyID (agent_policy_id) is set at first checkin; PolicyID (policy_id) is set
-	// at enrollment. Fall back to PolicyID so newly enrolled agents that have not yet
-	// checked in can still download artifacts for their assigned policy.
-	policyID := agent.AgentPolicyID
+	// PolicyID (policy_id) is set at enrollment and is the server-authoritative policy
+	// assignment. AgentPolicyID (agent_policy_id) is derived from the check-in request
+	// body (client-controlled) and must not be used as the authorization anchor.
+	// Fall back to AgentPolicyID only for agents that predate enrollment-time PolicyID tracking.
+	policyID := agent.PolicyID
 	if policyID == "" {
-		policyID = agent.PolicyID
+		policyID = agent.AgentPolicyID
 	}
 	if policyID == "" {
 		return ErrAgentPolicyIDMissing
