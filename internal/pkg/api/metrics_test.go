@@ -77,6 +77,50 @@ func TestComputeRate(t *testing.T) {
 	}
 }
 
+func TestRunConnRejectionRateSampler(t *testing.T) {
+	// Swap in a fresh gauge registered under a private namespace to avoid
+	// duplicate-name panics in the Prometheus registry across repeated runs.
+	origRate := cntHTTPRejectedRate
+	t.Cleanup(func() { cntHTTPRejectedRate = origRate })
+	cntHTTPRejectedRate = newGauge(
+		registry.newRegistry(fmt.Sprintf("test_conn_rejection_rate_sampler_%d", testRegistrySeq.Add(1))),
+		"tcp_rejected_rate",
+	)
+
+	ctx, cancel := context.WithCancel(t.Context())
+
+	const interval = 10 * time.Millisecond
+	done := make(chan error, 1)
+	go func() {
+		done <- RunConnRejectionRateSampler(ctx, interval)
+	}()
+
+	injectorDone := make(chan struct{})
+	go func() {
+		defer close(injectorDone)
+		ticker := time.NewTicker(interval / 2)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				cntHTTPRejected.Add(1)
+			}
+		}
+	}()
+
+	t.Cleanup(func() {
+		cancel()
+		require.NoError(t, <-done)
+		<-injectorDone
+	})
+
+	require.Eventually(t, func() bool {
+		return cntHTTPRejectedRate.metric.Get() > 0
+	}, 20*interval, interval/4, "expected the connection rejection rate gauge to become positive while rejections were ongoing")
+}
+
 func TestRunCheckinRejectionRateSampler(t *testing.T) {
 	// cntCheckin is a package-level global shared with the checkin route handler
 	// and other tests in this package. Swap in a throwaway routeStats registered

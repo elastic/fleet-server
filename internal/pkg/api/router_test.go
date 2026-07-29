@@ -14,6 +14,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestPathToOperation(t *testing.T) {
@@ -104,4 +105,43 @@ func TestLimiter(t *testing.T) {
 			assert.Equal(t, tt.status, resp.StatusCode)
 		})
 	}
+}
+
+func TestStatusRecorder(t *testing.T) {
+	rw := httptest.NewRecorder()
+	rec := &statusRecorder{ResponseWriter: rw}
+	rec.WriteHeader(http.StatusTeapot)
+	require.Equal(t, http.StatusTeapot, rec.status)
+	require.Equal(t, http.StatusTeapot, rw.Code)
+}
+
+func TestThrottleWithCount(t *testing.T) {
+	t.Run("does not increment counter on success", func(t *testing.T) {
+		before := cntHTTPRejected.Load()
+		h := throttleWithCount(5)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}))
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/", nil))
+		require.Equal(t, http.StatusOK, w.Code)
+		require.Equal(t, before, cntHTTPRejected.Load())
+	})
+
+	t.Run("increments counter when connection cap is hit", func(t *testing.T) {
+		before := cntHTTPRejected.Load()
+
+		started := make(chan struct{})
+		h := throttleWithCount(1)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			close(started)
+			time.Sleep(100 * time.Millisecond)
+		}))
+
+		go h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil))
+		<-started // first request has acquired the connection slot
+
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/", nil))
+		require.Equal(t, http.StatusTooManyRequests, w.Code)
+		require.Equal(t, before+1, cntHTTPRejected.Load())
+	})
 }
