@@ -84,6 +84,8 @@ type Bulk interface {
 	RemoteOutputConfigChanged(zlog zerolog.Logger, name string, newCfg map[string]any) bool
 
 	ReadSecrets(ctx context.Context, secretIds []string) (map[string]string, error)
+	WriteSecret(ctx context.Context, value string) (string, error)
+	DeleteSecret(ctx context.Context, secretID string) error
 }
 
 const kModBulk = "bulk"
@@ -333,6 +335,14 @@ func (b *Bulker) ReadSecrets(ctx context.Context, secretIds []string) (map[strin
 		result[id] = val
 	}
 	return result, nil
+}
+
+func (b *Bulker) WriteSecret(ctx context.Context, value string) (string, error) {
+	return WriteSecret(ctx, b.Client(), value)
+}
+
+func (b *Bulker) DeleteSecret(ctx context.Context, secretID string) error {
+	return DeleteSecret(ctx, b.Client(), secretID)
 }
 
 // Stop timer, but don't stall on channel.
