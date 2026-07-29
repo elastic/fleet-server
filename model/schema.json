@@ -620,9 +620,6 @@
         "audit_unenrolled_reason": {
           "description": "Agent reason for unenroll/uninstall annotation.",
           "type": "string",
-<<<<<<< HEAD
-          "enum": ["uninstall", "orphaned", "key_revoked", "migrated"]
-=======
           "enum": [
             "uninstall",
             "orphaned",
@@ -630,7 +627,6 @@
             "migrated",
             "reenrolled"
           ]
->>>>>>> 761825e ([Fleet] Write policy_base_id field at agent enrollment (#7422))
         },
         "upgraded_at": {
           "description": "Date/time the Elastic Agent was last upgraded",
