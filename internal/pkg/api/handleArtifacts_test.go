@@ -278,10 +278,10 @@ func TestAuthorizeArtifact(t *testing.T) {
 // (enrollment-derived) rather than AgentPolicyID (check-in-supplied).
 func TestAuthorizeArtifact_CrossPolicyBypass(t *testing.T) {
 	const (
-		victimPolicy  = "victim-policy-A"
-		targetPolicy  = "target-policy-B"
-		artifactID    = "endpoint-trustlist-windows-v1"
-		targetSHA2    = "044488cd5c93e311453951fba706bc78c83f295aff75c8a5a2e309656eb3ef2a"
+		victimPolicy = "victim-policy-A"
+		targetPolicy = "target-policy-B"
+		artifactID   = "endpoint-trustlist-windows-v1"
+		targetSHA2   = "044488cd5c93e311453951fba706bc78c83f295aff75c8a5a2e309656eb3ef2a"
 	)
 
 	policyBWithArtifact := &model.Policy{
