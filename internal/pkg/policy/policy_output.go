@@ -347,6 +347,9 @@ func (p *Output) prepareElasticsearch(
 
 		if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
 			zlog.Error().Err(err).Msg("fail update agent record")
+			if delErr := bulker.DeleteSecret(ctx, secretID); delErr != nil {
+				zlog.Warn().Err(delErr).Str("secret_id", secretID).Msg("failed to delete orphaned output API key secret after agent update failure")
+			}
 			return fmt.Errorf("fail update agent record: %w", err)
 		}
 
