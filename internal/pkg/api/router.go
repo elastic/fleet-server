@@ -85,7 +85,7 @@ func throttleWithCount(limit int) func(http.Handler) http.Handler {
 			rw := &statusRecorder{ResponseWriter: w}
 			throttled.ServeHTTP(rw, r)
 			if rw.status == http.StatusTooManyRequests {
-				cntHTTPRejected.Inc()
+				cntHTTPRejected.Add(1)
 			}
 		})
 	}

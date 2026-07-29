@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -36,8 +37,10 @@ var (
 	cntHTTPNew          *statsCounter
 	cntHTTPClose        *statsCounter
 	cntHTTPActive       *statsGauge
-	cntHTTPRejected     *statsCounter
 	cntHTTPRejectedRate *statsGauge
+	// cntHTTPRejected is an internal-only accumulator; only the derived rate is
+	// exposed in /stats. Not registered with the metrics registry.
+	cntHTTPRejected atomic.Uint64
 
 	cntCheckin       routeStats
 	cntEnroll        routeStats
@@ -63,7 +66,6 @@ func init() {
 	cntHTTPNew = newCounter(registry, "tcp_open")
 	cntHTTPClose = newCounter(registry, "tcp_close")
 	cntHTTPActive = newGauge(registry, "tcp_active")
-	cntHTTPRejected = newCounter(registry, "tcp_rejected")
 	cntHTTPRejectedRate = newGauge(registry, "tcp_rejected_rate")
 
 	routesRegistry := registry.newRegistry("routes")
@@ -386,13 +388,13 @@ func RunConnRejectionRateSampler(ctx context.Context, interval time.Duration) er
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
-	prev, prevT := cntHTTPRejected.Get(), time.Now()
+	prev, prevT := cntHTTPRejected.Load(), time.Now()
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
 		case now := <-ticker.C:
-			cur := cntHTTPRejected.Get()
+			cur := cntHTTPRejected.Load()
 			cntHTTPRejectedRate.Set(computeRate(prev, cur, now.Sub(prevT)))
 			prev, prevT = cur, now
 		}
