@@ -17,6 +17,17 @@ updates:
       - backport-active-all
     open-pull-requests-limit: 10
     groups:
+      elastic:
+        patterns:
+          - "github.com/elastic/*"
+          - "go.elastic.co/*"
+      test-tooling:
+        patterns:
+          - "github.com/testcontainers/*"
+          - "github.com/Shopify/*"
+          - "github.com/moby/*"
+          - "github.com/magefile/mage"
+          - "github.com/stretchr/*"
       go-dependencies:
         patterns:
           - "*"
