@@ -17,6 +17,7 @@ import (
 	"go.elastic.co/apm/v2"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
+	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/file"
@@ -142,6 +143,24 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 			},
 		},
 		{
+			ErrUnauthorizedArtifact,
+			HTTPErrResp{
+				http.StatusForbidden,
+				"Forbidden",
+				"agent not authorized for artifact",
+				zerolog.WarnLevel,
+			},
+		},
+		{
+			ErrAgentPolicyIDMissing,
+			HTTPErrResp{
+				http.StatusForbidden,
+				"Forbidden",
+				"agent has no policy ID",
+				zerolog.WarnLevel,
+			},
+		},
+		{
 			ErrorThrottle,
 			HTTPErrResp{
 				http.StatusTooManyRequests,
@@ -174,6 +193,15 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 				http.StatusTooManyRequests,
 				"ElasticsearchAPIKeyAuthLimit",
 				"exceeded the elasticsearch api key auth limit",
+				zerolog.WarnLevel,
+			},
+		},
+		{
+			bulk.ErrTooManyBulkDispatches,
+			HTTPErrResp{
+				http.StatusTooManyRequests,
+				"TooManyBulkDispatches",
+				"too many pending bulk dispatches",
 				zerolog.WarnLevel,
 			},
 		},

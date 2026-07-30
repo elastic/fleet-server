@@ -118,7 +118,11 @@ func TestToESConfigTLS(t *testing.T) {
 			require.NoError(t, err)
 
 			// cmp.Diff can't handle function pointers.
-			res.Transport.(*http.Transport).Proxy = nil
+			transport := res.Transport.(*http.Transport)
+			transport.Proxy = nil
+			if transport.TLSClientConfig != nil {
+				transport.TLSClientConfig.VerifyConnection = nil
+			}
 
 			test.result.Header.Set("X-elastic-product-origin", "fleet")
 			assert.True(t, cmp.Equal(test.result, res, copts...), "mismatch (-want +got)\n%s", cmp.Diff(test.result, res, copts...))
