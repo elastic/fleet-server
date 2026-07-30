@@ -569,6 +569,15 @@ func TestEnrollerT_retrieveStaticTokenEnrollmentToken(t *testing.T) {
 	}
 }
 
+func TestCreateFleetAgentVersionConflictSucceeds(t *testing.T) {
+	bulker := ftesting.NewMockBulk()
+	bulker.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return("", es.ErrElasticVersionConflict)
+
+	err := createFleetAgent(t.Context(), bulker, "test-agent-id", model.Agent{})
+	assert.NoError(t, err)
+}
+
 func TestValidateEnrollRequest(t *testing.T) {
 	t.Run("invalid json", func(t *testing.T) {
 		req, err := validateRequest(context.Background(), strings.NewReader("not a json"))

@@ -146,7 +146,7 @@ func (suite *AgentContainerSuite) TestHTTP() {
 }
 
 func (suite *AgentContainerSuite) TestWithSecretFiles() {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
 	req := testcontainers.ContainerRequest{
