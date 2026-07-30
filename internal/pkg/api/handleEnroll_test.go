@@ -379,7 +379,8 @@ func TestEnrollWithAgentIDExistingActive(t *testing.T) {
 	bulker := ftesting.NewMockBulk()
 	et, _ := NewEnrollerT(verCon, cfg, bulker, c)
 
-	source := fmt.Sprintf(`{"active":true,"agent":{"id":"1234","version":"8.9.0"},"type":"PERMANENT","policy_id":"1234","replace_token":"%s"}`, replaceHash)
+	policyID := "my-policy#9.2"
+	source := fmt.Sprintf(`{"active":true,"agent":{"id":"1234","version":"8.9.0"},"type":"PERMANENT","policy_id":"%s","replace_token":"%s"}`, policyID, replaceHash)
 	bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{
 		HitsT: es.HitsT{
 			Hits: []es.HitT{{
@@ -399,7 +400,7 @@ func TestEnrollWithAgentIDExistingActive(t *testing.T) {
 		}, nil)
 	bulker.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(
 		nil)
-	resp, _ := et._enroll(ctx, rb, zlog, req, "1234", []string{}, "8.9.0")
+	resp, _ := et._enroll(ctx, rb, zlog, req, policyID, []string{}, "8.9.0")
 
 	if resp.Action != "created" {
 		t.Fatal("enroll failed")
@@ -407,6 +408,19 @@ func TestEnrollWithAgentIDExistingActive(t *testing.T) {
 	if resp.Item.Id != agentID {
 		t.Fatalf("agent ID should have been %s (not %s)", agentID, resp.Item.Id)
 	}
+
+	var updateBody []byte
+	for _, c := range bulker.Calls {
+		if c.Method == "Update" {
+			updateBody = c.Arguments.Get(3).([]byte)
+			break
+		}
+	}
+	var updateDoc struct {
+		Doc map[string]any `json:"doc"`
+	}
+	assert.NoError(t, json.Unmarshal(updateBody, &updateDoc))
+	assert.Equal(t, "my-policy", updateDoc.Doc[dl.FieldPolicyBaseID])
 }
 
 func TestEnrollerT_retrieveStaticTokenEnrollmentToken(t *testing.T) {
@@ -557,6 +571,35 @@ func TestEnrollerT_retrieveStaticTokenEnrollmentToken(t *testing.T) {
 			}
 			assert.NoError(t, err)
 			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestCreateFleetAgentVersionConflictSucceeds(t *testing.T) {
+	bulker := ftesting.NewMockBulk()
+	bulker.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return("", es.ErrElasticVersionConflict)
+
+	err := createFleetAgent(t.Context(), bulker, "test-agent-id", model.Agent{})
+	assert.NoError(t, err)
+}
+
+func TestPolicyBaseID(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"my-policy#9.2", "my-policy"},
+		{"my-policy#9.2.1", "my-policy"},
+		{"my-policy", "my-policy"},
+		{"my-policy#", "my-policy"},
+		{"#versioned", ""},
+		{"a#b#c", "a#b"},
+		{"", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			assert.Equal(t, tt.want, policyBaseID(tt.input))
 		})
 	}
 }
