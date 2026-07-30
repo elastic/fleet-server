@@ -7,7 +7,9 @@ updates:
       - "/pkg/api/"
       - "/testing/"
     schedule:
-      interval: "daily"
+      interval: "weekly"
+      day: "monday"
+      time: "08:00"
     labels:
       - automation
       - dependency
@@ -15,9 +17,20 @@ updates:
       - backport-active-all
     open-pull-requests-limit: 10
     groups:
-      elastic-apm:
+      elastic:
         patterns:
-          - "go.elastic.co/apm/*"
+          - "github.com/elastic/*"
+          - "go.elastic.co/*"
+      test-tooling:
+        patterns:
+          - "github.com/testcontainers/*"
+          - "github.com/Shopify/*"
+          - "github.com/moby/*"
+          - "github.com/magefile/mage"
+          - "github.com/stretchr/*"
+      go-dependencies:
+        patterns:
+          - "*"
 
   - package-ecosystem: github-actions
     directories:
