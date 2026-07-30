@@ -153,11 +153,15 @@ func (ft *FileDeliveryT) sendFileAsRanges(zlog zerolog.Logger, w http.ResponseWr
 	sort.SliceStable(chunks, func(i, j int) bool {
 		return chunks[i].Pos < chunks[j].Pos
 	})
+	chunkSize := info.File.ChunkSize
+	if chunkSize <= 0 {
+		chunkSize = file.MaxChunkSize
+	}
 
 	// reduce to fetch only required chunks.
 	// Int64 Floor division used intentionally for index math
-	chunkIdxStart := ra.start / info.File.ChunkSize
-	chunkIdxStop := (ra.start + ra.length - 1) / info.File.ChunkSize
+	chunkIdxStart := ra.start / chunkSize
+	chunkIdxStop := (ra.start + ra.length - 1) / chunkSize
 	if chunkIdxStart >= int64(len(chunks)) || chunkIdxStart > chunkIdxStop || chunkIdxStop >= int64(len(chunks)) {
 		return ErrBadRange
 	}
@@ -174,8 +178,8 @@ func (ft *FileDeliveryT) sendFileAsRanges(zlog zerolog.Logger, w http.ResponseWr
 		w.Header().Set("X-File-SHA2", info.File.Hash.SHA2)
 	}
 
-	startOffset := ra.start % info.File.ChunkSize
-	endOffset := ((ra.start + ra.length - 1) % info.File.ChunkSize) + 1
+	startOffset := ra.start % chunkSize
+	endOffset := ((ra.start + ra.length - 1) % chunkSize) + 1
 
 	// Status code must be written before any calls to w.Write. But we cannot return any HTTP errors after this.
 	// So errors are logged, but not returned from this point forward

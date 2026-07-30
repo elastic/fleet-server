@@ -454,7 +454,7 @@ func TestFileDeliveryRangeSupport(t *testing.T) {
 	mockChunkSize := 100
 	mockFileSize := 600
 
-	mockBodyBytes := mockChunkedFile(tx, bulk, int64(mockChunkSize), int64(mockFileSize), "X")
+	mockBodyBytes := mockChunkedFile(tx, bulk, int64(mockChunkSize), int64(mockFileSize), "X", true)
 
 	// Testing behaviors described in https://datatracker.ietf.org/doc/html/rfc9110#section-14.1.2
 	cases := []struct {
@@ -488,6 +488,27 @@ func TestFileDeliveryRangeSupport(t *testing.T) {
 
 		})
 	}
+}
+
+func TestFileDeliveryRangeSupportWithoutExplicitChunkSize(t *testing.T) {
+	hr, _, tx, bulk := prepareFileDeliveryMock(t)
+
+	mockChunkSize := file.MaxChunkSize // spec default when not explicitly provided
+	mockFileSize := 340
+
+	mockBodyBytes := mockChunkedFile(tx, bulk, int64(mockChunkSize), int64(mockFileSize), "X", false)
+
+	rec := httptest.NewRecorder()
+
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/fleet/file/X", nil)
+	req.Header.Set("Range", "bytes=100-110")
+
+	hr.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusPartialContent, rec.Code)
+	assert.Equal(t, fmt.Sprintf("bytes %d-%d/%d", 100, 110, mockFileSize), rec.Header().Get("Content-Range"))
+	assert.Equal(t, "11", rec.Header().Get("Content-Length"))
+	assert.Equal(t, 11, rec.Body.Len())
+	assert.Equal(t, mockBodyBytes[100:111], rec.Body.Bytes())
 
 }
 
@@ -497,7 +518,7 @@ func TestFileDeliveryInvalidRangeReq(t *testing.T) {
 	mockChunkSize := 64
 	mockFileSize := 450
 
-	mockBodyBytes := mockChunkedFile(tx, bulk, int64(mockChunkSize), int64(mockFileSize), "X")
+	mockBodyBytes := mockChunkedFile(tx, bulk, int64(mockChunkSize), int64(mockFileSize), "X", true)
 	_ = mockBodyBytes
 
 	// invalid ranges
@@ -683,7 +704,7 @@ func prepareFileDeliveryMock(t *testing.T) (http.Handler, apiServer, *MockTransp
 	return Handler(&si), si, tx, fakebulk
 }
 
-func mockChunkedFile(tx *MockTransport, bulk *itesting.MockBulk, mockChunkSize int64, mockFileSize int64, fileID string) []byte {
+func mockChunkedFile(tx *MockTransport, bulk *itesting.MockBulk, mockChunkSize int64, mockFileSize int64, fileID string, writeChunkSize bool) []byte {
 	mockBodyBytes := make([]byte, mockFileSize)
 	j := 0
 	for i := range mockFileSize {
@@ -709,6 +730,10 @@ func mockChunkedFile(tx *MockTransport, bulk *itesting.MockBulk, mockChunkSize i
 		}
 	}
 
+	chunkSizeField := ""
+	if writeChunkSize {
+		chunkSizeField = fmt.Sprintf(`,"ChunkSize": %d`, mockChunkSize)
+	}
 	bulk.On("Search", mock.Anything, isFileMetaSearch, mock.Anything, mock.Anything, mock.Anything).Return(
 		&es.ResultT{
 			HitsT: es.HitsT{
@@ -728,10 +753,10 @@ func mockChunkedFile(tx *MockTransport, bulk *itesting.MockBulk, mockChunkSize i
 								"target_agents": ["someagent"],
 								"action_id": ""
 							},
-							"size": %d,
-							"ChunkSize": %d
+							"size": %d
+							%s
 						}
-					}`, mockFileSize, mockChunkSize),
+					}`, mockFileSize, chunkSizeField),
 				}},
 			},
 		}, nil,
