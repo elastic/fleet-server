@@ -80,3 +80,29 @@ entries:
       file:
         name: 1783099722-file-delivery-support-range.yaml
         checksum: 6d94c580d4c4d47376ae2661e09b1d52207f98ea
+    - kind: feature
+      summary: Write policy_base_id field at agent enrollment
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/7422
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1784718180
+      file:
+        name: 1784718180-write-policy-base-id-on-enrollment.yaml
+        checksum: b458474bb606768757617be5f257438eaae1bb1a
+    - kind: bug-fix
+      summary: Fix agent enrollment failures caused by 409 version conflicts during `.fleet-agents` primary shard relocation
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/7446
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1785185160
+      file:
+        name: 1785185160-enrollment-version-conflict.yaml
+        checksum: dfa448208740beda8ed226ca97043992763f791e
