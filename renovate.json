@@ -1,6 +1,5 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended"],
   "dependencyDashboard": true,
   "enabledManagers": ["gomod", "github-actions", "pre-commit"],
   "baseBranchPatterns": ["main", "9.5", "9.4", "9.3", "8.19"],
