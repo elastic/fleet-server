@@ -95,6 +95,7 @@ func TestRunConnRejectionRateSampler(t *testing.T) {
 		done <- RunConnRejectionRateSampler(ctx, interval)
 	}()
 
+	injectorCtx, stopInjector := context.WithCancel(ctx)
 	injectorDone := make(chan struct{})
 	go func() {
 		defer close(injectorDone)
@@ -102,7 +103,7 @@ func TestRunConnRejectionRateSampler(t *testing.T) {
 		defer ticker.Stop()
 		for {
 			select {
-			case <-ctx.Done():
+			case <-injectorCtx.Done():
 				return
 			case <-ticker.C:
 				cntHTTPRejected.Add(1)
@@ -112,6 +113,7 @@ func TestRunConnRejectionRateSampler(t *testing.T) {
 
 	t.Cleanup(func() {
 		cancel()
+		stopInjector()
 		require.NoError(t, <-done)
 		<-injectorDone
 	})
@@ -119,6 +121,12 @@ func TestRunConnRejectionRateSampler(t *testing.T) {
 	require.Eventually(t, func() bool {
 		return cntHTTPRejectedRate.metric.Get() > 0
 	}, 20*interval, interval/4, "expected the connection rejection rate gauge to become positive while rejections were ongoing")
+
+	stopInjector()
+	<-injectorDone
+	require.Eventually(t, func() bool {
+		return cntHTTPRejectedRate.metric.Get() == 0
+	}, 20*interval, interval/4, "expected the connection rejection rate gauge to return to zero after rejections stopped")
 }
 
 func TestRunCheckinRejectionRateSampler(t *testing.T) {
