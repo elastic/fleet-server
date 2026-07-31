@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 
 	"go.elastic.co/apm/v2"
 
@@ -82,15 +83,23 @@ func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*Pa
 		if err != nil {
 			return nil, fmt.Errorf("failed to replace secrets in output section of policy '%s': %w", name, err)
 		}
+
 		for _, key := range ks {
-			// Do not advertise remote ES service_token in secret_paths; Prepare(...) deletes it
-			// before the policy is sent to agents
-			if outputType == OutputTypeRemoteElasticsearch && key == FieldOutputServiceToken {
-				continue
-			}
 			secretKeys = append(secretKeys, "outputs."+name+"."+key)
 		}
+
+		// Do not advertise remote ES service_token in secret_paths; Prepare(...) deletes it
+		// before the policy is sent to agents
+		if _, ok := policyOutput[FieldOutputServiceToken]; ok {
+			if outputType == OutputTypeRemoteElasticsearch {
+				prefixed := "outputs." + name + "." + FieldOutputServiceToken
+				secretKeys = slices.DeleteFunc(secretKeys, func(key string) bool {
+					return key == prefixed
+				})
+			}
+		}
 	}
+
 	defaultName, err := findDefaultOutputName(p.Data.Outputs)
 	if err != nil {
 		return nil, err
