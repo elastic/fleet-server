@@ -303,7 +303,7 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 		bulker.AssertExpectations(t)
 	})
 
-	t.Run("Secret is deleted when agent document update fails", func(t *testing.T) {
+	t.Run("Secret is retained when agent document update fails", func(t *testing.T) {
 		logger := testlog.SetLogger(t)
 		bulker := ftesting.NewMockBulk()
 		apiKey := bulk.APIKey{ID: "abc", Key: "new-key"}
@@ -315,7 +315,6 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 		bulker.On("Update",
 			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(errors.New("ES update failed")).Once()
-		bulker.On("DeleteSecret", mock.Anything, secretID).Return(nil).Once()
 
 		output := Output{
 			Type: OutputTypeElasticsearch,
@@ -327,6 +326,7 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 
 		err := output.Prepare(context.Background(), logger, bulker, testAgent, policyMap)
 		require.Error(t, err)
+		bulker.AssertNotCalled(t, "DeleteSecret", mock.Anything, secretID)
 		bulker.AssertExpectations(t)
 	})
 
