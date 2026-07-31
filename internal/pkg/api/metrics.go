@@ -332,13 +332,9 @@ func attachPrometheusEndpoint(router metricsRouter, reg *prometheus.Registry, bi
 	router.AddRoute("/metrics", promhttp.InstrumentMetricHandler(reg, h).ServeHTTP)
 }
 
-// CheckinRateSampleInterval is how often RunCheckinRejectionRateSampler recomputes
-// the checkin capacity-rejection rate.
-const CheckinRateSampleInterval = 10 * time.Second
-
-// ConnRejectionRateSampleInterval is how often RunConnRejectionRateSampler recomputes
-// the connection-cap rejection rate.
-const ConnRejectionRateSampleInterval = CheckinRateSampleInterval
+// RejectionRateSampleInterval is how often the rejection-rate samplers recompute
+// the checkin and connection-cap rejection rates.
+const RejectionRateSampleInterval = 10 * time.Second
 
 // computeRate returns the count of rejections (cur-prev) divided by an elapsed
 // time (dt), rounded to the nearest integer. It returns 0 if dt is non-positive
