@@ -109,11 +109,23 @@ func TestLimiter(t *testing.T) {
 }
 
 func TestStatusRecorder(t *testing.T) {
-	rw := httptest.NewRecorder()
-	rec := &statusRecorder{ResponseWriter: rw}
-	rec.WriteHeader(http.StatusTeapot)
-	require.Equal(t, http.StatusTeapot, rec.status)
-	require.Equal(t, http.StatusTeapot, rw.Code)
+	t.Run("captures explicit status", func(t *testing.T) {
+		rw := httptest.NewRecorder()
+		rec := &statusRecorder{ResponseWriter: rw}
+		rec.WriteHeader(http.StatusTeapot)
+		require.Equal(t, http.StatusTeapot, rec.status)
+		require.Equal(t, http.StatusTeapot, rw.Code)
+	})
+
+	t.Run("captures implicit success status", func(t *testing.T) {
+		rw := httptest.NewRecorder()
+		rec := &statusRecorder{ResponseWriter: rw}
+		_, err := rec.Write([]byte("ok"))
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, rec.status)
+		require.Equal(t, http.StatusOK, rw.Code)
+		require.Equal(t, "ok", rw.Body.String())
+	})
 }
 
 func TestThrottleWithCount(t *testing.T) {

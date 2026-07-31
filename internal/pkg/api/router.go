@@ -97,9 +97,22 @@ type statusRecorder struct {
 	status int
 }
 
+func (s *statusRecorder) Write(buf []byte) (int, error) {
+	if s.status == 0 {
+		s.WriteHeader(http.StatusOK)
+	}
+	return s.ResponseWriter.Write(buf)
+}
+
 func (s *statusRecorder) WriteHeader(code int) {
-	s.status = code
+	if s.status == 0 {
+		s.status = code
+	}
 	s.ResponseWriter.WriteHeader(code)
+}
+
+func (s *statusRecorder) Unwrap() http.ResponseWriter {
+	return s.ResponseWriter
 }
 
 var pgpReg = regexp.MustCompile(`\/api\/agents\/upgrades\/[0-9]+\.[0-9]+\.[0-9]+\/pgp-public-key`)
