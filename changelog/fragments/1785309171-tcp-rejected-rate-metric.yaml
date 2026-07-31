@@ -1,0 +1,5 @@
+kind: enhancement
+
+summary: Add http_server.tcp_rejected_rate metric for connection-cap saturation signalling
+
+component: fleet-server
