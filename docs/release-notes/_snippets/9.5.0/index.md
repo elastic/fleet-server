@@ -6,10 +6,10 @@
 
 
 * Allow Fleet Server to reload TLS certificates without restarting. [#6838](https://github.com/elastic/fleet-server/pull/6838) [#6433](https://github.com/elastic/fleet-server/issues/6433)
-* Write policy_base_id field at agent enrollment. [#7422](https://github.com/elastic/fleet-server/pull/7422) 
-* OpAMP `RequestInstanceUid` flag always forces enrollment. [#6834](https://github.com/elastic/fleet-server/pull/6834) [#6789](https://github.com/elastic/fleet-server/issues/6789)
+* Write the `policy_base_id` field at agent enrollment. [#7422](https://github.com/elastic/fleet-server/pull/7422) 
+* Ensure the OpAMP `RequestInstanceUid` flag always forces enrollment. [#6834](https://github.com/elastic/fleet-server/pull/6834) [#6789](https://github.com/elastic/fleet-server/issues/6789)
 * Improve bulker performance. [#7190](https://github.com/elastic/fleet-server/pull/7190) 
-* Use go&#39;s FIPS module for fips artifacts. [#7219](https://github.com/elastic/fleet-server/pull/7219) 
+* Use Go's FIPS module for FIPS artifacts. [#7219](https://github.com/elastic/fleet-server/pull/7219) 
 * Support HTTP range in file delivery. [#7319](https://github.com/elastic/fleet-server/pull/7319) 
 
 
