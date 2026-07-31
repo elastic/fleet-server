@@ -5,7 +5,6 @@
 package api
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -144,12 +143,21 @@ func TestThrottleWithCount(t *testing.T) {
 		before := cntHTTPRejected.Load()
 
 		started := make(chan struct{})
+		release := make(chan struct{})
+		requestDone := make(chan struct{})
 		h := throttleWithCount(1)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			close(started)
-			time.Sleep(100 * time.Millisecond)
+			<-release
 		}))
 
-		go h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil))
+		go func() {
+			defer close(requestDone)
+			h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil))
+		}()
+		t.Cleanup(func() {
+			close(release)
+			<-requestDone
+		})
 		<-started // first request has acquired the connection slot
 
 		w := httptest.NewRecorder()
