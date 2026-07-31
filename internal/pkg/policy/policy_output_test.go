@@ -69,6 +69,15 @@ func TestRenderRemoveOutputPainlessScriptParameterizesOutputName(t *testing.T) {
 	assert.Equal(t, outputName, request.Script.Params["output_name"])
 }
 
+type recordingOutputSecretCandidateCollector struct {
+	candidates []OutputSecretCandidate
+}
+
+func (c *recordingOutputSecretCandidateCollector) Add(candidate OutputSecretCandidate) bool {
+	c.candidates = append(c.candidates, candidate)
+	return true
+}
+
 func TestPolicyLogstashOutputPrepare(t *testing.T) {
 	logger := testlog.SetLogger(t)
 	bulker := ftesting.NewMockBulk()
@@ -365,11 +374,19 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 			Role: &RoleT{Sha2: "new-hash", Raw: TestPayload},
 		}
 		policyMap := map[string]map[string]any{"test output": {}}
-		testAgent := &model.Agent{Outputs: map[string]*model.PolicyOutput{}}
+		testAgent := &model.Agent{ESDocument: model.ESDocument{Id: "agent-id"}, Outputs: map[string]*model.PolicyOutput{}}
+		collector := &recordingOutputSecretCandidateCollector{}
 
-		err := output.Prepare(context.Background(), logger, bulker, testAgent, policyMap)
+		err := output.Prepare(context.Background(), logger, bulker, testAgent, policyMap,
+			WithOutputSecretCandidateCollector(collector))
 		require.Error(t, err)
 		bulker.AssertNotCalled(t, "DeleteSecret", mock.Anything, secretID)
+		require.Equal(t, []OutputSecretCandidate{{
+			AgentID:    "agent-id",
+			OutputName: "test output",
+			SecretID:   secretID,
+			SecretRef:  "$co.elastic.secret{test-secret-id}",
+		}}, collector.candidates)
 		bulker.AssertExpectations(t)
 	})
 
