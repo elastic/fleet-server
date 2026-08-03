@@ -26,6 +26,49 @@ import (
 
 var TestPayload []byte
 
+func TestRenderUpdatePainlessScriptParameterizesOutputName(t *testing.T) {
+	const outputName = `output"';\()`
+	fields := map[string]any{
+		dl.FieldPolicyOutputAPIKeyID: "api-key-id",
+	}
+
+	body, err := renderUpdatePainlessScript(outputName, fields)
+	require.NoError(t, err)
+
+	var request struct {
+		Script struct {
+			Source string         `json:"source"`
+			Params map[string]any `json:"params"`
+		} `json:"script"`
+	}
+	require.NoError(t, json.Unmarshal(body, &request))
+
+	assert.NotContains(t, request.Script.Source, outputName)
+	assert.Contains(t, request.Script.Source, "params.output_name")
+	assert.Equal(t, outputName, request.Script.Params["output_name"])
+	assert.Equal(t, "api-key-id", request.Script.Params[dl.FieldPolicyOutputAPIKeyID])
+	assert.NotContains(t, fields, "output_name")
+}
+
+func TestRenderRemoveOutputPainlessScriptParameterizesOutputName(t *testing.T) {
+	const outputName = `output"';\()`
+
+	body, err := renderRemoveOutputPainlessScript(outputName)
+	require.NoError(t, err)
+
+	var request struct {
+		Script struct {
+			Source string         `json:"source"`
+			Params map[string]any `json:"params"`
+		} `json:"script"`
+	}
+	require.NoError(t, json.Unmarshal(body, &request))
+
+	assert.Equal(t, "ctx._source['outputs'].remove(params.output_name)", request.Script.Source)
+	assert.NotContains(t, request.Script.Source, outputName)
+	assert.Equal(t, outputName, request.Script.Params["output_name"])
+}
+
 func TestPolicyLogstashOutputPrepare(t *testing.T) {
 	logger := testlog.SetLogger(t)
 	bulker := ftesting.NewMockBulk()
