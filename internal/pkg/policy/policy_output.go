@@ -158,12 +158,7 @@ func (p *Output) prepareElasticsearch(
 		}
 
 		// remove output from agent doc
-		body, err = json.Marshal(map[string]any{
-			"script": map[string]any{
-				"lang":   "painless",
-				"source": fmt.Sprintf("ctx._source['outputs'].remove(\"%s\")", removedOutputName),
-			},
-		})
+		body, err = renderRemoveOutputPainlessScript(removedOutputName)
 		if err != nil {
 			return fmt.Errorf("could not create request body to update agent: %w", err)
 		}
@@ -476,41 +471,53 @@ func renderUpdatePainlessScript(outputName string, fields map[string]any) ([]byt
 	var source strings.Builder
 
 	// prepare agent.elasticsearch_outputs[OUTPUT_NAME]
-	source.WriteString(fmt.Sprintf(`
+	source.WriteString(`
 if (ctx._source['outputs']==null)
   {ctx._source['outputs']=new HashMap();}
-if (ctx._source['outputs']['%s']==null)
-  {ctx._source['outputs']['%s']=new HashMap();}
-`, outputName, outputName))
+if (ctx._source['outputs'][params.output_name]==null)
+  {ctx._source['outputs'][params.output_name]=new HashMap();}
+`)
 
 	for field := range fields {
 		if field == dl.FieldPolicyOutputToRetireAPIKeyIDs {
 			// dl.FieldPolicyOutputToRetireAPIKeyIDs is a special case.
 			// It's an array that gets deleted when the keys are invalidated.
 			// Thus, append the old API key ID, create the field if necessary.
-			source.WriteString(fmt.Sprintf(`
-if (ctx._source['outputs']['%s'].%s==null)
-  {ctx._source['outputs']['%s'].%s=new ArrayList();}
-if (!ctx._source['outputs']['%s'].%s.contains(params.%s))
-  {ctx._source['outputs']['%s'].%s.add(params.%s);}
-`, outputName, field, outputName, field, outputName, field, field, outputName, field, field))
+			fmt.Fprintf(&source, `
+if (ctx._source['outputs'][params.output_name].%s==null)
+  {ctx._source['outputs'][params.output_name].%s=new ArrayList();}
+if (!ctx._source['outputs'][params.output_name].%s.contains(params.%s))
+  {ctx._source['outputs'][params.output_name].%s.add(params.%s);}
+`, field, field, field, field, field, field)
 		} else {
 			// Update the other fields
-			source.WriteString(fmt.Sprintf(`
-ctx._source['outputs']['%s'].%s=params.%s;`,
-				outputName, field, field))
+			fmt.Fprintf(&source, `
+ctx._source['outputs'][params.output_name].%s=params.%s;`, field, field)
 		}
 	}
+	params := make(map[string]any, len(fields)+1)
+	maps.Copy(params, fields)
+	params["output_name"] = outputName
 
 	body, err := json.Marshal(map[string]any{
 		"script": map[string]any{
 			"lang":   "painless",
 			"source": source.String(),
-			"params": fields,
+			"params": params,
 		},
 	})
 
 	return body, err
+}
+
+func renderRemoveOutputPainlessScript(outputName string) ([]byte, error) {
+	return json.Marshal(map[string]any{
+		"script": map[string]any{
+			"lang":   "painless",
+			"source": "ctx._source['outputs'].remove(params.output_name)",
+			"params": map[string]any{"output_name": outputName},
+		},
+	})
 }
 
 func generateOutputAPIKey(
