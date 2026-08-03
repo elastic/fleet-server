@@ -471,40 +471,18 @@ func renderUpdatePainlessScript(outputName string, fields map[string]any) ([]byt
 	var source strings.Builder
 
 	// prepare agent.elasticsearch_outputs[OUTPUT_NAME]
-<<<<<<< HEAD
-	source.WriteString(fmt.Sprintf(`
-if (ctx._source['outputs']==null)
-  {ctx._source['outputs']=new HashMap();}
-if (ctx._source['outputs']['%s']==null)
-  {ctx._source['outputs']['%s']=new HashMap();}
-`, outputName, outputName))
-=======
 	source.WriteString(`
 if (ctx._source['outputs']==null)
   {ctx._source['outputs']=new HashMap();}
 if (ctx._source['outputs'][params.output_name]==null)
   {ctx._source['outputs'][params.output_name]=new HashMap();}
 `)
->>>>>>> 2395949 (fix: parameterize output names in update scripts (#7528))
 
 	for field := range fields {
 		if field == dl.FieldPolicyOutputToRetireAPIKeyIDs {
 			// dl.FieldPolicyOutputToRetireAPIKeyIDs is a special case.
 			// It's an array that gets deleted when the keys are invalidated.
 			// Thus, append the old API key ID, create the field if necessary.
-<<<<<<< HEAD
-			source.WriteString(fmt.Sprintf(`
-if (ctx._source['outputs']['%s'].%s==null)
-  {ctx._source['outputs']['%s'].%s=new ArrayList();}
-if (!ctx._source['outputs']['%s'].%s.contains(params.%s))
-  {ctx._source['outputs']['%s'].%s.add(params.%s);}
-`, outputName, field, outputName, field, outputName, field, field, outputName, field, field))
-		} else {
-			// Update the other fields
-			source.WriteString(fmt.Sprintf(`
-ctx._source['outputs']['%s'].%s=params.%s;`,
-				outputName, field, field))
-=======
 			fmt.Fprintf(&source, `
 if (ctx._source['outputs'][params.output_name].%s==null)
   {ctx._source['outputs'][params.output_name].%s=new ArrayList();}
@@ -515,7 +493,6 @@ if (!ctx._source['outputs'][params.output_name].%s.contains(params.%s))
 			// Update the other fields
 			fmt.Fprintf(&source, `
 ctx._source['outputs'][params.output_name].%s=params.%s;`, field, field)
->>>>>>> 2395949 (fix: parameterize output names in update scripts (#7528))
 		}
 	}
 	params := make(map[string]any, len(fields)+1)
