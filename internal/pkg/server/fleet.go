@@ -524,7 +524,11 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 	bc := checkin.NewBulk(bulker)
 	g.Go(loggedRunFunc(ctx, "Bulk checkin", bc.Run))
 
-	ct, err := api.NewCheckinT(f.verCon, &cfg.Inputs[0].Server, f.cache, bc, pm, am, ad, bulker)
+	outputSecretReconciler := gc.NewOrphanedOutputSecretReconciler(bulker)
+	g.Go(loggedRunFunc(ctx, "Orphaned output secret reconciler", outputSecretReconciler.Run))
+
+	ct, err := api.NewCheckinT(f.verCon, &cfg.Inputs[0].Server, f.cache, bc, pm, am, ad, bulker,
+		api.WithOutputSecretCandidateCollector(outputSecretReconciler))
 	if err != nil {
 		return err
 	}

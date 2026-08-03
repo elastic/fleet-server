@@ -69,6 +69,15 @@ func TestRenderRemoveOutputPainlessScriptParameterizesOutputName(t *testing.T) {
 	assert.Equal(t, outputName, request.Script.Params["output_name"])
 }
 
+type recordingOutputSecretCandidateCollector struct {
+	candidates []OutputSecretCandidate
+}
+
+func (c *recordingOutputSecretCandidateCollector) Add(candidate OutputSecretCandidate) bool {
+	c.candidates = append(c.candidates, candidate)
+	return true
+}
+
 func TestPolicyLogstashOutputPrepare(t *testing.T) {
 	logger := testlog.SetLogger(t)
 	bulker := ftesting.NewMockBulk()
