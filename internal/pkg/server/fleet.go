@@ -524,7 +524,26 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 	bc := checkin.NewBulk(bulker)
 	g.Go(loggedRunFunc(ctx, "Bulk checkin", bc.Run))
 
+<<<<<<< HEAD
 	ct, err := api.NewCheckinT(f.verCon, &cfg.Inputs[0].Server, f.cache, bc, pm, am, ad, bulker)
+=======
+	outputSecretReconciler := gc.NewOrphanedOutputSecretReconciler(bulker)
+	g.Go(loggedRunFunc(ctx, "Orphaned output secret reconciler", outputSecretReconciler.Run))
+
+	// Samples the checkin capacity-rejection counter into a rate gauge, exposed via
+	// /stats for use as an autoscaling signal. See api.RunCheckinRejectionRateSampler.
+	g.Go(loggedRunFunc(ctx, "Checkin rejection rate sampler", func(ctx context.Context) error {
+		return api.RunCheckinRejectionRateSampler(ctx, api.RejectionRateSampleInterval)
+	}))
+	// Samples the connection-cap rejection counter into a rate gauge, exposed via
+	// /stats for use as an autoscaling signal. See api.RunConnRejectionRateSampler.
+	g.Go(loggedRunFunc(ctx, "Connection rejection rate sampler", func(ctx context.Context) error {
+		return api.RunConnRejectionRateSampler(ctx, api.RejectionRateSampleInterval)
+	}))
+
+	ct, err := api.NewCheckinT(f.verCon, &cfg.Inputs[0].Server, f.cache, bc, pm, am, ad, bulker,
+		api.WithOutputSecretCandidateCollector(outputSecretReconciler))
+>>>>>>> 229f161 (fix: reconcile orphaned output secrets (#7534))
 	if err != nil {
 		return err
 	}

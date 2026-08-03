@@ -174,7 +174,7 @@ func TestPolicyOutputESPrepareRealES(t *testing.T) {
 	}
 
 	err = output.prepareElasticsearch(
-		ctx, zerolog.Nop(), bulker, bulker, &agent, policyMap, false)
+		ctx, zerolog.Nop(), bulker, bulker, &agent, policyMap, false, nil)
 	require.NoError(t, err)
 
 	// need to wait a bit before querying the agent again
@@ -250,7 +250,7 @@ func TestPolicyOutputESPrepareRemoteES(t *testing.T) {
 	}
 
 	err = output.prepareElasticsearch(
-		ctx, zerolog.Nop(), bulker, bulker, &agent, policyMap, false)
+		ctx, zerolog.Nop(), bulker, bulker, &agent, policyMap, false, nil)
 	require.NoError(t, err)
 
 	ftesting.Retry(t, ctx, func(ctx context.Context) error {
@@ -302,7 +302,7 @@ func TestPolicyOutputESPrepareESRetireRemoteAPIKeys(t *testing.T) {
 	}
 
 	err = output.prepareElasticsearch(
-		ctx, zerolog.Nop(), bulker, bulker, &agent, policyMap, false)
+		ctx, zerolog.Nop(), bulker, bulker, &agent, policyMap, false, nil)
 	require.NoError(t, err)
 
 	// need to wait a bit before querying the agent again
