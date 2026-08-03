@@ -47,9 +47,43 @@ type Output struct {
 	Role         *RoleT
 }
 
+// OutputSecretCandidate identifies a secret whose reference may or may not have
+// been committed to an agent document after an ambiguous update failure.
+type OutputSecretCandidate struct {
+	AgentID    string
+	OutputName string
+	SecretID   string
+	SecretRef  string
+}
+
+// OutputSecretCandidateCollector accepts secrets for out-of-band reconciliation.
+type OutputSecretCandidateCollector interface {
+	Add(OutputSecretCandidate) bool
+}
+
+type outputPrepareConfig struct {
+	secretCandidateCollector OutputSecretCandidateCollector
+}
+
+// OutputPrepareOption configures output preparation.
+type OutputPrepareOption func(*outputPrepareConfig)
+
+// WithOutputSecretCandidateCollector records secrets created before ambiguous
+// agent update failures so they can be reconciled outside the request path.
+func WithOutputSecretCandidateCollector(collector OutputSecretCandidateCollector) OutputPrepareOption {
+	return func(c *outputPrepareConfig) {
+		c.secretCandidateCollector = collector
+	}
+}
+
 // Prepare prepares the output p to be sent to the elastic-agent
 // The agent might be mutated for an elasticsearch output
-func (p *Output) Prepare(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agent *model.Agent, outputMap map[string]map[string]any) error {
+func (p *Output) Prepare(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agent *model.Agent, outputMap map[string]map[string]any, opts ...OutputPrepareOption) error {
+	cfg := outputPrepareConfig{}
+	for _, opt := range opts {
+		opt(&cfg)
+	}
+
 	span, ctx := apm.StartSpan(ctx, "prepareOutput", "process")
 	defer span.End()
 	span.Context.SetLabel("output_type", p.Type)
@@ -60,7 +94,7 @@ func (p *Output) Prepare(ctx context.Context, zlog zerolog.Logger, bulker bulk.B
 	switch p.Type {
 	case OutputTypeElasticsearch:
 		zlog.Debug().Msg("preparing elasticsearch output")
-		if err := p.prepareElasticsearch(ctx, zlog, bulker, bulker, agent, outputMap, false); err != nil {
+		if err := p.prepareElasticsearch(ctx, zlog, bulker, bulker, agent, outputMap, false, cfg.secretCandidateCollector); err != nil {
 			return fmt.Errorf("failed to prepare elasticsearch output %q: %w", p.Name, err)
 		}
 	case OutputTypeRemoteElasticsearch:
@@ -70,7 +104,7 @@ func (p *Output) Prepare(ctx context.Context, zlog zerolog.Logger, bulker bulk.B
 			return err
 		}
 		// the outputBulker is different for remote ES, it is used to create/update Api keys in the remote ES client
-		if err := p.prepareElasticsearch(ctx, zlog, bulker, newBulker, agent, outputMap, hasConfigChanged); err != nil {
+		if err := p.prepareElasticsearch(ctx, zlog, bulker, newBulker, agent, outputMap, hasConfigChanged, cfg.secretCandidateCollector); err != nil {
 			return fmt.Errorf("failed to prepare remote elasticsearch output %q: %w", p.Name, err)
 		}
 	case OutputTypeLogstash:
@@ -93,7 +127,8 @@ func (p *Output) prepareElasticsearch(
 	outputBulker bulk.Bulk,
 	agent *model.Agent,
 	outputMap map[string]map[string]any,
-	hasConfigChanged bool) error {
+	hasConfigChanged bool,
+	secretCandidateCollector OutputSecretCandidateCollector) error {
 	// The role is required to do api key management
 	if p.Role == nil {
 		zlog.Error().
@@ -346,6 +381,17 @@ func (p *Output) prepareElasticsearch(
 			// returns an error, for example when the request context expires while
 			// waiting for the response. Deleting the secret here can therefore leave
 			// the agent document pointing at a missing secret.
+			if secretCandidateCollector != nil {
+				candidate := OutputSecretCandidate{
+					AgentID:    agent.Id,
+					OutputName: p.Name,
+					SecretID:   secretID,
+					SecretRef:  apiKeyRef,
+				}
+				if !secretCandidateCollector.Add(candidate) {
+					zlog.Warn().Str("secret.id", secretID).Msg("failed to enqueue output secret reconciliation candidate")
+				}
+			}
 			return fmt.Errorf("fail update agent record: %w", err)
 		}
 
