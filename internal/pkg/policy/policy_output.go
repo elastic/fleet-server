@@ -81,7 +81,6 @@ func (p *Output) Prepare(ctx context.Context, zlog zerolog.Logger, bulker bulk.B
 		opt(&cfg)
 	}
 
-
 	span, ctx := apm.StartSpan(ctx, "prepareOutput", "process")
 	defer span.End()
 	span.Context.SetLabel("output_type", p.Type)
