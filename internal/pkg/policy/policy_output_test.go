@@ -306,8 +306,6 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 		bulker.On("APIKeyCreate",
 			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(&apiKey, nil).Once()
-		const secretID = "test-secret-id"
-		bulker.On("WriteSecret", mock.Anything, apiKey.Agent()).Return(secretID, nil).Once()
 		bulker.On("Update",
 			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(errors.New("ES update failed")).Once()
@@ -322,7 +320,7 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 
 		err := output.Prepare(context.Background(), logger, bulker, testAgent, policyMap)
 		require.Error(t, err)
-		bulker.AssertNotCalled(t, "DeleteSecret", mock.Anything, secretID)
+		bulker.AssertNotCalled(t, "DeleteSecret", mock.Anything, mock.Anything)
 		bulker.AssertExpectations(t)
 	})
 }
