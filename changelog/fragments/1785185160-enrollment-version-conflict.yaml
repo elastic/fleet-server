@@ -1,7 +1,0 @@
-kind: bug-fix
-
-summary: Fix agent enrollment failures caused by 409 version conflicts during `.fleet-agents` primary shard relocation
-
-component: fleet-server
-
-pr: https://github.com/elastic/fleet-server/pull/7446
