@@ -327,6 +327,10 @@ func (p *Output) prepareElasticsearch(
 
 		if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
 			zlog.Error().Err(err).Msg("fail update agent record")
+			// The update may have been committed by Elasticsearch even when the client
+			// returns an error, for example when the request context expires while
+			// waiting for the response. Deleting the secret here can therefore leave
+			// the agent document pointing at a missing secret.
 			return fmt.Errorf("fail update agent record: %w", err)
 		}
 
