@@ -1,0 +1,108 @@
+version: 9.5.0
+entries:
+    - kind: enhancement
+      summary: OpAMP `RequestInstanceUid` flag always forces enrollment
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/6834
+      issue:
+        - https://github.com/elastic/fleet-server/issues/6789
+      impact: ""
+      action: ""
+      timestamp: 1776191256
+      file:
+        name: 1776191256-Respond-to-OpAMP-RequestInstanceUid-flag-with-agent_identification.yaml
+        checksum: 5a6849db638ac04cbade233798409ba151b8ce09
+    - kind: feature
+      summary: Allow Fleet Server to reload TLS certificates without restarting
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/6838
+      issue:
+        - https://github.com/elastic/fleet-server/issues/6433
+      impact: ""
+      action: ""
+      timestamp: 1776277335
+      file:
+        name: 1776277335-pr-6835.yaml
+        checksum: d172ca27934608c05aa218f7938b563e6aa1d67f
+    - kind: security
+      summary: Enforce policy-based access control on artifact downloads
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/7009
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1778540235
+      file:
+        name: 1778540235-fix-artifact-access-control.yaml
+        checksum: edad22f9232befcd82915193120bb892a3fc4c6c
+    - kind: enhancement
+      summary: Improve bulker performance
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/7190
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1781177613
+      file:
+        name: 1781177613-Improve-bulker-performance.yaml
+        checksum: 15806b7b0441c41aea5c6df5859258591706ff1a
+    - kind: enhancement
+      summary: Use go's FIPS module for fips artifacts
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/7219
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1781550341
+      file:
+        name: 1781550341-Use-gos-FIPS-module-for-fips-artifacts.yaml
+        checksum: 8cd2361f2ce7b1eb4df6aefb0cdd9a4a0fc77481
+    - kind: enhancement
+      summary: Support HTTP range in file delivery
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/7319
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1783099722
+      file:
+        name: 1783099722-file-delivery-support-range.yaml
+        checksum: 6d94c580d4c4d47376ae2661e09b1d52207f98ea
+    - kind: feature
+      summary: Write policy_base_id field at agent enrollment
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/7422
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1784718180
+      file:
+        name: 1784718180-write-policy-base-id-on-enrollment.yaml
+        checksum: b458474bb606768757617be5f257438eaae1bb1a
+    - kind: bug-fix
+      summary: Fix agent enrollment failures caused by 409 version conflicts during `.fleet-agents` primary shard relocation
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/7446
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1785185160
+      file:
+        name: 1785185160-enrollment-version-conflict.yaml
+        checksum: dfa448208740beda8ed226ca97043992763f791e
