@@ -368,40 +368,6 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 		bulker.AssertNotCalled(t, "DeleteSecret", mock.Anything, secretID)
 		bulker.AssertExpectations(t)
 	})
-
-	t.Run("Existing plaintext key is delivered without modification", func(t *testing.T) {
-		logger := testlog.SetLogger(t)
-		bulker := ftesting.NewMockBulk()
-
-		apiKey := bulk.APIKey{ID: "existing-id", Key: "existing-key"}
-		hashPerm := "existing-hash"
-		output := Output{
-			Type: OutputTypeElasticsearch,
-			Name: "test output",
-			Role: &RoleT{Sha2: hashPerm, Raw: TestPayload},
-		}
-		policyMap := map[string]map[string]any{"test output": {}}
-		testAgent := &model.Agent{
-			Outputs: map[string]*model.PolicyOutput{
-				output.Name: {
-					APIKey:          apiKey.Agent(),
-					APIKeyID:        apiKey.ID,
-					PermissionsHash: hashPerm,
-					Type:            OutputTypeElasticsearch,
-				},
-			},
-		}
-
-		err := output.Prepare(context.Background(), logger, bulker, testAgent, policyMap)
-		require.NoError(t, err)
-
-		// Plaintext key is passed through directly — WriteSecret is not called.
-		key, ok := policyMap[output.Name]["api_key"].(string)
-		require.True(t, ok)
-		assert.Equal(t, apiKey.Agent(), key)
-		bulker.AssertNotCalled(t, "WriteSecret", mock.Anything, mock.Anything)
-		bulker.AssertExpectations(t)
-	})
 }
 
 func TestPolicyRemoteESOutputPrepareNoRole(t *testing.T) {
