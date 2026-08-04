@@ -298,8 +298,6 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 
 		bulker.AssertExpectations(t)
 	})
-<<<<<<< HEAD
-=======
 
 	t.Run("Secret is retained when agent document update fails", func(t *testing.T) {
 		logger := testlog.SetLogger(t)
@@ -361,7 +359,6 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 		bulker.AssertNotCalled(t, "WriteSecret", mock.Anything, mock.Anything)
 		bulker.AssertExpectations(t)
 	})
->>>>>>> 7fb25fd (fix: retain output secret when agent update fails (#7533))
 }
 
 func TestPolicyRemoteESOutputPrepareNoRole(t *testing.T) {
