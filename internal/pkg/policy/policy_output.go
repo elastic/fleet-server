@@ -362,24 +362,6 @@ func (p *Output) prepareElasticsearch(
 
 		if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
 			zlog.Error().Err(err).Msg("fail update agent record")
-<<<<<<< HEAD
-=======
-			// The update may have been committed by Elasticsearch even when the client
-			// returns an error, for example when the request context expires while
-			// waiting for the response. Deleting the secret here can therefore leave
-			// the agent document pointing at a missing secret.
-			if secretCandidateCollector != nil {
-				candidate := OutputSecretCandidate{
-					AgentID:    agent.Id,
-					OutputName: p.Name,
-					SecretID:   secretID,
-					SecretRef:  apiKeyRef,
-				}
-				if !secretCandidateCollector.Add(candidate) {
-					zlog.Warn().Str("secret.id", secretID).Msg("failed to enqueue output secret reconciliation candidate")
-				}
-			}
->>>>>>> 229f161 (fix: reconcile orphaned output secrets (#7534))
 			return fmt.Errorf("fail update agent record: %w", err)
 		}
 
