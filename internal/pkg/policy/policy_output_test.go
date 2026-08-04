@@ -341,6 +341,31 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 
 		bulker.AssertExpectations(t)
 	})
+
+	t.Run("Secret is retained when agent document update fails", func(t *testing.T) {
+		logger := testlog.SetLogger(t)
+		bulker := ftesting.NewMockBulk()
+		apiKey := bulk.APIKey{ID: "abc", Key: "new-key"}
+		bulker.On("APIKeyCreate",
+			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			Return(&apiKey, nil).Once()
+		bulker.On("Update",
+			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			Return(errors.New("ES update failed")).Once()
+
+		output := Output{
+			Type: OutputTypeElasticsearch,
+			Name: "test output",
+			Role: &RoleT{Sha2: "new-hash", Raw: TestPayload},
+		}
+		policyMap := map[string]map[string]any{"test output": {}}
+		testAgent := &model.Agent{Outputs: map[string]*model.PolicyOutput{}}
+
+		err := output.Prepare(context.Background(), logger, bulker, testAgent, policyMap)
+		require.Error(t, err)
+		bulker.AssertNotCalled(t, "DeleteSecret", mock.Anything, mock.Anything)
+		bulker.AssertExpectations(t)
+	})
 }
 
 func TestPolicyRemoteESOutputPrepareNoRole(t *testing.T) {
