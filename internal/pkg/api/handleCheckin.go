@@ -79,20 +79,8 @@ type CheckinT struct {
 	// gwPool is a gzip.Writer pool intended to lower the amount of writers created when responding to checkin requests.
 	// gzip.Writer allocations are expensive (~1.2MB each) and can exhaust an instance's memory if a lot of concurrent responses are sent (this occurs when a mass-action such as an upgrade is detected).
 	// effectiveness of the pool is controlled by rate limiter configured through the limit.action_limit attribute.
-	gwPool                         sync.Pool
-	bulker                         bulk.Bulk
-	outputSecretCandidateCollector policy.OutputSecretCandidateCollector
-}
-
-// CheckinOption configures check-in handling.
-type CheckinOption func(*CheckinT)
-
-// WithOutputSecretCandidateCollector enables out-of-band reconciliation of
-// secrets retained after ambiguous agent update failures.
-func WithOutputSecretCandidateCollector(collector policy.OutputSecretCandidateCollector) CheckinOption {
-	return func(ct *CheckinT) {
-		ct.outputSecretCandidateCollector = collector
-	}
+	gwPool sync.Pool
+	bulker bulk.Bulk
 }
 
 func NewCheckinT(
@@ -104,7 +92,6 @@ func NewCheckinT(
 	gcp monitor.GlobalCheckpointProvider,
 	ad *action.Dispatcher,
 	bulker bulk.Bulk,
-	opts ...CheckinOption,
 ) (*CheckinT, error) {
 	tr, err := action.NewTokenResolver(bulker)
 	if err != nil {
@@ -129,9 +116,6 @@ func NewCheckinT(
 			},
 		},
 		bulker: bulker,
-	}
-	for _, opt := range opts {
-		opt(ct)
 	}
 
 	return ct, nil
@@ -396,7 +380,7 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 				actions = append(actions, acs...)
 				break LOOP
 			case policy := <-sub.Output():
-				actionResp, err := processPolicy(ctx, zlog, ct.bulker, agent, policy, ct.outputSecretCandidateCollector)
+				actionResp, err := processPolicy(ctx, zlog, ct.bulker, agent, policy)
 				if err != nil {
 					span.End()
 					return fmt.Errorf("processPolicy: %w", err)
@@ -852,7 +836,7 @@ func convertActions(zlog zerolog.Logger, agentID string, actions []model.Action)
 // A new policy exists for this agent.  Perform the following:
 //   - Generate and update default ApiKey if roles have changed.
 //   - Rewrite the policy for delivery to the agent injecting the key material.
-func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agent *model.Agent, pp *policy.ParsedPolicy, secretCandidateCollector policy.OutputSecretCandidateCollector) (*Action, error) {
+func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agent *model.Agent, pp *policy.ParsedPolicy) (*Action, error) {
 	var links []apm.SpanLink = nil // set to a nil array to preserve default behaviour if no policy links are found
 	if err := pp.Links.Trace.Validate(); err == nil {
 		links = []apm.SpanLink{pp.Links}
@@ -881,7 +865,7 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 	}
 	// Iterate through the policy outputs and prepare them
 	for _, policyOutput := range pp.Outputs {
-		if err := policyOutput.Prepare(ctx, zlog, bulker, agent, data.Outputs, policy.WithOutputSecretCandidateCollector(secretCandidateCollector)); err != nil {
+		if err := policyOutput.Prepare(ctx, zlog, bulker, agent, data.Outputs); err != nil {
 			return nil, fmt.Errorf("failed to prepare output %q: %w",
 				policyOutput.Name, err)
 		}
