@@ -1,0 +1,7 @@
+kind: bug-fix
+
+summary: Fix spurious resolveSeqNo errors on check-in when .fleet-actions index does not exist
+
+component: fleet-server
+
+pr: https://github.com/elastic/fleet-server/pull/7548
