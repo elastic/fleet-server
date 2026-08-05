@@ -42,7 +42,7 @@ func TestTokenResolverResolve_EmptyToken(t *testing.T) {
 func TestTokenResolverResolve_IndexNotFound(t *testing.T) {
 	bulker := ftesting.NewMockBulk()
 	bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-		Return(nil, es.ErrIndexNotFound)
+		Return(&es.ResultT{}, es.ErrIndexNotFound)
 
 	tr, err := NewTokenResolver(bulker)
 	require.NoError(t, err)
@@ -55,7 +55,7 @@ func TestTokenResolverResolve_OtherError(t *testing.T) {
 	bulker := ftesting.NewMockBulk()
 	someErr := errors.New("connection refused")
 	bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-		Return(nil, someErr)
+		Return(&es.ResultT{}, someErr)
 
 	tr, err := NewTokenResolver(bulker)
 	require.NoError(t, err)
