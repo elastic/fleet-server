@@ -6,9 +6,11 @@ package action
 
 import (
 	"context"
+	"errors"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/rs/zerolog"
@@ -49,6 +51,10 @@ func (r *TokenResolver) Resolve(ctx context.Context, token string) (int64, error
 
 	seqno, err := dl.FindSeqNoByDocID(ctx, r.bulker, dl.QuerySeqNoByDocID, dl.FleetActions, token)
 	if err != nil {
+		if errors.Is(err, es.ErrIndexNotFound) {
+			zerolog.Ctx(ctx).Debug().Str("token", token).Msg("fleet-actions index not found on token resolve")
+			return seqno, dl.ErrNotFound
+		}
 		return seqno, err
 	}
 
