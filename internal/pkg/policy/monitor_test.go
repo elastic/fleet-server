@@ -17,6 +17,7 @@ import (
 	"github.com/gofrs/uuid/v5"
 	"github.com/google/go-cmp/cmp"
 	"github.com/rs/xid"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -613,5 +614,57 @@ func TestMonitor_LatestRev(t *testing.T) {
 		}
 		idx := pm.LatestRev(t.Context(), "test-id")
 		assert.Equal(t, int64(1), idx)
+	})
+}
+
+// TestMonitor_StaleRevisionIgnored verifies that updatePolicy rejects an incoming
+// document whose revision_idx is not greater than the cached revision. This guards
+// against the change-feed delivering old revisions (e.g. after a Kibana index
+// migration assigns higher _seq_no values to older documents) and overwriting a
+// clean cached policy with one that may reference deleted secrets.
+func TestMonitor_StaleRevisionIgnored(t *testing.T) {
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
+	policyID := uuid.Must(uuid.NewV4()).String()
+
+	makePolicy := func(rev int64) ParsedPolicy {
+		return ParsedPolicy{
+			Policy: model.Policy{
+				PolicyID:    policyID,
+				RevisionIdx: rev,
+				Data:        policyDataDefault,
+			},
+		}
+	}
+
+	pm := &monitorT{
+		log: zerolog.Ctx(ctx).With().Logger(),
+		policies: map[string]policyT{
+			policyID: {
+				pp:   makePolicy(8),
+				head: makeHead(),
+			},
+		},
+		pendingQ: makeHead(),
+	}
+
+	t.Run("equal revision is ignored", func(t *testing.T) {
+		stale := makePolicy(8)
+		updated := pm.updatePolicy(ctx, &stale)
+		assert.False(t, updated, "expected updatePolicy to return false for equal revision")
+		assert.Equal(t, int64(8), pm.policies[policyID].pp.Policy.RevisionIdx, "cached revision must not change")
+	})
+
+	t.Run("older revision is ignored", func(t *testing.T) {
+		stale := makePolicy(7)
+		updated := pm.updatePolicy(ctx, &stale)
+		assert.False(t, updated, "expected updatePolicy to return false for older revision")
+		assert.Equal(t, int64(8), pm.policies[policyID].pp.Policy.RevisionIdx, "cached revision must not change")
+	})
+
+	t.Run("newer revision is applied", func(t *testing.T) {
+		fresh := makePolicy(9)
+		updated := pm.updatePolicy(ctx, &fresh)
+		assert.True(t, updated, "expected updatePolicy to return true for newer revision")
+		assert.Equal(t, int64(9), pm.policies[policyID].pp.Policy.RevisionIdx, "cached revision must be updated")
 	})
 }
