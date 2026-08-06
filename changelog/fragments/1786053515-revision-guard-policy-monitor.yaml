@@ -1,0 +1,15 @@
+kind: bug-fix
+
+summary: Reject stale policy revisions before secret resolution in the policy monitor
+
+description: |
+  After a Kibana index migration, the `.fleet-policies` change-feed can deliver
+  older revision documents (with higher _seq_no values) after the policy monitor
+  has already cached a newer revision. Fleet Server now checks the incoming
+  revision_idx against the cached revision before attempting to parse the policy
+  or resolve its secrets. Stale revisions are dropped with a warning log and do
+  not overwrite the cached policy.
+
+component: fleet-server
+
+pr: https://github.com/elastic/fleet-server/pull/7572
