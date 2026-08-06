@@ -75,7 +75,7 @@ type bulkOptT struct {
 	apikeyMaxParallel        int
 	apikeyMaxReqSize         int
 	maxPendingBulkDispatches int64
-	maxConcurrentSecretReads int64
+	maxConcurrentSecretReads int
 	policyTokens             []config.PolicyToken
 	bi                       build.Info
 }
@@ -127,7 +127,7 @@ func WithMaxPendingBulkDispatches(max int64) BulkOpt {
 
 // WithMaxConcurrentSecretReads sets the upper bound on concurrent ReadSecrets calls.
 // When the limit is reached, ReadSecrets blocks until a slot is available. 0 means no limit.
-func WithMaxConcurrentSecretReads(max int64) BulkOpt {
+func WithMaxConcurrentSecretReads(max int) BulkOpt {
 	return func(opt *bulkOptT) {
 		opt.maxConcurrentSecretReads = max
 	}
@@ -172,7 +172,7 @@ func parseBulkOpts(opts ...BulkOpt) bulkOptT {
 		blockQueueSz:             defaultBlockQueueSz,
 		apikeyMaxReqSize:         defaultApikeyMaxReqSize,
 		maxPendingBulkDispatches: defaultMaxPendingBulkDispatches,
-		maxConcurrentSecretReads: int64(defaultAPIKeyMaxParallel),
+		maxConcurrentSecretReads: defaultAPIKeyMaxParallel,
 		policyTokens:             []config.PolicyToken{}, // default is empty
 	}
 
@@ -192,7 +192,7 @@ func (o *bulkOptT) MarshalZerologObject(e *zerolog.Event) {
 	e.Int("apikeyMaxParallel", o.apikeyMaxParallel)
 	e.Int("apikeyMaxReqSize", o.apikeyMaxReqSize)
 	e.Int64("maxPendingBulkDispatches", o.maxPendingBulkDispatches)
-	e.Int64("maxConcurrentSecretReads", o.maxConcurrentSecretReads)
+	e.Int("maxConcurrentSecretReads", o.maxConcurrentSecretReads)
 }
 
 // BulkOptsFromCfg transforms config to a slize of BulkOpt
