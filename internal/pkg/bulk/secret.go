@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -15,6 +16,9 @@ import (
 	"github.com/elastic/go-elasticsearch/v8"
 	"go.elastic.co/apm/v2"
 )
+
+// ErrSecretNotFound is returned when a secret document does not exist in the Fleet secrets store.
+var ErrSecretNotFound = errors.New("secret not found")
 
 type ExtendedClient struct {
 	*elasticsearch.Client
@@ -40,6 +44,9 @@ func (c *ExtendedAPI) Read(ctx context.Context, secretID string) (*SecretRespons
 		return nil, err
 	}
 	defer res.Body.Close()
+	if res.StatusCode == http.StatusNotFound {
+		return nil, fmt.Errorf("%q: %w", secretID, ErrSecretNotFound)
+	}
 	if res.StatusCode >= 400 {
 		body, _ := io.ReadAll(res.Body)
 		return nil, fmt.Errorf("unexpected status %d from fleet secret read: %s", res.StatusCode, body)
