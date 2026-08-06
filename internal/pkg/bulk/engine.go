@@ -17,12 +17,13 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/elastic/go-ucfg"
+
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger/ecs"
-	"github.com/elastic/go-ucfg"
 
 	"github.com/rs/zerolog"
 	"go.elastic.co/apm/v2"
@@ -165,7 +166,7 @@ func NewBulker(es esapi.Transport, tracer *apm.Tracer, opts ...BulkOpt) *Bulker 
 		blkPool:               sync.Pool{New: poolFunc},
 		flushBufPool:          sync.Pool{New: func() any { return new(bytes.Buffer) }},
 		apikeyLimit:           semaphore.NewWeighted(int64(bopts.apikeyMaxParallel)),
-		readSecretsLimit: semaphore.NewWeighted(int64(bopts.maxConcurrentSecretReads)),
+		readSecretsLimit:      semaphore.NewWeighted(int64(bopts.maxConcurrentSecretReads)),
 		tracer:                tracer,
 		remoteOutputConfigMap: make(map[string]map[string]any),
 		// remote ES bulkers
