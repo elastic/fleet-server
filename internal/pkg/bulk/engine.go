@@ -327,14 +327,14 @@ func (b *Bulker) hasChangedAndUpdateRemoteOutputConfig(zlog zerolog.Logger, name
 
 // read secrets one by one as there is no bulk API yet to read them in one request
 func (b *Bulker) ReadSecrets(ctx context.Context, secretIds []string) (map[string]string, error) {
-	if err := b.readSecretsLimit.Acquire(ctx, 1); err != nil {
-		return nil, err
-	}
-	defer b.readSecretsLimit.Release(1)
 	result := make(map[string]string)
 	esClient := b.Client()
 	for _, id := range secretIds {
+		if err := b.readSecretsLimit.Acquire(ctx, 1); err != nil {
+			return nil, err
+		}
 		val, err := ReadSecret(ctx, esClient, id)
+		b.readSecretsLimit.Release(1)
 		if err != nil {
 			if errors.Is(err, ErrSecretNotFound) {
 				zerolog.Ctx(ctx).Warn().Str("secret_id", id).Msg("secret not found; policy will load without it")
