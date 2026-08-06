@@ -435,9 +435,10 @@ func (m *monitorT) updatePolicy(ctx context.Context, pp *ParsedPolicy) bool {
 	}
 
 	// Reject stale revisions — the policy monitor can deliver old documents (e.g. after a
-	// Kibana index migration that assigns higher _seq_no values to older revisions) after
-	// a newer revision has already been cached. Without this guard, an old revision with
-	// dangling secrets would overwrite the good cache entry and crash-loop fleet-server.
+	// Kibana index migration assigns higher _seq_no values to older revisions) in a later
+	// batch than the clean revision. Applying a stale revision would push an outdated
+	// policy to all subscribed agents; inputs referencing deleted secrets would also fail
+	// to authenticate.
 	if newPolicy.RevisionIdx <= p.pp.Policy.RevisionIdx {
 		zlog.Warn().
 			Int64("cached_revision_idx", p.pp.Policy.RevisionIdx).
