@@ -330,7 +330,7 @@ func (b *Bulker) ReadSecrets(ctx context.Context, secretIds []string) (map[strin
 	result := make(map[string]string)
 	esClient := b.Client()
 	for _, id := range secretIds {
-		// limit concurrent direct ES secret reads, matching apikeyLimit granularity
+		// limit concurrent direct ES secret reads
 		if err := b.readSecretsLimit.Acquire(ctx, 1); err != nil {
 			return nil, err
 		}
