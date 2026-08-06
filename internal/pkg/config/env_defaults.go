@@ -11,6 +11,7 @@ import (
 	"io/fs"
 	"math"
 	"runtime"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -322,11 +323,20 @@ func loadLimits(log *zerolog.Logger, agentLimit int) *envLimits {
 	return defaultEnvLimits()
 }
 
-// memMB returns the system total memory in MB
-// It wraps memory.TotalMemory() so that we can replace the var in unit tests.
-var memMB func() uint64 = func() uint64 {
+// containerMemoryMB returns available memory in MiB, preferring the GOMEMLIMIT
+// runtime setting over host RAM so the ristretto cache is sized for the container,
+// not the node. Falls back to memory.TotalMemory() when GOMEMLIMIT is unset.
+func containerMemoryMB() uint64 {
+	limit := debug.SetMemoryLimit(-1)
+	if limit > 0 && limit != math.MaxInt64 {
+		return uint64(limit) / 1024 / 1024
+	}
 	return memory.TotalMemory() / 1024 / 1024
 }
+
+// memMB returns available memory in MiB.
+// It is a var so that unit tests can replace it.
+var memMB func() uint64 = containerMemoryMB
 
 func memEnvLimits(log *zerolog.Logger) *envLimits {
 	mem := memMB()
