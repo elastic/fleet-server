@@ -50,6 +50,7 @@ type ServerBulk struct {
 	FlushThresholdSize       int           `config:"flush_threshold_size"`
 	FlushMaxPending          int           `config:"flush_max_pending"`
 	MaxPendingBulkDispatches int64         `config:"max_pending_bulk_dispatches"`
+	MaxConcurrentSecretReads int64         `config:"max_concurrent_secret_reads"`
 }
 
 func (c *ServerBulk) InitDefaults() {
