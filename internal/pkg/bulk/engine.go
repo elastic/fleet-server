@@ -165,12 +165,7 @@ func NewBulker(es esapi.Transport, tracer *apm.Tracer, opts ...BulkOpt) *Bulker 
 		blkPool:               sync.Pool{New: poolFunc},
 		flushBufPool:          sync.Pool{New: func() any { return new(bytes.Buffer) }},
 		apikeyLimit:           semaphore.NewWeighted(int64(bopts.apikeyMaxParallel)),
-		readSecretsLimit: func() *semaphore.Weighted {
-			if bopts.maxConcurrentSecretReads > 0 {
-				return semaphore.NewWeighted(bopts.maxConcurrentSecretReads)
-			}
-			return nil
-		}(),
+		readSecretsLimit: semaphore.NewWeighted(int64(bopts.maxConcurrentSecretReads)),
 		tracer:                tracer,
 		remoteOutputConfigMap: make(map[string]map[string]any),
 		// remote ES bulkers
@@ -332,12 +327,10 @@ func (b *Bulker) hasChangedAndUpdateRemoteOutputConfig(zlog zerolog.Logger, name
 
 // read secrets one by one as there is no bulk API yet to read them in one request
 func (b *Bulker) ReadSecrets(ctx context.Context, secretIds []string) (map[string]string, error) {
-	if b.readSecretsLimit != nil {
-		if err := b.readSecretsLimit.Acquire(ctx, 1); err != nil {
-			return nil, err
-		}
-		defer b.readSecretsLimit.Release(1)
+	if err := b.readSecretsLimit.Acquire(ctx, 1); err != nil {
+		return nil, err
 	}
+	defer b.readSecretsLimit.Release(1)
 	result := make(map[string]string)
 	esClient := b.Client()
 	for _, id := range secretIds {
