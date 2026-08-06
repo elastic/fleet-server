@@ -619,7 +619,7 @@ func TestMonitor_LatestRev(t *testing.T) {
 
 // TestMonitor_StaleRevisionIgnored verifies that updatePolicy rejects an incoming
 // document whose revision_idx is not greater than the cached revision. This guards
-// against the change-feed delivering old revisions (e.g. after a Kibana index
+// against the policy monitor delivering old revisions (e.g. after a Kibana index
 // migration assigns higher _seq_no values to older documents) and overwriting a
 // clean cached policy with one that may reference deleted secrets.
 func TestMonitor_StaleRevisionIgnored(t *testing.T) {
