@@ -1,0 +1,73 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "dependencyDashboard": true,
+  "enabledManagers": ["gomod", "github-actions", "pre-commit"],
+  "baseBranchPatterns": ["main", "9.5", "9.4", "9.3", "8.19"],
+  "labels": [
+    "automation",
+    "dependency",
+    "skip-changelog",
+    "backport-skip",
+    "Team:Elastic-Agent-Control-Plane"
+  ],
+  "pre-commit": {
+    "enabled": true
+  },
+  "packageRules": [
+    {
+      "description": "Go modules: schedule, PR limit, branch prefix, and post-update tidy",
+      "matchManagers": ["gomod"],
+      "additionalBranchPrefix": "golang/",
+      "schedule": ["on monday"],
+      "prConcurrentLimit": 10,
+      "postUpdateOptions": ["gomodTidy"]
+    },
+    {
+      "description": "go-dependencies: catch-all group for Go modules not claimed by a more specific group",
+      "matchManagers": ["gomod"],
+      "groupName": "go-dependencies"
+    },
+    {
+      "description": "elastic: all Elastic org packages",
+      "matchManagers": ["gomod"],
+      "matchPackageNames": [
+        "/^github\\.com/elastic//",
+        "/^go\\.elastic\\.co//"
+      ],
+      "groupName": "elastic"
+    },
+    {
+      "description": "test-tooling: dependencies used for tests and test infrastructure",
+      "matchManagers": ["gomod"],
+      "matchPackageNames": [
+        "/^github\\.com/testcontainers//",
+        "/^github\\.com/Shopify//",
+        "/^github\\.com/moby//",
+        "/^github\\.com/magefile/mage$/",
+        "/^github\\.com/stretchr//"
+      ],
+      "groupName": "test-tooling"
+    },
+    {
+      "description": "GitHub Actions: grouped weekly Sunday updates",
+      "matchManagers": ["github-actions"],
+      "groupName": "github-actions",
+      "schedule": ["on sunday"],
+      "prConcurrentLimit": 10
+    },
+    {
+      "description": "GitHub Actions: keep macOS runner updates manual",
+      "matchManagers": ["github-actions"],
+      "matchDepTypes": ["github-runner"],
+      "matchPackageNames": ["macos"],
+      "enabled": false
+    },
+    {
+      "description": "pre-commit: weekly Sunday updates",
+      "matchManagers": ["pre-commit"],
+      "schedule": ["on sunday"],
+      "addLabels": ["changelog:dependencies"],
+      "prConcurrentLimit": 5
+    }
+  ]
+}
