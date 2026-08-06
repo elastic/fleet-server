@@ -121,6 +121,7 @@ type Bulker struct {
 	blkPool               sync.Pool
 	flushBufPool          sync.Pool
 	apikeyLimit           *semaphore.Weighted
+	readSecretsLimit      *semaphore.Weighted
 	tracer                *apm.Tracer
 	cancelFn              context.CancelFunc
 	pendingBulkDispatches atomic.Int64
@@ -139,7 +140,8 @@ const (
 	defaultAPIKeyMaxParallel              = 32
 	defaultApikeyMaxReqSize               = 100 * 1024 * 1024
 	defaultFlushContextTimeout            = time.Minute * 1
-	defaultMaxPendingBulkDispatches int64 = 0 // 0 means no limit
+	defaultMaxPendingBulkDispatches    int64 = 0 // 0 means no limit
+	defaultMaxConcurrentSecretReads int64 = 0 // 0 means no limit
 
 	// dispatchAbortDrainTimeout bounds how long the drain helper waits for
 	// a late response from the Run loop on an abort from the second
@@ -164,6 +166,12 @@ func NewBulker(es esapi.Transport, tracer *apm.Tracer, opts ...BulkOpt) *Bulker 
 		blkPool:               sync.Pool{New: poolFunc},
 		flushBufPool:          sync.Pool{New: func() any { return new(bytes.Buffer) }},
 		apikeyLimit:           semaphore.NewWeighted(int64(bopts.apikeyMaxParallel)),
+		readSecretsLimit: func() *semaphore.Weighted {
+			if bopts.maxConcurrentSecretReads > 0 {
+				return semaphore.NewWeighted(bopts.maxConcurrentSecretReads)
+			}
+			return nil
+		}(),
 		tracer:                tracer,
 		remoteOutputConfigMap: make(map[string]map[string]any),
 		// remote ES bulkers
@@ -325,6 +333,12 @@ func (b *Bulker) hasChangedAndUpdateRemoteOutputConfig(zlog zerolog.Logger, name
 
 // read secrets one by one as there is no bulk API yet to read them in one request
 func (b *Bulker) ReadSecrets(ctx context.Context, secretIds []string) (map[string]string, error) {
+	if b.readSecretsLimit != nil {
+		if err := b.readSecretsLimit.Acquire(ctx, 1); err != nil {
+			return nil, err
+		}
+		defer b.readSecretsLimit.Release(1)
+	}
 	result := make(map[string]string)
 	esClient := b.Client()
 	for _, id := range secretIds {
