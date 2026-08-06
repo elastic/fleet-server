@@ -378,6 +378,13 @@ func (m *monitorT) processPolicies(ctx context.Context, policies []model.Policy)
 
 	latest := m.groupByLatest(policies)
 	for _, policy := range latest {
+		if m.isStaleRevision(policy.PolicyID, policy.RevisionIdx) {
+			m.log.Warn().
+				Str(ecs.PolicyID, policy.PolicyID).
+				Int64(ecs.RevisionIdx, policy.RevisionIdx).
+				Msg("skipping stale policy revision; secret resolution and policy parse skipped")
+			continue
+		}
 		pp, err := NewParsedPolicy(ctx, m.bulker, policy)
 		if err != nil {
 			return err
@@ -386,6 +393,16 @@ func (m *monitorT) processPolicies(ctx context.Context, policies []model.Policy)
 		m.updatePolicy(ctx, pp)
 	}
 	return nil
+}
+
+// isStaleRevision reports whether the incoming revision_idx is not newer than
+// the cached revision for the given policy. Returns false for unknown policies
+// (first-seen policies must be processed regardless).
+func (m *monitorT) isStaleRevision(policyID string, revisionIdx int64) bool {
+	m.mut.Lock()
+	defer m.mut.Unlock()
+	p, ok := m.policies[policyID]
+	return ok && revisionIdx <= p.pp.Policy.RevisionIdx
 }
 
 func groupByLatest(policies []model.Policy) map[string]model.Policy {
@@ -434,11 +451,9 @@ func (m *monitorT) updatePolicy(ctx context.Context, pp *ParsedPolicy) bool {
 		return false
 	}
 
-	// Reject stale revisions — the policy monitor can deliver old documents (e.g. after a
-	// Kibana index migration assigns higher _seq_no values to older revisions) in a later
-	// batch than the clean revision. Applying a stale revision would push an outdated
-	// policy to all subscribed agents; inputs referencing deleted secrets would also fail
-	// to authenticate.
+	// Secondary stale-revision guard (primary check is in processPolicies before parsing).
+	// Rejects any revision whose revision_idx is not newer than the cached revision,
+	// guarding against races or direct callers that bypass the pre-parse check.
 	if newPolicy.RevisionIdx <= p.pp.Policy.RevisionIdx {
 		zlog.Warn().
 			Int64("cached_revision_idx", p.pp.Policy.RevisionIdx).

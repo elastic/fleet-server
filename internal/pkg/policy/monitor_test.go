@@ -668,3 +668,57 @@ func TestMonitor_StaleRevisionIgnored(t *testing.T) {
 		assert.Equal(t, int64(9), pm.policies[policyID].pp.Policy.RevisionIdx, "cached revision must be updated")
 	})
 }
+
+// failingSecretsBulk wraps MockBulk and makes ReadSecrets return an error,
+// letting tests verify that secret resolution is never attempted for stale revisions.
+type failingSecretsBulk struct {
+	ftesting.MockBulk
+}
+
+func (b *failingSecretsBulk) ReadSecrets(_ context.Context, _ []string) (map[string]string, error) {
+	return nil, fmt.Errorf("ReadSecrets must not be called for stale revisions")
+}
+
+// TestMonitor_StaleRevisionSkipsSecretResolution verifies that processPolicies
+// skips NewParsedPolicy (and therefore secret resolution) for stale revisions.
+// Without the pre-parse guard a stale doc with deleted secrets would fail during
+// secret resolution and cause processPolicies to return an error.
+func TestMonitor_StaleRevisionSkipsSecretResolution(t *testing.T) {
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
+	policyID := uuid.Must(uuid.NewV4()).String()
+
+	// A policy with a secret reference so that NewParsedPolicy calls ReadSecrets.
+	policyWithSecret := model.Policy{
+		PolicyID:    policyID,
+		RevisionIdx: 7, // stale: cached is 8
+		Data: &model.PolicyData{
+			Outputs: map[string]map[string]any{
+				"default": {"type": "elasticsearch"},
+			},
+			SecretReferences: []model.SecretReferencesItems{{ID: "some-secret-id"}},
+		},
+	}
+
+	bulker := &failingSecretsBulk{}
+	pm := &monitorT{
+		log:    zerolog.Ctx(ctx).With().Logger(),
+		bulker: bulker,
+		policies: map[string]policyT{
+			policyID: {
+				pp: ParsedPolicy{
+					Policy: model.Policy{
+						PolicyID:    policyID,
+						RevisionIdx: 8,
+						Data:        policyDataDefault,
+					},
+				},
+				head: makeHead(),
+			},
+		},
+		pendingQ: makeHead(),
+	}
+
+	err := pm.processPolicies(ctx, []model.Policy{policyWithSecret})
+	assert.NoError(t, err, "stale revision should be skipped without error, not trigger secret resolution")
+	assert.Equal(t, int64(8), pm.policies[policyID].pp.Policy.RevisionIdx, "cached revision must not change for stale input")
+}
