@@ -140,8 +140,8 @@ const (
 	defaultAPIKeyMaxParallel              = 32
 	defaultApikeyMaxReqSize               = 100 * 1024 * 1024
 	defaultFlushContextTimeout            = time.Minute * 1
-	defaultMaxPendingBulkDispatches    int64 = 0 // 0 means no limit
-	defaultMaxConcurrentSecretReads int64 = 0 // 0 means no limit
+	defaultMaxPendingBulkDispatches int64 = 0  // 0 means no limit
+	defaultMaxConcurrentSecretReads int64 = 32
 
 	// dispatchAbortDrainTimeout bounds how long the drain helper waits for
 	// a late response from the Run loop on an abort from the second
