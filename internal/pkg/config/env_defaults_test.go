@@ -92,7 +92,7 @@ func TestDefaultLimitsYAMLKeys(t *testing.T) {
 }
 
 // TestContainerMemoryMB verifies that containerMemoryMB prefers GOMEMLIMIT over
-// host RAM so the ristretto cache is sized for the container, not the node.
+// host RAM so fleet-server is correctly sized for the container, not the node.
 func TestContainerMemoryMB(t *testing.T) {
 	t.Run("uses GOMEMLIMIT when set", func(t *testing.T) {
 		const setLimit = int64(256 * 1024 * 1024) // 256 MiB
