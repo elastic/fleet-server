@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/fs"
 	"math"
+	"os"
 	"reflect"
 	"runtime/debug"
 	"strings"
@@ -108,5 +109,47 @@ func TestContainerMemoryMB(t *testing.T) {
 
 		got := containerMemoryMB()
 		assert.Equal(t, memory.TotalMemory()/1024/1024, got)
+	})
+}
+
+func TestReadCgroupMemoryFile(t *testing.T) {
+	writeFile := func(t *testing.T, content string) string {
+		t.Helper()
+		f, err := os.CreateTemp(t.TempDir(), "cgroup-memory-*")
+		require.NoError(t, err)
+		_, err = f.WriteString(content)
+		require.NoError(t, err)
+		require.NoError(t, f.Close())
+		return f.Name()
+	}
+
+	t.Run("returns MiB for a valid byte limit", func(t *testing.T) {
+		path := writeFile(t, "134217728\n") // 128 MiB
+		mb, ok := readCgroupMemoryFile(path)
+		assert.True(t, ok)
+		assert.Equal(t, uint64(128), mb)
+	})
+
+	t.Run("returns false for 'max' (unlimited)", func(t *testing.T) {
+		path := writeFile(t, "max\n")
+		_, ok := readCgroupMemoryFile(path)
+		assert.False(t, ok)
+	})
+
+	t.Run("returns false for MaxInt64 sentinel (cgroup v1 unlimited)", func(t *testing.T) {
+		path := writeFile(t, "9223372036854775807\n") // math.MaxInt64
+		_, ok := readCgroupMemoryFile(path)
+		assert.False(t, ok)
+	})
+
+	t.Run("returns false when file does not exist", func(t *testing.T) {
+		_, ok := readCgroupMemoryFile("/nonexistent/cgroup/memory.max")
+		assert.False(t, ok)
+	})
+
+	t.Run("returns false for invalid content", func(t *testing.T) {
+		path := writeFile(t, "not-a-number\n")
+		_, ok := readCgroupMemoryFile(path)
+		assert.False(t, ok)
 	})
 }
