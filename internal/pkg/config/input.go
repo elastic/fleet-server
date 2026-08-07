@@ -44,15 +44,12 @@ type ServerTLS struct {
 	Cert string `config:"cert"`
 }
 
-const defaultMaxConcurrentSecretReads = 32
-
 type ServerBulk struct {
 	FlushInterval            time.Duration `config:"flush_interval"`
 	FlushThresholdCount      int           `config:"flush_threshold_cnt"`
 	FlushThresholdSize       int           `config:"flush_threshold_size"`
 	FlushMaxPending          int           `config:"flush_max_pending"`
 	MaxPendingBulkDispatches int64         `config:"max_pending_bulk_dispatches"`
-	MaxConcurrentSecretReads int           `config:"max_concurrent_secret_reads"`
 }
 
 func (c *ServerBulk) InitDefaults() {
@@ -60,7 +57,6 @@ func (c *ServerBulk) InitDefaults() {
 	c.FlushThresholdCount = 2048
 	c.FlushThresholdSize = 1024 * 1024
 	c.FlushMaxPending = 8
-	c.MaxConcurrentSecretReads = defaultMaxConcurrentSecretReads
 }
 
 // Server is the configuration for the server

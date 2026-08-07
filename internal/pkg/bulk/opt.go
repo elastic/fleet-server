@@ -217,7 +217,6 @@ func BulkOptsFromCfg(cfg *config.Config) []BulkOpt {
 		WithAPIKeyMaxParallel(maxKeyParallel),
 		WithAPIKeyMaxRequestSize(cfg.Output.Elasticsearch.MaxContentLength),
 		WithMaxPendingBulkDispatches(bulkCfg.MaxPendingBulkDispatches),
-		WithMaxConcurrentSecretReads(bulkCfg.MaxConcurrentSecretReads),
 		WithPolicyTokens(policyTokens),
 	}
 }
