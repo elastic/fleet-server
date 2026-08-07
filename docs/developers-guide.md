@@ -420,7 +420,7 @@ These steps do the following:
 
 The `DOCKER_IMAGE` and `DOCKER_IMAGE_TAG` environment variables can be used to override the image name and tag. Run `mage -h test:cloudE2EUp` for all available options.
 
-To run the full automated cloud E2E test suite (build, deploy, test, and teardown in one shot), use:
+To also run the automated cloud E2E test suite after deploying, use the all-in-one target (equivalent to the above steps plus `mage test:cloudE2ERun`):
 
 ```bash
 EC_API_KEY=yourapikey mage test:cloudE2E
