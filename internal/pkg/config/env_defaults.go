@@ -325,6 +325,10 @@ func loadLimits(log *zerolog.Logger, agentLimit int) *envLimits {
 	return defaultEnvLimits()
 }
 
+// cgroupMemMB returns the cgroup memory limit in MiB.
+// It is a var so that unit tests can replace it.
+var cgroupMemMB func() (uint64, bool) = cgroupMemoryLimitMB
+
 // containerMemoryMB returns available memory in MiB using this priority order:
 //  1. GOMEMLIMIT, if explicitly set
 //  2. cgroup memory limit (v2, then v1), for containers without an explicit GOMEMLIMIT
@@ -334,7 +338,7 @@ func containerMemoryMB() uint64 {
 	if limit > 0 && limit != math.MaxInt64 {
 		return uint64(limit) / 1024 / 1024
 	}
-	if mb, ok := cgroupMemoryLimitMB(); ok {
+	if mb, ok := cgroupMemMB(); ok {
 		return mb
 	}
 	return memory.TotalMemory() / 1024 / 1024
