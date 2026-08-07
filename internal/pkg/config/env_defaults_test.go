@@ -7,11 +7,14 @@ package config
 import (
 	"io"
 	"io/fs"
+	"math"
 	"reflect"
+	"runtime/debug"
 	"strings"
 	"testing"
 
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
+	"github.com/pbnjay/memory"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -85,4 +88,25 @@ func TestDefaultLimitsYAMLKeys(t *testing.T) {
 		return nil
 	})
 	require.NoError(t, err)
+}
+
+// TestContainerMemoryMB verifies that containerMemoryMB prefers GOMEMLIMIT over
+// host RAM so the ristretto cache is sized for the container, not the node.
+func TestContainerMemoryMB(t *testing.T) {
+	t.Run("uses GOMEMLIMIT when set", func(t *testing.T) {
+		const setLimit = int64(256 * 1024 * 1024) // 256 MiB
+		prev := debug.SetMemoryLimit(setLimit)
+		t.Cleanup(func() { debug.SetMemoryLimit(prev) })
+
+		got := containerMemoryMB()
+		assert.Equal(t, uint64(256), got)
+	})
+
+	t.Run("falls back to host RAM when GOMEMLIMIT is unset", func(t *testing.T) {
+		prev := debug.SetMemoryLimit(math.MaxInt64)
+		t.Cleanup(func() { debug.SetMemoryLimit(prev) })
+
+		got := containerMemoryMB()
+		assert.Equal(t, memory.TotalMemory()/1024/1024, got)
+	})
 }
