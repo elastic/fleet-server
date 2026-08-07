@@ -617,12 +617,10 @@ func TestMonitor_LatestRev(t *testing.T) {
 	})
 }
 
-// TestMonitor_StaleRevisionIgnored verifies that updatePolicy rejects an incoming
-// document whose revision_idx is not greater than the cached revision. This guards
-// against the policy monitor delivering old revisions (e.g. after a Kibana index
-// migration assigns higher _seq_no values to older documents) and overwriting a
-// clean cached policy with one that may reference deleted secrets.
-func TestMonitor_StaleRevisionIgnored(t *testing.T) {
+// TestUpdatePolicy_NewerRevisionIsApplied verifies that updatePolicy stores an
+// incoming document and returns true when its revision_idx is greater than the
+// cached revision.
+func TestUpdatePolicy_NewerRevisionIsApplied(t *testing.T) {
 	ctx := testlog.SetLogger(t).WithContext(t.Context())
 	policyID := uuid.Must(uuid.NewV4()).String()
 
@@ -647,26 +645,10 @@ func TestMonitor_StaleRevisionIgnored(t *testing.T) {
 		pendingQ: makeHead(),
 	}
 
-	t.Run("equal revision is ignored", func(t *testing.T) {
-		stale := makePolicy(8)
-		updated := pm.updatePolicy(ctx, &stale)
-		assert.False(t, updated, "expected updatePolicy to return false for equal revision")
-		assert.Equal(t, int64(8), pm.policies[policyID].pp.Policy.RevisionIdx, "cached revision must not change")
-	})
-
-	t.Run("older revision is ignored", func(t *testing.T) {
-		stale := makePolicy(7)
-		updated := pm.updatePolicy(ctx, &stale)
-		assert.False(t, updated, "expected updatePolicy to return false for older revision")
-		assert.Equal(t, int64(8), pm.policies[policyID].pp.Policy.RevisionIdx, "cached revision must not change")
-	})
-
-	t.Run("newer revision is applied", func(t *testing.T) {
-		fresh := makePolicy(9)
-		updated := pm.updatePolicy(ctx, &fresh)
-		assert.True(t, updated, "expected updatePolicy to return true for newer revision")
-		assert.Equal(t, int64(9), pm.policies[policyID].pp.Policy.RevisionIdx, "cached revision must be updated")
-	})
+	fresh := makePolicy(9)
+	updated := pm.updatePolicy(ctx, &fresh)
+	assert.True(t, updated, "expected updatePolicy to return true for newer revision")
+	assert.Equal(t, int64(9), pm.policies[policyID].pp.Policy.RevisionIdx, "cached revision must be updated")
 }
 
 // failingSecretsBulk wraps MockBulk and makes ReadSecrets return an error,

@@ -451,16 +451,6 @@ func (m *monitorT) updatePolicy(ctx context.Context, pp *ParsedPolicy) bool {
 		return false
 	}
 
-	// Secondary stale-revision guard (primary check is in processPolicies before parsing).
-	// Rejects any revision whose revision_idx is not newer than the cached revision,
-	// guarding against races or direct callers that bypass the pre-parse check.
-	if newPolicy.RevisionIdx <= p.pp.Policy.RevisionIdx {
-		zlog.Warn().
-			Int64("cached_revision_idx", p.pp.Policy.RevisionIdx).
-			Msg("ignoring stale policy revision from policy monitor")
-		return false
-	}
-
 	// Cache the old stored policy for logging
 	oldPolicy := p.pp.Policy
 
