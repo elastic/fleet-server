@@ -402,22 +402,7 @@ cp build/binaries/fleet-server-8.7.0-SNAPSHOT-linux-x86_64/fleet-server ./data/e
 
 Elastic employees can create an Elastic Cloud (ECH) deployment with a locally built Fleet Server.
 
-The full end-to-end flow — build, push, deploy, test, and teardown — can be run with a single mage target:
-
-```bash
-EC_API_KEY=yourapikey mage test:cloudE2E
-```
-
-This runs the following steps in sequence:
-
-1. **`mage docker:cover`** — builds a coverage-instrumented `fleet-server` binary inside Docker
-2. **`mage docker:customAgentImage`** — creates a custom `elastic-agent-cloud` image with the locally built `fleet-server` binary swapped in (base image: `docker.elastic.co/cloud-release/elastic-agent-cloud`)
-3. **`mage docker:push`** — pushes the custom image to the registry (`docker.elastic.co/beats-ci/elastic-agent-cloud-fleet`)
-4. **`mage test:cloudE2EUp`** — provisions an ECH deployment via Terraform using the custom image
-5. **`mage test:cloudE2ERun`** — runs the cloud E2E tests against the deployment
-6. **`mage test:cloudE2EDown`** — destroys the ECH deployment
-
-You can also run each step individually. For example, to provision and tear down a deployment without running tests:
+To build a custom image and deploy it to ECH for manual testing:
 
 ```bash
 EC_API_KEY=yourapikey mage docker:cover docker:customAgentImage docker:push test:cloudE2EUp
@@ -425,5 +410,19 @@ EC_API_KEY=yourapikey mage docker:cover docker:customAgentImage docker:push test
 EC_API_KEY=yourapikey mage test:cloudE2EDown
 ```
 
-The `DOCKER_IMAGE` and `DOCKER_IMAGE_TAG` environment variables can be used to override the image name and tag used for the ECH deployment. Run `mage -h test:cloudE2EUp` for all available options.
+These steps do the following:
+
+1. **`mage docker:cover`** — builds a coverage-instrumented `fleet-server` binary inside Docker
+2. **`mage docker:customAgentImage`** — creates a custom `elastic-agent-cloud` image with the locally built `fleet-server` binary swapped in (base image: `docker.elastic.co/cloud-release/elastic-agent-cloud`)
+3. **`mage docker:push`** — pushes the custom image to the registry (`docker.elastic.co/beats-ci/elastic-agent-cloud-fleet`)
+4. **`mage test:cloudE2EUp`** — provisions an ECH deployment via Terraform using the custom image
+5. **`mage test:cloudE2EDown`** — destroys the ECH deployment when done
+
+The `DOCKER_IMAGE` and `DOCKER_IMAGE_TAG` environment variables can be used to override the image name and tag. Run `mage -h test:cloudE2EUp` for all available options.
+
+To run the full automated cloud E2E test suite (build, deploy, test, and teardown in one shot), use:
+
+```bash
+EC_API_KEY=yourapikey mage test:cloudE2E
+```
 
