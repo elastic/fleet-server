@@ -418,7 +418,7 @@ These steps do the following:
 4. **`mage test:cloudE2EUp`** — provisions an ECH deployment in the Cloud-First Testing (CFT) region via Terraform using the custom image
 5. **`mage test:cloudE2EDown`** — destroys the ECH deployment when done
 
-The `DOCKER_IMAGE` and `DOCKER_IMAGE_TAG` environment variables can be used to override the image name and tag. Run `mage -h test:cloudE2EUp` for all available options.
+When running the individual targets, `DOCKER_IMAGE` and `DOCKER_IMAGE_TAG` can be used to override the image name and tag used for the ECH deployment. Note that `mage test:cloudE2E` sets these variables internally, so external overrides have no effect on the all-in-one target. Run `mage -h test:cloudE2EUp` for all available options.
 
 To also run the automated cloud E2E test suite against the deployment (and tear it down afterwards), use the all-in-one target — equivalent to the above steps with `mage test:cloudE2ERun` inserted between `test:cloudE2EUp` and `test:cloudE2EDown`:
 
