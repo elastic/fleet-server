@@ -5,13 +5,8 @@ entries:
       description: ""
       component: fleet-server
       pr:
-        - https://github.com/elastic/fleet-server/pull/7563
-        - https://github.com/elastic/fleet-server/pull/7571
-        - https://github.com/elastic/fleet-server/pull/7583
-        - https://github.com/elastic/fleet-server/pull/7572
-      issue:
-        - https://github.com/elastic/fleet-server/issues/7536
-        - https://github.com/elastic/fleet-server/issues/7570
+        - https://github.com/elastic/fleet-server/pull/7503
+      issue: []
       impact: ""
       action: ""
       timestamp: 1753776000
@@ -23,13 +18,8 @@ entries:
       description: ""
       component: fleet-server
       pr:
-        - https://github.com/elastic/fleet-server/pull/7563
-        - https://github.com/elastic/fleet-server/pull/7571
-        - https://github.com/elastic/fleet-server/pull/7583
-        - https://github.com/elastic/fleet-server/pull/7572
-      issue:
-        - https://github.com/elastic/fleet-server/issues/7536
-        - https://github.com/elastic/fleet-server/issues/7570
+        - https://github.com/elastic/fleet-server/pull/7528
+      issue: []
       impact: ""
       action: ""
       timestamp: 1785505460
@@ -45,13 +35,8 @@ entries:
         deleting the secret in that case leaves the agent with a dangling reference.
       component: fleet-server
       pr:
-        - https://github.com/elastic/fleet-server/pull/7563
-        - https://github.com/elastic/fleet-server/pull/7571
-        - https://github.com/elastic/fleet-server/pull/7583
-        - https://github.com/elastic/fleet-server/pull/7572
-      issue:
-        - https://github.com/elastic/fleet-server/issues/7536
-        - https://github.com/elastic/fleet-server/issues/7570
+        - https://github.com/elastic/fleet-server/pull/7533
+      issue: []
       impact: ""
       action: ""
       timestamp: 1785539200
