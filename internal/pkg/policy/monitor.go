@@ -339,8 +339,8 @@ func (m *monitorT) processPolicies(ctx context.Context, policies []model.Policy)
 	for _, policy := range latest {
 		if m.isStaleRevision(policy.PolicyID, policy.RevisionIdx) {
 			m.log.Warn().
-				Str(ecs.PolicyID, policy.PolicyID).
-				Int64(ecs.RevisionIdx, policy.RevisionIdx).
+				Str(logger.PolicyID, policy.PolicyID).
+				Int64(logger.RevisionIdx, policy.RevisionIdx).
 				Msg("skipping stale policy revision; secret resolution and policy parse skipped")
 			continue
 		}
