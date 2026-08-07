@@ -400,15 +400,18 @@ cp build/binaries/fleet-server-8.7.0-SNAPSHOT-linux-x86_64/fleet-server ./data/e
 
 ## Testing on cloud
 
-Elastic employees can create an Elastic Cloud (ECH) deployment with a locally built Fleet Server.
+Elastic employees can create an Elastic Cloud Hosted (ECH) deployment with a locally built Fleet Server.
 
 To build a custom image and deploy it to ECH for manual testing:
 
 ```bash
-EC_API_KEY=yourapikey mage docker:cover docker:customAgentImage docker:push test:cloudE2EUp
+SNAPSHOT=true PLATFORMS=linux/amd64 DOCKER_IMAGE_TAG=my-custom-tag \
+  EC_API_KEY=yourapikey mage docker:cover docker:customAgentImage docker:push test:cloudE2EUp
 # ... manual testing ...
-EC_API_KEY=yourapikey mage test:cloudE2EDown
+DOCKER_IMAGE_TAG=my-custom-tag EC_API_KEY=yourapikey mage test:cloudE2EDown
 ```
+
+`SNAPSHOT=true` and `PLATFORMS=linux/amd64` are required — ECH runs on `linux/amd64`, so omitting `PLATFORMS` on Apple Silicon will produce an `arm64` image that won't run in the deployment. Setting a consistent `DOCKER_IMAGE_TAG` ensures that `docker:customAgentImage`, `docker:push`, and `test:cloudE2EUp`/`test:cloudE2EDown` all refer to the same image.
 
 These steps do the following:
 
@@ -418,11 +421,13 @@ These steps do the following:
 4. **`mage test:cloudE2EUp`** — provisions an ECH deployment in the Cloud-First Testing (CFT) region via Terraform using the custom image
 5. **`mage test:cloudE2EDown`** — destroys the ECH deployment when done
 
-When running the individual targets, `DOCKER_IMAGE` and `DOCKER_IMAGE_TAG` can be used to override the image name and tag used for the ECH deployment. Note that `mage test:cloudE2E` sets these variables internally, so external overrides have no effect on the all-in-one target. Run `mage -h test:cloudE2EUp` for all available options.
+`DOCKER_IMAGE` and `DOCKER_IMAGE_TAG` can be used to override the image name and tag. Note that `mage test:cloudE2E` sets these variables internally, so external overrides have no effect on the all-in-one target. Run `mage -h test:cloudE2EUp` for all available options.
 
 To also run the automated cloud E2E test suite against the deployment (and tear it down afterwards), use the all-in-one target — equivalent to the above steps with `mage test:cloudE2ERun` inserted between `test:cloudE2EUp` and `test:cloudE2EDown`:
 
 ```bash
 EC_API_KEY=yourapikey mage test:cloudE2E
 ```
+
+If `mage test:cloudE2E` fails partway through, the deployment may be left running. Run `mage test:cloudE2EDown` to clean it up.
 
