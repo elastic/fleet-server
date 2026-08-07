@@ -29,10 +29,12 @@ func (m *blockingTransport) RoundTrip(_ *http.Request) (*http.Response, error) {
 	m.inFlight.Add(1)
 	defer m.inFlight.Add(-1)
 	<-m.gate
+	h := http.Header{}
+	h.Set("X-Elastic-Product", "Elasticsearch")
 	body := `{"value":"test"}`
 	return &http.Response{
 		StatusCode: http.StatusOK,
-		Header:     make(http.Header),
+		Header:     h,
 		Body:       io.NopCloser(strings.NewReader(body)),
 	}, nil
 }
