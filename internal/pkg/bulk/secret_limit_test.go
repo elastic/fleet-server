@@ -142,11 +142,9 @@ func TestReadSecretsDefaultConcurrency(t *testing.T) {
 	// slot and block in the transport, filling all capacity.
 	var wg sync.WaitGroup
 	for i := range defaultMaxConcurrentSecretReads {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			_, _ = b.ReadSecrets(context.Background(), []string{fmt.Sprintf("id%d", i)})
-		}()
+		})
 	}
 
 	// Spin until all slots are occupied.
