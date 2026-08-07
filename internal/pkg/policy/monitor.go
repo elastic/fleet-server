@@ -337,6 +337,13 @@ func (m *monitorT) processPolicies(ctx context.Context, policies []model.Policy)
 
 	latest := m.groupByLatest(policies)
 	for _, policy := range latest {
+		if m.isStaleRevision(policy.PolicyID, policy.RevisionIdx) {
+			m.log.Warn().
+				Str(ecs.PolicyID, policy.PolicyID).
+				Int64(ecs.RevisionIdx, policy.RevisionIdx).
+				Msg("skipping stale policy revision; secret resolution and policy parse skipped")
+			continue
+		}
 		pp, err := NewParsedPolicy(ctx, m.bulker, policy)
 		if err != nil {
 			return err
@@ -345,6 +352,16 @@ func (m *monitorT) processPolicies(ctx context.Context, policies []model.Policy)
 		m.updatePolicy(ctx, pp)
 	}
 	return nil
+}
+
+// isStaleRevision reports whether the incoming revision_idx is not newer than
+// the cached revision for the given policy. Returns false for unknown policies
+// (first-seen policies must be processed regardless).
+func (m *monitorT) isStaleRevision(policyID string, revisionIdx int64) bool {
+	m.mut.Lock()
+	defer m.mut.Unlock()
+	p, ok := m.policies[policyID]
+	return ok && revisionIdx <= p.pp.Policy.RevisionIdx
 }
 
 func groupByLatest(policies []model.Policy) map[string]model.Policy {

@@ -16,6 +16,7 @@ import (
 	"github.com/gofrs/uuid"
 	"github.com/google/go-cmp/cmp"
 	"github.com/rs/xid"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -447,3 +448,273 @@ LOOP:
 	ms.AssertExpectations(t)
 	mm.AssertExpectations(t)
 }
+<<<<<<< HEAD
+=======
+
+func Test_Monitor_cancel_pending(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	ctx = testlog.SetLogger(t).WithContext(ctx)
+
+	chHitT := make(chan []es.HitT, 2)
+	defer close(chHitT)
+	ms := mmock.NewMockSubscription()
+	ms.On("Output").Return((<-chan []es.HitT)(chHitT))
+	mm := mmock.NewMockMonitor()
+	mm.On("Subscribe").Return(ms).Once()
+	mm.On("Unsubscribe", mock.Anything).Return().Once()
+	bulker := ftesting.NewMockBulk()
+
+	monitor := NewMonitor(bulker, mm, config.ServerLimits{})
+	pm := monitor.(*monitorT)
+	pm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
+		return []model.Policy{}, nil
+	}
+	pm.dispatchCh = make(chan struct{}, 1)
+
+	agentId := uuid.Must(uuid.NewV4()).String()
+	policyId := uuid.Must(uuid.NewV4()).String()
+
+	rId := xid.New().String()
+	policy := model.Policy{
+		ESDocument: model.ESDocument{
+			Id:      rId,
+			Version: 1,
+			SeqNo:   1,
+		},
+		PolicyID:    policyId,
+		Data:        policyDataDefault,
+		RevisionIdx: 1,
+	}
+	policyData, err := json.Marshal(&policy)
+	require.NoError(t, err)
+	policy2 := model.Policy{
+		ESDocument: model.ESDocument{
+			Id:      rId,
+			Version: 1,
+			SeqNo:   1,
+		},
+		PolicyID:    policyId,
+		Data:        policyDataDefault,
+		RevisionIdx: 2,
+	}
+	policyData2, err := json.Marshal(&policy2)
+	require.NoError(t, err)
+
+	// Send both revisions to monitor as as seperate hits
+	chHitT <- []es.HitT{{
+		ID:      rId,
+		SeqNo:   1,
+		Version: 1,
+		Source:  policyData,
+	}}
+	chHitT <- []es.HitT{{
+		ID:      rId,
+		SeqNo:   2,
+		Version: 1,
+		Source:  policyData2,
+	}}
+
+	// start monitor
+	var merr error
+	var mwg sync.WaitGroup
+	mwg.Go(func() {
+		merr = monitor.Run(ctx)
+	})
+	err = monitor.(*monitorT).waitStart(ctx)
+	require.NoError(t, err)
+
+	// subscribe with revision 0
+	s, err := monitor.Subscribe(agentId, policyId, 0)
+	defer monitor.Unsubscribe(s)
+	require.NoError(t, err)
+
+	// This sleep allows the main run to call dispatch
+	// but dispatch will not proceed until there is a signal from the dispatchCh
+	time.Sleep(100 * time.Millisecond)
+	pm.dispatchCh <- struct{}{}
+
+	tm := time.NewTimer(time.Second)
+	policies := make([]*ParsedPolicy, 0, 2)
+LOOP:
+	for {
+		select {
+		case p := <-s.Output():
+			policies = append(policies, p)
+		case <-tm.C:
+			break LOOP
+		}
+	}
+
+	cancel()
+	mwg.Wait()
+	if merr != nil && merr != context.Canceled {
+		t.Fatal(merr)
+	}
+	require.Len(t, policies, 1, "expected to recieve one revision")
+	require.Equal(t, policies[0].Policy.RevisionIdx, int64(2))
+	ms.AssertExpectations(t)
+	mm.AssertExpectations(t)
+}
+
+func TestMonitor_LatestRev(t *testing.T) {
+	t.Run("empty policy id", func(t *testing.T) {
+		pm := &monitorT{}
+		idx := pm.LatestRev(t.Context(), "")
+		assert.Equal(t, int64(0), idx)
+	})
+
+	t.Run("policy load error", func(t *testing.T) {
+		bulker := ftesting.NewMockBulk()
+		mm := mmock.NewMockMonitor()
+		monitor := NewMonitor(bulker, mm, config.ServerLimits{})
+		pm := monitor.(*monitorT)
+		pm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
+			return nil, fmt.Errorf("policy fetch error")
+		}
+
+		idx := pm.LatestRev(t.Context(), "test-id")
+		assert.Equal(t, int64(0), idx)
+	})
+
+	t.Run("policy not found", func(t *testing.T) {
+		bulker := ftesting.NewMockBulk()
+		mm := mmock.NewMockMonitor()
+		monitor := NewMonitor(bulker, mm, config.ServerLimits{})
+		pm := monitor.(*monitorT)
+		pm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
+			return []model.Policy{}, nil
+		}
+		idx := pm.LatestRev(t.Context(), "test-id")
+		assert.Equal(t, int64(0), idx)
+	})
+
+	t.Run("policy found after load", func(t *testing.T) {
+		bulker := ftesting.NewMockBulk()
+		mm := mmock.NewMockMonitor()
+		monitor := NewMonitor(bulker, mm, config.ServerLimits{})
+		pm := monitor.(*monitorT)
+		policyId := uuid.Must(uuid.NewV4()).String()
+		rId := xid.New().String()
+		policy := model.Policy{
+			ESDocument: model.ESDocument{
+				Id:      rId,
+				Version: 1,
+				SeqNo:   1,
+			},
+			PolicyID:    policyId,
+			Data:        policyDataDefault,
+			RevisionIdx: 2,
+		}
+		pm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
+			return []model.Policy{policy}, nil
+		}
+		idx := pm.LatestRev(t.Context(), policyId)
+		assert.Equal(t, int64(2), idx)
+	})
+
+	t.Run("policy found", func(t *testing.T) {
+		pm := &monitorT{
+			policies: map[string]policyT{
+				"test-id": policyT{
+					pp: ParsedPolicy{
+						Policy: model.Policy{
+							RevisionIdx: 1,
+						},
+					},
+				},
+			},
+		}
+		idx := pm.LatestRev(t.Context(), "test-id")
+		assert.Equal(t, int64(1), idx)
+	})
+}
+
+// TestUpdatePolicy_NewerRevisionIsApplied verifies that updatePolicy stores an
+// incoming document and returns true when its revision_idx is greater than the
+// cached revision.
+func TestUpdatePolicy_NewerRevisionIsApplied(t *testing.T) {
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
+	policyID := uuid.Must(uuid.NewV4()).String()
+
+	makePolicy := func(rev int64) ParsedPolicy {
+		return ParsedPolicy{
+			Policy: model.Policy{
+				PolicyID:    policyID,
+				RevisionIdx: rev,
+				Data:        policyDataDefault,
+			},
+		}
+	}
+
+	pm := &monitorT{
+		log: zerolog.Ctx(ctx).With().Logger(),
+		policies: map[string]policyT{
+			policyID: {
+				pp:   makePolicy(8),
+				head: makeHead(),
+			},
+		},
+		pendingQ: makeHead(),
+	}
+
+	fresh := makePolicy(9)
+	updated := pm.updatePolicy(ctx, &fresh)
+	assert.True(t, updated, "expected updatePolicy to return true for newer revision")
+	assert.Equal(t, int64(9), pm.policies[policyID].pp.Policy.RevisionIdx, "cached revision must be updated")
+}
+
+// failingSecretsBulk wraps MockBulk and makes ReadSecrets return an error,
+// letting tests verify that secret resolution is never attempted for stale revisions.
+type failingSecretsBulk struct {
+	ftesting.MockBulk
+}
+
+func (b *failingSecretsBulk) ReadSecrets(_ context.Context, _ []string) (map[string]string, error) {
+	return nil, fmt.Errorf("ReadSecrets must not be called for stale revisions")
+}
+
+// TestMonitor_StaleRevisionSkipsSecretResolution verifies that processPolicies
+// skips NewParsedPolicy (and therefore secret resolution) for stale revisions.
+// Without the pre-parse guard a stale doc with deleted secrets would fail during
+// secret resolution and cause processPolicies to return an error.
+func TestMonitor_StaleRevisionSkipsSecretResolution(t *testing.T) {
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
+	policyID := uuid.Must(uuid.NewV4()).String()
+
+	// A policy with a secret reference so that NewParsedPolicy calls ReadSecrets.
+	policyWithSecret := model.Policy{
+		PolicyID:    policyID,
+		RevisionIdx: 7, // stale: cached is 8
+		Data: &model.PolicyData{
+			Outputs: map[string]map[string]any{
+				"default": {"type": "elasticsearch"},
+			},
+			SecretReferences: []model.SecretReferencesItems{{ID: "some-secret-id"}},
+		},
+	}
+
+	bulker := &failingSecretsBulk{}
+	pm := &monitorT{
+		log:    zerolog.Ctx(ctx).With().Logger(),
+		bulker: bulker,
+		policies: map[string]policyT{
+			policyID: {
+				pp: ParsedPolicy{
+					Policy: model.Policy{
+						PolicyID:    policyID,
+						RevisionIdx: 8,
+						Data:        policyDataDefault,
+					},
+				},
+				head: makeHead(),
+			},
+		},
+		pendingQ: makeHead(),
+	}
+
+	err := pm.processPolicies(ctx, []model.Policy{policyWithSecret})
+	assert.NoError(t, err, "stale revision should be skipped without error, not trigger secret resolution")
+	assert.Equal(t, int64(8), pm.policies[policyID].pp.Policy.RevisionIdx, "cached revision must not change for stale input")
+}
+>>>>>>> b6828bc (fix: add revision guard to updatePolicy to reject stale policy revisions (#7572))
