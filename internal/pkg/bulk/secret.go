@@ -7,12 +7,9 @@ package bulk
 import (
 	"context"
 	"encoding/json"
-<<<<<<< HEAD
-=======
 	"errors"
 	"fmt"
 	"io"
->>>>>>> 5ece0ba (fix: gracefully handle missing secrets in policy monitor (#7571))
 	"net/http"
 
 	"github.com/elastic/go-elasticsearch/v8"
@@ -46,8 +43,6 @@ func (c *ExtendedAPI) Read(ctx context.Context, secretID string) (*SecretRespons
 		return nil, err
 	}
 	defer res.Body.Close()
-<<<<<<< HEAD
-=======
 	if res.StatusCode == http.StatusNotFound {
 		return nil, fmt.Errorf("%q: %w", secretID, ErrSecretNotFound)
 	}
@@ -55,7 +50,6 @@ func (c *ExtendedAPI) Read(ctx context.Context, secretID string) (*SecretRespons
 		body, _ := io.ReadAll(res.Body)
 		return nil, fmt.Errorf("unexpected status %d from fleet secret read: %s", res.StatusCode, body)
 	}
->>>>>>> 5ece0ba (fix: gracefully handle missing secrets in policy monitor (#7571))
 	var secretResp SecretResponse
 
 	err = json.NewDecoder(res.Body).Decode(&secretResp)
