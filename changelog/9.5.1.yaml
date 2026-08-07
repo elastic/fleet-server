@@ -1,0 +1,73 @@
+version: 9.5.1
+entries:
+    - kind: security
+      summary: Anchor artifact authorization on enrollment-derived policy ID
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/7563
+        - https://github.com/elastic/fleet-server/pull/7571
+        - https://github.com/elastic/fleet-server/pull/7583
+        - https://github.com/elastic/fleet-server/pull/7572
+      issue:
+        - https://github.com/elastic/fleet-server/issues/7536
+        - https://github.com/elastic/fleet-server/issues/7570
+      impact: ""
+      action: ""
+      timestamp: 1753776000
+      file:
+        name: 1753776000-artifact-authz-policy-id.yaml
+        checksum: 95d2da33af5c726db2445fa8e5f522f0198eb391
+    - kind: security
+      summary: Treat output names as parameters in Elasticsearch update scripts
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/7563
+        - https://github.com/elastic/fleet-server/pull/7571
+        - https://github.com/elastic/fleet-server/pull/7583
+        - https://github.com/elastic/fleet-server/pull/7572
+      issue:
+        - https://github.com/elastic/fleet-server/issues/7536
+        - https://github.com/elastic/fleet-server/issues/7570
+      impact: ""
+      action: ""
+      timestamp: 1785505460
+      file:
+        name: 1785505460-parameterize-output-painless-scripts.yaml
+        checksum: bbf0031cb9a16726b0cb08b07d2c3ba47db8d8e4
+    - kind: bug-fix
+      summary: Retain output API key secrets when agent document updates fail
+      description: |
+        Fleet Server no longer deletes a newly created output API key secret when the
+        corresponding agent document update returns an error. Elasticsearch may have
+        committed an update even when the client times out waiting for its response;
+        deleting the secret in that case leaves the agent with a dangling reference.
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/7563
+        - https://github.com/elastic/fleet-server/pull/7571
+        - https://github.com/elastic/fleet-server/pull/7583
+        - https://github.com/elastic/fleet-server/pull/7572
+      issue:
+        - https://github.com/elastic/fleet-server/issues/7536
+        - https://github.com/elastic/fleet-server/issues/7570
+      impact: ""
+      action: ""
+      timestamp: 1785539200
+      file:
+        name: 1785539200-retain-output-secret-on-agent-update-failure.yaml
+        checksum: c1af6222145fa524c30a68bd2df623aab45c4480
+    - kind: bug-fix
+      summary: Fix spurious resolveSeqNo errors on check-in when .fleet-actions index does not exist
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/7548
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1785788555
+      file:
+        name: 1785788555-token-resolver-index-not-found.yaml
+        checksum: 83f180df4d44010edb38dfcf98d91ced4811cbb2
