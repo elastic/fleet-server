@@ -198,7 +198,7 @@ func isInvalidAPIKeyErr(err error) bool {
 
 // writeUnenrollResponse writes a 200 check-in response containing a single UNENROLL action.
 // It is used when UnenrollOnInvalidAPIKey is enabled and the agent's API key is invalid.
-func (ct *CheckinT) writeUnenrollResponse(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, agentID string) error {
+func (ct *CheckinT) writeUnenrollResponse(zlog zerolog.Logger, w http.ResponseWriter, agentID string) error {
 	u, err := uuid.NewV4()
 	if err != nil {
 		return err
