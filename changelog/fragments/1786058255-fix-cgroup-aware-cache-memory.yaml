@@ -1,4 +1,4 @@
-kind: enhancement
+kind: bug-fix
 
 summary: Read cgroup memory limit for cache sizing when GOMEMLIMIT is not set
 
