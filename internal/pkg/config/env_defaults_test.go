@@ -103,9 +103,23 @@ func TestContainerMemoryMB(t *testing.T) {
 		assert.Equal(t, uint64(256), got)
 	})
 
-	t.Run("falls back to host RAM when GOMEMLIMIT is unset", func(t *testing.T) {
+	t.Run("uses cgroup limit when GOMEMLIMIT is unset", func(t *testing.T) {
 		prev := debug.SetMemoryLimit(math.MaxInt64)
 		t.Cleanup(func() { debug.SetMemoryLimit(prev) })
+		prevCgroup := cgroupMemMB
+		cgroupMemMB = func() (uint64, bool) { return 128, true }
+		t.Cleanup(func() { cgroupMemMB = prevCgroup })
+
+		got := containerMemoryMB()
+		assert.Equal(t, uint64(128), got)
+	})
+
+	t.Run("falls back to host RAM when GOMEMLIMIT and cgroup are both unset", func(t *testing.T) {
+		prev := debug.SetMemoryLimit(math.MaxInt64)
+		t.Cleanup(func() { debug.SetMemoryLimit(prev) })
+		prevCgroup := cgroupMemMB
+		cgroupMemMB = func() (uint64, bool) { return 0, false }
+		t.Cleanup(func() { cgroupMemMB = prevCgroup })
 
 		got := containerMemoryMB()
 		assert.Equal(t, memory.TotalMemory()/1024/1024, got)
