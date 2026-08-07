@@ -316,7 +316,7 @@ func loadLimits(log *zerolog.Logger, agentLimit int) *envLimits {
 			log.Info().Msgf("Using system limits for %d to %d agents for a configured value of %d agents", l.Agents.Min, l.Agents.Max, agentLimit)
 			ramSize := memMB()
 			if ramSize < l.RecommendedRAM {
-				log.Warn().Msgf("Detected %d MB of available memory, which is lower than the recommended amount (%d MB) for the configured agent limit", ramSize, l.RecommendedRAM)
+				log.Warn().Msgf("Detected %d MiB of available memory, which is lower than the recommended amount (%d MiB) for the configured agent limit", ramSize, l.RecommendedRAM)
 			}
 			return l
 		}
