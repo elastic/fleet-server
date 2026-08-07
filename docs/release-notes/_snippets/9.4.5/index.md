@@ -6,7 +6,7 @@
 
 
 * Write policy_base_id field at agent enrollment. [#7422](https://github.com/elastic/fleet-server/pull/7422) 
-* Bump elastic-agent-libs to v0.46.0 for FIPS 140-3 peer cert key-type enforcement. [#7562](https://github.com/elastic/fleet-server/pull/7562) [#7571](https://github.com/elastic/fleet-server/pull/7571) [#7580](https://github.com/elastic/fleet-server/pull/7580) [#7585](https://github.com/elastic/fleet-server/pull/7585) [#7536](https://github.com/elastic/fleet-server/issues/7536)
+* Bump elastic-agent-libs to v0.46.0 for FIPS 140-3 peer cert key-type enforcement. [#7454](https://github.com/elastic/fleet-server/pull/7454) [#7536](https://github.com/elastic/fleet-server/issues/7536)
 
   Bump elastic-agent-libs to v0.46.0 which enforces FIPS 140-3 compliant peer
   certificate key types across all TLS verification modes. Also set the
@@ -18,11 +18,11 @@
 ### Fixes [fleet-server-9.4.5-fixes]
 
 
-* Anchor artifact authorization on enrollment-derived policy ID. [#7562](https://github.com/elastic/fleet-server/pull/7562) [#7571](https://github.com/elastic/fleet-server/pull/7571) [#7580](https://github.com/elastic/fleet-server/pull/7580) [#7585](https://github.com/elastic/fleet-server/pull/7585) [#7536](https://github.com/elastic/fleet-server/issues/7536)
-* Enforce policy-based access control on artifact downloads. [#7562](https://github.com/elastic/fleet-server/pull/7562) [#7571](https://github.com/elastic/fleet-server/pull/7571) [#7580](https://github.com/elastic/fleet-server/pull/7580) [#7585](https://github.com/elastic/fleet-server/pull/7585) [#7536](https://github.com/elastic/fleet-server/issues/7536)
-* Treat output names as parameters in Elasticsearch update scripts. [#7562](https://github.com/elastic/fleet-server/pull/7562) [#7571](https://github.com/elastic/fleet-server/pull/7571) [#7580](https://github.com/elastic/fleet-server/pull/7580) [#7585](https://github.com/elastic/fleet-server/pull/7585) [#7536](https://github.com/elastic/fleet-server/issues/7536)
+* Anchor artifact authorization on enrollment-derived policy ID. [#7507](https://github.com/elastic/fleet-server/pull/7507) [#7536](https://github.com/elastic/fleet-server/issues/7536)
+* Enforce policy-based access control on artifact downloads. [#7162](https://github.com/elastic/fleet-server/pull/7162) [#7536](https://github.com/elastic/fleet-server/issues/7536)
+* Treat output names as parameters in Elasticsearch update scripts. [#7541](https://github.com/elastic/fleet-server/pull/7541) [#7536](https://github.com/elastic/fleet-server/issues/7536)
 * Fix agent enrollment failures caused by 409 version conflicts during `.fleet-agents` primary shard relocation. [#7446](https://github.com/elastic/fleet-server/pull/7446) 
-* Retain output API key secrets when agent document updates fail. [#7562](https://github.com/elastic/fleet-server/pull/7562) [#7571](https://github.com/elastic/fleet-server/pull/7571) [#7580](https://github.com/elastic/fleet-server/pull/7580) [#7585](https://github.com/elastic/fleet-server/pull/7585) [#7536](https://github.com/elastic/fleet-server/issues/7536)
+* Retain output API key secrets when agent document updates fail. [#7545](https://github.com/elastic/fleet-server/pull/7545) [#7536](https://github.com/elastic/fleet-server/issues/7536)
 
   Fleet Server no longer deletes a newly created output API key secret when the
   corresponding agent document update returns an error. Elasticsearch may have
