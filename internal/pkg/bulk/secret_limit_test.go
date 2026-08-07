@@ -106,25 +106,40 @@ func TestReadSecretsContextCancelledWhileWaiting(t *testing.T) {
 	require.ErrorIs(t, err, context.Canceled)
 }
 
+// TestReadSecretsNoLimitWhenZero verifies that WithMaxConcurrentSecretReads(0)
+// disables the concurrency limit: readSecretsLimit is nil and ReadSecrets
+// completes without blocking.
+func TestReadSecretsNoLimitWhenZero(t *testing.T) {
+	mt := &blockingTransport{gate: make(chan struct{})}
+	close(mt.gate) // unblocked so ReadSecrets returns immediately
+
+	b := newTestBulkerWithTransport(t, mt, WithMaxConcurrentSecretReads(0))
+
+	require.Nil(t, b.readSecretsLimit)
+
+	_, err := b.ReadSecrets(context.Background(), []string{"id1"})
+	require.NoError(t, err)
+}
+
 // TestReadSecretsDefaultConcurrency verifies that a Bulker created without
 // WithMaxConcurrentSecretReads initialises readSecretsLimit with the default
-// capacity of defaultAPIKeyMaxParallel (32). It confirms the capacity
-// indirectly: after filling all 32 slots via concurrent ReadSecrets calls
-// that block in the transport, an additional Acquire with a cancelled context
+// capacity of defaultMaxConcurrentSecretReads (32). It confirms the capacity
+// indirectly: after filling all slots via concurrent ReadSecrets calls that
+// block in the transport, an additional Acquire with a cancelled context
 // returns context.Canceled immediately.
 func TestReadSecretsDefaultConcurrency(t *testing.T) {
 	mt := &blockingTransport{gate: make(chan struct{})}
 
-	// No WithMaxConcurrentSecretReads option → uses defaultAPIKeyMaxParallel.
+	// No WithMaxConcurrentSecretReads option → uses defaultMaxConcurrentSecretReads.
 	b := newTestBulkerWithTransport(t, mt)
 
 	require.NotNil(t, b.readSecretsLimit)
 
-	// Launch defaultAPIKeyMaxParallel goroutines, each calling ReadSecrets with
-	// a single unique secret ID. Each goroutine will acquire one semaphore slot
-	// and block in the transport, filling all capacity.
+	// Launch defaultMaxConcurrentSecretReads goroutines, each calling ReadSecrets
+	// with a single unique secret ID. Each goroutine will acquire one semaphore
+	// slot and block in the transport, filling all capacity.
 	var wg sync.WaitGroup
-	for i := range defaultAPIKeyMaxParallel {
+	for i := range defaultMaxConcurrentSecretReads {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -133,7 +148,7 @@ func TestReadSecretsDefaultConcurrency(t *testing.T) {
 	}
 
 	// Spin until all slots are occupied.
-	for mt.inFlight.Load() < int64(defaultAPIKeyMaxParallel) {
+	for mt.inFlight.Load() < int64(defaultMaxConcurrentSecretReads) {
 		// wait for all goroutines to enter the transport
 	}
 

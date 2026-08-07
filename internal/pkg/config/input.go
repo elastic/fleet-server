@@ -44,7 +44,6 @@ type ServerTLS struct {
 	Cert string `config:"cert"`
 }
 
-// defaultMaxConcurrentSecretReads matches defaultAPIKeyMaxParallel in the bulk package.
 const defaultMaxConcurrentSecretReads = 32
 
 type ServerBulk struct {

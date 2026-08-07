@@ -139,6 +139,7 @@ const (
 	defaultMaxPending                     = 32
 	defaultBlockQueueSz                   = 32 // Small capacity to allow multiOp to spin fast
 	defaultAPIKeyMaxParallel              = 32
+	defaultMaxConcurrentSecretReads       = 32
 	defaultApikeyMaxReqSize               = 100 * 1024 * 1024
 	defaultFlushContextTimeout            = time.Minute * 1
 	defaultMaxPendingBulkDispatches int64 = 0 // 0 means no limit
@@ -159,19 +160,22 @@ func NewBulker(es esapi.Transport, tracer *apm.Tracer, opts ...BulkOpt) *Bulker 
 		return &bulkT{ch: make(chan respT, 1)}
 	}
 
-	return &Bulker{
+	b := &Bulker{
 		opts:                  bopts,
 		es:                    es,
 		ch:                    make(chan *bulkT, bopts.blockQueueSz),
 		blkPool:               sync.Pool{New: poolFunc},
 		flushBufPool:          sync.Pool{New: func() any { return new(bytes.Buffer) }},
 		apikeyLimit:           semaphore.NewWeighted(int64(bopts.apikeyMaxParallel)),
-		readSecretsLimit:      semaphore.NewWeighted(int64(bopts.maxConcurrentSecretReads)),
 		tracer:                tracer,
 		remoteOutputConfigMap: make(map[string]map[string]any),
 		// remote ES bulkers
 		bulkerMap: make(map[string]Bulk),
 	}
+	if bopts.maxConcurrentSecretReads > 0 {
+		b.readSecretsLimit = semaphore.NewWeighted(int64(bopts.maxConcurrentSecretReads))
+	}
+	return b
 }
 
 func (b *Bulker) GetBulker(outputName string) Bulk {
@@ -331,12 +335,15 @@ func (b *Bulker) ReadSecrets(ctx context.Context, secretIds []string) (map[strin
 	result := make(map[string]string)
 	esClient := b.Client()
 	for _, id := range secretIds {
-		// limit concurrent direct ES secret reads
-		if err := b.readSecretsLimit.Acquire(ctx, 1); err != nil {
-			return nil, err
+		if b.readSecretsLimit != nil {
+			if err := b.readSecretsLimit.Acquire(ctx, 1); err != nil {
+				return nil, err
+			}
 		}
 		val, err := ReadSecret(ctx, esClient, id)
-		b.readSecretsLimit.Release(1)
+		if b.readSecretsLimit != nil {
+			b.readSecretsLimit.Release(1)
+		}
 		if err != nil {
 			if errors.Is(err, ErrSecretNotFound) {
 				zerolog.Ctx(ctx).Warn().Str("secret_id", id).Msg("secret not found; policy will load without it")
