@@ -415,7 +415,7 @@ These steps do the following:
 1. **`mage docker:cover`** — builds a coverage-instrumented `fleet-server` binary inside Docker
 2. **`mage docker:customAgentImage`** — creates a custom `elastic-agent-cloud` image with the locally built `fleet-server` binary swapped in (base image: `docker.elastic.co/cloud-release/elastic-agent-cloud`)
 3. **`mage docker:push`** — pushes the custom image to the registry (`docker.elastic.co/beats-ci/elastic-agent-cloud-fleet`)
-4. **`mage test:cloudE2EUp`** — provisions an ECH deployment via Terraform using the custom image
+4. **`mage test:cloudE2EUp`** — provisions an ECH deployment in the Cloud-First Testing (CFT) region via Terraform using the custom image
 5. **`mage test:cloudE2EDown`** — destroys the ECH deployment when done
 
 The `DOCKER_IMAGE` and `DOCKER_IMAGE_TAG` environment variables can be used to override the image name and tag. Run `mage -h test:cloudE2EUp` for all available options.
