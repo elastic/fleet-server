@@ -9,10 +9,7 @@ entries:
         runtime, and verify this in the binary FIPS marker check.
       component: fleet-server
       pr:
-        - https://github.com/elastic/fleet-server/pull/7565
-        - https://github.com/elastic/fleet-server/pull/7571
-        - https://github.com/elastic/fleet-server/pull/7581
-        - https://github.com/elastic/fleet-server/pull/7582
+        - https://github.com/elastic/fleet-server/pull/7456
       issue:
         - https://github.com/elastic/fleet-server/issues/7536
       impact: ""
@@ -39,10 +36,7 @@ entries:
       description: ""
       component: fleet-server
       pr:
-        - https://github.com/elastic/fleet-server/pull/7565
-        - https://github.com/elastic/fleet-server/pull/7571
-        - https://github.com/elastic/fleet-server/pull/7581
-        - https://github.com/elastic/fleet-server/pull/7582
+        - https://github.com/elastic/fleet-server/pull/7543
       issue:
         - https://github.com/elastic/fleet-server/issues/7536
       impact: ""
@@ -60,10 +54,7 @@ entries:
         deleting the secret in that case leaves the agent with a dangling reference.
       component: fleet-server
       pr:
-        - https://github.com/elastic/fleet-server/pull/7565
-        - https://github.com/elastic/fleet-server/pull/7571
-        - https://github.com/elastic/fleet-server/pull/7581
-        - https://github.com/elastic/fleet-server/pull/7582
+        - https://github.com/elastic/fleet-server/pull/7547
       issue:
         - https://github.com/elastic/fleet-server/issues/7536
       impact: ""
