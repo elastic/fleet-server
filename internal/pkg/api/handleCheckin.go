@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/action"
+	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/checkin"
@@ -36,6 +37,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/secret"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 
+	"github.com/gofrs/uuid/v5"
 	"github.com/hashicorp/go-version"
 	"github.com/miolini/datacounter"
 	"github.com/rs/zerolog"
@@ -153,6 +155,9 @@ func (ct *CheckinT) handleCheckin(zlog zerolog.Logger, w http.ResponseWriter, r 
 			ctx := zlog.WithContext(r.Context())
 			invalidateAPIKeysOfInactiveAgent(ctx, zlog, ct.bulker, agent)
 		}
+		if ct.cfg.Features.UnenrollOnInvalidAPIKey && isInvalidAPIKeyErr(err) {
+			return ct.writeUnenrollResponse(zlog, w, r, id)
+		}
 		return err
 	}
 
@@ -180,6 +185,49 @@ func invalidateAPIKeysOfInactiveAgent(ctx context.Context, zlog zerolog.Logger, 
 	}
 	zlog.Info().Any("fleet.policy.apiKeyIDsToRetire", remoteAPIKeys).Msg("handleCheckin invalidate remote API keys")
 	invalidateAPIKeys(ctx, zlog, bulker, remoteAPIKeys, "")
+}
+
+// isInvalidAPIKeyErr reports whether err represents an invalid or disabled API key
+// that would normally produce a 401 response on check-in.
+func isInvalidAPIKeyErr(err error) bool {
+	return errors.Is(err, apikey.ErrAPIKeyNotFound) ||
+		errors.Is(err, apikey.ErrUnauthorized) ||
+		errors.Is(err, ErrAPIKeyNotEnabled) ||
+		errors.Is(err, ErrAgentInactive)
+}
+
+// writeUnenrollResponse writes a 200 check-in response containing a single UNENROLL action.
+// It is used when UnenrollOnInvalidAPIKey is enabled and the agent's API key is invalid.
+func (ct *CheckinT) writeUnenrollResponse(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, agentID string) error {
+	u, err := uuid.NewV4()
+	if err != nil {
+		return err
+	}
+
+	action := Action{
+		AgentId:   agentID,
+		CreatedAt: time.Now().UTC().Format(time.RFC3339),
+		Id:        u.String(),
+		Type:      UNENROLL,
+	}
+
+	zlog.Info().
+		Str(ecs.AgentID, agentID).
+		Str(ecs.ActionID, action.Id).
+		Msg("Returning UNENROLL action for agent with invalid API key")
+
+	resp := CheckinResponse{
+		Action:  "checkin",
+		Actions: []Action{action},
+	}
+
+	payload, err := json.Marshal(&resp)
+	if err != nil {
+		return fmt.Errorf("writeUnenrollResponse marshal: %w", err)
+	}
+
+	_, err = w.Write(payload)
+	return err
 }
 
 // validatedCheckin is a struct to wrap all the things that validateRequest returns.
