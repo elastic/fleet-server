@@ -1,0 +1,13 @@
+kind: bug-fix
+
+summary: Fix ristretto cache sized from host RAM instead of container memory limit
+
+description: >
+  memEnvLimits() called memory.TotalMemory() to select the ristretto cache tier.
+  On a Kubernetes node with >=16 GB of RAM this picked a MaxCost of 256-512 MB --
+  2-4x the pod's GOMEMLIMIT -- causing OOMKills even at modest agent counts.
+  The fix reads GOMEMLIMIT via debug.SetMemoryLimit(-1) and uses that value to
+  select the cache tier, falling back to memory.TotalMemory() only when GOMEMLIMIT
+  is unset (non-containerised deployments).
+
+component: fleet-server
