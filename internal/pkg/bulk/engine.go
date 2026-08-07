@@ -172,6 +172,7 @@ func NewBulker(es esapi.Transport, tracer *apm.Tracer, opts ...BulkOpt) *Bulker 
 		// remote ES bulkers
 		bulkerMap: make(map[string]Bulk),
 	}
+	// 0 means no limit; leave readSecretsLimit nil so ReadSecrets skips the semaphore.
 	if bopts.maxConcurrentSecretReads > 0 {
 		b.readSecretsLimit = semaphore.NewWeighted(int64(bopts.maxConcurrentSecretReads))
 	}
