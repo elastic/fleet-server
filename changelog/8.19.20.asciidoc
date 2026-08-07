@@ -1,0 +1,49 @@
+// begin 8.19.20 relnotes
+
+[[release-notes-8.19.20]]
+==  8.19.20
+
+Review important information about the  8.19.20 release.
+
+[discrete]
+[[security-updates-8.19.20]]
+=== Security updates
+
+
+
+
+* Treat output names as parameters in Elasticsearch update scripts. https://github.com/elastic/fleet-server/pull/7543[#7543] https://github.com/elastic/fleet-server/issues/7536[#7536]
+
+
+
+
+
+
+
+
+
+
+[discrete]
+[[enhancements-8.19.20]]
+=== Enhancements
+
+
+
+
+* Bump elastic-agent-libs to v0.46.0 for FIPS 140-3 peer cert key-type enforcement. https://github.com/elastic/fleet-server/pull/7456[#7456] https://github.com/elastic/fleet-server/issues/7536[#7536]
+
+
+
+
+[discrete]
+[[bug-fixes-8.19.20]]
+=== Bug fixes
+
+
+
+
+* Fix agent enrollment failures caused by 409 version conflicts during `.fleet-agents` primary shard relocation. https://github.com/elastic/fleet-server/pull/7446[#7446] 
+* Retain output API key secrets when agent document updates fail. https://github.com/elastic/fleet-server/pull/7547[#7547] https://github.com/elastic/fleet-server/issues/7536[#7536]
+* Fix spurious resolveSeqNo errors on check-in when .fleet-actions index does not exist. https://github.com/elastic/fleet-server/pull/7548[#7548] 
+
+// end 8.19.20 relnotes
