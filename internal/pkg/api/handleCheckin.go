@@ -156,7 +156,7 @@ func (ct *CheckinT) handleCheckin(zlog zerolog.Logger, w http.ResponseWriter, r 
 			invalidateAPIKeysOfInactiveAgent(ctx, zlog, ct.bulker, agent)
 		}
 		if ct.cfg.Features.UnenrollOnInvalidAPIKey && isInvalidAPIKeyErr(err) {
-			return ct.writeUnenrollResponse(zlog, w, r, id)
+			return ct.writeUnenrollResponse(zlog, w, id)
 		}
 		return err
 	}
