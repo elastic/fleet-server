@@ -1139,10 +1139,9 @@ func TestWriteUnenrollResponse(t *testing.T) {
 
 	agentID := "test-agent-id"
 	wr := httptest.NewRecorder()
-	req := &http.Request{}
 	logger := testlog.SetLogger(t)
 
-	err = ct.writeUnenrollResponse(logger, wr, req, agentID)
+	err = ct.writeUnenrollResponse(logger, wr, agentID)
 	require.NoError(t, err)
 
 	resp := wr.Result()
