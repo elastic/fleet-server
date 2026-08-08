@@ -1,0 +1,18 @@
+kind: enhancement
+
+summary: Add unenroll_on_invalid_api_key feature flag to return UNENROLL instead of 401 on bad API key
+
+description: |
+  Fleet Server now supports a new feature flag `unenroll_on_invalid_api_key`
+  under `inputs[].server.feature_flags`. When enabled, a checkin request that
+  arrives with an invalid, expired, or disabled API key returns HTTP 200 with
+  a single `UNENROLL` action instead of the default HTTP 401 response.
+
+  This allows an elastic-agent whose API key has been revoked to gracefully
+  unenroll and stop attempting to communicate with Fleet Server, rather than
+  entering an error-retry loop.
+
+  The flag is disabled by default; existing behaviour is unchanged unless it
+  is explicitly set to `true` in the configuration.
+
+component: fleet-server

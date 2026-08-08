@@ -436,9 +436,8 @@ func TestServerUnauthorized(t *testing.T) {
 		srv.buildURL(agentID, "acks"),
 	}
 
-	allurls := []string{
-		srv.buildURL("", "enroll"),
-	}
+	allurls := make([]string, 0, 1+len(agenturls))
+	allurls = append(allurls, srv.buildURL("", "enroll"))
 	allurls = append(allurls, agenturls...)
 
 	// Expecting no authorization header error
@@ -1817,4 +1816,75 @@ func TestCheckinOTelColPolicy(t *testing.T) {
 	encodedApiKey := base64.StdEncoding.EncodeToString([]byte(output.ApiKey))
 
 	assert.Equal(t, encodedApiKey, exporter.ApiKey)
+}
+
+// Test_Checkin_UnenrollOnInvalidAPIKey verifies that when the UnenrollOnInvalidAPIKey
+// feature flag is enabled, fleet-server returns a 200 with an UNENROLL action instead
+// of a 401 when an agent checks in with an invalidated API key.
+func Test_Checkin_UnenrollOnInvalidAPIKey(t *testing.T) {
+	doCheckin := func(t *testing.T, ctx context.Context, srv *tserver, agentID, agentKey string) *http.Response {
+		t.Helper()
+		req, err := http.NewRequestWithContext(ctx, "POST",
+			srv.baseURL()+"/api/fleet/agents/"+agentID+"/checkin",
+			strings.NewReader(checkinBody))
+		require.NoError(t, err)
+		req.Header.Set("Authorization", "ApiKey "+agentKey)
+		req.Header.Set("User-Agent", "elastic agent "+serverVersion)
+		req.Header.Set("Content-Type", "application/json")
+		res, err := cleanhttp.DefaultClient().Do(req)
+		require.NoError(t, err)
+		return res
+	}
+
+	t.Run("flag enabled: invalid key for real agent returns 200 with UNENROLL", func(t *testing.T) {
+		srv, err := startTestServer(t, t.Context(), policyData, func(cfg *config.Config) error {
+			cfg.Inputs[0].Server.Features.UnenrollOnInvalidAPIKey = true
+			return nil
+		})
+		require.NoError(t, err)
+		ctx := testlog.SetLogger(t).WithContext(t.Context())
+
+		// Enroll a real agent so the agent ID is present in the system.
+		enrollment := EnrollAgent(t, ctx, srv, enrollBody)
+		agentID := enrollment.Item.Id
+		t.Cleanup(func() { _ = srv.bulker.Delete(ctx, dl.FleetAgents, agentID) })
+
+		// Use a key that was never created in ES. This guarantees ErrUnauthorized
+		// without depending on ES's propagation window for invalidated keys.
+		fakeKey := base64.StdEncoding.EncodeToString([]byte("invalid-id:invalid-secret"))
+
+		res := doCheckin(t, ctx, srv, agentID, fakeKey)
+		defer res.Body.Close()
+
+		require.Equal(t, http.StatusOK, res.StatusCode)
+
+		body, err := io.ReadAll(res.Body)
+		require.NoError(t, err)
+
+		var checkinResp api.CheckinResponse
+		require.NoError(t, json.Unmarshal(body, &checkinResp))
+
+		require.Len(t, checkinResp.Actions, 1, "expected exactly one UNENROLL action")
+		action := checkinResp.Actions[0]
+		assert.Equal(t, api.UNENROLL, action.Type)
+		assert.Equal(t, agentID, action.AgentId)
+		assert.NotEmpty(t, action.Id)
+	})
+
+	t.Run("flag disabled: unknown key returns 401", func(t *testing.T) {
+		srv, err := startTestServer(t, t.Context(), policyData)
+		require.NoError(t, err)
+		ctx := testlog.SetLogger(t).WithContext(t.Context())
+
+		// Use a random agent ID and a key that was never created in ES.
+		// This is the same approach as TestServerUnauthorized and avoids
+		// depending on ES's eventual-consistency window for invalidated keys.
+		agentID := uuid.Must(uuid.NewV4()).String()
+		fakeKey := base64.StdEncoding.EncodeToString([]byte("fake-id:fake-secret"))
+
+		res := doCheckin(t, ctx, srv, agentID, fakeKey)
+		defer res.Body.Close()
+
+		assert.Equal(t, http.StatusUnauthorized, res.StatusCode)
+	})
 }
