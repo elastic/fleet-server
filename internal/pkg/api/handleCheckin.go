@@ -155,8 +155,8 @@ func (ct *CheckinT) handleCheckin(zlog zerolog.Logger, w http.ResponseWriter, r 
 			ctx := zlog.WithContext(r.Context())
 			invalidateAPIKeysOfInactiveAgent(ctx, zlog, ct.bulker, agent)
 		}
-		if ct.cfg.Features.UnenrollOnInvalidAPIKey && isInvalidAPIKeyErr(err) {
-			return ct.writeUnenrollResponse(zlog, w, id)
+		if ct.cfg.Features.EmptyPolicyOnInvalidAPIKey && isInvalidAPIKeyErr(err) {
+			return ct.writeEmptyPolicyResponse(zlog, w, id)
 		}
 		return err
 	}
@@ -196,25 +196,32 @@ func isInvalidAPIKeyErr(err error) bool {
 		errors.Is(err, ErrAgentInactive)
 }
 
-// writeUnenrollResponse writes a 200 check-in response containing a single UNENROLL action.
-// It is used when UnenrollOnInvalidAPIKey is enabled and the agent's API key is invalid.
-func (ct *CheckinT) writeUnenrollResponse(zlog zerolog.Logger, w http.ResponseWriter, agentID string) error {
+// writeEmptyPolicyResponse writes a 200 check-in response containing a POLICY_CHANGE with an
+// empty policy. It is used when EmptyPolicyOnInvalidAPIKey is enabled and the agent's API key is
+// invalid.
+func (ct *CheckinT) writeEmptyPolicyResponse(zlog zerolog.Logger, w http.ResponseWriter, agentID string) error {
 	u, err := uuid.NewV4()
 	if err != nil {
 		return err
+	}
+
+	var ad Action_Data
+	if err = ad.FromActionPolicyChange(ActionPolicyChange{Policy: PolicyData{}}); err != nil {
+		return fmt.Errorf("writeEmptyPolicyResponse build data: %w", err)
 	}
 
 	action := Action{
 		AgentId:   agentID,
 		CreatedAt: time.Now().UTC().Format(time.RFC3339),
 		Id:        u.String(),
-		Type:      UNENROLL,
+		Type:      POLICYCHANGE,
+		Data:      ad,
 	}
 
 	zlog.Info().
 		Str(ecs.AgentID, agentID).
 		Str(ecs.ActionID, action.Id).
-		Msg("Returning UNENROLL action for agent with invalid API key")
+		Msg("Returning empty POLICY_CHANGE for agent with invalid API key")
 
 	resp := CheckinResponse{
 		Action:  "checkin",
@@ -223,7 +230,7 @@ func (ct *CheckinT) writeUnenrollResponse(zlog zerolog.Logger, w http.ResponseWr
 
 	payload, err := json.Marshal(&resp)
 	if err != nil {
-		return fmt.Errorf("writeUnenrollResponse marshal: %w", err)
+		return fmt.Errorf("writeEmptyPolicyResponse marshal: %w", err)
 	}
 
 	_, err = w.Write(payload)

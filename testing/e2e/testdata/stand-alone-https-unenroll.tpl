@@ -20,6 +20,6 @@ inputs:
       checkin_long_poll: 5s
       checkin_jitter: 0s
     feature_flags:
-      unenroll_on_invalid_api_key: true
+      empty_policy_on_invalid_api_key: true
 logging:
   to_stderr: true

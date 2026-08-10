@@ -1131,7 +1131,7 @@ func TestIsInvalidAPIKeyErr(t *testing.T) {
 	}
 }
 
-func TestWriteUnenrollResponse(t *testing.T) {
+func TestWriteEmptyPolicyResponse(t *testing.T) {
 	verCon := mustBuildConstraints("8.0.0")
 	cfg := &config.Server{}
 	ct, err := NewCheckinT(verCon, cfg, nil, nil, nil, nil, nil, ftesting.NewMockBulk())
@@ -1141,7 +1141,7 @@ func TestWriteUnenrollResponse(t *testing.T) {
 	wr := httptest.NewRecorder()
 	logger := testlog.SetLogger(t)
 
-	err = ct.writeUnenrollResponse(logger, wr, agentID)
+	err = ct.writeEmptyPolicyResponse(logger, wr, agentID)
 	require.NoError(t, err)
 
 	resp := wr.Result()
@@ -1157,9 +1157,13 @@ func TestWriteUnenrollResponse(t *testing.T) {
 
 	action := checkinResp.Actions[0]
 	assert.Equal(t, agentID, action.AgentId)
-	assert.Equal(t, UNENROLL, action.Type)
+	assert.Equal(t, POLICYCHANGE, action.Type)
 	assert.NotEmpty(t, action.Id)
 	assert.NotEmpty(t, action.CreatedAt)
+
+	pc, err := action.Data.AsActionPolicyChange()
+	require.NoError(t, err)
+	assert.Empty(t, pc.Policy.Inputs)
 }
 
 // makeAPIKeyAuthHeader returns an Authorization header value for the given key id and secret.
@@ -1168,7 +1172,7 @@ func makeAPIKeyAuthHeader(id, secret string) string {
 	return "ApiKey " + token
 }
 
-func TestHandleCheckin_UnenrollOnInvalidAPIKey(t *testing.T) {
+func TestHandleCheckin_EmptyPolicyOnInvalidAPIKey(t *testing.T) {
 	const agentID = "test-agent-id"
 
 	tests := []struct {
@@ -1179,25 +1183,25 @@ func TestHandleCheckin_UnenrollOnInvalidAPIKey(t *testing.T) {
 		wantAction  ActionType
 	}{
 		{
-			name:        "flag enabled, ErrAPIKeyNotFound returns UNENROLL",
+			name:        "flag enabled, ErrAPIKeyNotFound returns POLICY_CHANGE",
 			authErr:     apikey.ErrAPIKeyNotFound,
 			flagEnabled: true,
 			wantStatus:  http.StatusOK,
-			wantAction:  UNENROLL,
+			wantAction:  POLICYCHANGE,
 		},
 		{
-			name:        "flag enabled, ErrUnauthorized returns UNENROLL",
+			name:        "flag enabled, ErrUnauthorized returns POLICY_CHANGE",
 			authErr:     apikey.ErrUnauthorized,
 			flagEnabled: true,
 			wantStatus:  http.StatusOK,
-			wantAction:  UNENROLL,
+			wantAction:  POLICYCHANGE,
 		},
 		{
-			name:        "flag enabled, ErrAPIKeyNotEnabled returns UNENROLL",
+			name:        "flag enabled, ErrAPIKeyNotEnabled returns POLICY_CHANGE",
 			authErr:     ErrAPIKeyNotEnabled,
 			flagEnabled: true,
 			wantStatus:  http.StatusOK,
-			wantAction:  UNENROLL,
+			wantAction:  POLICYCHANGE,
 		},
 		{
 			name:        "flag disabled, ErrAPIKeyNotFound returns 401",
@@ -1219,7 +1223,7 @@ func TestHandleCheckin_UnenrollOnInvalidAPIKey(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			cfg := &config.Server{
 				Features: config.FeatureFlags{
-					UnenrollOnInvalidAPIKey: tc.flagEnabled,
+					EmptyPolicyOnInvalidAPIKey: tc.flagEnabled,
 				},
 			}
 

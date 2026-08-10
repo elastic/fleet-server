@@ -286,10 +286,11 @@ fleet:
 #        // enable OpAMP endpoint (enabled by default)
 #        enable_opamp: true
 #
-#        // When true, a checkin with an invalid or disabled API key returns HTTP 200 with an
-#        // UNENROLL action instead of HTTP 401, allowing the agent to gracefully unenroll.
+#        // When true, a checkin with an invalid or disabled API key returns HTTP 200 with a
+#        // POLICY_CHANGE action carrying an empty policy instead of HTTP 401. This causes the
+#        // agent to stop all inputs.
 #        // Disabled by default.
-#        unenroll_on_invalid_api_key: false
+#        empty_policy_on_invalid_api_key: false
 #
 #    # monitor options are advanced configuration and should not be adjusted is most cases
 #    monitor:

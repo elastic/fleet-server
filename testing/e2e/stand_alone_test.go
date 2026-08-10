@@ -855,51 +855,26 @@ func (suite *StandAloneSuite) TestAgentUnenrollsOnInvalidAPIKey() {
 
 	// After ttl_api_key (2 s) the cache entry expires. After checkin_long_poll (5 s) the
 	// current long-poll returns empty and the agent starts a new checkin. That new checkin
-	// re-authenticates with ES, gets ErrUnauthorized, and fleet-server returns UNENROLL.
-	// The agent should log the action within ~15 s.
-	suite.T().Log("Waiting for elastic-agent to log unenroll action...")
+	// re-authenticates with ES, gets ErrUnauthorized, and fleet-server returns an empty
+	// POLICY_CHANGE. The agent applies the empty policy and stops all components.
+	// Poll "elastic-agent status --output json" until the components list is empty.
+	suite.T().Log("Waiting for elastic-agent to have no running components...")
 	suite.Require().Eventually(func() bool {
-		p, err := os.ReadFile(agentLogPath)
+		cmd := exec.CommandContext(ctx, paths.agentBinary, "status", "--output", "json")
+		cmd.Dir = agentDir
+		out, err := cmd.Output()
 		if err != nil {
 			return false
 		}
-		return strings.Contains(strings.ToLower(string(p)), "unenroll")
-	}, 30*time.Second, time.Second, "elastic-agent log never mentioned unenroll")
-	suite.T().Log("Agent logged unenroll action")
-
-	// An unenrolled agent keeps its process running but stops checking in.
-	// Capture the last_checkin timestamp immediately after the unenroll log appeared,
-	// then wait longer than two checkin cycles (2 × checkin_long_poll = 10 s + buffer)
-	// and confirm the timestamp has not advanced — i.e. the agent stopped communicating.
-	lastCheckin := suite.agentLastCheckin(ctx, agentID)
-	suite.T().Logf("last_checkin after unenroll log: %s", lastCheckin)
-
-	time.Sleep(15 * time.Second)
-
-	newLastCheckin := suite.agentLastCheckin(ctx, agentID)
-	suite.Equal(lastCheckin, newLastCheckin,
-		"last_checkin advanced after unenroll — agent is still checking in")
-	suite.T().Log("Agent stopped checking in after unenroll: confirmed")
-}
-
-// agentLastCheckin queries .fleet-agents and returns the last_checkin timestamp string for the given agent.
-func (suite *StandAloneSuite) agentLastCheckin(ctx context.Context, agentID string) string {
-	suite.T().Helper()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
-		"http://"+suite.ESHosts+"/.fleet-agents/_doc/"+agentID, nil)
-	suite.Require().NoError(err)
-	req.SetBasicAuth(suite.ElasticUser, suite.ElasticPass)
-	resp, err := suite.Client.Do(req)
-	suite.Require().NoError(err)
-	defer resp.Body.Close()
-	suite.Require().Equal(http.StatusOK, resp.StatusCode)
-	var doc struct {
-		Source struct {
-			LastCheckin string `json:"last_checkin"`
-		} `json:"_source"`
-	}
-	suite.Require().NoError(json.NewDecoder(resp.Body).Decode(&doc))
-	return doc.Source.LastCheckin
+		var statusResp struct {
+			Components []json.RawMessage `json:"components"`
+		}
+		if err := json.Unmarshal(out, &statusResp); err != nil {
+			return false
+		}
+		return len(statusResp.Components) == 0
+	}, 2*time.Minute, 10*time.Second, "elastic-agent still has running components after empty policy was applied")
+	suite.T().Log("Agent has no running components — empty policy confirmed")
 }
 
 // agentAccessAPIKeyID queries .fleet-agents to retrieve the access_api_key_id for the given agent.

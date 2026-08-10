@@ -1818,10 +1818,10 @@ func TestCheckinOTelColPolicy(t *testing.T) {
 	assert.Equal(t, encodedApiKey, exporter.ApiKey)
 }
 
-// Test_Checkin_UnenrollOnInvalidAPIKey verifies that when the UnenrollOnInvalidAPIKey
-// feature flag is enabled, fleet-server returns a 200 with an UNENROLL action instead
+// Test_Checkin_EmptyPolicyOnInvalidAPIKey verifies that when the EmptyPolicyOnInvalidAPIKey
+// feature flag is enabled, fleet-server returns a 200 with a POLICY_CHANGE (empty policy) instead
 // of a 401 when an agent checks in with an invalidated API key.
-func Test_Checkin_UnenrollOnInvalidAPIKey(t *testing.T) {
+func Test_Checkin_EmptyPolicyOnInvalidAPIKey(t *testing.T) {
 	doCheckin := func(t *testing.T, ctx context.Context, srv *tserver, agentID, agentKey string) *http.Response {
 		t.Helper()
 		req, err := http.NewRequestWithContext(ctx, "POST",
@@ -1836,9 +1836,9 @@ func Test_Checkin_UnenrollOnInvalidAPIKey(t *testing.T) {
 		return res
 	}
 
-	t.Run("flag enabled: invalid key for real agent returns 200 with UNENROLL", func(t *testing.T) {
+	t.Run("flag enabled: invalid key for real agent returns 200 with POLICY_CHANGE", func(t *testing.T) {
 		srv, err := startTestServer(t, t.Context(), policyData, func(cfg *config.Config) error {
-			cfg.Inputs[0].Server.Features.UnenrollOnInvalidAPIKey = true
+			cfg.Inputs[0].Server.Features.EmptyPolicyOnInvalidAPIKey = true
 			return nil
 		})
 		require.NoError(t, err)
@@ -1864,11 +1864,15 @@ func Test_Checkin_UnenrollOnInvalidAPIKey(t *testing.T) {
 		var checkinResp api.CheckinResponse
 		require.NoError(t, json.Unmarshal(body, &checkinResp))
 
-		require.Len(t, checkinResp.Actions, 1, "expected exactly one UNENROLL action")
+		require.Len(t, checkinResp.Actions, 1, "expected exactly one POLICY_CHANGE action")
 		action := checkinResp.Actions[0]
-		assert.Equal(t, api.UNENROLL, action.Type)
+		assert.Equal(t, api.POLICYCHANGE, action.Type)
 		assert.Equal(t, agentID, action.AgentId)
 		assert.NotEmpty(t, action.Id)
+
+		pc, err := action.Data.AsActionPolicyChange()
+		require.NoError(t, err)
+		assert.Empty(t, pc.Policy.Inputs)
 	})
 
 	t.Run("flag disabled: unknown key returns 401", func(t *testing.T) {
