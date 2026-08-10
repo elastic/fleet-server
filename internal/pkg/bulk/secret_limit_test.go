@@ -63,11 +63,11 @@ func TestReadSecretsLimitsConcurrency(t *testing.T) {
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		_, errs[0] = b.ReadSecrets(context.Background(), []string{"id1"})
+		_, errs[0] = b.ReadSecrets(t.Context(), []string{"id1"})
 	}()
 	go func() {
 		defer wg.Done()
-		_, errs[1] = b.ReadSecrets(context.Background(), []string{"id2"})
+		_, errs[1] = b.ReadSecrets(t.Context(), []string{"id2"})
 	}()
 
 	require.Eventually(t, func() bool {
@@ -96,12 +96,12 @@ func TestReadSecretsContextCancelledWhileWaiting(t *testing.T) {
 	b := newTestBulkerWithTransport(t, mt, WithMaxConcurrentSecretReads(1))
 
 	// Manually hold the only semaphore slot so ReadSecrets must wait.
-	err := b.readSecretsLimit.Acquire(context.Background(), 1)
+	err := b.readSecretsLimit.Acquire(t.Context(), 1)
 	require.NoError(t, err)
 	defer b.readSecretsLimit.Release(1)
 
 	// Call ReadSecrets with an already-cancelled context.
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	_, err = b.ReadSecrets(ctx, []string{"id1"})
@@ -119,7 +119,7 @@ func TestReadSecretsNoLimitWhenZero(t *testing.T) {
 
 	require.Nil(t, b.readSecretsLimit)
 
-	_, err := b.ReadSecrets(context.Background(), []string{"id1"})
+	_, err := b.ReadSecrets(t.Context(), []string{"id1"})
 	require.NoError(t, err)
 }
 
@@ -143,7 +143,7 @@ func TestReadSecretsDefaultConcurrency(t *testing.T) {
 	var wg sync.WaitGroup
 	for i := range defaultMaxConcurrentSecretReads {
 		wg.Go(func() {
-			_, _ = b.ReadSecrets(context.Background(), []string{fmt.Sprintf("id%d", i)})
+			_, _ = b.ReadSecrets(t.Context(), []string{fmt.Sprintf("id%d", i)})
 		})
 	}
 
@@ -152,7 +152,7 @@ func TestReadSecretsDefaultConcurrency(t *testing.T) {
 	}, time.Second, time.Millisecond, "wait for all goroutines to enter the transport")
 
 	// The semaphore is now full; a cancelled-context acquire must return immediately.
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	err := b.readSecretsLimit.Acquire(ctx, 1)
 	require.ErrorIs(t, err, context.Canceled)
