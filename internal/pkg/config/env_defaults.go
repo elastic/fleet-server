@@ -10,8 +10,10 @@ import (
 	"io"
 	"io/fs"
 	"math"
+	"os"
 	"runtime"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"time"
 
@@ -294,7 +296,7 @@ func loadLimits(log *zerolog.Logger, agentLimit int) *envLimits {
 			log.Info().Msgf("Using system limits for %d to %d agents for a configured value of %d agents", l.Agents.Min, l.Agents.Max, agentLimit)
 			ramSize := memMB()
 			if ramSize < l.RecommendedRAM {
-				log.Warn().Msgf("Detected %d MB of available memory, which is lower than the recommended amount (%d MB) for the configured agent limit", ramSize, l.RecommendedRAM)
+				log.Warn().Msgf("Detected %d MiB of available memory, which is lower than the recommended amount (%d MiB) for the configured agent limit", ramSize, l.RecommendedRAM)
 			}
 			return l
 		}
@@ -303,15 +305,62 @@ func loadLimits(log *zerolog.Logger, agentLimit int) *envLimits {
 	return defaultEnvLimits()
 }
 
-// containerMemoryMB returns available memory in MiB, preferring the GOMEMLIMIT
-// runtime setting over host RAM so the ristretto cache is sized for the container,
-// not the node. Falls back to memory.TotalMemory() when GOMEMLIMIT is unset.
+// cgroupMemMB returns the cgroup memory limit in MiB.
+// It is a var so that unit tests can replace it.
+var cgroupMemMB func() (uint64, bool) = cgroupMemoryLimitMB
+
+// containerMemoryMB returns available memory in MiB using this priority order:
+//  1. GOMEMLIMIT, if explicitly set
+//  2. cgroup memory limit (v2, then v1), for containers without an explicit GOMEMLIMIT
+//  3. host total RAM, for non-containerised deployments
 func containerMemoryMB() uint64 {
 	limit := debug.SetMemoryLimit(-1)
 	if limit > 0 && limit != math.MaxInt64 {
 		return uint64(limit) / 1024 / 1024
 	}
+	if mb, ok := cgroupMemMB(); ok {
+		return mb
+	}
 	return memory.TotalMemory() / 1024 / 1024
+}
+
+// cgroupMemoryLimitMB reads the container memory limit from cgroup files.
+// It tries cgroup v2 first, then cgroup v1. This only checks the cgroup mount
+// root, so it does not account for limits imposed by nested cgroups. Returns
+// (0, false) when no applicable limit is found (unlimited, missing file, or
+// parse error).
+func cgroupMemoryLimitMB() (uint64, bool) {
+	if mb, ok := readCgroupMemoryFile("/sys/fs/cgroup/memory.max"); ok {
+		return mb, true
+	}
+	return readCgroupMemoryFile("/sys/fs/cgroup/memory/memory.limit_in_bytes")
+}
+
+// readCgroupMemoryFile parses a cgroup memory limit file and returns the
+// value in MiB. Returns (0, false) when the file doesn't exist, contains
+// "max" (unlimited), or the value is at or above cgroup v1's page-aligned
+// unlimited sentinel.
+func readCgroupMemoryFile(path string) (uint64, bool) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return 0, false
+	}
+	s := strings.TrimSpace(string(data))
+	if s == "max" {
+		return 0, false
+	}
+	n, err := strconv.ParseUint(s, 10, 64)
+	if err != nil || n >= cgroupV1UnlimitedMemoryLimit() {
+		return 0, false
+	}
+	return n / 1024 / 1024, true
+}
+
+// cgroupV1UnlimitedMemoryLimit is the value cgroup v1 exposes for an
+// unrestricted memory limit: MaxInt64 rounded down to the system page size.
+func cgroupV1UnlimitedMemoryLimit() uint64 {
+	pageSize := int64(os.Getpagesize())
+	return uint64(math.MaxInt64 / pageSize * pageSize) //nolint:gosec // the page-aligned result is always non-negative
 }
 
 // memMB returns available memory in MiB.
