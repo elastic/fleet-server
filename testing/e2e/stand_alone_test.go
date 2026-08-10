@@ -743,9 +743,26 @@ func (suite *StandAloneSuite) TestOpAMPWithUpstreamCollector() {
 //   - checkin_long_poll: 5s  (agent retries within seconds)
 //
 // The test observes only the elastic-agent's own log output — not fleet-server's API response —
-// to confirm the agent processes the UNENROLL action and stops running.
+// to confirm the agent processes the UNENROLL action and stops checking in.
 func (suite *StandAloneSuite) TestAgentUnenrollsOnInvalidAPIKey() {
-	ctx, cancel := context.WithTimeout(suite.T().Context(), 7*time.Minute)
+	dlCtx, dlCancel := context.WithTimeout(suite.T().Context(), 10*time.Minute)
+	defer dlCancel()
+	rc := downloadElasticAgent(dlCtx, suite.T(), suite.Client)
+	agentExtractDir := suite.T().TempDir()
+	var paths extractedPaths
+	switch runtime.GOOS {
+	case "darwin", "linux":
+		paths = extractTar(suite.T(), rc, agentExtractDir)
+	case "windows":
+		paths = extractZip(suite.T(), rc, agentExtractDir)
+	default:
+		suite.Require().Failf("Unsupported OS", "OS %s is unsupported for this test", runtime.GOOS)
+	}
+	rc.Close()
+	suite.Require().NotEmpty(paths.agentBinary, "elastic-agent binary not found in archive")
+	agentDir := filepath.Dir(paths.agentBinary)
+
+	ctx, cancel := context.WithTimeout(suite.T().Context(), 10*time.Minute)
 	defer cancel()
 
 	// Start fleet-server with the feature flag, 2 s API key cache, and 5 s checkin poll.
@@ -768,25 +785,9 @@ func (suite *StandAloneSuite) TestAgentUnenrollsOnInvalidAPIKey() {
 	fsCmd.Cancel = func() error { return fsCmd.Process.Signal(syscall.SIGTERM) }
 	fsCmd.Env = []string{"GOCOVERDIR=" + suite.CoverPath}
 	suite.Require().NoError(fsCmd.Start())
-	defer fsCmd.Wait()
+	suite.T().Cleanup(func() { fsCmd.Wait() })
 
 	suite.FleetServerStatusOK(ctx, "https://localhost:8220")
-
-	// Download the elastic-agent snapshot and extract it.
-	dlCtx, dlCancel := context.WithTimeout(ctx, 10*time.Minute)
-	defer dlCancel()
-	rc := downloadElasticAgent(dlCtx, suite.T(), suite.Client)
-	agentExtractDir := suite.T().TempDir()
-	var paths extractedPaths
-	switch runtime.GOOS {
-	case "darwin", "linux":
-		paths = extractTar(suite.T(), rc, agentExtractDir)
-	default:
-		suite.Require().Failf("Unsupported OS", "OS %s is unsupported for this test", runtime.GOOS)
-	}
-	rc.Close()
-	suite.Require().NotEmpty(paths.agentBinary, "elastic-agent binary not found in archive")
-	agentDir := filepath.Dir(paths.agentBinary)
 
 	// Enroll the agent against the running fleet-server (blocking one-shot command).
 	enrollmentToken := suite.GetEnrollmentTokenForPolicyID(ctx, "dummy-policy")
