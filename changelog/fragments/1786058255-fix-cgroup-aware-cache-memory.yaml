@@ -1,0 +1,10 @@
+kind: bug-fix
+
+summary: Read cgroup memory limit for cache sizing when GOMEMLIMIT is not set
+
+description: >
+  containerMemoryMB() now falls back to the cgroup memory limit (v2 then v1)
+  before host RAM. This ensures fleet-server is correctly sized for the
+  container even in deployments that do not explicitly set GOMEMLIMIT.
+
+component: fleet-server
