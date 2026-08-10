@@ -1839,6 +1839,8 @@ func Test_Checkin_EmptyPolicyOnInvalidAPIKey(t *testing.T) {
 	t.Run("flag enabled: invalid key for real agent returns 200 with POLICY_CHANGE", func(t *testing.T) {
 		srv, err := startTestServer(t, t.Context(), policyData, func(cfg *config.Config) error {
 			cfg.Inputs[0].Server.Features.EmptyPolicyOnInvalidAPIKey = true
+			cfg.Inputs[0].Server.Timeouts.CheckinLongPoll = 100 * time.Millisecond
+			cfg.Inputs[0].Server.Timeouts.CheckinJitter = 0
 			return nil
 		})
 		require.NoError(t, err)

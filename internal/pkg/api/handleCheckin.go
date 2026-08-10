@@ -156,7 +156,7 @@ func (ct *CheckinT) handleCheckin(zlog zerolog.Logger, w http.ResponseWriter, r 
 			invalidateAPIKeysOfInactiveAgent(ctx, zlog, ct.bulker, agent)
 		}
 		if ct.cfg.Features.EmptyPolicyOnInvalidAPIKey && isInvalidAPIKeyErr(err) {
-			return ct.writeEmptyPolicyResponse(zlog, w, id)
+			return ct.writeEmptyPolicyResponse(zlog, w, r, id)
 		}
 		return err
 	}
@@ -199,7 +199,23 @@ func isInvalidAPIKeyErr(err error) bool {
 // writeEmptyPolicyResponse writes a 200 check-in response containing a POLICY_CHANGE with an
 // empty policy. It is used when EmptyPolicyOnInvalidAPIKey is enabled and the agent's API key is
 // invalid.
-func (ct *CheckinT) writeEmptyPolicyResponse(zlog zerolog.Logger, w http.ResponseWriter, agentID string) error {
+//
+// To prevent a request storm (the agent re-checks in immediately after applying the empty policy,
+// receives another empty policy, and so on), the response is held for checkin_long_poll minus
+// jitter before being written — the same back-pressure the normal long-poll path applies.
+func (ct *CheckinT) writeEmptyPolicyResponse(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, agentID string) error {
+	// Hold the connection for the configured long-poll duration so the agent doesn't
+	// hammer fleet-server with back-to-back requests after its API key is invalidated.
+	pollDur := ct.cfg.Timeouts.CheckinLongPoll
+	if jitter := ct.cfg.Timeouts.CheckinJitter; jitter > 0 {
+		pollDur -= time.Duration(rand.Int63n(int64(jitter)))
+	}
+	select {
+	case <-r.Context().Done():
+		return r.Context().Err()
+	case <-time.After(pollDur):
+	}
+
 	u, err := uuid.NewV4()
 	if err != nil {
 		return err

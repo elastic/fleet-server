@@ -1139,9 +1139,10 @@ func TestWriteEmptyPolicyResponse(t *testing.T) {
 
 	agentID := "test-agent-id"
 	wr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/", nil)
 	logger := testlog.SetLogger(t)
 
-	err = ct.writeEmptyPolicyResponse(logger, wr, agentID)
+	err = ct.writeEmptyPolicyResponse(logger, wr, req, agentID)
 	require.NoError(t, err)
 
 	resp := wr.Result()
