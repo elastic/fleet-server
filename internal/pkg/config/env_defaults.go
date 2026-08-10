@@ -356,8 +356,8 @@ func cgroupMemoryLimitMB() (uint64, bool) {
 
 // readCgroupMemoryFile parses a cgroup memory limit file and returns the
 // value in MiB. Returns (0, false) when the file doesn't exist, contains
-// "max" (unlimited), or the value is at or above MaxInt64 (cgroup v1's
-// sentinel for unlimited).
+// "max" (unlimited), or the value is at or above cgroup v1's page-aligned
+// unlimited sentinel.
 func readCgroupMemoryFile(path string) (uint64, bool) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -368,10 +368,17 @@ func readCgroupMemoryFile(path string) (uint64, bool) {
 		return 0, false
 	}
 	n, err := strconv.ParseUint(s, 10, 64)
-	if err != nil || n >= math.MaxInt64 {
+	if err != nil || n >= cgroupV1UnlimitedMemoryLimit() {
 		return 0, false
 	}
 	return n / 1024 / 1024, true
+}
+
+// cgroupV1UnlimitedMemoryLimit is the value cgroup v1 exposes for an
+// unrestricted memory limit: MaxInt64 rounded down to the system page size.
+func cgroupV1UnlimitedMemoryLimit() uint64 {
+	pageSize := int64(os.Getpagesize())
+	return uint64(math.MaxInt64 / pageSize * pageSize) //nolint:gosec // the page-aligned result is always non-negative
 }
 
 // memMB returns available memory in MiB.

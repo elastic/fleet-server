@@ -11,6 +11,7 @@ import (
 	"os"
 	"reflect"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -150,8 +151,8 @@ func TestReadCgroupMemoryFile(t *testing.T) {
 		assert.False(t, ok)
 	})
 
-	t.Run("returns false for MaxInt64 sentinel (cgroup v1 unlimited)", func(t *testing.T) {
-		path := writeFile(t, "9223372036854775807\n") // math.MaxInt64
+	t.Run("returns false for the cgroup v1 unlimited sentinel", func(t *testing.T) {
+		path := writeFile(t, strconv.FormatUint(cgroupV1UnlimitedMemoryLimit(), 10)+"\n")
 		_, ok := readCgroupMemoryFile(path)
 		assert.False(t, ok)
 	})
