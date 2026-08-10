@@ -13,6 +13,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/stretchr/testify/require"
@@ -69,10 +70,9 @@ func TestReadSecretsLimitsConcurrency(t *testing.T) {
 		_, errs[1] = b.ReadSecrets(context.Background(), []string{"id2"})
 	}()
 
-	// Spin until at least one request is in the transport.
-	for mt.inFlight.Load() < 1 {
-		// wait for the first goroutine to enter the transport
-	}
+	require.Eventually(t, func() bool {
+		return mt.inFlight.Load() >= 1
+	}, time.Second, time.Millisecond, "wait for the first goroutine to enter the transport")
 
 	// With semaphore capacity 1, the second goroutine is blocked on Acquire
 	// and cannot have entered the transport yet.
@@ -147,10 +147,9 @@ func TestReadSecretsDefaultConcurrency(t *testing.T) {
 		})
 	}
 
-	// Spin until all slots are occupied.
-	for mt.inFlight.Load() < int64(defaultMaxConcurrentSecretReads) {
-		// wait for all goroutines to enter the transport
-	}
+	require.Eventually(t, func() bool {
+		return mt.inFlight.Load() >= int64(defaultMaxConcurrentSecretReads)
+	}, time.Second, time.Millisecond, "wait for all goroutines to enter the transport")
 
 	// The semaphore is now full; a cancelled-context acquire must return immediately.
 	ctx, cancel := context.WithCancel(context.Background())
