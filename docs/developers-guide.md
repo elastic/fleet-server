@@ -405,13 +405,15 @@ Elastic employees can create an Elastic Cloud Hosted (ECH) deployment with a loc
 To build a custom image and deploy it to ECH for manual testing:
 
 ```bash
-SNAPSHOT=true PLATFORMS=linux/amd64 DOCKER_IMAGE_TAG=my-custom-tag \
+export DOCKER_IMAGE=docker.elastic.co/beats-ci/elastic-agent-cloud-fleet
+export DOCKER_IMAGE_TAG=my-username-$(date +%s)
+SNAPSHOT=true PLATFORMS=linux/amd64 \
   EC_API_KEY=yourapikey mage docker:cover docker:customAgentImage docker:push test:cloudE2EUp
 # ... manual testing ...
-DOCKER_IMAGE_TAG=my-custom-tag EC_API_KEY=yourapikey mage test:cloudE2EDown
+EC_API_KEY=yourapikey mage test:cloudE2EDown
 ```
 
-`SNAPSHOT=true` and `PLATFORMS=linux/amd64` are required — ECH runs on `linux/amd64`, so omitting `PLATFORMS` on Apple Silicon will produce an `arm64` image that won't run in the deployment. Setting a consistent `DOCKER_IMAGE_TAG` ensures that `docker:customAgentImage`, `docker:push`, and `test:cloudE2EUp`/`test:cloudE2EDown` all refer to the same image.
+`SNAPSHOT=true` and `PLATFORMS=linux/amd64` build the required snapshot binary. The registry is shared, so choose a globally unique `DOCKER_IMAGE_TAG`; keeping the same `DOCKER_IMAGE` and tag in the shell session ensures that `docker:customAgentImage`, `docker:push`, `test:cloudE2EUp`, and `test:cloudE2EDown` all refer to the same image.
 
 These steps do the following:
 
@@ -430,4 +432,3 @@ EC_API_KEY=yourapikey mage test:cloudE2E
 ```
 
 If `mage test:cloudE2E` fails partway through, the deployment may be left running. Run `mage test:cloudE2EDown` to clean it up.
-
