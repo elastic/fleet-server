@@ -23,7 +23,12 @@ import (
 // and tracks how many requests are currently in-flight.
 type blockingTransport struct {
 	gate     chan struct{}
+	gateOnce sync.Once
 	inFlight atomic.Int64
+}
+
+func (m *blockingTransport) unblock() {
+	m.gateOnce.Do(func() { close(m.gate) })
 }
 
 func (m *blockingTransport) RoundTrip(_ *http.Request) (*http.Response, error) {
@@ -55,6 +60,7 @@ func newTestBulkerWithTransport(t *testing.T, transport http.RoundTripper, opts 
 // ReadSecrets callers.
 func TestReadSecretsLimitsConcurrency(t *testing.T) {
 	mt := &blockingTransport{gate: make(chan struct{})}
+	defer mt.unblock()
 	b := newTestBulkerWithTransport(t, mt, WithMaxConcurrentSecretReads(1))
 
 	var wg sync.WaitGroup
@@ -76,7 +82,7 @@ func TestReadSecretsLimitsConcurrency(t *testing.T) {
 	require.Equal(t, int64(1), mt.inFlight.Load())
 
 	// Unblock both goroutines and wait for them to finish.
-	close(mt.gate)
+	mt.unblock()
 	wg.Wait()
 
 	require.NoError(t, errs[0])
@@ -128,6 +134,7 @@ func TestReadSecretsNoLimitWhenZero(t *testing.T) {
 // returns context.Canceled immediately.
 func TestReadSecretsDefaultConcurrency(t *testing.T) {
 	mt := &blockingTransport{gate: make(chan struct{})}
+	defer mt.unblock()
 
 	// No WithMaxConcurrentSecretReads option → uses defaultMaxConcurrentSecretReads.
 	b := newTestBulkerWithTransport(t, mt)
@@ -155,6 +162,6 @@ func TestReadSecretsDefaultConcurrency(t *testing.T) {
 	require.ErrorIs(t, err, context.Canceled)
 
 	// Unblock all goroutines.
-	close(mt.gate)
+	mt.unblock()
 	wg.Wait()
 }
