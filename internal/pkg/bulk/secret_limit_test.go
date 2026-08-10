@@ -60,15 +60,12 @@ func TestReadSecretsLimitsConcurrency(t *testing.T) {
 	var wg sync.WaitGroup
 	errs := make([]error, 2)
 
-	wg.Add(2)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		_, errs[0] = b.ReadSecrets(t.Context(), []string{"id1"})
-	}()
-	go func() {
-		defer wg.Done()
+	})
+	wg.Go(func() {
 		_, errs[1] = b.ReadSecrets(t.Context(), []string{"id2"})
-	}()
+	})
 
 	require.Eventually(t, func() bool {
 		return mt.inFlight.Load() >= 1
