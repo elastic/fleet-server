@@ -8,8 +8,10 @@ import (
 	"io"
 	"io/fs"
 	"math"
+	"os"
 	"reflect"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -91,7 +93,7 @@ func TestDefaultLimitsYAMLKeys(t *testing.T) {
 }
 
 // TestContainerMemoryMB verifies that containerMemoryMB prefers GOMEMLIMIT over
-// host RAM so the ristretto cache is sized for the container, not the node.
+// host RAM so fleet-server is correctly sized for the container, not the node.
 func TestContainerMemoryMB(t *testing.T) {
 	t.Run("uses GOMEMLIMIT when set", func(t *testing.T) {
 		const setLimit = int64(256 * 1024 * 1024) // 256 MiB
@@ -102,11 +104,67 @@ func TestContainerMemoryMB(t *testing.T) {
 		assert.Equal(t, uint64(256), got)
 	})
 
-	t.Run("falls back to host RAM when GOMEMLIMIT is unset", func(t *testing.T) {
+	t.Run("uses cgroup limit when GOMEMLIMIT is unset", func(t *testing.T) {
 		prev := debug.SetMemoryLimit(math.MaxInt64)
 		t.Cleanup(func() { debug.SetMemoryLimit(prev) })
+		prevCgroup := cgroupMemMB
+		cgroupMemMB = func() (uint64, bool) { return 128, true }
+		t.Cleanup(func() { cgroupMemMB = prevCgroup })
+
+		got := containerMemoryMB()
+		assert.Equal(t, uint64(128), got)
+	})
+
+	t.Run("falls back to host RAM when GOMEMLIMIT and cgroup are both unset", func(t *testing.T) {
+		prev := debug.SetMemoryLimit(math.MaxInt64)
+		t.Cleanup(func() { debug.SetMemoryLimit(prev) })
+		prevCgroup := cgroupMemMB
+		cgroupMemMB = func() (uint64, bool) { return 0, false }
+		t.Cleanup(func() { cgroupMemMB = prevCgroup })
 
 		got := containerMemoryMB()
 		assert.Equal(t, memory.TotalMemory()/1024/1024, got)
+	})
+}
+
+func TestReadCgroupMemoryFile(t *testing.T) {
+	writeFile := func(t *testing.T, content string) string {
+		t.Helper()
+		f, err := os.CreateTemp(t.TempDir(), "cgroup-memory-*")
+		require.NoError(t, err)
+		_, err = f.WriteString(content)
+		require.NoError(t, err)
+		require.NoError(t, f.Close())
+		return f.Name()
+	}
+
+	t.Run("returns MiB for a valid byte limit", func(t *testing.T) {
+		path := writeFile(t, "134217728\n") // 128 MiB
+		mb, ok := readCgroupMemoryFile(path)
+		assert.True(t, ok)
+		assert.Equal(t, uint64(128), mb)
+	})
+
+	t.Run("returns false for 'max' (unlimited)", func(t *testing.T) {
+		path := writeFile(t, "max\n")
+		_, ok := readCgroupMemoryFile(path)
+		assert.False(t, ok)
+	})
+
+	t.Run("returns false for the cgroup v1 unlimited sentinel", func(t *testing.T) {
+		path := writeFile(t, strconv.FormatUint(cgroupV1UnlimitedMemoryLimit(), 10)+"\n")
+		_, ok := readCgroupMemoryFile(path)
+		assert.False(t, ok)
+	})
+
+	t.Run("returns false when file does not exist", func(t *testing.T) {
+		_, ok := readCgroupMemoryFile("/nonexistent/cgroup/memory.max")
+		assert.False(t, ok)
+	})
+
+	t.Run("returns false for invalid content", func(t *testing.T) {
+		path := writeFile(t, "not-a-number\n")
+		_, ok := readCgroupMemoryFile(path)
+		assert.False(t, ok)
 	})
 }
