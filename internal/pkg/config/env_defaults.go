@@ -345,8 +345,10 @@ func containerMemoryMB() uint64 {
 }
 
 // cgroupMemoryLimitMB reads the container memory limit from cgroup files.
-// It tries cgroup v2 first, then cgroup v1. Returns (0, false) when no
-// applicable limit is found (unlimited, missing file, or parse error).
+// It tries cgroup v2 first, then cgroup v1. This only checks the cgroup mount
+// root, so it does not account for limits imposed by nested cgroups. Returns
+// (0, false) when no applicable limit is found (unlimited, missing file, or
+// parse error).
 func cgroupMemoryLimitMB() (uint64, bool) {
 	if mb, ok := readCgroupMemoryFile("/sys/fs/cgroup/memory.max"); ok {
 		return mb, true
