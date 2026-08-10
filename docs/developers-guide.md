@@ -413,7 +413,7 @@ SNAPSHOT=true PLATFORMS=linux/amd64 \
 EC_API_KEY=yourapikey mage test:cloudE2EDown
 ```
 
-`SNAPSHOT=true` and `PLATFORMS=linux/amd64` build the required snapshot binary. The registry is shared, so choose a globally unique `DOCKER_IMAGE_TAG`; keeping the same `DOCKER_IMAGE` and tag in the shell session ensures that `docker:customAgentImage`, `docker:push`, `test:cloudE2EUp`, and `test:cloudE2EDown` all refer to the same image.
+Run this workflow from an `amd64` host: `docker:customAgentImage` creates an image for the host architecture, while ECH runs on `linux/amd64`. `SNAPSHOT=true` and `PLATFORMS=linux/amd64` build the required snapshot binary. The registry is shared, so choose a globally unique `DOCKER_IMAGE_TAG`; keeping the same `DOCKER_IMAGE` and tag in the shell session ensures that `docker:customAgentImage`, `docker:push`, `test:cloudE2EUp`, and `test:cloudE2EDown` all refer to the same image.
 
 These steps do the following:
 
