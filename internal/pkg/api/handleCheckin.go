@@ -239,7 +239,7 @@ func (ct *CheckinT) RunInvalidKeyStateCleaner(ctx context.Context) error {
 }
 
 // handleInvalidAPIKey implements a three-step escalation for agents that repeatedly check in
-// with an invalid API key when GracefulUnenrollOnInvalidAPIKey is enabled:
+// with an invalid API key when GracefulForceUnenroll is enabled:
 //
 //  1. First occurrence  → POLICY_CHANGE with empty policy (agent stops all inputs).
 //  2. Second occurrence → UNENROLL action (agent begins unenroll flow).

@@ -734,7 +734,7 @@ func (suite *StandAloneSuite) TestOpAMPWithUpstreamCollector() {
 	suite.Contains(agentDoc.Tags, "otelcontribcol", "expected tags to contain otelcontribcol")
 }
 
-// TestAgentUnenrollsOnInvalidAPIKey exercises the full three-step escalation that fleet-server
+// TestAgentGracefulForceUnenroll exercises the full three-step escalation that fleet-server
 // applies when an agent checks in with an invalidated API key and the
 // graceful_force_unenroll.enabled feature flag is enabled:
 //
@@ -747,7 +747,7 @@ func (suite *StandAloneSuite) TestOpAMPWithUpstreamCollector() {
 //   - graceful_force_unenroll.enabled: true
 //   - ttl_api_key: 2s  (cache expires quickly after key invalidation)
 //   - checkin_long_poll: 5s  (controls how fast the agent retries after step 1)
-func (suite *StandAloneSuite) TestAgentGracefulUnenrollOnInvalidAPIKey() {
+func (suite *StandAloneSuite) TestAgentGracefulForceUnenroll() {
 	dlCtx, dlCancel := context.WithTimeout(suite.T().Context(), 10*time.Minute)
 	defer dlCancel()
 	rc := downloadElasticAgent(dlCtx, suite.T(), suite.Client)
