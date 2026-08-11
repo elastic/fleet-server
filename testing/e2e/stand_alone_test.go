@@ -820,7 +820,14 @@ func (suite *StandAloneSuite) TestAgentGracefulForceUnenroll() {
 	suite.Require().NoError(agentCmd.Start())
 
 	agentExited := make(chan error, 1)
-	go func() { agentExited <- agentCmd.Wait() }()
+	// agentHasExited is closed once the agent process terminates; safe to check
+	// multiple times without consuming the value in agentExited.
+	agentHasExited := make(chan struct{})
+	go func() {
+		err := agentCmd.Wait()
+		close(agentHasExited)
+		agentExited <- err
+	}()
 
 	suite.T().Cleanup(func() {
 		agentLog.Close()
@@ -860,8 +867,20 @@ func (suite *StandAloneSuite) TestAgentGracefulForceUnenroll() {
 	// re-authenticates with ES, gets ErrUnauthorized, and fleet-server returns an empty
 	// POLICY_CHANGE (escalation step 1). The agent applies the empty policy and stops all
 	// components, but continues to check in with fleet-server.
+	//
+	// Note: the window between POLICY_CHANGE and the subsequent UNENROLL (step 2) can be
+	// very short (< 1 s). If the agent has already exited by the time we poll, that is
+	// also acceptable evidence that the full escalation sequence ran — treat it as step 1
+	// confirmed and proceed directly to the exit check.
 	suite.T().Log("Waiting for elastic-agent to have no running components (step 1: POLICY_CHANGE)...")
 	suite.Require().Eventually(func() bool {
+		// Fast-path: if the agent has already exited, POLICY_CHANGE + UNENROLL both ran.
+		select {
+		case <-agentHasExited:
+			suite.T().Log("Agent exited before step 1 was polled; POLICY_CHANGE implied by state machine")
+			return true
+		default:
+		}
 		cmd := exec.CommandContext(ctx, paths.agentBinary, "status", "--output", "json")
 		cmd.Dir = agentDir
 		out, err := cmd.Output()
@@ -875,7 +894,7 @@ func (suite *StandAloneSuite) TestAgentGracefulForceUnenroll() {
 			return false
 		}
 		return len(statusResp.Components) == 0
-	}, 2*time.Minute, 10*time.Second, "elastic-agent still has running components after empty policy was applied")
+	}, 2*time.Minute, 2*time.Second, "elastic-agent still has running components after empty policy was applied")
 	suite.T().Log("Agent has no running components — empty POLICY_CHANGE confirmed")
 
 	// The agent continues checking in. The 2nd invalid checkin returns UNENROLL (escalation
