@@ -1,3 +1,0 @@
-kind: security
-summary: Treat output names as parameters in Elasticsearch update scripts
-component: fleet-server
