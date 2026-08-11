@@ -1181,11 +1181,10 @@ func TestHandleInvalidAPIKey_Escalation(t *testing.T) {
 	const agentID = "escalation-agent"
 	logger := testlog.SetLogger(t)
 	origErr := apikey.ErrUnauthorized
-	req := httptest.NewRequest(http.MethodPost, "/", nil)
 
 	call := func() (ActionType, error) {
 		wr := httptest.NewRecorder()
-		herr := ct.handleInvalidAPIKey(logger, wr, req, agentID, origErr)
+		herr := ct.handleInvalidAPIKey(logger, wr, agentID, origErr)
 		if herr != nil {
 			return "", herr
 		}
