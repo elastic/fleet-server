@@ -1818,13 +1818,13 @@ func TestCheckinOTelColPolicy(t *testing.T) {
 	assert.Equal(t, encodedApiKey, exporter.ApiKey)
 }
 
-// Test_Checkin_GracefulUnenrollOnInvalidAPIKey verifies the three-step state machine that runs when
-// the GracefulUnenrollOnInvalidAPIKey feature flag is enabled and an agent checks in with an invalid key:
+// Test_Checkin_GracefulForceUnenroll verifies the three-step state machine that runs when
+// the GracefulForceUnenroll feature is enabled and an agent checks in with an invalid key:
 //
 //	1st call → HTTP 200 + POLICY_CHANGE (empty policy, stops all agent inputs)
 //	2nd call → HTTP 200 + UNENROLL
 //	3rd+ call → HTTP 401 (original error passed through)
-func Test_Checkin_GracefulUnenrollOnInvalidAPIKey(t *testing.T) {
+func Test_Checkin_GracefulForceUnenroll(t *testing.T) {
 	doCheckin := func(t *testing.T, ctx context.Context, srv *tserver, agentID, agentKey string) *http.Response {
 		t.Helper()
 		req, err := http.NewRequestWithContext(ctx, "POST",
@@ -1841,7 +1841,7 @@ func Test_Checkin_GracefulUnenrollOnInvalidAPIKey(t *testing.T) {
 
 	t.Run("flag enabled: escalation through state machine", func(t *testing.T) {
 		srv, err := startTestServer(t, t.Context(), policyData, func(cfg *config.Config) error {
-			cfg.Inputs[0].Server.Features.GracefulUnenrollOnInvalidAPIKey = true
+			cfg.Inputs[0].Server.Features.GracefulForceUnenroll.Enabled = true
 			return nil
 		})
 		require.NoError(t, err)

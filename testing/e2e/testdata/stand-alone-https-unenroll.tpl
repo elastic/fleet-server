@@ -20,6 +20,7 @@ inputs:
       checkin_long_poll: 5s
       checkin_jitter: 0s
     feature_flags:
-      graceful_unenroll_on_invalid_api_key: true
+      graceful_force_unenroll:
+        enabled: true
 logging:
   to_stderr: true

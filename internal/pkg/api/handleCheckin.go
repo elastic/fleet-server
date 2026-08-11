@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"compress/flate"
 	"compress/gzip"
+	"container/list"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -60,6 +61,8 @@ const (
 
 	invalidKeyStateReset         = time.Hour
 	invalidKeyStateCleanInterval = 5 * time.Minute
+
+	invalidKeyLRUEntryBytes = 250
 )
 
 // validActionTypes is a map of action.type and if they are valid
@@ -102,9 +105,10 @@ type CheckinT struct {
 	bulker                         bulk.Bulk
 	outputSecretCandidateCollector policy.OutputSecretCandidateCollector
 
-	// invalidKeyStates tracks per-agent invalid-API-key state for the GracefulUnenrollOnInvalidAPIKey
-	// feature. Entries expire and are removed after invalidKeyStateReset.
-	invalidKeyStates sync.Map
+	// invalidKeyStates is a memory-bounded LRU that tracks per-agent invalid-API-key escalation
+	// state for the GracefulForceUnenroll feature. Its cap is set by
+	// cfg.Features.GracefulForceUnenroll.MaxBytes (default 50 MB, ~200,000 entries).
+	invalidKeyStates *invalidKeyLRU
 }
 
 // CheckinOption configures check-in handling.
@@ -151,7 +155,8 @@ func NewCheckinT(
 				return zipper
 			},
 		},
-		bulker: bulker,
+		bulker:           bulker,
+		invalidKeyStates: newInvalidKeyLRU(cfg.Features.GracefulForceUnenroll.MaxBytes),
 	}
 	for _, opt := range opts {
 		opt(ct)
@@ -170,7 +175,7 @@ func (ct *CheckinT) handleCheckin(zlog zerolog.Logger, w http.ResponseWriter, r 
 			ctx := zlog.WithContext(r.Context())
 			invalidateAPIKeysOfInactiveAgent(ctx, zlog, ct.bulker, agent)
 		}
-		if ct.cfg.Features.GracefulUnenrollOnInvalidAPIKey && isInvalidAPIKeyErr(err) {
+		if ct.cfg.Features.GracefulForceUnenroll.Enabled && isInvalidAPIKeyErr(err) {
 			return ct.handleInvalidAPIKey(zlog, w, r, id, err)
 		}
 		return err
@@ -211,18 +216,15 @@ func isInvalidAPIKeyErr(err error) bool {
 		errors.Is(err, ErrAgentInactive)
 }
 
-// ClearInvalidKeyStates removes all entries from the invalid-key state map, resetting every
+// ClearInvalidKeyStates removes all entries from the invalid-key LRU, resetting every
 // agent's escalation sequence back to the beginning. Intended for testing.
 func (ct *CheckinT) ClearInvalidKeyStates() {
-	ct.invalidKeyStates.Range(func(key, _ any) bool {
-		ct.invalidKeyStates.Delete(key)
-		return true
-	})
+	ct.invalidKeyStates.Clear()
 }
 
-// RunInvalidKeyStateCleaner periodically removes stale entries from the invalid-key state map.
-// Entries that have not triggered a new checkin within invalidKeyStateReset are discarded so
-// that the map does not grow unboundedly for agents that stop communicating after unenrolling.
+// RunInvalidKeyStateCleaner periodically evicts entries from the invalid-key LRU whose
+// escalation window has expired, freeing memory for agents that stopped communicating after
+// being unenrolled. Eviction also happens on insert when the LRU is full.
 func (ct *CheckinT) RunInvalidKeyStateCleaner(ctx context.Context) error {
 	t := time.NewTicker(invalidKeyStateCleanInterval)
 	defer t.Stop()
@@ -231,13 +233,7 @@ func (ct *CheckinT) RunInvalidKeyStateCleaner(ctx context.Context) error {
 		case <-ctx.Done():
 			return nil
 		case now := <-t.C:
-			ct.invalidKeyStates.Range(func(key, value any) bool {
-				s := value.(invalidKeyState)
-				if now.Sub(s.firstSeen) >= invalidKeyStateReset {
-					ct.invalidKeyStates.Delete(key)
-				}
-				return true
-			})
+			ct.invalidKeyStates.CleanExpired(now.Add(-invalidKeyStateReset))
 		}
 	}
 }
@@ -254,8 +250,8 @@ func (ct *CheckinT) handleInvalidAPIKey(zlog zerolog.Logger, w http.ResponseWrit
 	now := time.Now()
 
 	var s invalidKeyState
-	if v, ok := ct.invalidKeyStates.Load(agentID); ok {
-		s = v.(invalidKeyState)
+	if loaded, ok := ct.invalidKeyStates.Load(agentID); ok {
+		s = loaded
 		if now.Sub(s.firstSeen) >= invalidKeyStateReset {
 			ct.invalidKeyStates.Delete(agentID)
 			s = invalidKeyState{}
@@ -1492,4 +1488,111 @@ func (ct *CheckinT) processPolicyDetails(ctx context.Context, zlog zerolog.Logge
 		}
 	}
 	return revisionIDX, opts, nil
+}
+
+// invalidKeyLRUEntry is the value stored in each list node of the LRU.
+type invalidKeyLRUEntry struct {
+	agentID string
+	state   invalidKeyState
+}
+
+// invalidKeyLRU is a memory-bounded LRU cache for per-agent invalid-key escalation state.
+// When the cap is reached the least-recently-used entry is evicted, resetting that agent's
+// escalation sequence back to step 1 (POLICY_CHANGE) on its next check-in.
+type invalidKeyLRU struct {
+	mu       sync.Mutex
+	maxBytes int64
+	used     int64
+	l        *list.List
+	items    map[string]*list.Element
+}
+
+func newInvalidKeyLRU(maxBytes int64) *invalidKeyLRU {
+	if maxBytes <= 0 {
+		maxBytes = config.DefaultGracefulForceUnenrollMaxBytes
+	}
+	return &invalidKeyLRU{
+		maxBytes: maxBytes,
+		l:        list.New(),
+		items:    make(map[string]*list.Element),
+	}
+}
+
+func (c *invalidKeyLRU) Load(agentID string) (invalidKeyState, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	el, ok := c.items[agentID]
+	if !ok {
+		return invalidKeyState{}, false
+	}
+	c.l.MoveToFront(el)
+	return el.Value.(*invalidKeyLRUEntry).state, true
+}
+
+func (c *invalidKeyLRU) Store(agentID string, s invalidKeyState) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if el, ok := c.items[agentID]; ok {
+		el.Value.(*invalidKeyLRUEntry).state = s
+		c.l.MoveToFront(el)
+		return
+	}
+	for c.used+invalidKeyLRUEntryBytes > c.maxBytes && c.l.Len() > 0 {
+		c.evictOldest()
+	}
+	el := c.l.PushFront(&invalidKeyLRUEntry{agentID: agentID, state: s})
+	c.items[agentID] = el
+	c.used += invalidKeyLRUEntryBytes
+}
+
+func (c *invalidKeyLRU) Delete(agentID string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.delete(agentID)
+}
+
+// delete removes an entry by agentID. Must be called with c.mu held.
+func (c *invalidKeyLRU) delete(agentID string) {
+	el, ok := c.items[agentID]
+	if !ok {
+		return
+	}
+	c.l.Remove(el)
+	delete(c.items, agentID)
+	c.used -= invalidKeyLRUEntryBytes
+}
+
+// evictOldest removes the least-recently-used entry. Must be called with c.mu held.
+func (c *invalidKeyLRU) evictOldest() {
+	el := c.l.Back()
+	if el == nil {
+		return
+	}
+	c.l.Remove(el)
+	delete(c.items, el.Value.(*invalidKeyLRUEntry).agentID)
+	c.used -= invalidKeyLRUEntryBytes
+}
+
+// CleanExpired removes all entries whose firstSeen is not after cutoff.
+func (c *invalidKeyLRU) CleanExpired(cutoff time.Time) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	var expired []string
+	for agentID, el := range c.items {
+		if !el.Value.(*invalidKeyLRUEntry).state.firstSeen.After(cutoff) {
+			expired = append(expired, agentID)
+		}
+	}
+	for _, id := range expired {
+		c.delete(id)
+	}
+}
+
+// Clear removes all entries, resetting every agent's escalation state.
+func (c *invalidKeyLRU) Clear() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.l.Init()
+	c.items = make(map[string]*list.Element)
+	c.used = 0
 }

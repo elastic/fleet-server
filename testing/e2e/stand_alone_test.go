@@ -736,7 +736,7 @@ func (suite *StandAloneSuite) TestOpAMPWithUpstreamCollector() {
 
 // TestAgentUnenrollsOnInvalidAPIKey exercises the full three-step escalation that fleet-server
 // applies when an agent checks in with an invalidated API key and the
-// graceful_unenroll_on_invalid_api_key feature flag is enabled:
+// graceful_force_unenroll.enabled feature flag is enabled:
 //
 //  1. 1st invalid checkin → fleet-server returns POLICY_CHANGE with empty policy.
 //     The agent stops all running components.
@@ -744,7 +744,7 @@ func (suite *StandAloneSuite) TestOpAMPWithUpstreamCollector() {
 //     The agent disenrolls and exits.
 //
 // Fleet-server runs with:
-//   - graceful_unenroll_on_invalid_api_key: true
+//   - graceful_force_unenroll.enabled: true
 //   - ttl_api_key: 2s  (cache expires quickly after key invalidation)
 //   - checkin_long_poll: 5s  (controls how fast the agent retries after step 1)
 func (suite *StandAloneSuite) TestAgentGracefulUnenrollOnInvalidAPIKey() {

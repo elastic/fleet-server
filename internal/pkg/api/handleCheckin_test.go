@@ -1131,7 +1131,7 @@ func TestIsInvalidAPIKeyErr(t *testing.T) {
 	}
 }
 
-func TestWritePolicyChangeResponse(t *testing.T) {
+func TestWriteEmptyPolicyChangeResponse(t *testing.T) {
 	verCon := mustBuildConstraints("8.0.0")
 	cfg := &config.Server{}
 	ct, err := NewCheckinT(verCon, cfg, nil, nil, nil, nil, nil, ftesting.NewMockBulk())
@@ -1214,9 +1214,8 @@ func TestHandleInvalidAPIKey_Escalation(t *testing.T) {
 	assert.ErrorIs(t, err, origErr)
 
 	// Simulate state expiry by backdating firstSeen.
-	s, ok := ct.invalidKeyStates.Load(agentID)
+	state, ok := ct.invalidKeyStates.Load(agentID)
 	require.True(t, ok)
-	state := s.(invalidKeyState)
 	state.firstSeen = time.Now().Add(-(invalidKeyStateReset + time.Second))
 	ct.invalidKeyStates.Store(agentID, state)
 
@@ -1232,7 +1231,7 @@ func makeAPIKeyAuthHeader(id, secret string) string {
 	return "ApiKey " + token
 }
 
-func TestHandleCheckin_GracefulUnenrollOnInvalidAPIKey(t *testing.T) {
+func TestHandleCheckin_GracefulForceUnenroll(t *testing.T) {
 	const agentID = "test-agent-id"
 
 	tests := []struct {
@@ -1283,7 +1282,9 @@ func TestHandleCheckin_GracefulUnenrollOnInvalidAPIKey(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			cfg := &config.Server{
 				Features: config.FeatureFlags{
-					GracefulUnenrollOnInvalidAPIKey: tc.flagEnabled,
+					GracefulForceUnenroll: config.GracefulForceUnenrollConfig{
+						Enabled: tc.flagEnabled,
+					},
 				},
 			}
 
