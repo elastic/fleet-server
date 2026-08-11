@@ -1,17 +1,21 @@
 kind: enhancement
 
-summary: Add empty_policy_on_invalid_api_key feature flag to silence agents with invalid API keys
+summary: Add graceful_unenroll_on_invalid_api_key feature flag to gracefully unenroll agents with invalid API keys
 
 description: |
-  Fleet Server now supports a new feature flag `empty_policy_on_invalid_api_key`
-  under `inputs[].server.feature_flags`. When enabled, a checkin request that
-  arrives with an invalid, expired, or disabled API key returns HTTP 200 with
-  a POLICY_CHANGE action carrying an empty policy instead of the default HTTP 401
-  response.
+  Fleet Server now supports a new feature flag `graceful_unenroll_on_invalid_api_key`
+  under `inputs[].server.feature_flags`. When enabled, a checkin request that arrives
+  with an invalid, expired, or disabled API key triggers a three-step escalation instead
+  of the default HTTP 401 response:
 
-  The empty policy causes the agent to stop all inputs.
+  1. First occurrence: HTTP 200 with a POLICY_CHANGE action carrying an empty policy,
+     causing the agent to stop all running inputs.
+  2. Second occurrence: HTTP 200 with an UNENROLL action, causing the agent to
+     disenroll itself and exit.
+  3. Third and subsequent occurrences: HTTP 401 pass-through for up to one hour,
+     after which the cycle resets from step 1.
 
-  The flag is disabled by default; existing behaviour is unchanged unless it
-  is explicitly set to `true` in the configuration.
+  The flag is disabled by default; existing behaviour is unchanged unless it is
+  explicitly set to `true` in the configuration.
 
 component: fleet-server

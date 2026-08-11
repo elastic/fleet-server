@@ -103,10 +103,11 @@ type (
 		// EnableOpAMP controls whether the OpAMP endpoint is enabled. Defaults to true.
 		EnableOpAMP bool `config:"enable_opamp"`
 
-		// EmptyPolicyOnInvalidAPIKey when true will return a 200 with a POLICY_CHANGE action carrying
-		// an empty policy instead of a 401 when an agent checks in with an invalid or disabled API key.
-		// This causes the agent to stop all inputs.
-		EmptyPolicyOnInvalidAPIKey bool `config:"empty_policy_on_invalid_api_key"`
+		// GracefulUnenrollOnInvalidAPIKey when true activates a three-step escalation for agents
+		// that check in with an invalid or disabled API key: (1) POLICY_CHANGE with empty policy
+		// to stop all inputs, (2) UNENROLL to disenroll the agent, (3) pass-through 401 for up
+		// to one hour, then the cycle resets.
+		GracefulUnenrollOnInvalidAPIKey bool `config:"graceful_unenroll_on_invalid_api_key"`
 	}
 )
 

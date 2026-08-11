@@ -1232,7 +1232,7 @@ func makeAPIKeyAuthHeader(id, secret string) string {
 	return "ApiKey " + token
 }
 
-func TestHandleCheckin_EmptyPolicyOnInvalidAPIKey(t *testing.T) {
+func TestHandleCheckin_GracefulUnenrollOnInvalidAPIKey(t *testing.T) {
 	const agentID = "test-agent-id"
 
 	tests := []struct {
@@ -1283,7 +1283,7 @@ func TestHandleCheckin_EmptyPolicyOnInvalidAPIKey(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			cfg := &config.Server{
 				Features: config.FeatureFlags{
-					EmptyPolicyOnInvalidAPIKey: tc.flagEnabled,
+					GracefulUnenrollOnInvalidAPIKey: tc.flagEnabled,
 				},
 			}
 

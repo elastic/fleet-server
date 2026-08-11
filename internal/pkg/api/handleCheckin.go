@@ -102,7 +102,7 @@ type CheckinT struct {
 	bulker                         bulk.Bulk
 	outputSecretCandidateCollector policy.OutputSecretCandidateCollector
 
-	// invalidKeyStates tracks per-agent invalid-API-key state for the EmptyPolicyOnInvalidAPIKey
+	// invalidKeyStates tracks per-agent invalid-API-key state for the GracefulUnenrollOnInvalidAPIKey
 	// feature. Entries expire and are removed after invalidKeyStateReset.
 	invalidKeyStates sync.Map
 }
@@ -170,7 +170,7 @@ func (ct *CheckinT) handleCheckin(zlog zerolog.Logger, w http.ResponseWriter, r 
 			ctx := zlog.WithContext(r.Context())
 			invalidateAPIKeysOfInactiveAgent(ctx, zlog, ct.bulker, agent)
 		}
-		if ct.cfg.Features.EmptyPolicyOnInvalidAPIKey && isInvalidAPIKeyErr(err) {
+		if ct.cfg.Features.GracefulUnenrollOnInvalidAPIKey && isInvalidAPIKeyErr(err) {
 			return ct.handleInvalidAPIKey(zlog, w, r, id, err)
 		}
 		return err
@@ -243,7 +243,7 @@ func (ct *CheckinT) RunInvalidKeyStateCleaner(ctx context.Context) error {
 }
 
 // handleInvalidAPIKey implements a three-step escalation for agents that repeatedly check in
-// with an invalid API key when EmptyPolicyOnInvalidAPIKey is enabled:
+// with an invalid API key when GracefulUnenrollOnInvalidAPIKey is enabled:
 //
 //  1. First occurrence  → POLICY_CHANGE with empty policy (agent stops all inputs).
 //  2. Second occurrence → UNENROLL action (agent begins unenroll flow).
