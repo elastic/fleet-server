@@ -176,7 +176,7 @@ func (ct *CheckinT) handleCheckin(zlog zerolog.Logger, w http.ResponseWriter, r 
 			invalidateAPIKeysOfInactiveAgent(ctx, zlog, ct.bulker, agent)
 		}
 		if ct.cfg.Features.GracefulForceUnenroll.Enabled && isInvalidAPIKeyErr(err) {
-			return ct.handleInvalidAPIKey(zlog, w, r, id, err)
+			return ct.handleInvalidAPIKey(zlog, w, id, err)
 		}
 		return err
 	}
@@ -246,7 +246,7 @@ func (ct *CheckinT) RunInvalidKeyStateCleaner(ctx context.Context) error {
 //  3. Third+ occurrence → pass the original 401 error through for up to one hour.
 //
 // After invalidKeyStateReset the per-agent state is cleared and the cycle restarts.
-func (ct *CheckinT) handleInvalidAPIKey(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, agentID string, origErr error) error {
+func (ct *CheckinT) handleInvalidAPIKey(zlog zerolog.Logger, w http.ResponseWriter, agentID string, origErr error) error {
 	now := time.Now()
 
 	var s invalidKeyState
@@ -1526,14 +1526,14 @@ func (c *invalidKeyLRU) Load(agentID string) (invalidKeyState, bool) {
 		return invalidKeyState{}, false
 	}
 	c.l.MoveToFront(el)
-	return el.Value.(*invalidKeyLRUEntry).state, true
+	return mustEntry(el).state, true
 }
 
 func (c *invalidKeyLRU) Store(agentID string, s invalidKeyState) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if el, ok := c.items[agentID]; ok {
-		el.Value.(*invalidKeyLRUEntry).state = s
+		mustEntry(el).state = s
 		c.l.MoveToFront(el)
 		return
 	}
@@ -1569,7 +1569,7 @@ func (c *invalidKeyLRU) evictOldest() {
 		return
 	}
 	c.l.Remove(el)
-	delete(c.items, el.Value.(*invalidKeyLRUEntry).agentID)
+	delete(c.items, mustEntry(el).agentID)
 	c.used -= invalidKeyLRUEntryBytes
 }
 
@@ -1579,7 +1579,7 @@ func (c *invalidKeyLRU) CleanExpired(cutoff time.Time) {
 	defer c.mu.Unlock()
 	var expired []string
 	for agentID, el := range c.items {
-		if !el.Value.(*invalidKeyLRUEntry).state.firstSeen.After(cutoff) {
+		if !mustEntry(el).state.firstSeen.After(cutoff) {
 			expired = append(expired, agentID)
 		}
 	}
@@ -1595,4 +1595,12 @@ func (c *invalidKeyLRU) Clear() {
 	c.l.Init()
 	c.items = make(map[string]*list.Element)
 	c.used = 0
+}
+
+func mustEntry(el *list.Element) *invalidKeyLRUEntry {
+	entry, ok := el.Value.(*invalidKeyLRUEntry)
+	if !ok {
+		panic("invalidKeyLRU: unexpected list element type")
+	}
+	return entry
 }
