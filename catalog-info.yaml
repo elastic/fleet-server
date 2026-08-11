@@ -12,7 +12,7 @@ metadata:
 
 spec:
   type: tool
-  owner: group:ingest-fp
+  owner: group:Streams
   system: platform-ingest
   lifecycle: production
   dependsOn:
@@ -33,7 +33,7 @@ metadata:
 
 spec:
   type: buildkite-pipeline
-  owner: group:ingest-fp
+  owner: group:Streams
   system: buildkite
   implementation:
     apiVersion: buildkite.elastic.dev/v1
@@ -63,7 +63,7 @@ spec:
         SLACK_NOTIFICATIONS_ALL_BRANCHES: 'false'
         SLACK_NOTIFICATIONS_ON_SUCCESS: 'false'
       teams:
-        ingest-fp:
+        Streams:
           access_level: MANAGE_BUILD_AND_READ
         observablt-ci:
           access_level: MANAGE_BUILD_AND_READ
@@ -85,7 +85,7 @@ metadata:
 
 spec:
   type: buildkite-pipeline
-  owner: group:ingest-fp
+  owner: group:Streams
   system: buildkite
   implementation:
     apiVersion: buildkite.elastic.dev/v1
@@ -117,7 +117,7 @@ spec:
       skip_intermediate_builds: true
       skip_intermediate_builds_branch_filter: '!main !7.* !8.* !9.*'
       teams:
-        ingest-fp:
+        Streams:
           access_level: MANAGE_BUILD_AND_READ
         observablt-ci:
           access_level: MANAGE_BUILD_AND_READ
@@ -157,7 +157,7 @@ spec:
         build_pull_requests: false
         trigger_mode: none
       teams:
-        ingest-fp:
+        Streams:
           access_level: MANAGE_BUILD_AND_READ
         cloud-tooling:
           access_level: MANAGE_BUILD_AND_READ
@@ -177,7 +177,7 @@ metadata:
       url: https://buildkite.com/elastic/fleet-server-perf-tests
 spec:
   type: buildkite-pipeline
-  owner: group:ingest-fp
+  owner: group:Streams
   system: buildkite
   implementation:
     apiVersion: buildkite.elastic.dev/v1
@@ -205,7 +205,7 @@ spec:
       skip_intermediate_builds: true
       skip_intermediate_builds_branch_filter: '!main !7.* !8.* !9.*'
       teams:
-        ingest-fp:
+        Streams:
           access_level: MANAGE_BUILD_AND_READ
         cloud-tooling:
           access_level: MANAGE_BUILD_AND_READ
@@ -227,7 +227,7 @@ metadata:
 
 spec:
   type: buildkite-pipeline
-  owner: group:ingest-fp
+  owner: group:Streams
   system: buildkite
   implementation:
     apiVersion: buildkite.elastic.dev/v1
@@ -247,7 +247,7 @@ spec:
       skip_intermediate_builds: true
       skip_intermediate_builds_branch_filter: '!main !8.* !9.*'
       teams:
-        ingest-fp:
+        Streams:
           access_level: MANAGE_BUILD_AND_READ
         observablt-ci:
           access_level: MANAGE_BUILD_AND_READ
