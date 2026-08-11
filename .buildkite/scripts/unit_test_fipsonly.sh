@@ -9,4 +9,7 @@ with_go
 with_mage
 
 echo "Starting the fips140=only unit tests..."
-mage test:unitFIPSOnly test:junitReport
+test_status=0
+mage test:unitFIPSOnly || test_status=$?
+mage test:junitReport
+exit "$test_status"

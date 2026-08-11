@@ -1699,7 +1699,7 @@ func (Test) JunitReport() error {
 		if d.IsDir() && name != "build" { // Skip non-parent directories
 			return filepath.SkipDir
 		}
-		if !strings.HasSuffix(name, ".out") {
+		if !strings.HasPrefix(filepath.Base(name), "test-") || !strings.HasSuffix(name, ".out") {
 			return nil
 		}
 
@@ -1711,7 +1711,7 @@ func (Test) JunitReport() error {
 		var output bytes.Buffer
 		var stderr bytes.Buffer
 
-		cmd := exec.Command("go", "tool", "-modfile", filepath.Join("dev-tools", "go.mod"), "github.com/jstemmer/go-junit-report")
+		cmd := exec.Command("go", "tool", "-modfile", filepath.Join("dev-tools", "go.mod"), "github.com/jstemmer/go-junit-report/v2")
 		cmd.Stdin = srcFile
 		cmd.Stdout = &output
 		cmd.Stderr = &stderr

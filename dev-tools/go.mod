@@ -5,7 +5,7 @@ go 1.26.5
 tool (
 	github.com/elastic/go-json-schema-generate/cmd/schema-generate
 	github.com/elastic/go-licenser
-	github.com/jstemmer/go-junit-report
+	github.com/jstemmer/go-junit-report/v2
 	github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen
 	go.elastic.co/go-licence-detector
 	golang.org/x/perf/cmd/benchstat
