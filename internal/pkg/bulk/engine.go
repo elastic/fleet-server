@@ -21,12 +21,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
-<<<<<<< HEAD
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
-	"github.com/elastic/go-ucfg"
-=======
-	"github.com/elastic/fleet-server/v7/internal/pkg/logger/ecs"
->>>>>>> 5bef901 (bulk: add configurable concurrency limit for ReadSecrets (#7567))
 
 	"github.com/rs/zerolog"
 	"go.elastic.co/apm/v2"
