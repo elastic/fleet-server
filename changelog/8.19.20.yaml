@@ -1,0 +1,78 @@
+version: 8.19.20
+entries:
+    - kind: enhancement
+      summary: Bump elastic-agent-libs to v0.46.0 for FIPS 140-3 peer cert key-type enforcement
+      description: |
+        Bump elastic-agent-libs to v0.46.0 which enforces FIPS 140-3 compliant peer
+        certificate key types across all TLS verification modes. Also set the
+        fips140=on GODEBUG default in the FIPS binary so it enforces FIPS mode at
+        runtime, and verify this in the binary FIPS marker check.
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/7456
+      issue:
+        - https://github.com/elastic/fleet-server/issues/7536
+      impact: ""
+      action: ""
+      timestamp: 1783518046
+      file:
+        name: 1783518046-Bump-elastic-agent-libs-for-FIPS-peer-cert-enforcement.yaml
+        checksum: 4a10327d1d112aae226e85943d1a9e6d68401369
+    - kind: bug-fix
+      summary: Fix agent enrollment failures caused by 409 version conflicts during `.fleet-agents` primary shard relocation
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/7446
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1785185160
+      file:
+        name: 1785185160-enrollment-version-conflict.yaml
+        checksum: dfa448208740beda8ed226ca97043992763f791e
+    - kind: security
+      summary: Treat output names as parameters in Elasticsearch update scripts
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/7543
+      issue:
+        - https://github.com/elastic/fleet-server/issues/7536
+      impact: ""
+      action: ""
+      timestamp: 1785505460
+      file:
+        name: 1785505460-parameterize-output-painless-scripts.yaml
+        checksum: bbf0031cb9a16726b0cb08b07d2c3ba47db8d8e4
+    - kind: bug-fix
+      summary: Retain output API key secrets when agent document updates fail
+      description: |
+        Fleet Server no longer deletes a newly created output API key secret when the
+        corresponding agent document update returns an error. Elasticsearch may have
+        committed an update even when the client times out waiting for its response;
+        deleting the secret in that case leaves the agent with a dangling reference.
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/7547
+      issue:
+        - https://github.com/elastic/fleet-server/issues/7536
+      impact: ""
+      action: ""
+      timestamp: 1785539200
+      file:
+        name: 1785539200-retain-output-secret-on-agent-update-failure.yaml
+        checksum: c1af6222145fa524c30a68bd2df623aab45c4480
+    - kind: bug-fix
+      summary: Fix spurious resolveSeqNo errors on check-in when .fleet-actions index does not exist
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/7548
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1785788555
+      file:
+        name: 1785788555-token-resolver-index-not-found.yaml
+        checksum: 83f180df4d44010edb38dfcf98d91ced4811cbb2
