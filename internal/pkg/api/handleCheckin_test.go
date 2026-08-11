@@ -1131,7 +1131,7 @@ func TestIsInvalidAPIKeyErr(t *testing.T) {
 	}
 }
 
-func TestWriteEmptyPolicyResponse(t *testing.T) {
+func TestWritePolicyChangeResponse(t *testing.T) {
 	verCon := mustBuildConstraints("8.0.0")
 	cfg := &config.Server{}
 	ct, err := NewCheckinT(verCon, cfg, nil, nil, nil, nil, nil, ftesting.NewMockBulk())
@@ -1141,7 +1141,7 @@ func TestWriteEmptyPolicyResponse(t *testing.T) {
 	wr := httptest.NewRecorder()
 	logger := testlog.SetLogger(t)
 
-	err = ct.writeEmptyPolicyResponse(logger, wr, agentID)
+	err = ct.writeEmptyPolicyChangeResponse(logger, wr, agentID)
 	require.NoError(t, err)
 
 	resp := wr.Result()

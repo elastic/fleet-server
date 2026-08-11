@@ -747,7 +747,7 @@ func (suite *StandAloneSuite) TestOpAMPWithUpstreamCollector() {
 //   - graceful_unenroll_on_invalid_api_key: true
 //   - ttl_api_key: 2s  (cache expires quickly after key invalidation)
 //   - checkin_long_poll: 5s  (controls how fast the agent retries after step 1)
-func (suite *StandAloneSuite) TestAgentUnenrollsOnInvalidAPIKey() {
+func (suite *StandAloneSuite) TestAgentGracefulUnenrollOnInvalidAPIKey() {
 	dlCtx, dlCancel := context.WithTimeout(suite.T().Context(), 10*time.Minute)
 	defer dlCancel()
 	rc := downloadElasticAgent(dlCtx, suite.T(), suite.Client)

@@ -270,7 +270,7 @@ func (ct *CheckinT) handleInvalidAPIKey(zlog zerolog.Logger, w http.ResponseWrit
 
 	switch s.count {
 	case 1:
-		return ct.writeEmptyPolicyResponse(zlog, w, agentID)
+		return ct.writeEmptyPolicyChangeResponse(zlog, w, agentID)
 	case 2:
 		return ct.writeUnenrollResponse(zlog, w, agentID)
 	default:
@@ -278,9 +278,9 @@ func (ct *CheckinT) handleInvalidAPIKey(zlog zerolog.Logger, w http.ResponseWrit
 	}
 }
 
-// writeEmptyPolicyResponse writes a 200 check-in response containing a POLICY_CHANGE with an
+// writeEmptyPolicyChangeResponse writes a 200 check-in response containing a POLICY_CHANGE with an
 // empty policy, causing the agent to stop all inputs.
-func (ct *CheckinT) writeEmptyPolicyResponse(zlog zerolog.Logger, w http.ResponseWriter, agentID string) error {
+func (ct *CheckinT) writeEmptyPolicyChangeResponse(zlog zerolog.Logger, w http.ResponseWriter, agentID string) error {
 	u, err := uuid.NewV4()
 	if err != nil {
 		return err
@@ -288,7 +288,7 @@ func (ct *CheckinT) writeEmptyPolicyResponse(zlog zerolog.Logger, w http.Respons
 
 	var ad Action_Data
 	if err = ad.FromActionPolicyChange(ActionPolicyChange{Policy: PolicyData{}}); err != nil {
-		return fmt.Errorf("writeEmptyPolicyResponse build data: %w", err)
+		return fmt.Errorf("writeEmptyPolicyChangeResponse build data: %w", err)
 	}
 
 	action := Action{
@@ -311,7 +311,7 @@ func (ct *CheckinT) writeEmptyPolicyResponse(zlog zerolog.Logger, w http.Respons
 
 	payload, err := json.Marshal(&resp)
 	if err != nil {
-		return fmt.Errorf("writeEmptyPolicyResponse marshal: %w", err)
+		return fmt.Errorf("writeEmptyPolicyChangeResponse marshal: %w", err)
 	}
 
 	_, err = w.Write(payload)
