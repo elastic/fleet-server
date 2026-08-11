@@ -436,9 +436,8 @@ func TestServerUnauthorized(t *testing.T) {
 		srv.buildURL(agentID, "acks"),
 	}
 
-	allurls := []string{
-		srv.buildURL("", "enroll"),
-	}
+	allurls := make([]string, 0, 1+len(agenturls))
+	allurls = append(allurls, srv.buildURL("", "enroll"))
 	allurls = append(allurls, agenturls...)
 
 	// Expecting no authorization header error
