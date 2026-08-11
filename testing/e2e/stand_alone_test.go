@@ -734,16 +734,19 @@ func (suite *StandAloneSuite) TestOpAMPWithUpstreamCollector() {
 	suite.Contains(agentDoc.Tags, "otelcontribcol", "expected tags to contain otelcontribcol")
 }
 
-// TestAgentUnenrollsOnInvalidAPIKey proves that a real elastic-agent unenrolls itself when
-// fleet-server returns an UNENROLL action due to an invalidated API key.
+// TestAgentUnenrollsOnInvalidAPIKey exercises the full three-step escalation that fleet-server
+// applies when an agent checks in with an invalidated API key and the
+// empty_policy_on_invalid_api_key feature flag is enabled:
+//
+//  1. 1st invalid checkin → fleet-server returns POLICY_CHANGE with empty policy.
+//     The agent stops all running components.
+//  2. 2nd invalid checkin → fleet-server returns UNENROLL.
+//     The agent disenrolls and exits.
 //
 // Fleet-server runs with:
-//   - unenroll_on_invalid_api_key: true
+//   - empty_policy_on_invalid_api_key: true
 //   - ttl_api_key: 2s  (cache expires quickly after key invalidation)
-//   - checkin_long_poll: 5s  (agent retries within seconds)
-//
-// The test observes only the elastic-agent's own log output — not fleet-server's API response —
-// to confirm the agent processes the UNENROLL action and stops checking in.
+//   - checkin_long_poll: 5s  (controls how fast the agent retries after step 1)
 func (suite *StandAloneSuite) TestAgentUnenrollsOnInvalidAPIKey() {
 	dlCtx, dlCancel := context.WithTimeout(suite.T().Context(), 10*time.Minute)
 	defer dlCancel()
@@ -853,12 +856,11 @@ func (suite *StandAloneSuite) TestAgentUnenrollsOnInvalidAPIKey() {
 	suite.T().Logf("Invalidating agent API key %s", apiKeyID)
 	suite.invalidateESAPIKey(ctx, apiKeyID)
 
-	// After ttl_api_key (2 s) the cache entry expires. After checkin_long_poll (5 s) the
-	// current long-poll returns empty and the agent starts a new checkin. That new checkin
+	// After ttl_api_key (2 s) the cache entry expires. The agent's next checkin
 	// re-authenticates with ES, gets ErrUnauthorized, and fleet-server returns an empty
-	// POLICY_CHANGE. The agent applies the empty policy and stops all components.
-	// Poll "elastic-agent status --output json" until the components list is empty.
-	suite.T().Log("Waiting for elastic-agent to have no running components...")
+	// POLICY_CHANGE (escalation step 1). The agent applies the empty policy and stops all
+	// components, but continues to check in with fleet-server.
+	suite.T().Log("Waiting for elastic-agent to have no running components (step 1: POLICY_CHANGE)...")
 	suite.Require().Eventually(func() bool {
 		cmd := exec.CommandContext(ctx, paths.agentBinary, "status", "--output", "json")
 		cmd.Dir = agentDir
@@ -874,7 +876,18 @@ func (suite *StandAloneSuite) TestAgentUnenrollsOnInvalidAPIKey() {
 		}
 		return len(statusResp.Components) == 0
 	}, 2*time.Minute, 10*time.Second, "elastic-agent still has running components after empty policy was applied")
-	suite.T().Log("Agent has no running components — empty policy confirmed")
+	suite.T().Log("Agent has no running components — empty POLICY_CHANGE confirmed")
+
+	// The agent continues checking in. The 2nd invalid checkin returns UNENROLL (escalation
+	// step 2). The agent disenrolls and exits, so "elastic-agent status" can no longer reach
+	// the daemon and returns a non-zero exit code.
+	suite.T().Log("Waiting for elastic-agent to exit (step 2: UNENROLL)...")
+	suite.Require().Eventually(func() bool {
+		cmd := exec.CommandContext(ctx, paths.agentBinary, "status")
+		cmd.Dir = agentDir
+		return cmd.Run() != nil
+	}, 2*time.Minute, 10*time.Second, "elastic-agent did not exit after UNENROLL action")
+	suite.T().Log("Agent has exited — UNENROLL confirmed")
 }
 
 // agentAccessAPIKeyID queries .fleet-agents to retrieve the access_api_key_id for the given agent.

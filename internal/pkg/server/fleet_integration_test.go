@@ -1818,9 +1818,12 @@ func TestCheckinOTelColPolicy(t *testing.T) {
 	assert.Equal(t, encodedApiKey, exporter.ApiKey)
 }
 
-// Test_Checkin_EmptyPolicyOnInvalidAPIKey verifies that when the EmptyPolicyOnInvalidAPIKey
-// feature flag is enabled, fleet-server returns a 200 with a POLICY_CHANGE (empty policy) instead
-// of a 401 when an agent checks in with an invalidated API key.
+// Test_Checkin_EmptyPolicyOnInvalidAPIKey verifies the three-step state machine that runs when
+// the EmptyPolicyOnInvalidAPIKey feature flag is enabled and an agent checks in with an invalid key:
+//
+//	1st call → HTTP 200 + POLICY_CHANGE (empty policy, stops all agent inputs)
+//	2nd call → HTTP 200 + UNENROLL
+//	3rd+ call → HTTP 401 (original error passed through)
 func Test_Checkin_EmptyPolicyOnInvalidAPIKey(t *testing.T) {
 	doCheckin := func(t *testing.T, ctx context.Context, srv *tserver, agentID, agentKey string) *http.Response {
 		t.Helper()
@@ -1836,11 +1839,9 @@ func Test_Checkin_EmptyPolicyOnInvalidAPIKey(t *testing.T) {
 		return res
 	}
 
-	t.Run("flag enabled: invalid key for real agent returns 200 with POLICY_CHANGE", func(t *testing.T) {
+	t.Run("flag enabled: escalation through state machine", func(t *testing.T) {
 		srv, err := startTestServer(t, t.Context(), policyData, func(cfg *config.Config) error {
 			cfg.Inputs[0].Server.Features.EmptyPolicyOnInvalidAPIKey = true
-			cfg.Inputs[0].Server.Timeouts.CheckinLongPoll = 100 * time.Millisecond
-			cfg.Inputs[0].Server.Timeouts.CheckinJitter = 0
 			return nil
 		})
 		require.NoError(t, err)
@@ -1855,26 +1856,74 @@ func Test_Checkin_EmptyPolicyOnInvalidAPIKey(t *testing.T) {
 		// without depending on ES's propagation window for invalidated keys.
 		fakeKey := base64.StdEncoding.EncodeToString([]byte("invalid-id:invalid-secret"))
 
+		// 1st call: expect HTTP 200 with POLICY_CHANGE (empty policy).
 		res := doCheckin(t, ctx, srv, agentID, fakeKey)
-		defer res.Body.Close()
-
-		require.Equal(t, http.StatusOK, res.StatusCode)
-
 		body, err := io.ReadAll(res.Body)
+		res.Body.Close()
 		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, res.StatusCode)
 
 		var checkinResp api.CheckinResponse
 		require.NoError(t, json.Unmarshal(body, &checkinResp))
-
-		require.Len(t, checkinResp.Actions, 1, "expected exactly one POLICY_CHANGE action")
+		require.Len(t, checkinResp.Actions, 1, "expected exactly one action on 1st call")
 		action := checkinResp.Actions[0]
-		assert.Equal(t, api.POLICYCHANGE, action.Type)
+		assert.Equal(t, api.POLICYCHANGE, action.Type, "1st call should return POLICY_CHANGE")
 		assert.Equal(t, agentID, action.AgentId)
 		assert.NotEmpty(t, action.Id)
-
 		pc, err := action.Data.AsActionPolicyChange()
 		require.NoError(t, err)
 		assert.Empty(t, pc.Policy.Inputs)
+
+		// 2nd call: expect HTTP 200 with UNENROLL.
+		res = doCheckin(t, ctx, srv, agentID, fakeKey)
+		body, err = io.ReadAll(res.Body)
+		res.Body.Close()
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, res.StatusCode)
+
+		require.NoError(t, json.Unmarshal(body, &checkinResp))
+		require.Len(t, checkinResp.Actions, 1, "expected exactly one action on 2nd call")
+		action = checkinResp.Actions[0]
+		assert.Equal(t, api.UNENROLL, action.Type, "2nd call should return UNENROLL")
+		assert.Equal(t, agentID, action.AgentId)
+
+		// 3rd call: expect HTTP 401 (pass-through).
+		res = doCheckin(t, ctx, srv, agentID, fakeKey)
+		res.Body.Close()
+		assert.Equal(t, http.StatusUnauthorized, res.StatusCode, "3rd call should return 401")
+
+		// 4th call: still HTTP 401.
+		res = doCheckin(t, ctx, srv, agentID, fakeKey)
+		res.Body.Close()
+		assert.Equal(t, http.StatusUnauthorized, res.StatusCode, "4th call should still return 401")
+
+		// Clear the state map and verify the cycle restarts from the beginning.
+		srv.srv.checkinT.ClearInvalidKeyStates()
+
+		// 1st call after reset: expect POLICY_CHANGE again.
+		res = doCheckin(t, ctx, srv, agentID, fakeKey)
+		body, err = io.ReadAll(res.Body)
+		res.Body.Close()
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, res.StatusCode)
+		require.NoError(t, json.Unmarshal(body, &checkinResp))
+		require.Len(t, checkinResp.Actions, 1, "expected exactly one action after reset")
+		assert.Equal(t, api.POLICYCHANGE, checkinResp.Actions[0].Type, "1st call after reset should return POLICY_CHANGE")
+
+		// 2nd call after reset: expect UNENROLL.
+		res = doCheckin(t, ctx, srv, agentID, fakeKey)
+		body, err = io.ReadAll(res.Body)
+		res.Body.Close()
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, res.StatusCode)
+		require.NoError(t, json.Unmarshal(body, &checkinResp))
+		require.Len(t, checkinResp.Actions, 1, "expected exactly one action on 2nd call after reset")
+		assert.Equal(t, api.UNENROLL, checkinResp.Actions[0].Type, "2nd call after reset should return UNENROLL")
+
+		// 3rd call after reset: expect 401 again.
+		res = doCheckin(t, ctx, srv, agentID, fakeKey)
+		res.Body.Close()
+		assert.Equal(t, http.StatusUnauthorized, res.StatusCode, "3rd call after reset should return 401")
 	})
 
 	t.Run("flag disabled: unknown key returns 401", func(t *testing.T) {

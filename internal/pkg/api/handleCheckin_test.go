@@ -1139,10 +1139,9 @@ func TestWriteEmptyPolicyResponse(t *testing.T) {
 
 	agentID := "test-agent-id"
 	wr := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/", nil)
 	logger := testlog.SetLogger(t)
 
-	err = ct.writeEmptyPolicyResponse(logger, wr, req, agentID)
+	err = ct.writeEmptyPolicyResponse(logger, wr, agentID)
 	require.NoError(t, err)
 
 	resp := wr.Result()
@@ -1167,6 +1166,66 @@ func TestWriteEmptyPolicyResponse(t *testing.T) {
 	assert.Empty(t, pc.Policy.Inputs)
 }
 
+// TestHandleInvalidAPIKey_Escalation verifies the three-step state machine:
+//
+//	1st invalid checkin → POLICY_CHANGE
+//	2nd invalid checkin → UNENROLL
+//	3rd+ invalid checkin → original 401 error
+//	after 1 hour → state resets
+func TestHandleInvalidAPIKey_Escalation(t *testing.T) {
+	verCon := mustBuildConstraints("8.0.0")
+	cfg := &config.Server{}
+	ct, err := NewCheckinT(verCon, cfg, nil, nil, nil, nil, nil, ftesting.NewMockBulk())
+	require.NoError(t, err)
+
+	const agentID = "escalation-agent"
+	logger := testlog.SetLogger(t)
+	origErr := apikey.ErrUnauthorized
+	req := httptest.NewRequest(http.MethodPost, "/", nil)
+
+	call := func() (ActionType, error) {
+		wr := httptest.NewRecorder()
+		herr := ct.handleInvalidAPIKey(logger, wr, req, agentID, origErr)
+		if herr != nil {
+			return "", herr
+		}
+		var resp CheckinResponse
+		require.NoError(t, json.NewDecoder(wr.Body).Decode(&resp))
+		require.Len(t, resp.Actions, 1)
+		return resp.Actions[0].Type, nil
+	}
+
+	// 1st call → POLICY_CHANGE
+	actionType, err := call()
+	require.NoError(t, err)
+	assert.Equal(t, POLICYCHANGE, actionType)
+
+	// 2nd call → UNENROLL
+	actionType, err = call()
+	require.NoError(t, err)
+	assert.Equal(t, UNENROLL, actionType)
+
+	// 3rd call → original error (401)
+	_, err = call()
+	assert.ErrorIs(t, err, origErr)
+
+	// 4th call → still original error
+	_, err = call()
+	assert.ErrorIs(t, err, origErr)
+
+	// Simulate state expiry by backdating firstSeen.
+	s, ok := ct.invalidKeyStates.Load(agentID)
+	require.True(t, ok)
+	state := s.(invalidKeyState)
+	state.firstSeen = time.Now().Add(-(invalidKeyStateReset + time.Second))
+	ct.invalidKeyStates.Store(agentID, state)
+
+	// After reset → back to POLICY_CHANGE
+	actionType, err = call()
+	require.NoError(t, err)
+	assert.Equal(t, POLICYCHANGE, actionType)
+}
+
 // makeAPIKeyAuthHeader returns an Authorization header value for the given key id and secret.
 func makeAPIKeyAuthHeader(id, secret string) string {
 	token := base64.StdEncoding.EncodeToString([]byte(id + ":" + secret))
@@ -1184,21 +1243,21 @@ func TestHandleCheckin_EmptyPolicyOnInvalidAPIKey(t *testing.T) {
 		wantAction  ActionType
 	}{
 		{
-			name:        "flag enabled, ErrAPIKeyNotFound returns POLICY_CHANGE",
+			name:        "flag enabled, ErrAPIKeyNotFound returns POLICY_CHANGE on first occurrence",
 			authErr:     apikey.ErrAPIKeyNotFound,
 			flagEnabled: true,
 			wantStatus:  http.StatusOK,
 			wantAction:  POLICYCHANGE,
 		},
 		{
-			name:        "flag enabled, ErrUnauthorized returns POLICY_CHANGE",
+			name:        "flag enabled, ErrUnauthorized returns POLICY_CHANGE on first occurrence",
 			authErr:     apikey.ErrUnauthorized,
 			flagEnabled: true,
 			wantStatus:  http.StatusOK,
 			wantAction:  POLICYCHANGE,
 		},
 		{
-			name:        "flag enabled, ErrAPIKeyNotEnabled returns POLICY_CHANGE",
+			name:        "flag enabled, ErrAPIKeyNotEnabled returns POLICY_CHANGE on first occurrence",
 			authErr:     ErrAPIKeyNotEnabled,
 			flagEnabled: true,
 			wantStatus:  http.StatusOK,

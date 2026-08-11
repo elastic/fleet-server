@@ -57,6 +57,9 @@ const (
 	kEncodingGzip  = "gzip"
 	FailedStatus   = "FAILED"
 	DegradedStatus = "DEGRADED"
+
+	invalidKeyStateReset         = time.Hour
+	invalidKeyStateCleanInterval = 5 * time.Minute
 )
 
 // validActionTypes is a map of action.type and if they are valid
@@ -72,6 +75,14 @@ var validActionTypes = map[string]bool{
 	string(UPGRADE):              true,
 	string(MIGRATE):              true,
 	string(PRIVILEGELEVELCHANGE): true,
+}
+
+// invalidKeyState tracks how many times an agent has checked in with an invalid API key
+// and when that sequence started, so the state machine in handleInvalidAPIKey can escalate
+// appropriately and reset after one hour.
+type invalidKeyState struct {
+	count     int
+	firstSeen time.Time
 }
 
 type CheckinT struct {
@@ -90,6 +101,10 @@ type CheckinT struct {
 	gwPool                         sync.Pool
 	bulker                         bulk.Bulk
 	outputSecretCandidateCollector policy.OutputSecretCandidateCollector
+
+	// invalidKeyStates tracks per-agent invalid-API-key state for the EmptyPolicyOnInvalidAPIKey
+	// feature. Entries expire and are removed after invalidKeyStateReset.
+	invalidKeyStates sync.Map
 }
 
 // CheckinOption configures check-in handling.
@@ -156,7 +171,7 @@ func (ct *CheckinT) handleCheckin(zlog zerolog.Logger, w http.ResponseWriter, r 
 			invalidateAPIKeysOfInactiveAgent(ctx, zlog, ct.bulker, agent)
 		}
 		if ct.cfg.Features.EmptyPolicyOnInvalidAPIKey && isInvalidAPIKeyErr(err) {
-			return ct.writeEmptyPolicyResponse(zlog, w, r, id)
+			return ct.handleInvalidAPIKey(zlog, w, r, id, err)
 		}
 		return err
 	}
@@ -196,26 +211,76 @@ func isInvalidAPIKeyErr(err error) bool {
 		errors.Is(err, ErrAgentInactive)
 }
 
-// writeEmptyPolicyResponse writes a 200 check-in response containing a POLICY_CHANGE with an
-// empty policy. It is used when EmptyPolicyOnInvalidAPIKey is enabled and the agent's API key is
-// invalid.
-//
-// To prevent a request storm (the agent re-checks in immediately after applying the empty policy,
-// receives another empty policy, and so on), the response is held for checkin_long_poll minus
-// jitter before being written — the same back-pressure the normal long-poll path applies.
-func (ct *CheckinT) writeEmptyPolicyResponse(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, agentID string) error {
-	// Hold the connection for the configured long-poll duration so the agent doesn't
-	// hammer fleet-server with back-to-back requests after its API key is invalidated.
-	pollDur := ct.cfg.Timeouts.CheckinLongPoll
-	if jitter := ct.cfg.Timeouts.CheckinJitter; jitter > 0 {
-		pollDur -= time.Duration(rand.Int63n(int64(jitter)))
+// ClearInvalidKeyStates removes all entries from the invalid-key state map, resetting every
+// agent's escalation sequence back to the beginning. Intended for testing.
+func (ct *CheckinT) ClearInvalidKeyStates() {
+	ct.invalidKeyStates.Range(func(key, _ any) bool {
+		ct.invalidKeyStates.Delete(key)
+		return true
+	})
+}
+
+// RunInvalidKeyStateCleaner periodically removes stale entries from the invalid-key state map.
+// Entries that have not triggered a new checkin within invalidKeyStateReset are discarded so
+// that the map does not grow unboundedly for agents that stop communicating after unenrolling.
+func (ct *CheckinT) RunInvalidKeyStateCleaner(ctx context.Context) error {
+	t := time.NewTicker(invalidKeyStateCleanInterval)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case now := <-t.C:
+			ct.invalidKeyStates.Range(func(key, value any) bool {
+				s := value.(invalidKeyState)
+				if now.Sub(s.firstSeen) >= invalidKeyStateReset {
+					ct.invalidKeyStates.Delete(key)
+				}
+				return true
+			})
+		}
 	}
-	select {
-	case <-r.Context().Done():
-		return r.Context().Err()
-	case <-time.After(pollDur):
+}
+
+// handleInvalidAPIKey implements a three-step escalation for agents that repeatedly check in
+// with an invalid API key when EmptyPolicyOnInvalidAPIKey is enabled:
+//
+//  1. First occurrence  → POLICY_CHANGE with empty policy (agent stops all inputs).
+//  2. Second occurrence → UNENROLL action (agent begins unenroll flow).
+//  3. Third+ occurrence → pass the original 401 error through for up to one hour.
+//
+// After invalidKeyStateReset the per-agent state is cleared and the cycle restarts.
+func (ct *CheckinT) handleInvalidAPIKey(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, agentID string, origErr error) error {
+	now := time.Now()
+
+	var s invalidKeyState
+	if v, ok := ct.invalidKeyStates.Load(agentID); ok {
+		s = v.(invalidKeyState)
+		if now.Sub(s.firstSeen) >= invalidKeyStateReset {
+			ct.invalidKeyStates.Delete(agentID)
+			s = invalidKeyState{}
+		}
 	}
 
+	s.count++
+	if s.count == 1 {
+		s.firstSeen = now
+	}
+	ct.invalidKeyStates.Store(agentID, s)
+
+	switch s.count {
+	case 1:
+		return ct.writeEmptyPolicyResponse(zlog, w, agentID)
+	case 2:
+		return ct.writeUnenrollResponse(zlog, w, agentID)
+	default:
+		return origErr
+	}
+}
+
+// writeEmptyPolicyResponse writes a 200 check-in response containing a POLICY_CHANGE with an
+// empty policy, causing the agent to stop all inputs.
+func (ct *CheckinT) writeEmptyPolicyResponse(zlog zerolog.Logger, w http.ResponseWriter, agentID string) error {
 	u, err := uuid.NewV4()
 	if err != nil {
 		return err
@@ -247,6 +312,39 @@ func (ct *CheckinT) writeEmptyPolicyResponse(zlog zerolog.Logger, w http.Respons
 	payload, err := json.Marshal(&resp)
 	if err != nil {
 		return fmt.Errorf("writeEmptyPolicyResponse marshal: %w", err)
+	}
+
+	_, err = w.Write(payload)
+	return err
+}
+
+// writeUnenrollResponse writes a 200 check-in response containing a single UNENROLL action.
+func (ct *CheckinT) writeUnenrollResponse(zlog zerolog.Logger, w http.ResponseWriter, agentID string) error {
+	u, err := uuid.NewV4()
+	if err != nil {
+		return err
+	}
+
+	action := Action{
+		AgentId:   agentID,
+		CreatedAt: time.Now().UTC().Format(time.RFC3339),
+		Id:        u.String(),
+		Type:      UNENROLL,
+	}
+
+	zlog.Info().
+		Str(ecs.AgentID, agentID).
+		Str(ecs.ActionID, action.Id).
+		Msg("Returning UNENROLL action for agent with invalid API key")
+
+	resp := CheckinResponse{
+		Action:  "checkin",
+		Actions: []Action{action},
+	}
+
+	payload, err := json.Marshal(&resp)
+	if err != nil {
+		return fmt.Errorf("writeUnenrollResponse marshal: %w", err)
 	}
 
 	_, err = w.Write(payload)
