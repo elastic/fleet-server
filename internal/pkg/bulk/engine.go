@@ -17,12 +17,13 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/elastic/go-ucfg"
+
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger/ecs"
-	"github.com/elastic/go-ucfg"
 
 	"github.com/rs/zerolog"
 	"go.elastic.co/apm/v2"
@@ -119,6 +120,7 @@ type Bulker struct {
 	blkPool               sync.Pool
 	flushBufPool          sync.Pool
 	apikeyLimit           *semaphore.Weighted
+	readSecretsLimit      *semaphore.Weighted
 	tracer                *apm.Tracer
 	cancelFn              context.CancelFunc
 	pendingBulkDispatches atomic.Int64
@@ -135,6 +137,7 @@ const (
 	defaultMaxPending                     = 32
 	defaultBlockQueueSz                   = 32 // Small capacity to allow multiOp to spin fast
 	defaultAPIKeyMaxParallel              = 32
+	defaultMaxConcurrentSecretReads       = 32
 	defaultApikeyMaxReqSize               = 100 * 1024 * 1024
 	defaultFlushContextTimeout            = time.Minute * 1
 	defaultMaxPendingBulkDispatches int64 = 0 // 0 means no limit
@@ -155,7 +158,7 @@ func NewBulker(es esapi.Transport, tracer *apm.Tracer, opts ...BulkOpt) *Bulker 
 		return &bulkT{ch: make(chan respT, 1)}
 	}
 
-	return &Bulker{
+	b := &Bulker{
 		opts:                  bopts,
 		es:                    es,
 		ch:                    make(chan *bulkT, bopts.blockQueueSz),
@@ -167,6 +170,11 @@ func NewBulker(es esapi.Transport, tracer *apm.Tracer, opts ...BulkOpt) *Bulker 
 		// remote ES bulkers
 		bulkerMap: make(map[string]Bulk),
 	}
+	// 0 means no limit; leave readSecretsLimit nil so ReadSecrets skips the semaphore.
+	if bopts.maxConcurrentSecretReads > 0 {
+		b.readSecretsLimit = semaphore.NewWeighted(int64(bopts.maxConcurrentSecretReads))
+	}
+	return b
 }
 
 func (b *Bulker) GetBulker(outputName string) Bulk {
@@ -326,7 +334,15 @@ func (b *Bulker) ReadSecrets(ctx context.Context, secretIds []string) (map[strin
 	result := make(map[string]string)
 	esClient := b.Client()
 	for _, id := range secretIds {
+		if b.readSecretsLimit != nil {
+			if err := b.readSecretsLimit.Acquire(ctx, 1); err != nil {
+				return nil, err
+			}
+		}
 		val, err := ReadSecret(ctx, esClient, id)
+		if b.readSecretsLimit != nil {
+			b.readSecretsLimit.Release(1)
+		}
 		if err != nil {
 			return nil, err
 		}
