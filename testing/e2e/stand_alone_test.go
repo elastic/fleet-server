@@ -862,14 +862,14 @@ func (suite *StandAloneSuite) TestAgentGracefulForceUnenroll() {
 			if a.ID != "e2e-test-id" {
 				suite.T().Logf("agent %s status=%s", a.ID, a.Status)
 			}
-			if a.ID != "e2e-test-id" && a.Status == "online" {
+			if a.ID != "e2e-test-id" && (a.Status == "online" || a.Status == "updating") {
 				agentID = a.ID
 				return true
 			}
 		}
 		return false
-	}, 3*time.Minute, 5*time.Second, "enrolled agent never reached online status in Kibana")
-	suite.T().Logf("Agent %s is online", agentID)
+	}, 3*time.Minute, 5*time.Second, "enrolled agent never reached online or updating status in Kibana")
+	suite.T().Logf("Agent %s is active and checking in", agentID)
 
 	// Retrieve the agent's ES API key ID so we can invalidate it.
 	apiKeyID := suite.agentAccessAPIKeyID(ctx, agentID)
