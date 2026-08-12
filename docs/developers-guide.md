@@ -400,23 +400,35 @@ cp build/binaries/fleet-server-8.7.0-SNAPSHOT-linux-x86_64/fleet-server ./data/e
 
 ## Testing on cloud
 
-Elastic employees can create an Elastic Cloud deployment with a locally built Fleet Server.
+Elastic employees can create an Elastic Cloud Hosted (ECH) deployment with a locally built Fleet Server.
 
-To deploy it you can use the following commands:
-
-```bash
-EC_API_KEY=yourapikey make -C dev-tools/cloud cloud-deploy
-```
-
-And then to clean the deployment
+To build a custom image and deploy it to ECH for manual testing:
 
 ```bash
-EC_API_KEY=yourapikey make -C dev-tools/cloud cloud-clean
+export DOCKER_IMAGE=docker.elastic.co/beats-ci/elastic-agent-cloud-fleet
+export DOCKER_IMAGE_TAG=my-username-$(date +%s)
+SNAPSHOT=true PLATFORMS=linux/amd64 \
+  EC_API_KEY=yourapikey mage docker:cover docker:customAgentImage docker:push test:cloudE2EUp
+# ... manual testing ...
+EC_API_KEY=yourapikey mage test:cloudE2EDown
 ```
 
-For more advanced scenario you can build a custom docker image that you could use in your own terraform.
+Run this workflow from an `amd64` host: `docker:customAgentImage` creates an image for the host architecture, while ECH runs on `linux/amd64`. `SNAPSHOT=true` and `PLATFORMS=linux/amd64` build the required snapshot binary. The registry is shared, so choose a globally unique `DOCKER_IMAGE_TAG`; keeping the same `DOCKER_IMAGE` and tag in the shell session ensures that `docker:customAgentImage`, `docker:push`, `test:cloudE2EUp`, and `test:cloudE2EDown` all refer to the same image.
 
-```
-make -C dev-tools/cloud build-and-push-cloud-image
+These steps do the following:
+
+1. **`mage docker:cover`** — builds a coverage-instrumented `fleet-server` binary inside Docker
+2. **`mage docker:customAgentImage`** — creates a custom `elastic-agent-cloud` image with the locally built `fleet-server` binary swapped in (base image: `docker.elastic.co/cloud-release/elastic-agent-cloud`)
+3. **`mage docker:push`** — pushes the custom image to the registry (`docker.elastic.co/beats-ci/elastic-agent-cloud-fleet`)
+4. **`mage test:cloudE2EUp`** — provisions an ECH deployment in the Cloud-First Testing (CFT) region via Terraform using the custom image
+5. **`mage test:cloudE2EDown`** — destroys the ECH deployment when done
+
+`DOCKER_IMAGE` and `DOCKER_IMAGE_TAG` can be used to override the image name and tag. Note that `mage test:cloudE2E` sets these variables internally, so external overrides have no effect on the all-in-one target. Run `mage -h test:cloudE2EUp` for all available options.
+
+To also run the automated cloud E2E test suite against the deployment (and tear it down afterwards), use the all-in-one target — equivalent to the above steps with `mage test:cloudE2ERun` inserted between `test:cloudE2EUp` and `test:cloudE2EDown`:
+
+```bash
+EC_API_KEY=yourapikey mage test:cloudE2E
 ```
 
+If `mage test:cloudE2E` fails partway through, the deployment may be left running. Run `mage test:cloudE2EDown` to clean it up.
