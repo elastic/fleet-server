@@ -911,15 +911,21 @@ func (suite *StandAloneSuite) TestAgentGracefulForceUnenroll() {
 	suite.T().Log("Agent has no running components — empty POLICY_CHANGE confirmed")
 
 	// The agent continues checking in. The 2nd invalid checkin returns UNENROLL (escalation
-	// step 2). The agent disenrolls and exits, so "elastic-agent status" can no longer reach
-	// the daemon and returns a non-zero exit code.
-	suite.T().Log("Waiting for elastic-agent to exit (step 2: UNENROLL)...")
+	// step 2). On receiving UNENROLL the agent cancels its fleet gateway and goes dormant —
+	// the process stays running but stops sending checkins. Fleet-server will mark the agent
+	// offline once its last_checkin age exceeds the offline threshold.
+	suite.T().Log("Waiting for elastic-agent to become offline after UNENROLL (step 2)...")
 	suite.Require().Eventually(func() bool {
-		cmd := exec.CommandContext(ctx, paths.agentBinary, "status")
-		cmd.Dir = agentDir
-		return cmd.Run() != nil
-	}, 2*time.Minute, 10*time.Second, "elastic-agent did not exit after UNENROLL action")
-	suite.T().Log("Agent has exited — UNENROLL confirmed")
+		_, agents := suite.GetAgents(ctx)
+		for _, a := range agents {
+			if a.ID == agentID {
+				suite.T().Logf("agent %s status=%s", a.ID, a.Status)
+				return a.Status == "offline" || a.Status == "unenrolled"
+			}
+		}
+		return false
+	}, 3*time.Minute, 5*time.Second, "elastic-agent did not become offline or unenrolled after UNENROLL action")
+	suite.T().Log("Agent is offline/unenrolled — UNENROLL confirmed")
 }
 
 // agentAccessAPIKeyID queries .fleet-agents to retrieve the access_api_key_id for the given agent.
