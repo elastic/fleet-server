@@ -798,7 +798,7 @@ func (suite *StandAloneSuite) TestAgentGracefulForceUnenroll() {
 		"--url=https://localhost:8220",
 		"--enrollment-token="+enrollmentToken,
 		"--certificate-authorities="+filepath.Join(suite.CertPath, "e2e-test-ca.crt"),
-		"--delay-enroll",
+		"--skip-daemon-reload",
 	)
 	enrollCmd.Dir = agentDir
 	enrollCmd.Env = append(os.Environ(), "GOCOVERDIR="+suite.CoverPath)
