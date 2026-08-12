@@ -847,15 +847,28 @@ func (suite *StandAloneSuite) TestAgentGracefulForceUnenroll() {
 	suite.T().Log("Waiting for enrolled agent to appear online in Kibana...")
 	agentID := ""
 	suite.Require().Eventually(func() bool {
+		// Fail fast if the agent process has already exited (crash).
+		select {
+		case <-agentHasExited:
+			if p, readErr := os.ReadFile(agentLogPath); readErr == nil {
+				suite.T().Logf("agent exited early; log:\n%s", string(p))
+			}
+			suite.Fail("elastic-agent process exited before becoming online")
+			return false
+		default:
+		}
 		_, agents := suite.GetAgents(ctx)
 		for _, a := range agents {
+			if a.ID != "e2e-test-id" {
+				suite.T().Logf("agent %s status=%s", a.ID, a.Status)
+			}
 			if a.ID != "e2e-test-id" && a.Status == "online" {
 				agentID = a.ID
 				return true
 			}
 		}
 		return false
-	}, 3*time.Minute, time.Second, "enrolled agent never reached online status in Kibana")
+	}, 3*time.Minute, 5*time.Second, "enrolled agent never reached online status in Kibana")
 	suite.T().Logf("Agent %s is online", agentID)
 
 	// Retrieve the agent's ES API key ID so we can invalidate it.
