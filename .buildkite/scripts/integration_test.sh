@@ -13,4 +13,7 @@ with_docker_compose
 with_mage
 
 echo "Starting the integration tests..."
-mage test:integration test:junitReport
+test_status=0
+mage test:integration || test_status=$?
+mage test:junitReport
+exit "$test_status"

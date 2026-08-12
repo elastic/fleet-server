@@ -13,4 +13,7 @@ with_docker_compose
 with_mage
 
 echo "Starting the E2E tests..."
-mage test:e2e test:junitReport
+test_status=0
+mage test:e2e || test_status=$?
+mage test:junitReport
+exit "$test_status"
