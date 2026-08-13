@@ -12,22 +12,22 @@ import (
 
 // Time returns the time for the current leader.
 func (m *PolicyLeader) Time() (time.Time, error) {
-	return time.Parse(time.RFC3339Nano, m.Timestamp)
+	return m.Timestamp, nil
 }
 
 // SetTime sets the timestamp.
 func (m *PolicyLeader) SetTime(t time.Time) {
-	m.Timestamp = t.Format(time.RFC3339Nano)
+	m.Timestamp = t
 }
 
 // Time returns the time for the server.
 func (m *Server) Time() (time.Time, error) {
-	return time.Parse(time.RFC3339Nano, m.Timestamp)
+	return m.Timestamp, nil
 }
 
 // SetTime sets the timestamp.
 func (m *Server) SetTime(t time.Time) {
-	m.Timestamp = t.Format(time.RFC3339Nano)
+	m.Timestamp = t
 }
 
 // CheckDifferentVersion returns Agent version if it is different from ver, otherwise return empty string
@@ -52,9 +52,8 @@ func (a *Agent) APIKeyIDs() []ToRetireAPIKeyIdsItems {
 	keys := make([]ToRetireAPIKeyIdsItems, 0, len(a.Outputs)+1)
 	if a.AccessAPIKeyID != "" {
 		keys = append(keys, ToRetireAPIKeyIdsItems{
-			ID:        a.AccessAPIKeyID,
-			Output:    "",
-			RetiredAt: "",
+			ID:     a.AccessAPIKeyID,
+			Output: "",
 		})
 	}
 
@@ -65,9 +64,8 @@ func (a *Agent) APIKeyIDs() []ToRetireAPIKeyIdsItems {
 				name = outputName
 			}
 			keys = append(keys, ToRetireAPIKeyIdsItems{
-				ID:        output.APIKeyID,
-				Output:    name,
-				RetiredAt: "",
+				ID:     output.APIKeyID,
+				Output: name,
 			})
 		}
 		for _, key := range output.ToRetireAPIKeyIds {

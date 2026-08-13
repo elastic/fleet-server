@@ -234,7 +234,7 @@ func (et *EnrollerT) _enroll(
 	}
 
 	// only delete existing agent if it never checked in
-	if agent.Id != "" && agent.LastCheckin == "" {
+	if agent.Id != "" && agent.LastCheckin.IsZero() {
 		zlog.Debug().
 			Str("EnrollmentId", enrollmentID).
 			Str("AgentId", agent.Id).
@@ -410,7 +410,7 @@ func (et *EnrollerT) _enroll(
 			PolicyBaseID:   policyBaseID(policyID),
 			Namespaces:     namespaces,
 			Type:           string(req.Type),
-			EnrolledAt:     now.UTC().Format(time.RFC3339),
+			EnrolledAt:     now.UTC(),
 			LocalMetadata:  localMeta,
 			AccessAPIKeyID: accessAPIKey.ID,
 			ActionSeqNo:    []int64{sqn.UndefinedSeqNo},
@@ -439,7 +439,7 @@ func (et *EnrollerT) _enroll(
 			AccessApiKey:         accessAPIKey.Token(),
 			AccessApiKeyId:       agent.AccessAPIKeyID,
 			Active:               agent.Active,
-			EnrolledAt:           agent.EnrolledAt,
+			EnrolledAt:           agent.EnrolledAt.Format(time.RFC3339),
 			Id:                   agentID,
 			LocalMetadata:        agent.LocalMetadata,
 			PolicyId:             agent.PolicyID,

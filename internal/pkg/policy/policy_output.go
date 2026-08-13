@@ -167,7 +167,7 @@ func (p *Output) prepareElasticsearch(
 			zlog.Info().Str(ecs.APIKeyID, agentOutput.APIKeyID).Str(ecs.PolicyOutputName, agentOutputName).Msg("Output removed, will retire API key")
 			retiring := model.ToRetireAPIKeyIdsItems{
 				ID:        agentOutput.APIKeyID,
-				RetiredAt: time.Now().UTC().Format(time.RFC3339),
+				RetiredAt: time.Now().UTC(),
 				Output:    agentOutputName,
 			}
 			if secretID, ok := secret.ParseSecretReference(agentOutput.APIKey); ok {
@@ -360,7 +360,7 @@ func (p *Output) prepareElasticsearch(
 		if output.APIKeyID != "" {
 			retiring := model.ToRetireAPIKeyIdsItems{
 				ID:        output.APIKeyID,
-				RetiredAt: time.Now().UTC().Format(time.RFC3339),
+				RetiredAt: time.Now().UTC(),
 				Output:    p.Name,
 			}
 			if secretID, ok := secret.ParseSecretReference(output.APIKey); ok {

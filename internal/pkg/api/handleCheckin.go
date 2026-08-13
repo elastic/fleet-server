@@ -487,7 +487,7 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 		checkin.WithSeqNo(seqno),
 		checkin.WithVer(ver),
 		checkin.WithUnhealthyReason(unhealthyReason),
-		checkin.WithDeleteAudit(agent.AuditUnenrolledReason != "" || agent.UnenrolledAt != ""),
+		checkin.WithDeleteAudit(agent.AuditUnenrolledReason != "" || !agent.UnenrolledAt.IsZero()),
 	}
 
 	if validated.rawAvailableRollbacks != nil {
@@ -1022,17 +1022,19 @@ func convertActions(zlog zerolog.Logger, agentID string, actions []model.Action)
 		}
 		r := Action{
 			AgentId:   agentID,
-			CreatedAt: action.Timestamp,
+			CreatedAt: action.Timestamp.Format(time.RFC3339Nano),
 			Data:      ad,
 			Id:        action.ActionID,
 			Type:      ActionType(action.Type),
 			InputType: action.InputType,
 		}
-		if action.StartTime != "" {
-			r.StartTime = &action.StartTime
+		if !action.StartTime.IsZero() {
+			t := action.StartTime.Format(time.RFC3339Nano)
+			r.StartTime = &t
 		}
-		if action.Expiration != "" {
-			r.Expiration = &action.Expiration
+		if !action.Expiration.IsZero() {
+			t := action.Expiration.Format(time.RFC3339Nano)
+			r.Expiration = &t
 		}
 		if action.Traceparent != "" {
 			r.Traceparent = &action.Traceparent
@@ -1147,7 +1149,7 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 	r := policy.RevisionFromPolicy(pp.Policy)
 	resp := Action{
 		AgentId:   agent.Id,
-		CreatedAt: pp.Policy.Timestamp,
+		CreatedAt: pp.Policy.Timestamp.Format(time.RFC3339Nano),
 		Data:      ad,
 		Id:        r.String(),
 		Type:      POLICYCHANGE,

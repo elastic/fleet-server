@@ -178,7 +178,7 @@ func eventToActionResult(agentID, aType string, namespaces []string, ev AckReque
 			Namespaces: namespaces,
 			Data:       p,
 			Error:      fromPtr(event.Error),
-			Timestamp:  event.Timestamp.Format(time.RFC3339Nano),
+			Timestamp:  event.Timestamp,
 		}
 	case string(INPUTACTION):
 		event, _ := ev.AsInputEvent()
@@ -187,12 +187,12 @@ func eventToActionResult(agentID, aType string, namespaces []string, ev AckReque
 			AgentID:         agentID,
 			Namespaces:      namespaces,
 			ActionInputType: event.ActionInputType,
-			StartedAt:       event.StartedAt.Format(time.RFC3339Nano),
-			CompletedAt:     event.CompletedAt.Format(time.RFC3339Nano),
+			StartedAt:       event.StartedAt,
+			CompletedAt:     event.CompletedAt,
 			ActionData:      event.ActionData,
 			ActionResponse:  event.ActionResponse,
 			Error:           fromPtr(event.Error),
-			Timestamp:       event.Timestamp.Format(time.RFC3339Nano),
+			Timestamp:       event.Timestamp,
 		}
 	default: // UPGRADE action acks are also handled by handelUpgrade (deprecated func)
 		event, _ := ev.AsGenericEvent()
@@ -201,7 +201,7 @@ func eventToActionResult(agentID, aType string, namespaces []string, ev AckReque
 			Namespaces: namespaces,
 			AgentID:    agentID,
 			Error:      fromPtr(event.Error),
-			Timestamp:  event.Timestamp.Format(time.RFC3339Nano),
+			Timestamp:  event.Timestamp,
 		}
 	}
 }

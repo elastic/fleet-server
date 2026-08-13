@@ -239,7 +239,7 @@ func Test_Agent_Namespace_test1(t *testing.T) {
 	newActionID, _ := uuid.NewV4()
 	var actionData = model.Action{
 		Agents:     []string{resp.Item.Id},
-		Expiration: time.Now().Add(time.Hour * 2000).Format(time.RFC3339),
+		Expiration: time.Now().Add(time.Hour * 2000),
 		ActionID:   newActionID.String(),
 		Namespaces: []string{"test1"},
 		Type:       "SETTINGS",

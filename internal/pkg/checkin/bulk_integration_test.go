@@ -36,7 +36,7 @@ func TestEffectiveConfigReplacesRemovedFields(t *testing.T) {
 	agentID := uuid.Must(uuid.NewV7()).String()
 
 	// Step 1: Create a document with effective_config containing 2 pipelines.
-	now := time.Now().UTC().Format(time.RFC3339)
+	now := time.Now().UTC()
 	initialConfig := json.RawMessage(`{"service":{"pipelines":{"traces":{"receivers":["otlp"],"exporters":["logging"]},"metrics":{"receivers":["otlp"],"exporters":["logging"]}}}}`)
 	initialDoc, err := json.Marshal(model.Agent{
 		Active:            true,

@@ -31,7 +31,7 @@ func createRandomEnrollmentAPIKey(policyID string, active bool) model.Enrollment
 		Active:    active,
 		APIKey:    "d2JndlFIWUJJUVVxWDVia2NJTV86X0d6ZmljZGNTc1d4R1otbklrZFFRZw==",
 		APIKeyID:  xid.New().String(),
-		CreatedAt: now.Format(time.RFC3339),
+		CreatedAt: now,
 		Name:      "Default (db3f8318-05f0-4625-a808-9deddb0112b5)",
 		PolicyID:  policyID,
 	}

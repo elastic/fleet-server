@@ -37,7 +37,7 @@ func createRandomPolicy(id string, revisionIdx int) model.Policy {
 		RevisionIdx:        int64(revisionIdx),
 		Data:               &policyData,
 		DefaultFleetServer: false,
-		Timestamp:          now.Format(time.RFC3339),
+		Timestamp:          now,
 	}
 }
 
@@ -189,7 +189,7 @@ func TestQueryOutputFromPolicy(t *testing.T) {
 		CoordinatorIdx:     0,
 		Data:               &policyData,
 		DefaultFleetServer: false,
-		Timestamp:          now.Format(time.RFC3339),
+		Timestamp:          now,
 	}
 	_, err := CreatePolicy(ctx, bulker, rec, WithIndexName(index))
 	if err != nil {

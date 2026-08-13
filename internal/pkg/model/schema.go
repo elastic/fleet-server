@@ -8,6 +8,7 @@ package model
 
 import (
 	"encoding/json"
+	"time"
 )
 
 // Root
@@ -43,7 +44,7 @@ type Action struct {
 	Data json.RawMessage `json:"data,omitempty"`
 
 	// The action expiration date/time
-	Expiration string `json:"expiration,omitempty"`
+	Expiration time.Time `json:"expiration,omitempty"`
 
 	// The input type the actions should be routed to.
 	InputType string `json:"input_type,omitempty"`
@@ -62,13 +63,13 @@ type Action struct {
 	Signed           *Signed                 `json:"signed,omitempty"`
 
 	// The action start date/time
-	StartTime string `json:"start_time,omitempty"`
+	StartTime time.Time `json:"start_time,omitempty"`
 
 	// The optional action timeout in seconds
 	Timeout int64 `json:"timeout,omitempty"`
 
 	// Date/time the action was created
-	Timestamp string `json:"@timestamp,omitempty"`
+	Timestamp time.Time `json:"@timestamp,omitempty"`
 
 	// APM traceparent for the action.
 	Traceparent string `json:"traceparent,omitempty"`
@@ -100,7 +101,7 @@ type ActionResult struct {
 	AgentID string `json:"agent_id,omitempty"`
 
 	// Date/time the action was completed
-	CompletedAt string `json:"completed_at,omitempty"`
+	CompletedAt time.Time `json:"completed_at,omitempty"`
 
 	// The opaque payload.
 	Data json.RawMessage `json:"data,omitempty"`
@@ -112,10 +113,10 @@ type ActionResult struct {
 	Namespaces []string `json:"namespaces,omitempty"`
 
 	// Date/time the action was started
-	StartedAt string `json:"started_at,omitempty"`
+	StartedAt time.Time `json:"started_at,omitempty"`
 
 	// Date/time the action was created
-	Timestamp string `json:"@timestamp,omitempty"`
+	Timestamp time.Time `json:"@timestamp,omitempty"`
 }
 
 // Agent An Elastic Agent that has enrolled into Fleet
@@ -139,7 +140,7 @@ type Agent struct {
 	AuditUnenrolledReason string `json:"audit_unenrolled_reason,omitempty"`
 
 	// Agent timestamp for audit unenroll/uninstall action
-	AuditUnenrolledTime string `json:"audit_unenrolled_time,omitempty"`
+	AuditUnenrolledTime time.Time `json:"audit_unenrolled_time,omitempty"`
 
 	// List of capabilities of the collector
 	Capabilities []string `json:"capabilities,omitempty"`
@@ -160,7 +161,7 @@ type Agent struct {
 	EffectiveConfig json.RawMessage `json:"effective_config,omitempty"`
 
 	// Date/time the Elastic Agent enrolled
-	EnrolledAt string `json:"enrolled_at"`
+	EnrolledAt time.Time `json:"enrolled_at"`
 
 	// Enrollment ID
 	EnrollmentID string `json:"enrollment_id,omitempty"`
@@ -172,7 +173,7 @@ type Agent struct {
 	IdentifyingAttributes json.RawMessage `json:"identifying_attributes,omitempty"`
 
 	// Date/time the Elastic Agent checked in last time
-	LastCheckin string `json:"last_checkin,omitempty"`
+	LastCheckin time.Time `json:"last_checkin,omitempty"`
 
 	// Last checkin message
 	LastCheckinMessage string `json:"last_checkin_message,omitempty"`
@@ -181,7 +182,7 @@ type Agent struct {
 	LastCheckinStatus string `json:"last_checkin_status,omitempty"`
 
 	// Date/time the Elastic Agent was last updated
-	LastUpdated string `json:"last_updated,omitempty"`
+	LastUpdated time.Time `json:"last_updated,omitempty"`
 
 	// Local metadata information for the Elastic Agent
 	LocalMetadata json.RawMessage `json:"local_metadata,omitempty"`
@@ -229,19 +230,19 @@ type Agent struct {
 	Type string `json:"type"`
 
 	// Date/time the Elastic Agent unenrolled
-	UnenrolledAt string `json:"unenrolled_at,omitempty"`
+	UnenrolledAt time.Time `json:"unenrolled_at,omitempty"`
 
 	// Reason the Elastic Agent was unenrolled
 	UnenrolledReason string `json:"unenrolled_reason,omitempty"`
 
 	// Date/time the Elastic Agent unenrolled started
-	UnenrollmentStartedAt string `json:"unenrollment_started_at,omitempty"`
+	UnenrollmentStartedAt time.Time `json:"unenrollment_started_at,omitempty"`
 
 	// Unhealthy reason: input/output/other
 	UnhealthyReason []string `json:"unhealthy_reason,omitempty"`
 
 	// Date/time the Elastic Agent was last updated
-	UpdatedAt string `json:"updated_at,omitempty"`
+	UpdatedAt time.Time `json:"updated_at,omitempty"`
 
 	// Container for upgrade-related agent data
 	Upgrade *Upgrade `json:"upgrade,omitempty"`
@@ -253,13 +254,13 @@ type Agent struct {
 	UpgradeDetails *UpgradeDetails `json:"upgrade_details,omitempty"`
 
 	// Date/time the Elastic Agent started the current upgrade
-	UpgradeStartedAt string `json:"upgrade_started_at,omitempty"`
+	UpgradeStartedAt time.Time `json:"upgrade_started_at,omitempty"`
 
 	// Upgrade status
 	UpgradeStatus string `json:"upgrade_status,omitempty"`
 
 	// Date/time the Elastic Agent was last upgraded
-	UpgradedAt string `json:"upgraded_at,omitempty"`
+	UpgradedAt time.Time `json:"upgraded_at,omitempty"`
 
 	// User provided metadata information for the Elastic Agent
 	UserProvidedMetadata json.RawMessage `json:"user_provided_metadata,omitempty"`
@@ -289,7 +290,7 @@ type Artifact struct {
 	CompressionAlgorithm string `json:"compression_algorithm,omitempty"`
 
 	// Timestamp artifact was created
-	Created string `json:"created"`
+	Created time.Time `json:"created"`
 
 	// SHA256 of artifact before encoding has been applied
 	DecodedSha256 string `json:"decoded_sha256,omitempty"`
@@ -315,8 +316,8 @@ type Artifact struct {
 
 // AvailableRollback
 type AvailableRollback struct {
-	ValidUntil string `json:"valid_until,omitempty"`
-	Version    string `json:"version,omitempty"`
+	ValidUntil time.Time `json:"valid_until,omitempty"`
+	Version    string    `json:"version,omitempty"`
 }
 
 // Checkin An Elastic Agent checkin to Fleet
@@ -336,7 +337,7 @@ type Checkin struct {
 	Status string `json:"status"`
 
 	// Date/time the checkin was created
-	Timestamp string `json:"@timestamp,omitempty"`
+	Timestamp time.Time `json:"@timestamp,omitempty"`
 }
 
 // CheckinPolicy The current status of the applied policy
@@ -395,17 +396,17 @@ type EnrollmentAPIKey struct {
 	APIKeyID string `json:"api_key_id"`
 
 	// True when the key is active
-	Active    bool   `json:"active,omitempty"`
-	CreatedAt string `json:"created_at,omitempty"`
-	ExpireAt  string `json:"expire_at,omitempty"`
+	Active    bool      `json:"active,omitempty"`
+	CreatedAt time.Time `json:"created_at,omitempty"`
+	ExpireAt  time.Time `json:"expire_at,omitempty"`
 
 	// Enrollment key name
 	Name string `json:"name,omitempty"`
 
 	// Namespaces
-	Namespaces []string `json:"namespaces,omitempty"`
-	PolicyID   string   `json:"policy_id,omitempty"`
-	UpdatedAt  string   `json:"updated_at,omitempty"`
+	Namespaces []string  `json:"namespaces,omitempty"`
+	PolicyID   string    `json:"policy_id,omitempty"`
+	UpdatedAt  time.Time `json:"updated_at,omitempty"`
 }
 
 // HostMetadata The host metadata for the Elastic Agent
@@ -471,7 +472,7 @@ type Policy struct {
 	RevisionIdx int64 `json:"revision_idx"`
 
 	// Date/time the policy revision was created
-	Timestamp string `json:"@timestamp,omitempty"`
+	Timestamp time.Time `json:"@timestamp,omitempty"`
 
 	// Timeout (seconds) that an Elastic Agent should be un-enrolled.
 	UnenrollTimeout int64 `json:"unenroll_timeout,omitempty"`
@@ -530,7 +531,7 @@ type PolicyLeader struct {
 	Server *ServerMetadata `json:"server"`
 
 	// Date/time the leader was taken or held
-	Timestamp string `json:"@timestamp,omitempty"`
+	Timestamp time.Time `json:"@timestamp,omitempty"`
 }
 
 // PolicyOutput holds the needed data to manage the output API keys
@@ -566,7 +567,7 @@ type Server struct {
 	Server *ServerMetadata `json:"server"`
 
 	// Date/time the server was updated
-	Timestamp string `json:"@timestamp,omitempty"`
+	Timestamp time.Time `json:"@timestamp,omitempty"`
 }
 
 // ServerMetadata A Fleet Server metadata
@@ -605,7 +606,7 @@ type ToRetireAPIKeyIdsItems struct {
 	Output string `json:"output,omitempty"`
 
 	// Date/time the API key was retired
-	RetiredAt string `json:"retired_at,omitempty"`
+	RetiredAt time.Time `json:"retired_at,omitempty"`
 
 	// Fleet secret ID for the retired API key, if the key was stored in .fleet-secrets
 	SecretID string `json:"secret_id,omitempty"`
