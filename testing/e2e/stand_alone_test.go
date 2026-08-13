@@ -784,11 +784,24 @@ func (suite *StandAloneSuite) TestAgentGracefulForceUnenroll() {
 	f.Close()
 	suite.Require().NoError(err)
 
+	// Capture fleet-server stderr to a file so step 2 can scan it for the
+	// "Returning UNENROLL action" log message (fleet-server logs to stderr).
+	fsLogPath := filepath.Join(dir, "fleet-server.log")
+	fsLog, err := os.Create(fsLogPath)
+	suite.Require().NoError(err)
+
 	fsCmd := exec.CommandContext(ctx, suite.binaryPath, "-c", filepath.Join(dir, "fs-config.yml"))
 	fsCmd.Cancel = func() error { return fsCmd.Process.Signal(syscall.SIGTERM) }
 	fsCmd.Env = []string{"GOCOVERDIR=" + suite.CoverPath}
+	fsCmd.Stderr = fsLog
 	suite.Require().NoError(fsCmd.Start())
-	suite.T().Cleanup(func() { fsCmd.Wait() })
+	suite.T().Cleanup(func() {
+		fsCmd.Wait()
+		fsLog.Close()
+		if p, readErr := os.ReadFile(fsLogPath); readErr == nil {
+			suite.T().Logf("fleet-server output:\n%s", string(p))
+		}
+	})
 
 	suite.FleetServerStatusOK(ctx, "https://localhost:8220")
 
@@ -912,20 +925,20 @@ func (suite *StandAloneSuite) TestAgentGracefulForceUnenroll() {
 
 	// The agent continues checking in. The 2nd invalid checkin returns UNENROLL (escalation
 	// step 2). On receiving UNENROLL the agent cancels its fleet gateway and goes dormant —
-	// the process stays running but stops sending checkins. Fleet-server will mark the agent
-	// offline once its last_checkin age exceeds the offline threshold.
-	suite.T().Log("Waiting for elastic-agent to become offline after UNENROLL (step 2)...")
+	// the process stays running but stops sending checkins. The agent's Kibana status does not
+	// transition to "offline" until the policy's checkin interval expires (potentially several
+	// minutes), so instead we scan fleet-server's own log output for the unique message it
+	// emits when it sends the UNENROLL action.
+	suite.T().Log("Waiting for fleet-server to emit UNENROLL action log (step 2)...")
 	suite.Require().Eventually(func() bool {
-		_, agents := suite.GetAgents(ctx)
-		for _, a := range agents {
-			if a.ID == agentID {
-				suite.T().Logf("agent %s status=%s", a.ID, a.Status)
-				return a.Status == "offline" || a.Status == "unenrolled"
-			}
+		data, readErr := os.ReadFile(fsLogPath)
+		if readErr != nil {
+			return false
 		}
-		return false
-	}, 3*time.Minute, 5*time.Second, "elastic-agent did not become offline or unenrolled after UNENROLL action")
-	suite.T().Log("Agent is offline/unenrolled — UNENROLL confirmed")
+		return bytes.Contains(data, []byte("Returning UNENROLL action for agent with invalid API key")) &&
+			bytes.Contains(data, []byte(agentID))
+	}, 2*time.Minute, 2*time.Second, "fleet-server did not emit UNENROLL action for agent within timeout")
+	suite.T().Log("Fleet-server emitted UNENROLL action — UNENROLL confirmed")
 }
 
 // agentAccessAPIKeyID queries .fleet-agents to retrieve the access_api_key_id for the given agent.
