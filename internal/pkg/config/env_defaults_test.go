@@ -31,8 +31,9 @@ func TestLoadLimits(t *testing.T) {
 		ExpectedAgentLimit   int
 	}{
 		{"default", -1, int(getMaxInt())},
-		{"few agents", 5, 2500},
-		{"512", 512, 2500},
+		{"few agents", 5, 500},
+		{"512", 512, 1000},
+		{"lte2500 lower bound", 1001, 2500},
 		{"lesser bound", 5001, 10000},
 		{"upper bound", 10000, 10000},
 		{"above max", 40001, int(getMaxInt())},
