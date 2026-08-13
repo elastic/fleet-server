@@ -4,7 +4,7 @@ num_agents:
 recommended_min_ram: 512
 cache_limits:
   num_counters: 10000
-  max_cost: 67108864 # 64MiB
+  max_cost: 52428800 # 50MiB
 server_limits:
   max_connections: 3000
   action_limit:
