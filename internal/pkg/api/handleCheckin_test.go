@@ -1604,7 +1604,7 @@ func TestProcessPolicyRemoteESServiceTokenSecretPaths(t *testing.T) {
 		},
 	}
 
-	action, err := processPolicy(t.Context(), logger, bulker, agent, pp)
+	action, err := processPolicy(t.Context(), logger, bulker, agent, pp, nil)
 	require.NoError(t, err)
 
 	pc, err := action.Data.AsActionPolicyChange()
