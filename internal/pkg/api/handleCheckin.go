@@ -914,19 +914,36 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 	}
 
 	data := model.ClonePolicyData(pp.Policy.Data)
-	for _, policyOutput := range data.Outputs {
+	for name, policyOutput := range data.Outputs {
 		// NOTE: Not sure if output secret keys collected here include new entries, but they are collected for completeness
 		ks, err := secret.ProcessOutputSecret(policyOutput, secretValues)
 		if err != nil {
-			return nil, fmt.Errorf("failed to process output secret for output %q: %w", policyOutput["name"], err)
+			return nil, fmt.Errorf("failed to process output secret for output %q: %w", name, err)
 		}
-		pp.SecretKeys = append(pp.SecretKeys, ks...)
+		for _, key := range ks {
+			pp.SecretKeys = append(pp.SecretKeys, "outputs."+name+"."+key)
+		}
 	}
 	// Iterate through the policy outputs and prepare them
 	for _, policyOutput := range pp.Outputs {
 		if err := policyOutput.Prepare(ctx, zlog, bulker, agent, data.Outputs); err != nil {
 			return nil, fmt.Errorf("failed to prepare output %q: %w",
 				policyOutput.Name, err)
+		}
+	}
+
+	// Do not advertise remote ES service_token in secret_paths once Prepare(...) has
+	// deleted it from the policy sent to agents. Use pp.Outputs for type because
+	// Prepare rewrites data.Outputs type to elasticsearch.
+	for name, out := range pp.Outputs {
+		if out.Type != policy.OutputTypeRemoteElasticsearch {
+			continue
+		}
+		if _, ok := data.Outputs[name][policy.FieldOutputServiceToken]; !ok {
+			prefixed := "outputs." + name + "." + policy.FieldOutputServiceToken
+			pp.SecretKeys = slices.DeleteFunc(pp.SecretKeys, func(key string) bool {
+				return key == prefixed
+			})
 		}
 	}
 	// Prepare OTel exporters from the information in outputs.
