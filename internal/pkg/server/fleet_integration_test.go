@@ -436,9 +436,8 @@ func TestServerUnauthorized(t *testing.T) {
 		srv.buildURL(agentID, "acks"),
 	}
 
-	allurls := []string{
-		srv.buildURL("", "enroll"),
-	}
+	allurls := make([]string, 0, 1+len(agenturls))
+	allurls = append(allurls, srv.buildURL("", "enroll"))
 	allurls = append(allurls, agenturls...)
 
 	// Expecting no authorization header error
@@ -1817,4 +1816,130 @@ func TestCheckinOTelColPolicy(t *testing.T) {
 	encodedApiKey := base64.StdEncoding.EncodeToString([]byte(output.ApiKey))
 
 	assert.Equal(t, encodedApiKey, exporter.ApiKey)
+}
+
+// Test_Checkin_GracefulForceUnenroll verifies the three-step state machine that runs when
+// the GracefulForceUnenroll feature is enabled and an agent checks in with an invalid key:
+//
+//	1st call → HTTP 200 + POLICY_CHANGE (empty policy, stops all agent inputs)
+//	2nd call → HTTP 200 + UNENROLL
+//	3rd+ call → HTTP 401 (original error passed through)
+func Test_Checkin_GracefulForceUnenroll(t *testing.T) {
+	doCheckin := func(t *testing.T, ctx context.Context, srv *tserver, agentID, agentKey string) *http.Response {
+		t.Helper()
+		req, err := http.NewRequestWithContext(ctx, "POST",
+			srv.baseURL()+"/api/fleet/agents/"+agentID+"/checkin",
+			strings.NewReader(checkinBody))
+		require.NoError(t, err)
+		req.Header.Set("Authorization", "ApiKey "+agentKey)
+		req.Header.Set("User-Agent", "elastic agent "+serverVersion)
+		req.Header.Set("Content-Type", "application/json")
+		res, err := cleanhttp.DefaultClient().Do(req)
+		require.NoError(t, err)
+		return res
+	}
+
+	t.Run("flag enabled: escalation through state machine", func(t *testing.T) {
+		srv, err := startTestServer(t, t.Context(), policyData, func(cfg *config.Config) error {
+			cfg.Inputs[0].Server.Features.GracefulForceUnenroll.Enabled = true
+			return nil
+		})
+		require.NoError(t, err)
+		ctx := testlog.SetLogger(t).WithContext(t.Context())
+
+		// Enroll a real agent so the agent ID is present in the system.
+		enrollment := EnrollAgent(t, ctx, srv, enrollBody)
+		agentID := enrollment.Item.Id
+		t.Cleanup(func() { _ = srv.bulker.Delete(ctx, dl.FleetAgents, agentID) })
+
+		// Use a key that was never created in ES. This guarantees ErrUnauthorized
+		// without depending on ES's propagation window for invalidated keys.
+		fakeKey := base64.StdEncoding.EncodeToString([]byte("invalid-id:invalid-secret"))
+
+		// 1st call: expect HTTP 200 with POLICY_CHANGE (empty policy).
+		res := doCheckin(t, ctx, srv, agentID, fakeKey)
+		body, err := io.ReadAll(res.Body)
+		res.Body.Close()
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, res.StatusCode)
+
+		var checkinResp api.CheckinResponse
+		require.NoError(t, json.Unmarshal(body, &checkinResp))
+		require.Len(t, checkinResp.Actions, 1, "expected exactly one action on 1st call")
+		action := checkinResp.Actions[0]
+		assert.Equal(t, api.POLICYCHANGE, action.Type, "1st call should return POLICY_CHANGE")
+		assert.Equal(t, agentID, action.AgentId)
+		assert.NotEmpty(t, action.Id)
+		pc, err := action.Data.AsActionPolicyChange()
+		require.NoError(t, err)
+		assert.Empty(t, pc.Policy.Inputs)
+
+		// 2nd call: expect HTTP 200 with UNENROLL.
+		res = doCheckin(t, ctx, srv, agentID, fakeKey)
+		body, err = io.ReadAll(res.Body)
+		res.Body.Close()
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, res.StatusCode)
+
+		require.NoError(t, json.Unmarshal(body, &checkinResp))
+		require.Len(t, checkinResp.Actions, 1, "expected exactly one action on 2nd call")
+		action = checkinResp.Actions[0]
+		assert.Equal(t, api.UNENROLL, action.Type, "2nd call should return UNENROLL")
+		assert.Equal(t, agentID, action.AgentId)
+
+		// 3rd call: expect HTTP 401 (pass-through).
+		res = doCheckin(t, ctx, srv, agentID, fakeKey)
+		res.Body.Close()
+		assert.Equal(t, http.StatusUnauthorized, res.StatusCode, "3rd call should return 401")
+
+		// 4th call: still HTTP 401.
+		res = doCheckin(t, ctx, srv, agentID, fakeKey)
+		res.Body.Close()
+		assert.Equal(t, http.StatusUnauthorized, res.StatusCode, "4th call should still return 401")
+
+		// Clear the state map and verify the cycle restarts from the beginning.
+		srv.srv.checkinT.ClearInvalidKeyStates()
+
+		// 1st call after reset: expect POLICY_CHANGE again.
+		res = doCheckin(t, ctx, srv, agentID, fakeKey)
+		body, err = io.ReadAll(res.Body)
+		res.Body.Close()
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, res.StatusCode)
+		require.NoError(t, json.Unmarshal(body, &checkinResp))
+		require.Len(t, checkinResp.Actions, 1, "expected exactly one action after reset")
+		assert.Equal(t, api.POLICYCHANGE, checkinResp.Actions[0].Type, "1st call after reset should return POLICY_CHANGE")
+
+		// 2nd call after reset: expect UNENROLL.
+		res = doCheckin(t, ctx, srv, agentID, fakeKey)
+		body, err = io.ReadAll(res.Body)
+		res.Body.Close()
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, res.StatusCode)
+		require.NoError(t, json.Unmarshal(body, &checkinResp))
+		require.Len(t, checkinResp.Actions, 1, "expected exactly one action on 2nd call after reset")
+		assert.Equal(t, api.UNENROLL, checkinResp.Actions[0].Type, "2nd call after reset should return UNENROLL")
+
+		// 3rd call after reset: expect 401 again.
+		res = doCheckin(t, ctx, srv, agentID, fakeKey)
+		res.Body.Close()
+		assert.Equal(t, http.StatusUnauthorized, res.StatusCode, "3rd call after reset should return 401")
+	})
+
+	t.Run("flag disabled: unknown key returns 401", func(t *testing.T) {
+		srv, err := startTestServer(t, t.Context(), policyData)
+		require.NoError(t, err)
+		ctx := testlog.SetLogger(t).WithContext(t.Context())
+
+		// Use a random agent ID and a key that was never created in ES.
+		// This is the same approach as TestServerUnauthorized and avoids
+		// depending on ES's eventual-consistency window for invalidated keys.
+		agentID := uuid.Must(uuid.NewV4()).String()
+		fakeKey := base64.StdEncoding.EncodeToString([]byte("fake-id:fake-secret"))
+
+		res := doCheckin(t, ctx, srv, agentID, fakeKey)
+		defer res.Body.Close()
+
+		assert.Equal(t, http.StatusUnauthorized, res.StatusCode)
+	})
 }
