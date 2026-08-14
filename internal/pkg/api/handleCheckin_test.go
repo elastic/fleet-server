@@ -11,8 +11,10 @@ import (
 	"compress/flate"
 	"compress/gzip"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -20,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/checkin"
@@ -1101,6 +1104,243 @@ func requireMarshalJSON(t *testing.T, obj any) json.RawMessage {
 	data, err := json.Marshal(obj)
 	require.NoError(t, err)
 	return data
+}
+
+func TestIsInvalidAPIKeyErr(t *testing.T) {
+	tests := []struct {
+		name     string
+		err      error
+		expected bool
+	}{
+		{name: "ErrAPIKeyNotFound", err: apikey.ErrAPIKeyNotFound, expected: true},
+		{name: "ErrUnauthorized", err: apikey.ErrUnauthorized, expected: true},
+		{name: "ErrAPIKeyNotEnabled", err: ErrAPIKeyNotEnabled, expected: true},
+		{name: "ErrAgentInactive", err: ErrAgentInactive, expected: true},
+		{name: "wrapped ErrAPIKeyNotFound", err: fmt.Errorf("outer: %w", apikey.ErrAPIKeyNotFound), expected: true},
+		{name: "wrapped ErrAgentInactive", err: fmt.Errorf("outer: %w", ErrAgentInactive), expected: true},
+		{name: "ErrNoAuthHeader", err: apikey.ErrNoAuthHeader, expected: false},
+		{name: "ErrMalformedHeader", err: apikey.ErrMalformedHeader, expected: false},
+		{name: "ErrAgentCorrupted", err: ErrAgentCorrupted, expected: false},
+		{name: "ErrAgentIdentity", err: ErrAgentIdentity, expected: false},
+		{name: "generic error", err: errors.New("some other error"), expected: false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.expected, isInvalidAPIKeyErr(tc.err))
+		})
+	}
+}
+
+func TestWriteEmptyPolicyChangeResponse(t *testing.T) {
+	verCon := mustBuildConstraints("8.0.0")
+	cfg := &config.Server{}
+	ct, err := NewCheckinT(verCon, cfg, nil, nil, nil, nil, nil, ftesting.NewMockBulk())
+	require.NoError(t, err)
+
+	agentID := "test-agent-id"
+	wr := httptest.NewRecorder()
+	logger := testlog.SetLogger(t)
+
+	err = ct.writeEmptyPolicyChangeResponse(logger, wr, agentID)
+	require.NoError(t, err)
+
+	resp := wr.Result()
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var checkinResp CheckinResponse
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&checkinResp))
+
+	assert.Equal(t, "checkin", checkinResp.Action)
+	require.Len(t, checkinResp.Actions, 1)
+
+	action := checkinResp.Actions[0]
+	assert.Equal(t, agentID, action.AgentId)
+	assert.Equal(t, POLICYCHANGE, action.Type)
+	assert.NotEmpty(t, action.Id)
+	assert.NotEmpty(t, action.CreatedAt)
+
+	pc, err := action.Data.AsActionPolicyChange()
+	require.NoError(t, err)
+	assert.Empty(t, pc.Policy.Inputs)
+}
+
+// TestHandleInvalidAPIKey_Escalation verifies the three-step state machine:
+//
+//	1st invalid checkin → POLICY_CHANGE
+//	2nd invalid checkin → UNENROLL
+//	3rd+ invalid checkin → original 401 error
+//	after 1 hour → state resets
+func TestHandleInvalidAPIKey_Escalation(t *testing.T) {
+	verCon := mustBuildConstraints("8.0.0")
+	cfg := &config.Server{}
+	ct, err := NewCheckinT(verCon, cfg, nil, nil, nil, nil, nil, ftesting.NewMockBulk())
+	require.NoError(t, err)
+
+	const agentID = "escalation-agent"
+	logger := testlog.SetLogger(t)
+	origErr := apikey.ErrUnauthorized
+
+	call := func() (ActionType, error) {
+		wr := httptest.NewRecorder()
+		herr := ct.handleInvalidAPIKey(logger, wr, agentID, origErr)
+		if herr != nil {
+			return "", herr
+		}
+		var resp CheckinResponse
+		require.NoError(t, json.NewDecoder(wr.Body).Decode(&resp))
+		require.Len(t, resp.Actions, 1)
+		return resp.Actions[0].Type, nil
+	}
+
+	// 1st call → POLICY_CHANGE
+	actionType, err := call()
+	require.NoError(t, err)
+	assert.Equal(t, POLICYCHANGE, actionType)
+
+	// 2nd call → UNENROLL
+	actionType, err = call()
+	require.NoError(t, err)
+	assert.Equal(t, UNENROLL, actionType)
+
+	// 3rd call → original error (401)
+	_, err = call()
+	assert.ErrorIs(t, err, origErr)
+
+	// 4th call → still original error
+	_, err = call()
+	assert.ErrorIs(t, err, origErr)
+
+	// Simulate state expiry by backdating firstSeen.
+	state, ok := ct.invalidKeyStates.Load(agentID)
+	require.True(t, ok)
+	state.firstSeen = time.Now().Add(-(invalidKeyStateReset + time.Second))
+	ct.invalidKeyStates.Store(agentID, state)
+
+	// After reset → back to POLICY_CHANGE
+	actionType, err = call()
+	require.NoError(t, err)
+	assert.Equal(t, POLICYCHANGE, actionType)
+}
+
+// makeAPIKeyAuthHeader returns an Authorization header value for the given key id and secret.
+func makeAPIKeyAuthHeader(id, secret string) string {
+	token := base64.StdEncoding.EncodeToString([]byte(id + ":" + secret))
+	return "ApiKey " + token
+}
+
+func TestHandleCheckin_GracefulForceUnenroll(t *testing.T) {
+	const agentID = "test-agent-id"
+
+	tests := []struct {
+		name        string
+		authErr     error
+		flagEnabled bool
+		wantStatus  int
+		wantAction  ActionType
+	}{
+		{
+			name:        "flag enabled, ErrAPIKeyNotFound returns POLICY_CHANGE on first occurrence",
+			authErr:     apikey.ErrAPIKeyNotFound,
+			flagEnabled: true,
+			wantStatus:  http.StatusOK,
+			wantAction:  POLICYCHANGE,
+		},
+		{
+			name:        "flag enabled, ErrUnauthorized returns POLICY_CHANGE on first occurrence",
+			authErr:     apikey.ErrUnauthorized,
+			flagEnabled: true,
+			wantStatus:  http.StatusOK,
+			wantAction:  POLICYCHANGE,
+		},
+		{
+			name:        "flag enabled, ErrAPIKeyNotEnabled returns POLICY_CHANGE on first occurrence",
+			authErr:     ErrAPIKeyNotEnabled,
+			flagEnabled: true,
+			wantStatus:  http.StatusOK,
+			wantAction:  POLICYCHANGE,
+		},
+		{
+			name:        "flag disabled, ErrAPIKeyNotFound returns 401",
+			authErr:     apikey.ErrAPIKeyNotFound,
+			flagEnabled: false,
+			wantStatus:  http.StatusUnauthorized,
+		},
+		{
+			name:        "flag enabled, ErrNoAuthHeader is not intercepted",
+			authErr:     apikey.ErrNoAuthHeader,
+			flagEnabled: true,
+			wantStatus:  http.StatusUnauthorized,
+		},
+	}
+
+	verCon := mustBuildConstraints("8.0.0")
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := &config.Server{
+				Features: config.FeatureFlags{
+					GracefulForceUnenroll: config.GracefulForceUnenrollConfig{
+						Enabled: tc.flagEnabled,
+					},
+				},
+			}
+
+			mCache := testcache.NewMockCache()
+			mBulk := ftesting.NewMockBulk()
+
+			var req *http.Request
+			if errors.Is(tc.authErr, apikey.ErrNoAuthHeader) {
+				// no Authorization header — triggers ErrNoAuthHeader before any bulker call
+				req = httptest.NewRequest(http.MethodPost, "/", nil)
+			} else if errors.Is(tc.authErr, ErrAPIKeyNotEnabled) {
+				// ErrAPIKeyNotEnabled is produced by authAPIKey after APIKeyAuth returns
+				// a disabled key (Enabled: false, nil error). SetAPIKey is then called
+				// to update the cache before the error is surfaced.
+				req = httptest.NewRequest(http.MethodPost, "/", nil)
+				req.Header.Set("Authorization", makeAPIKeyAuthHeader("key-id", "key-secret"))
+				mCache.On("ValidAPIKey", mock.Anything).Return(false)
+				mBulk.On("APIKeyAuth", mock.Anything, mock.Anything).Return(&bulk.SecurityInfo{Enabled: false}, nil)
+				mCache.On("SetAPIKey", mock.Anything, false)
+			} else {
+				req = httptest.NewRequest(http.MethodPost, "/", nil)
+				req.Header.Set("Authorization", makeAPIKeyAuthHeader("key-id", "key-secret"))
+				mCache.On("ValidAPIKey", mock.Anything).Return(false)
+				mBulk.On("APIKeyAuth", mock.Anything, mock.Anything).Return((*bulk.SecurityInfo)(nil), tc.authErr)
+			}
+
+			ct, err := NewCheckinT(verCon, cfg, mCache, nil, nil, nil, nil, mBulk)
+			require.NoError(t, err)
+
+			logger := testlog.SetLogger(t)
+			wr := httptest.NewRecorder()
+
+			handleErr := ct.handleCheckin(logger, wr, req, agentID, "elastic-agent/8.0.0")
+
+			if tc.wantStatus == http.StatusOK {
+				// On success the handler writes the response itself and returns nil.
+				require.NoError(t, handleErr)
+				resp := wr.Result()
+				defer resp.Body.Close()
+				assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+				var checkinResp CheckinResponse
+				require.NoError(t, json.NewDecoder(resp.Body).Decode(&checkinResp))
+				require.Len(t, checkinResp.Actions, 1)
+				assert.Equal(t, tc.wantAction, checkinResp.Actions[0].Type)
+				assert.Equal(t, agentID, checkinResp.Actions[0].AgentId)
+				assert.NotEmpty(t, checkinResp.Actions[0].Id)
+			} else {
+				// On 401 the handler returns the error; the API layer writes the status.
+				require.Error(t, handleErr)
+				assert.ErrorIs(t, handleErr, tc.authErr)
+			}
+
+			mBulk.AssertExpectations(t)
+			mCache.AssertExpectations(t)
+		})
+	}
 }
 
 func TestValidateCheckinRequest(t *testing.T) {

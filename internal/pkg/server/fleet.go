@@ -56,6 +56,8 @@ type Fleet struct {
 	// Used for diagnostics reporting
 	l   sync.RWMutex
 	cfg *config.Config
+
+	checkinT *api.CheckinT
 }
 
 // NewFleet creates the actual fleet server service.
@@ -543,6 +545,8 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 	if err != nil {
 		return err
 	}
+	f.checkinT = ct
+	g.Go(loggedRunFunc(ctx, "Invalid API key state cleaner", ct.RunInvalidKeyStateCleaner))
 	et, err := api.NewEnrollerT(f.verCon, &cfg.Inputs[0].Server, bulker, f.cache)
 	if err != nil {
 		return err
