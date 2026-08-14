@@ -1746,3 +1746,116 @@ func TestProcessPolicyDetails(t *testing.T) {
 		assert.Empty(t, opts)
 	})
 }
+
+// TestProcessPolicyRemoteESServiceTokenSecretPaths ensures secret_path does not
+// contain service_token for remote ES output as they are stripped before sending the policy to the agents
+
+func TestProcessPolicyRemoteESServiceTokenSecretPaths(t *testing.T) {
+	logger := testlog.SetLogger(t)
+
+	const policyPayload = `{
+  "id": "remote-with-secrets",
+  "revision": 1,
+  "outputs": {
+    "default": {
+      "type": "elasticsearch",
+      "hosts": ["https://local.es.example:443"]
+    },
+    "OUTPUT_ID": {
+      "type": "remote_elasticsearch",
+      "hosts": ["https://remote.es.example:443"],
+      "service_token": null,
+      "secrets": {
+        "service_token": {"id": "SERVICE_TOKEN_ID"},
+        "ssl": {"key": {"id": "SSL_KEY_ID"}}
+      }
+    }
+  },
+  "output_permissions": {
+    "default": {
+      "_fallback": {
+        "cluster": ["monitor"],
+        "indices": [{"names": ["logs-*", "metrics-*"], "privileges": ["auto_configure", "create_doc"]}]
+      }
+    },
+    "OUTPUT_ID": {
+      "_fallback": {
+        "cluster": ["monitor"],
+        "indices": [{"names": ["logs-*", "metrics-*"], "privileges": ["auto_configure", "create_doc"]}]
+      }
+    }
+  },
+  "inputs": [],
+  "secret_references": [
+    {"id": "SERVICE_TOKEN_ID"},
+    {"id": "SSL_KEY_ID"}
+  ],
+  "agent": {
+    "monitoring": {
+      "enabled": true,
+      "use_output": "OUTPUT_ID",
+      "logs": true,
+      "metrics": true
+    }
+  },
+  "fleet": {
+    "hosts": ["http://localhost:8220"]
+  }
+}`
+
+	var d model.PolicyData
+	err := json.Unmarshal([]byte(policyPayload), &d)
+	require.NoError(t, err)
+
+	bulker := ftesting.NewMockBulk()
+	pp, err := policy.NewParsedPolicy(t.Context(), bulker, model.Policy{
+		PolicyID:    "policy1",
+		RevisionIdx: 1,
+		Data:        &d,
+	})
+	require.NoError(t, err)
+
+	defaultOut := pp.Outputs["default"]
+	remoteOut := pp.Outputs["OUTPUT_ID"]
+	require.NotNil(t, defaultOut.Role)
+	require.NotNil(t, remoteOut.Role)
+
+	outputBulker := ftesting.NewMockBulk()
+	bulker.On("CreateAndGetBulker", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(outputBulker, false, nil)
+
+	defaultKey := bulk.APIKey{ID: "default-id", Key: "default-key"}
+	remoteKey := bulk.APIKey{ID: "remote-id", Key: "remote-key"}
+	agent := &model.Agent{
+		ESDocument: model.ESDocument{Id: "agent1"},
+		Outputs: map[string]*model.PolicyOutput{
+			"default": {
+				APIKey:          defaultKey.Agent(),
+				APIKeyID:        defaultKey.ID,
+				PermissionsHash: defaultOut.Role.Sha2,
+				Type:            policy.OutputTypeElasticsearch,
+			},
+			"OUTPUT_ID": {
+				APIKey:          remoteKey.Agent(),
+				APIKeyID:        remoteKey.ID,
+				PermissionsHash: remoteOut.Role.Sha2,
+				Type:            policy.OutputTypeRemoteElasticsearch,
+			},
+		},
+	}
+
+	action, err := processPolicy(t.Context(), logger, bulker, agent, pp, nil)
+	require.NoError(t, err)
+
+	pc, err := action.Data.AsActionPolicyChange()
+	require.NoError(t, err)
+
+	assert.NotContains(t, pc.Policy.SecretPaths, "outputs.OUTPUT_ID.service_token")
+	assert.Contains(t, pc.Policy.SecretPaths, "outputs.OUTPUT_ID.ssl.key")
+
+	remotePolicy, ok := pc.Policy.Outputs["OUTPUT_ID"].(map[string]any)
+	require.True(t, ok)
+	_, hasServiceToken := remotePolicy["service_token"]
+	assert.False(t, hasServiceToken, "service_token should be deleted by Prepare before delivery to agents")
+	assert.Equal(t, policy.OutputTypeElasticsearch, remotePolicy["type"])
+}

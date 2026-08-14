@@ -9,8 +9,8 @@ import (
 )
 
 type Cacher interface {
-	Get(key any) (any, bool)
-	Set(key, value any, cost int64) bool
-	SetWithTTL(key, value any, cost int64, ttl time.Duration) bool
+	Get(key string) (any, bool)
+	Set(key string, value any, cost int64) bool
+	SetWithTTL(key string, value any, cost int64, ttl time.Duration) bool
 	Close()
 }
