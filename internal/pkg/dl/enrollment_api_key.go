@@ -89,7 +89,7 @@ func findEnrollmentAPIKeys(ctx context.Context, bulker bulk.Bulk, index string, 
 // CreateEnrollmentAPIKey creates a new enrollment API key
 func CreateEnrollmentAPIKey(ctx context.Context, bulker bulk.Bulk, key model.EnrollmentAPIKey, opt ...Option) (string, error) {
 	o := newOption(FleetEnrollmentAPIKeys, opt...)
-	data, err := json.Marshal(&key)
+	data, err := json.Marshal(&key) //nolint:gosec // G117: marshaling enrollment API key is intentional, the struct matches the ES document schema
 	if err != nil {
 		return "", err
 	}

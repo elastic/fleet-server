@@ -25,7 +25,7 @@ func TestThrottleZero(t *testing.T) {
 
 	N := rand.Intn(64) + 10 //nolint:gosec // random number is used for testing
 
-	var tokens []*Token
+	tokens := make([]*Token, 0, N)
 	for i := range N {
 
 		key := strconv.Itoa(i)

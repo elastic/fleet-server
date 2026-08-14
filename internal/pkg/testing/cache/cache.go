@@ -31,7 +31,7 @@ func (m *MockCache) SetAction(action model.Action) {
 
 func (m *MockCache) GetAction(id string) (model.Action, bool) {
 	args := m.Called(id)
-	return args.Get(0).(model.Action), args.Bool(1)
+	return args.Get(0).(model.Action), args.Bool(1) //nolint:errcheck // testify mock type assertion: intentional panic on type mismatch
 }
 
 func (m *MockCache) SetAPIKey(key corecache.APIKey, enabled bool) {
@@ -49,7 +49,7 @@ func (m *MockCache) SetEnrollmentAPIKey(id string, key model.EnrollmentAPIKey, c
 
 func (m *MockCache) GetEnrollmentAPIKey(id string) (model.EnrollmentAPIKey, bool) {
 	args := m.Called(id)
-	return args.Get(0).(model.EnrollmentAPIKey), args.Bool(1)
+	return args.Get(0).(model.EnrollmentAPIKey), args.Bool(1) //nolint:errcheck // testify mock type assertion: intentional panic on type mismatch
 }
 
 func (m *MockCache) SetArtifact(artifact model.Artifact) {
@@ -58,7 +58,7 @@ func (m *MockCache) SetArtifact(artifact model.Artifact) {
 
 func (m *MockCache) GetArtifact(ident, sha2 string) (model.Artifact, bool) {
 	args := m.Called(ident, sha2)
-	return args.Get(0).(model.Artifact), args.Bool(1)
+	return args.Get(0).(model.Artifact), args.Bool(1) //nolint:errcheck // testify mock type assertion: intentional panic on type mismatch
 }
 
 func (m *MockCache) SetUpload(id string, info file.Info) {
@@ -67,7 +67,7 @@ func (m *MockCache) SetUpload(id string, info file.Info) {
 
 func (m *MockCache) GetUpload(id string) (file.Info, bool) {
 	args := m.Called(id)
-	return args.Get(0).(file.Info), args.Bool(1)
+	return args.Get(0).(file.Info), args.Bool(1) //nolint:errcheck // testify mock type assertion: intentional panic on type mismatch
 }
 
 func (m *MockCache) SetPGPKey(id string, p []byte) {
@@ -76,5 +76,5 @@ func (m *MockCache) SetPGPKey(id string, p []byte) {
 
 func (m *MockCache) GetPGPKey(id string) ([]byte, bool) {
 	args := m.Called(id)
-	return args.Get(0).([]byte), args.Bool(1)
+	return args.Get(0).([]byte), args.Bool(1) //nolint:errcheck // testify mock type assertion: intentional panic on type mismatch
 }

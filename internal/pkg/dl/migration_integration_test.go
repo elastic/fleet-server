@@ -32,7 +32,7 @@ var testNow, _ = time.Parse(time.RFC3339, nowStr)
 func createSomeAgents(ctx context.Context, t *testing.T, n int, apiKey bulk.APIKey, index string, bulker bulk.Bulk) []string {
 	t.Helper()
 
-	var createdAgents []string
+	createdAgents := make([]string, 0, n)
 
 	for i := range n {
 		outputAPIKey := bulk.APIKey{

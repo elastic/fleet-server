@@ -113,7 +113,7 @@ func TestQueryLatestPolicies400k(t *testing.T) {
 		return len(policies) == 4
 	}, time.Second*2, time.Millisecond*100, "Expected to eventually have 4 policies found: %d", len(policies))
 
-	for _, policy := range policies {
+	for _, policy := range policies { //nolint:gosec // G602: range over a slice is safe even if empty
 		if policy.RevisionIdx != 100000 {
 			t.Errorf("Expected to find revision_idx 100000 for policy %s, found %d", policy.PolicyID, policy.RevisionIdx)
 		}
@@ -143,7 +143,7 @@ func TestQueryLatestPolicies11kUnique(t *testing.T) {
 		return len(policies) != 11000
 	}, time.Second*2, time.Millisecond*100, "Expected to eventually have 11000 policies found: %d", len(policies))
 
-	for _, policy := range policies {
+	for _, policy := range policies { //nolint:gosec // G602: range over a slice is safe even if empty
 		if policy.RevisionIdx != 2 {
 			t.Errorf("Expected to find revision_idx 1 for policy %s, found %d", policy.PolicyID, policy.RevisionIdx)
 		}

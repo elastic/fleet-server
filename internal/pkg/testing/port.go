@@ -18,5 +18,5 @@ func FreePort() (uint16, error) {
 	}
 	defer l.Close()
 
-	return uint16(l.Addr().(*net.TCPAddr).Port), nil //nolint:gosec // disable G115
+	return uint16(l.Addr().(*net.TCPAddr).Port), nil //nolint:gosec,errcheck // G115: port fits in uint16; errcheck: type assertion always succeeds for TCP listener
 }

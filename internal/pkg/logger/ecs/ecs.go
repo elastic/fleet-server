@@ -57,7 +57,7 @@ const (
 	ServiceType = "service.type"
 )
 
-// Non ECS compliant contants used in logging
+// Non ECS compliant constants used in logging
 
 const (
 	APIKeyID              = "fleet.apikey.id" //nolint:gosec // key name

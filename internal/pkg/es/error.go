@@ -31,13 +31,14 @@ type ErrElastic struct {
 }
 
 func (e *ErrElastic) Unwrap() error {
-	if e.Type == indexNotFoundErrorType {
+	switch e.Type {
+	case indexNotFoundErrorType:
 		return ErrIndexNotFound
-	} else if e.Type == timeoutErrorType {
+	case timeoutErrorType:
 		return ErrTimeout
+	default:
+		return nil
 	}
-
-	return nil
 }
 
 func (e ErrElastic) Error() string {

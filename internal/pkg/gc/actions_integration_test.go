@@ -48,7 +48,7 @@ func testCleanupActionsWithSelectSize(t *testing.T, _ int) {
 		thirtyDaysAndHour = "721h"
 	)
 	var (
-		expiredActions, nonExpiredActions []model.Action
+		expiredActions, nonExpiredActions []model.Action //nolint:prealloc // assigned from function calls, not built by appending in a loop
 		err                               error
 	)
 

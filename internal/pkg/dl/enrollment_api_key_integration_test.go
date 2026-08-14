@@ -41,7 +41,7 @@ func createRandomEnrollmentAPIKey(policyID string, active bool) model.Enrollment
 func storeRandomEnrollmentAPIKey(ctx context.Context, bulker bulk.Bulk, index string, policyID string, active bool) (model.EnrollmentAPIKey, error) {
 	rec := createRandomEnrollmentAPIKey(policyID, active)
 
-	body, err := json.Marshal(rec)
+	body, err := json.Marshal(rec) //nolint:gosec // G117: marshaling enrollment API key for test setup is intentional
 	if err != nil {
 		return rec, err
 	}

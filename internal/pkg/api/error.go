@@ -606,8 +606,7 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 		}
 	}
 
-	var drErr *BadRequestErr
-	if errors.As(err, &drErr) {
+	if _, ok := errors.AsType[*BadRequestErr](err); ok {
 		return HTTPErrResp{
 			http.StatusBadRequest,
 			"BadRequest",
@@ -617,8 +616,7 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 	}
 
 	// If it's a JSON marshal error
-	var jErr *json.MarshalerError
-	if errors.As(err, &jErr) {
+	if _, ok := errors.AsType[*json.MarshalerError](err); ok {
 		return HTTPErrResp{
 			http.StatusInternalServerError,
 			err.Error(),
@@ -627,8 +625,7 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 		}
 	}
 
-	var esErr *es.ErrElastic
-	if errors.As(err, &esErr) {
+	if esErr, ok := errors.AsType[*es.ErrElastic](err); ok {
 		return HTTPErrResp{
 			http.StatusServiceUnavailable,
 			esErr.Error(),
