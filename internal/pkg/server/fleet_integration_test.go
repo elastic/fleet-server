@@ -20,6 +20,7 @@ import (
 	"net/http/httptest"
 	"path"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -788,6 +789,129 @@ func Test_Agent_Enrollment_Id(t *testing.T) {
 	} else {
 		t.Fatal("duplicate agent found after enrolling with same enrollment id")
 	}
+}
+
+// Test_Agent_Enrollment_Id_Race demonstrates that the enrollment_id deduplication
+// mechanism is racy: concurrent enrollments with the same enrollment_id can all
+// succeed and create duplicate agent records because fleet-server's lookup uses an
+// ES search query, which is subject to near-real-time indexing latency (default 1s
+// refresh interval). If retries arrive before ES has indexed the first document,
+// the search returns nothing and a second (ghost) agent record is created.
+//
+// This race is more pronounced in Serverless Elasticsearch, where the write path
+// goes through object storage (S3), making the indexing latency significantly
+// higher than the standard 1s refresh interval.
+func Test_Agent_Enrollment_Id_Race(t *testing.T) {
+	const (
+		enrollmentID = "race-test-enrollment-id"
+		concurrency  = 5
+	)
+
+	enrollBodyWEnrollmentID := fmt.Sprintf(`{
+	    "type": "PERMANENT",
+	    "shared_id": "",
+	    "enrollment_id": %q,
+	    "metadata": {
+		"user_provided": {},
+		"local": {},
+		"tags": []
+	    }
+	}`, enrollmentID)
+
+	srv, err := startTestServer(t, t.Context(), policyData)
+	require.NoError(t, err)
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
+
+	// Disable auto-refresh on .fleet-agents so that concurrent enrollment
+	// requests cannot find each other's committed documents via ES search.
+	esCfg := elasticsearch.Config{
+		Username: "elastic",
+		Password: "changeme",
+	}
+	esClient, err := elasticsearch.NewClient(esCfg)
+	require.NoError(t, err)
+
+	_, err = esClient.Indices.PutSettings(
+		bytes.NewBufferString(`{"index":{"refresh_interval":"-1"}}`),
+		esClient.Indices.PutSettings.WithIndex(dl.FleetAgents),
+	)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		// Restore default refresh interval.
+		_, _ = esClient.Indices.PutSettings(
+			bytes.NewBufferString(`{"index":{"refresh_interval":"1s"}}`),
+			esClient.Indices.PutSettings.WithIndex(dl.FleetAgents),
+		)
+	})
+
+	// Send N concurrent enrollment requests with the same enrollment_id.
+	// With auto-refresh disabled, none of them can find the others' documents
+	// via the enrollment_id search, so each creates a new agent record.
+	var (
+		mu      sync.Mutex
+		agentIDs []string
+	)
+	g, gCtx := errgroup.WithContext(ctx)
+	for i := 0; i < concurrency; i++ {
+		g.Go(func() error {
+			req, err := http.NewRequestWithContext(gCtx, "POST", srv.baseURL()+"/api/fleet/agents/enroll", strings.NewReader(enrollBodyWEnrollmentID))
+			if err != nil {
+				return err
+			}
+			req.Header.Set("Authorization", "ApiKey "+srv.enrollKey)
+			req.Header.Set("User-Agent", "elastic agent "+serverVersion)
+			req.Header.Set("Content-Type", "application/json")
+
+			cli := cleanhttp.DefaultClient()
+			res, err := cli.Do(req)
+			if err != nil {
+				return err
+			}
+			defer res.Body.Close()
+			if res.StatusCode != http.StatusOK {
+				return fmt.Errorf("unexpected status %d", res.StatusCode)
+			}
+			p, _ := io.ReadAll(res.Body)
+			var response api.EnrollResponse
+			if err := json.Unmarshal(p, &response); err != nil {
+				return err
+			}
+			mu.Lock()
+			agentIDs = append(agentIDs, response.Item.Id)
+			mu.Unlock()
+			return nil
+		})
+	}
+	require.NoError(t, g.Wait())
+
+	// Trigger a manual refresh so all committed documents become searchable.
+	_, err = esClient.Indices.Refresh(esClient.Indices.Refresh.WithIndex(dl.FleetAgents))
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		for _, id := range agentIDs {
+			_ = srv.bulker.Delete(ctx, dl.FleetAgents, id)
+		}
+	})
+
+	// Count how many agent records exist with this enrollment_id using the raw
+	// ES client (no search-result caching). If the race exists, count > 1.
+	// A correct implementation would have count == 1.
+	countRes, err := esClient.Count(
+		esClient.Count.WithContext(ctx),
+		esClient.Count.WithIndex(dl.FleetAgents),
+		esClient.Count.WithBody(bytes.NewBufferString(fmt.Sprintf(
+			`{"query":{"term":{"enrollment_id":%q}}}`, enrollmentID,
+		))),
+	)
+	require.NoError(t, err)
+	defer countRes.Body.Close()
+	var countBody struct {
+		Count int `json:"count"`
+	}
+	require.NoError(t, json.NewDecoder(countRes.Body).Decode(&countBody))
+	t.Logf("found %d agent record(s) with enrollment_id=%q (expected 1)", countBody.Count, enrollmentID)
+	require.Equal(t, 1, countBody.Count, "enrollment_id race: %d duplicate agent records created", countBody.Count)
 }
 
 func Test_Agent_Enrollment_Id_Invalidated_API_key(t *testing.T) {
