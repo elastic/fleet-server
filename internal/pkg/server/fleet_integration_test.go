@@ -791,16 +791,22 @@ func Test_Agent_Enrollment_Id(t *testing.T) {
 	}
 }
 
-// Test_Agent_Enrollment_Id_Race demonstrates that the enrollment_id deduplication
-// mechanism is racy: concurrent enrollments with the same enrollment_id can all
-// succeed and create duplicate agent records because fleet-server's lookup uses an
-// ES search query, which is subject to near-real-time indexing latency (default 1s
-// refresh interval). If retries arrive before ES has indexed the first document,
-// the search returns nothing and a second (ghost) agent record is created.
+// Test_Agent_Enrollment_Id_Race tests the theory that the enrollment_id
+// deduplication mechanism is racy: concurrent enrollments with the same
+// enrollment_id can all succeed and create duplicate agent records because
+// fleet-server's lookup uses an ES search query, which is subject to
+// near-real-time indexing latency (default 1s refresh interval). If retries
+// arrive before ES has indexed the first document, the search returns nothing
+// and a second (ghost) agent record is created.
 //
-// This race is more pronounced in Serverless Elasticsearch, where the write path
-// goes through object storage (S3), making the indexing latency significantly
-// higher than the standard 1s refresh interval.
+// The test uses the default ES configuration (no refresh_interval override) to
+// replicate production conditions. A brief sleep after the first enrollment
+// ensures the document is committed to ES but not yet searchable, then
+// concurrent retries are fired into that window.
+//
+// This race is expected to be more pronounced in Serverless Elasticsearch,
+// where the write path goes through object storage (S3), making indexing
+// latency significantly higher than the standard 1s refresh interval.
 func Test_Agent_Enrollment_Id_Race(t *testing.T) {
 	const (
 		enrollmentID = "race-test-enrollment-id"
@@ -822,8 +828,6 @@ func Test_Agent_Enrollment_Id_Race(t *testing.T) {
 	require.NoError(t, err)
 	ctx := testlog.SetLogger(t).WithContext(t.Context())
 
-	// Disable auto-refresh on .fleet-agents so that concurrent enrollment
-	// requests cannot find each other's committed documents via ES search.
 	esCfg := elasticsearch.Config{
 		Username: "elastic",
 		Password: "changeme",
@@ -831,53 +835,55 @@ func Test_Agent_Enrollment_Id_Race(t *testing.T) {
 	esClient, err := elasticsearch.NewClient(esCfg)
 	require.NoError(t, err)
 
-	_, err = esClient.Indices.PutSettings(
-		bytes.NewBufferString(`{"index":{"refresh_interval":"-1"}}`),
-		esClient.Indices.PutSettings.WithIndex(dl.FleetAgents),
-	)
-	require.NoError(t, err)
-	t.Cleanup(func() {
-		// Restore default refresh interval.
-		_, _ = esClient.Indices.PutSettings(
-			bytes.NewBufferString(`{"index":{"refresh_interval":"1s"}}`),
-			esClient.Indices.PutSettings.WithIndex(dl.FleetAgents),
-		)
-	})
+	doEnroll := func() (string, error) {
+		req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/enroll", strings.NewReader(enrollBodyWEnrollmentID))
+		if err != nil {
+			return "", err
+		}
+		req.Header.Set("Authorization", "ApiKey "+srv.enrollKey)
+		req.Header.Set("User-Agent", "elastic agent "+serverVersion)
+		req.Header.Set("Content-Type", "application/json")
+		cli := cleanhttp.DefaultClient()
+		res, err := cli.Do(req)
+		if err != nil {
+			return "", err
+		}
+		defer res.Body.Close()
+		if res.StatusCode != http.StatusOK {
+			return "", fmt.Errorf("unexpected status %d", res.StatusCode)
+		}
+		p, _ := io.ReadAll(res.Body)
+		var response api.EnrollResponse
+		if err := json.Unmarshal(p, &response); err != nil {
+			return "", err
+		}
+		return response.Item.Id, nil
+	}
 
-	// Send N concurrent enrollment requests with the same enrollment_id.
-	// With auto-refresh disabled, none of them can find the others' documents
-	// via the enrollment_id search, so each creates a new agent record.
+	// Send the first enrollment and wait briefly — long enough for the document
+	// to be committed to ES primary storage but not yet searchable (i.e. within
+	// the 1s default refresh interval).
+	firstID, err := doEnroll()
+	require.NoError(t, err)
+	time.Sleep(100 * time.Millisecond)
+
+	// Now fire N concurrent retries with the same enrollment_id. These arrive
+	// while the first document is committed but not yet indexed, so the
+	// enrollment_id search returns nothing for each and each creates a new record.
 	var (
-		mu      sync.Mutex
-		agentIDs []string
+		mu       sync.Mutex
+		agentIDs = []string{firstID}
 	)
 	g, gCtx := errgroup.WithContext(ctx)
 	for i := 0; i < concurrency; i++ {
 		g.Go(func() error {
-			req, err := http.NewRequestWithContext(gCtx, "POST", srv.baseURL()+"/api/fleet/agents/enroll", strings.NewReader(enrollBodyWEnrollmentID))
+			_ = gCtx
+			id, err := doEnroll()
 			if err != nil {
-				return err
-			}
-			req.Header.Set("Authorization", "ApiKey "+srv.enrollKey)
-			req.Header.Set("User-Agent", "elastic agent "+serverVersion)
-			req.Header.Set("Content-Type", "application/json")
-
-			cli := cleanhttp.DefaultClient()
-			res, err := cli.Do(req)
-			if err != nil {
-				return err
-			}
-			defer res.Body.Close()
-			if res.StatusCode != http.StatusOK {
-				return fmt.Errorf("unexpected status %d", res.StatusCode)
-			}
-			p, _ := io.ReadAll(res.Body)
-			var response api.EnrollResponse
-			if err := json.Unmarshal(p, &response); err != nil {
 				return err
 			}
 			mu.Lock()
-			agentIDs = append(agentIDs, response.Item.Id)
+			agentIDs = append(agentIDs, id)
 			mu.Unlock()
 			return nil
 		})
@@ -894,9 +900,8 @@ func Test_Agent_Enrollment_Id_Race(t *testing.T) {
 		}
 	})
 
-	// Count how many agent records exist with this enrollment_id using the raw
-	// ES client (no search-result caching). If the race exists, count > 1.
-	// A correct implementation would have count == 1.
+	// Count how many agent records exist with this enrollment_id.
+	// If the theory is correct, count > 1. A correct implementation would have count == 1.
 	countRes, err := esClient.Count(
 		esClient.Count.WithContext(ctx),
 		esClient.Count.WithIndex(dl.FleetAgents),
