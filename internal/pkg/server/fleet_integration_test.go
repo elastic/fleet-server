@@ -898,7 +898,7 @@ func Test_Agent_Enrollment_Id_Race(t *testing.T) {
 		agentIDs = []string{firstID}
 	)
 	g, gCtx := errgroup.WithContext(ctx)
-	for i := 0; i < concurrency; i++ {
+	for range concurrency {
 		g.Go(func() error {
 			_ = gCtx
 			id, err := doEnroll()
