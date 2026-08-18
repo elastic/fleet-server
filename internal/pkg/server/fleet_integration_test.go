@@ -133,6 +133,16 @@ func WithAPM(url string, enabled bool) Option {
 	}
 }
 
+// WithNoEnrollRateLimit disables the enroll rate limiter so concurrent enrollment
+// requests are not rejected with 503, allowing race conditions to be observed.
+func WithNoEnrollRateLimit() Option {
+	return func(cfg *config.Config) error {
+		cfg.Inputs[0].Server.Limits.EnrollLimit.Interval = 0
+		cfg.Inputs[0].Server.Limits.EnrollLimit.Burst = 0
+		return nil
+	}
+}
+
 func startTestServer(t *testing.T, ctx context.Context, policyD model.PolicyData, opts ...Option) (*tserver, error) {
 	t.Helper()
 
@@ -795,18 +805,15 @@ func Test_Agent_Enrollment_Id(t *testing.T) {
 // deduplication mechanism is racy: concurrent enrollments with the same
 // enrollment_id can all succeed and create duplicate agent records because
 // fleet-server's lookup uses an ES search query, which is subject to
-// near-real-time indexing latency (default 1s refresh interval). If retries
-// arrive before ES has indexed the first document, the search returns nothing
-// and a second (ghost) agent record is created.
+// near-real-time indexing latency. If retries arrive before ES has indexed
+// the first document, the search returns nothing and a second (ghost) agent
+// record is created.
 //
-// The test uses the default ES configuration (no refresh_interval override) to
-// replicate production conditions. A brief sleep after the first enrollment
-// ensures the document is committed to ES but not yet searchable, then
-// concurrent retries are fired into that window.
-//
-// This race is expected to be more pronounced in Serverless Elasticsearch,
-// where the write path goes through object storage (S3), making indexing
-// latency significantly higher than the standard 1s refresh interval.
+// The test sets refresh_interval=5s on .fleet-agents to replicate Serverless
+// Elasticsearch conditions (Serverless defaults to 5s, vs 1s for standard ES),
+// then waits exactly 5s before firing retries — matching Horde's first backoff
+// wait (EnrollBackoffInit=5s, attempt=0). The retry lands right at the edge of
+// the refresh window, making the race timing-dependent.
 func Test_Agent_Enrollment_Id_Race(t *testing.T) {
 	const (
 		enrollmentID = "race-test-enrollment-id"
@@ -824,7 +831,7 @@ func Test_Agent_Enrollment_Id_Race(t *testing.T) {
 	    }
 	}`, enrollmentID)
 
-	srv, err := startTestServer(t, t.Context(), policyData)
+	srv, err := startTestServer(t, t.Context(), policyData, WithNoEnrollRateLimit())
 	require.NoError(t, err)
 	ctx := testlog.SetLogger(t).WithContext(t.Context())
 
@@ -834,6 +841,20 @@ func Test_Agent_Enrollment_Id_Race(t *testing.T) {
 	}
 	esClient, err := elasticsearch.NewClient(esCfg)
 	require.NoError(t, err)
+
+	// Set refresh_interval=5s to match Serverless Elasticsearch defaults.
+	_, err = esClient.Indices.PutSettings(
+		strings.NewReader(`{"index":{"refresh_interval":"5s"}}`),
+		esClient.Indices.PutSettings.WithIndex(dl.FleetAgents),
+	)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		// Restore default refresh interval.
+		_, _ = esClient.Indices.PutSettings(
+			strings.NewReader(`{"index":{"refresh_interval":null}}`),
+			esClient.Indices.PutSettings.WithIndex(dl.FleetAgents),
+		)
+	})
 
 	doEnroll := func() (string, error) {
 		req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/enroll", strings.NewReader(enrollBodyWEnrollmentID))
@@ -860,18 +881,18 @@ func Test_Agent_Enrollment_Id_Race(t *testing.T) {
 		return response.Item.Id, nil
 	}
 
-	// Send the first enrollment and wait briefly — long enough for the document
-	// to be committed to ES primary storage but not yet searchable (i.e. within
-	// the 1s default refresh interval).
+	// Send the first enrollment, then wait exactly 5s — matching Horde's first
+	// backoff wait (EnrollBackoffInit=5s, attempt=0, jitter collapses to zero).
+	// With refresh_interval=5s, the retry lands right at the edge of the refresh
+	// window: whether the race triggers depends on where in the 5s cycle the
+	// first enrollment landed.
 	firstID, err := doEnroll()
 	require.NoError(t, err)
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(5 * time.Second)
 
-	// Now fire N concurrent retries with the same enrollment_id. These arrive
-	// while the first document is committed but not yet indexed, so the
-	// enrollment_id search returns nothing for each and each creates a new record.
-	// 503s are expected under concurrent load (rate limiter) and are not fatal —
-	// we only care about how many records were actually committed.
+	// Fire N concurrent retries with the same enrollment_id. These simulate
+	// multiple drones all firing their first retry at t=5s. The rate limiter is
+	// disabled so all requests reach the enrollment handler.
 	var (
 		mu       sync.Mutex
 		agentIDs = []string{firstID}
