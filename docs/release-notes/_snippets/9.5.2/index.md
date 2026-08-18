@@ -5,7 +5,7 @@
 ### Features and enhancements [fleet-server-9.5.2-features-enhancements]
 
 
-* Add graceful_force_unenroll feature flag to gracefully unenroll agents with invalid API keys. [#7593](https://github.com/elastic/fleet-server/pull/7593) [#7656](https://github.com/elastic/fleet-server/pull/7656) [#7659](https://github.com/elastic/fleet-server/pull/7659) 
+* Add graceful_force_unenroll feature flag to gracefully unenroll agents with invalid API keys. [#7593](https://github.com/elastic/fleet-server/pull/7593) 
 
   Fleet Server now supports a new `graceful_force_unenroll` block under
   `inputs[].server.feature_flags`. When enabled, a checkin request that arrives
@@ -42,7 +42,7 @@
   or resolve its secrets. Stale revisions are dropped with a warning log and do
   not overwrite the cached policy.
   
-* Read cgroup memory limit for cache sizing when GOMEMLIMIT is not set. [#7593](https://github.com/elastic/fleet-server/pull/7593) [#7656](https://github.com/elastic/fleet-server/pull/7656) [#7659](https://github.com/elastic/fleet-server/pull/7659) 
+* Read cgroup memory limit for cache sizing when GOMEMLIMIT is not set. [#7573](https://github.com/elastic/fleet-server/pull/7573) 
 
   containerMemoryMB() now falls back to the cgroup memory limit (v2 then v1) before host RAM. This ensures fleet-server is correctly sized for the container even in deployments that do not explicitly set GOMEMLIMIT.
   

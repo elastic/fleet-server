@@ -12,9 +12,7 @@ entries:
         Excess reads wait until a slot is available.
       component: fleet-server
       pr:
-        - https://github.com/elastic/fleet-server/pull/7593
-        - https://github.com/elastic/fleet-server/pull/7656
-        - https://github.com/elastic/fleet-server/pull/7659
+        - https://github.com/elastic/fleet-server/pull/7567
       issue: []
       impact: ""
       action: ""
@@ -48,9 +46,7 @@ entries:
         containerMemoryMB() now falls back to the cgroup memory limit (v2 then v1) before host RAM. This ensures fleet-server is correctly sized for the container even in deployments that do not explicitly set GOMEMLIMIT.
       component: fleet-server
       pr:
-        - https://github.com/elastic/fleet-server/pull/7593
-        - https://github.com/elastic/fleet-server/pull/7656
-        - https://github.com/elastic/fleet-server/pull/7659
+        - https://github.com/elastic/fleet-server/pull/7573
       issue: []
       impact: ""
       action: ""
@@ -83,8 +79,6 @@ entries:
       component: fleet-server
       pr:
         - https://github.com/elastic/fleet-server/pull/7593
-        - https://github.com/elastic/fleet-server/pull/7656
-        - https://github.com/elastic/fleet-server/pull/7659
       issue: []
       impact: ""
       action: ""
