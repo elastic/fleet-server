@@ -19,6 +19,11 @@ const (
 	kDefaultInternalHost = "localhost"
 	kDefaultInternalPort = 8221
 	fleetInputType       = "fleet-server"
+
+	// DefaultGracefulForceUnenrollMaxBytes is the default memory cap for the LRU that tracks
+	// per-agent escalation state when graceful_force_unenroll is enabled. At ~250 bytes per
+	// entry this holds approximately 200,000 agents.
+	DefaultGracefulForceUnenrollMaxBytes = 50_000_000 // 50 MB
 )
 
 // Policy is the configuration policy to use.
@@ -102,6 +107,25 @@ type (
 
 		// EnableOpAMP controls whether the OpAMP endpoint is enabled. Defaults to true.
 		EnableOpAMP bool `config:"enable_opamp"`
+
+		// GracefulForceUnenroll configures the three-step escalation applied to agents that
+		// check in with an invalid or disabled API key.
+		GracefulForceUnenroll GracefulForceUnenrollConfig `config:"graceful_force_unenroll"`
+	}
+
+	// GracefulForceUnenrollConfig controls the graceful-force-unenroll feature.
+	GracefulForceUnenrollConfig struct {
+		// Enabled activates the three-step escalation: (1) POLICY_CHANGE with empty policy
+		// to stop all inputs, (2) UNENROLL to disenroll the agent, (3) pass-through 401 for
+		// up to one hour, then the cycle resets.
+		Enabled bool `config:"enabled"`
+
+		// MaxBytes is the memory cap in bytes for the in-memory LRU that tracks per-agent
+		// escalation state. Each entry costs ~250 bytes; the default 50000000 (50 MB) holds
+		// ~200,000 entries. When full, the least-recently-used entry is evicted, resetting
+		// that agent's escalation back to step 1 on its next check-in. A value of 0 uses
+		// the default.
+		MaxBytes int64 `config:"max_bytes"`
 	}
 )
 
@@ -121,6 +145,7 @@ func (c *Server) InitDefaults() {
 	c.PGP.InitDefaults()
 	c.PDKDF2.InitDefaults()
 	c.Features.EnableOpAMP = true
+	c.Features.GracefulForceUnenroll.MaxBytes = DefaultGracefulForceUnenrollMaxBytes
 }
 
 // BindEndpoints returns the binding address for the all HTTP server listeners.
