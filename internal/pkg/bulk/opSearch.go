@@ -350,9 +350,12 @@ func (b *Bulker) flushEnrollSearch(ctx context.Context, queue queueT) error {
 	}
 
 	// WARNING: Once we start pushing items to the queue, the node pointers are invalid.
+	// Save any fields we need after the channel send before sending — the receiver
+	// calls freeBlk immediately on receipt, which races with any subsequent read of n.
 	for i, n := range canonicals {
 		response := &blk.Responses[i]
 		respErr := response.deriveError()
+		key := n.dedupeKey // must be captured before n.ch send
 		select {
 		case n.ch <- respT{err: respErr, idx: n.idx, data: response}:
 		default:
@@ -364,7 +367,7 @@ func (b *Bulker) flushEnrollSearch(ctx context.Context, queue queueT) error {
 		if respErr != nil {
 			dupeErr = respErr
 		}
-		for _, dupe := range dupesByKey[n.dedupeKey] {
+		for _, dupe := range dupesByKey[key] {
 			select {
 			case dupe.ch <- respT{err: dupeErr}:
 			default:
