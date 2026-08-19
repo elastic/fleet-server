@@ -73,6 +73,7 @@ func (c *ServerBulk) InitDefaults() {
 	c.FlushThresholdCount = 2048
 	c.FlushThresholdSize = 1024 * 1024
 	c.FlushMaxPending = 8
+	c.EnrollBulker.InitDefaults()
 }
 
 // Server is the configuration for the server
