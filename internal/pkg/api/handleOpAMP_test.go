@@ -580,10 +580,11 @@ func TestUpdateAgentWithAgentToServerMessage(t *testing.T) {
 		checker := &mockCheckin{}
 		oa := &OpAMPT{bc: checker}
 
+		unenrolledTime := time.Now().UTC()
 		agent := &model.Agent{
 			ESDocument:            model.ESDocument{Id: "agent-123"},
 			AuditUnenrolledReason: reenrolled,
-			AuditUnenrolledTime:   time.Now().UTC(),
+			AuditUnenrolledTime:   &unenrolledTime,
 		}
 
 		msg := &protobufs.AgentToServer{

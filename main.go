@@ -7,6 +7,10 @@
 //go:generate go tool -modfile ./dev-tools/go.mod github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen -generate types -package api -o pkg/api/types.gen.go  model/openapi.yml
 //go:generate go tool -modfile ./dev-tools/go.mod github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen -generate client -package api -o pkg/api/client.gen.go  model/openapi.yml
 //go:generate go fmt internal/pkg/model/schema.go
+// NOTE: After regenerating schema.go, manually change optional time.Time fields in model.Agent
+// to *time.Time (e.g. LastCheckin, UnenrolledAt, UpdatedAt, etc.). The schema-generate tool
+// does not support pointer types, but omitempty is ineffective for struct types in encoding/json,
+// causing zero time.Time values to serialize as "0001-01-01T00:00:00Z" instead of being omitted.
 //go:generate go fmt internal/pkg/api/openapi.gen.go
 //go:generate go fmt pkg/api/types.gen.go
 //go:generate go fmt pkg/api/client.gen.go

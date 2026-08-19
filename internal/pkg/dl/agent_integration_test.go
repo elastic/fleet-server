@@ -47,9 +47,9 @@ func TestFindAgent_NewModel(t *testing.T) {
 	body, err := json.Marshal(model.Agent{
 		PolicyID:          policyID,
 		Active:            true,
-		LastCheckin:       now,
+		LastCheckin:       &now,
 		LastCheckinStatus: "",
-		UpdatedAt:         now,
+		UpdatedAt:         &now,
 		EnrolledAt:        now,
 		Outputs:           wantOutputs,
 	})

@@ -41,9 +41,9 @@ func TestEffectiveConfigReplacesRemovedFields(t *testing.T) {
 	initialDoc, err := json.Marshal(model.Agent{
 		Active:            true,
 		EnrolledAt:        now,
-		LastCheckin:       now,
+		LastCheckin:       &now,
 		LastCheckinStatus: "online",
-		UpdatedAt:         now,
+		UpdatedAt:         &now,
 		EffectiveConfig:   initialConfig,
 	})
 	require.NoError(t, err)

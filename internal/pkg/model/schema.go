@@ -140,7 +140,7 @@ type Agent struct {
 	AuditUnenrolledReason string `json:"audit_unenrolled_reason,omitempty"`
 
 	// Agent timestamp for audit unenroll/uninstall action
-	AuditUnenrolledTime time.Time `json:"audit_unenrolled_time,omitempty"`
+	AuditUnenrolledTime *time.Time `json:"audit_unenrolled_time,omitempty"`
 
 	// List of capabilities of the collector
 	Capabilities []string `json:"capabilities,omitempty"`
@@ -173,7 +173,7 @@ type Agent struct {
 	IdentifyingAttributes json.RawMessage `json:"identifying_attributes,omitempty"`
 
 	// Date/time the Elastic Agent checked in last time
-	LastCheckin time.Time `json:"last_checkin,omitempty"`
+	LastCheckin *time.Time `json:"last_checkin,omitempty"`
 
 	// Last checkin message
 	LastCheckinMessage string `json:"last_checkin_message,omitempty"`
@@ -182,7 +182,7 @@ type Agent struct {
 	LastCheckinStatus string `json:"last_checkin_status,omitempty"`
 
 	// Date/time the Elastic Agent was last updated
-	LastUpdated time.Time `json:"last_updated,omitempty"`
+	LastUpdated *time.Time `json:"last_updated,omitempty"`
 
 	// Local metadata information for the Elastic Agent
 	LocalMetadata json.RawMessage `json:"local_metadata,omitempty"`
@@ -230,19 +230,19 @@ type Agent struct {
 	Type string `json:"type"`
 
 	// Date/time the Elastic Agent unenrolled
-	UnenrolledAt time.Time `json:"unenrolled_at,omitempty"`
+	UnenrolledAt *time.Time `json:"unenrolled_at,omitempty"`
 
 	// Reason the Elastic Agent was unenrolled
 	UnenrolledReason string `json:"unenrolled_reason,omitempty"`
 
 	// Date/time the Elastic Agent unenrolled started
-	UnenrollmentStartedAt time.Time `json:"unenrollment_started_at,omitempty"`
+	UnenrollmentStartedAt *time.Time `json:"unenrollment_started_at,omitempty"`
 
 	// Unhealthy reason: input/output/other
 	UnhealthyReason []string `json:"unhealthy_reason,omitempty"`
 
 	// Date/time the Elastic Agent was last updated
-	UpdatedAt time.Time `json:"updated_at,omitempty"`
+	UpdatedAt *time.Time `json:"updated_at,omitempty"`
 
 	// Container for upgrade-related agent data
 	Upgrade *Upgrade `json:"upgrade,omitempty"`
@@ -254,13 +254,13 @@ type Agent struct {
 	UpgradeDetails *UpgradeDetails `json:"upgrade_details,omitempty"`
 
 	// Date/time the Elastic Agent started the current upgrade
-	UpgradeStartedAt time.Time `json:"upgrade_started_at,omitempty"`
+	UpgradeStartedAt *time.Time `json:"upgrade_started_at,omitempty"`
 
 	// Upgrade status
 	UpgradeStatus string `json:"upgrade_status,omitempty"`
 
 	// Date/time the Elastic Agent was last upgraded
-	UpgradedAt time.Time `json:"upgraded_at,omitempty"`
+	UpgradedAt *time.Time `json:"upgraded_at,omitempty"`
 
 	// User provided metadata information for the Elastic Agent
 	UserProvidedMetadata json.RawMessage `json:"user_provided_metadata,omitempty"`

@@ -46,9 +46,9 @@ func createSomeAgents(ctx context.Context, t *testing.T, n int, apiKey bulk.APIK
 		agentModel := model.Agent{
 			PolicyID:                    policyID,
 			Active:                      true,
-			LastCheckin:                 testNow,
+			LastCheckin:                 &testNow,
 			LastCheckinStatus:           "",
-			UpdatedAt:                   testNow,
+			UpdatedAt:                   &testNow,
 			EnrolledAt:                  testNow,
 			DefaultAPIKeyID:             outputAPIKey.ID,
 			DefaultAPIKey:               outputAPIKey.Agent(),
@@ -214,9 +214,9 @@ func TestMigrateOutputs_nil_DefaultAPIKeyHistory(t *testing.T) {
 	agentModel := model.Agent{
 		PolicyID:                    policyID,
 		Active:                      true,
-		LastCheckin:                 testNow,
+		LastCheckin:                 &testNow,
 		LastCheckinStatus:           "",
-		UpdatedAt:                   testNow,
+		UpdatedAt:                   &testNow,
 		EnrolledAt:                  testNow,
 		DefaultAPIKeyID:             outputAPIKey.ID,
 		DefaultAPIKey:               outputAPIKey.Agent(),

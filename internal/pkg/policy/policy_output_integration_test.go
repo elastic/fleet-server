@@ -76,9 +76,9 @@ func TestRenderUpdatePainlessScript(t *testing.T) {
 			agentModel := model.Agent{
 				PolicyID:          policyID,
 				Active:            true,
-				LastCheckin:       now,
+				LastCheckin:       &now,
 				LastCheckinStatus: "",
-				UpdatedAt:         now,
+				UpdatedAt:         &now,
 				EnrolledAt:        now,
 				Outputs: map[string]*model.PolicyOutput{
 					outputName: {
@@ -205,9 +205,9 @@ func createAgent(ctx context.Context, t *testing.T, index string, bulker bulk.Bu
 	agentModel := model.Agent{
 		PolicyID:          policyID,
 		Active:            true,
-		LastCheckin:       now,
+		LastCheckin:       &now,
 		LastCheckinStatus: "",
-		UpdatedAt:         now,
+		UpdatedAt:         &now,
 		EnrolledAt:        now,
 		Outputs:           outputs,
 	}

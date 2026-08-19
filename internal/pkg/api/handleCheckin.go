@@ -487,7 +487,7 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 		checkin.WithSeqNo(seqno),
 		checkin.WithVer(ver),
 		checkin.WithUnhealthyReason(unhealthyReason),
-		checkin.WithDeleteAudit(agent.AuditUnenrolledReason != "" || !agent.UnenrolledAt.IsZero()),
+		checkin.WithDeleteAudit(agent.AuditUnenrolledReason != "" || agent.UnenrolledAt != nil),
 	}
 
 	if validated.rawAvailableRollbacks != nil {

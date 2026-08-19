@@ -234,7 +234,7 @@ func (et *EnrollerT) _enroll(
 	}
 
 	// only delete existing agent if it never checked in
-	if agent.Id != "" && agent.LastCheckin.IsZero() {
+	if agent.Id != "" && agent.LastCheckin == nil {
 		zlog.Debug().
 			Str("EnrollmentId", enrollmentID).
 			Str("AgentId", agent.Id).
