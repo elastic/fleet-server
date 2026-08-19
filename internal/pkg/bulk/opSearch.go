@@ -308,7 +308,7 @@ func (b *Bulker) flushEnrollSearch(ctx context.Context, queue queueT) error {
 	// Build msearch body from canonical items only.
 	const kRoughEstimatePerItem = 256
 	bufSz := max(len(canonicals)*kRoughEstimatePerItem, queue.pending)
-	buf := b.flushBufPool.Get().(*bytes.Buffer) //nolint:errcheck
+	buf := b.flushBufPool.Get().(*bytes.Buffer) //nolint:errcheck // we control what is placed in the pool
 	buf.Reset()
 	buf.Grow(bufSz)
 	defer b.flushBufPool.Put(buf)

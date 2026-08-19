@@ -60,12 +60,12 @@ func (c *ServerBulkEnrollBulker) InitDefaults() {
 }
 
 type ServerBulk struct {
-	FlushInterval            time.Duration        `config:"flush_interval"`
-	FlushThresholdCount      int                  `config:"flush_threshold_cnt"`
-	FlushThresholdSize       int                  `config:"flush_threshold_size"`
-	FlushMaxPending          int                  `config:"flush_max_pending"`
-	MaxPendingBulkDispatches int64                `config:"max_pending_bulk_dispatches"`
-	EnrollBulker             ServerBulkEnrollBulker  `config:"enroll_bulker"`
+	FlushInterval            time.Duration          `config:"flush_interval"`
+	FlushThresholdCount      int                    `config:"flush_threshold_cnt"`
+	FlushThresholdSize       int                    `config:"flush_threshold_size"`
+	FlushMaxPending          int                    `config:"flush_max_pending"`
+	MaxPendingBulkDispatches int64                  `config:"max_pending_bulk_dispatches"`
+	EnrollBulker             ServerBulkEnrollBulker `config:"enroll_bulker"`
 }
 
 func (c *ServerBulk) InitDefaults() {
