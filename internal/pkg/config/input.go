@@ -49,12 +49,12 @@ type ServerTLS struct {
 	Cert string `config:"cert"`
 }
 
-type ServerBulkEnrollBatcher struct {
+type ServerBulkEnrollBulker struct {
 	FlushInterval       time.Duration `config:"flush_interval"`
 	FlushThresholdCount int           `config:"flush_threshold_cnt"`
 }
 
-func (c *ServerBulkEnrollBatcher) InitDefaults() {
+func (c *ServerBulkEnrollBulker) InitDefaults() {
 	c.FlushInterval = time.Second
 	c.FlushThresholdCount = 50
 }
@@ -65,7 +65,7 @@ type ServerBulk struct {
 	FlushThresholdSize       int                  `config:"flush_threshold_size"`
 	FlushMaxPending          int                  `config:"flush_max_pending"`
 	MaxPendingBulkDispatches int64                `config:"max_pending_bulk_dispatches"`
-	EnrollBatcher            ServerBulkEnrollBatcher `config:"enroll_batcher"`
+	EnrollBulker             ServerBulkEnrollBulker  `config:"enroll_bulker"`
 }
 
 func (c *ServerBulk) InitDefaults() {

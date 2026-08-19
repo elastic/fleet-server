@@ -247,7 +247,7 @@ func BulkOptsFromCfg(cfg *config.Config) []BulkOpt {
 		WithAPIKeyMaxRequestSize(cfg.Output.Elasticsearch.MaxContentLength),
 		WithMaxPendingBulkDispatches(bulkCfg.MaxPendingBulkDispatches),
 		WithPolicyTokens(policyTokens),
-		WithEnrollFlushInterval(bulkCfg.EnrollBatcher.FlushInterval),
-		WithEnrollFlushThresholdCount(bulkCfg.EnrollBatcher.FlushThresholdCount),
+		WithEnrollFlushInterval(bulkCfg.EnrollBulker.FlushInterval),
+		WithEnrollFlushThresholdCount(bulkCfg.EnrollBulker.FlushThresholdCount),
 	}
 }

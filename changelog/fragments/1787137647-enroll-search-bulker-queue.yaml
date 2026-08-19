@@ -15,7 +15,7 @@ description: |
   comes first, capping refresh calls at one per fleet-server instance per flush window.
 
   Both the flush interval and threshold count are configurable via
-  inputs[].server.bulk.enroll_batcher.flush_interval and
-  inputs[].server.bulk.enroll_batcher.flush_threshold_cnt.
+  inputs[].server.bulk.enroll_bulker.flush_interval and
+  inputs[].server.bulk.enroll_bulker.flush_threshold_cnt.
 
 component: fleet-server
