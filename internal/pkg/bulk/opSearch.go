@@ -352,14 +352,21 @@ func (b *Bulker) flushEnrollSearch(ctx context.Context, queue queueT) error {
 	// WARNING: Once we start pushing items to the queue, the node pointers are invalid.
 	for i, n := range canonicals {
 		response := &blk.Responses[i]
+		respErr := response.deriveError()
 		select {
-		case n.ch <- respT{err: response.deriveError(), idx: n.idx, data: response}:
+		case n.ch <- respT{err: respErr, idx: n.idx, data: response}:
 		default:
 			panic("Unexpected blocked response channel on flushEnrollSearch canonical")
 		}
+		// If the canonical's search itself failed, propagate that error to duplicates
+		// instead of ErrEnrollDuplicate so callers don't suppress real failures.
+		dupeErr := ErrEnrollDuplicate
+		if respErr != nil {
+			dupeErr = respErr
+		}
 		for _, dupe := range dupesByKey[n.dedupeKey] {
 			select {
-			case dupe.ch <- respT{err: ErrEnrollDuplicate}:
+			case dupe.ch <- respT{err: dupeErr}:
 			default:
 				panic("Unexpected blocked response channel on flushEnrollSearch dupe")
 			}
