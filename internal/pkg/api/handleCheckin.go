@@ -101,30 +101,13 @@ type CheckinT struct {
 	// gwPool is a gzip.Writer pool intended to lower the amount of writers created when responding to checkin requests.
 	// gzip.Writer allocations are expensive (~1.2MB each) and can exhaust an instance's memory if a lot of concurrent responses are sent (this occurs when a mass-action such as an upgrade is detected).
 	// effectiveness of the pool is controlled by rate limiter configured through the limit.action_limit attribute.
-<<<<<<< HEAD
 	gwPool sync.Pool
 	bulker bulk.Bulk
-=======
-	gwPool                         sync.Pool
-	bulker                         bulk.Bulk
-	outputSecretCandidateCollector policy.OutputSecretCandidateCollector
 
 	// invalidKeyStates is a memory-bounded LRU that tracks per-agent invalid-API-key escalation
 	// state for the GracefulForceUnenroll feature. Its cap is set by
 	// cfg.Features.GracefulForceUnenroll.MaxBytes (default 50 MB, ~200,000 entries).
 	invalidKeyStates *invalidKeyLRU
-}
-
-// CheckinOption configures check-in handling.
-type CheckinOption func(*CheckinT)
-
-// WithOutputSecretCandidateCollector enables out-of-band reconciliation of
-// secrets retained after ambiguous agent update failures.
-func WithOutputSecretCandidateCollector(collector policy.OutputSecretCandidateCollector) CheckinOption {
-	return func(ct *CheckinT) {
-		ct.outputSecretCandidateCollector = collector
-	}
->>>>>>> 34a8c89 (Add option to enable graceful unenroll to invalid API key agents. (#7593))
 }
 
 func NewCheckinT(
