@@ -245,16 +245,26 @@ func (b *Bulker) flushSearch(ctx context.Context, queue queueT) error {
 }
 
 // flushEnrollSearch handles the kQueueEnrollSearch queue. It:
-//  1. Groups items by dedupeKey — first occurrence is canonical, the rest are duplicates.
-//  2. Refreshes the index named by the first item's refreshIndex.
+//  1. Groups items by dedupeKey — oldest (FIFO) occurrence is canonical, the rest are duplicates.
+//  2. Refreshes all unique refreshIndex values in the batch.
 //  3. Sends an msearch containing only the canonical items.
-//  4. Dispatches results to canonical items; sends ErrEnrollDuplicate to duplicates.
+//  4. Dispatches results to canonical items; sends ErrEnrollDuplicate to duplicates (or the
+//     canonical's error if the search itself failed, to avoid hiding operational failures).
 func (b *Bulker) flushEnrollSearch(ctx context.Context, queue queueT) error {
-	// Group items: first occurrence of each dedupeKey is canonical, rest are dupes.
+	// Collect items in LIFO order from the queue (queue.head is newest), then reverse to FIFO
+	// so the oldest request becomes canonical for each dedupeKey.
+	var all []*bulkT
+	for n := queue.head; n != nil; n = n.next {
+		all = append(all, n)
+	}
+	for i, j := 0, len(all)-1; i < j; i, j = i+1, j-1 {
+		all[i], all[j] = all[j], all[i]
+	}
+
+	// Group items: oldest occurrence of each dedupeKey is canonical, rest are dupes.
 	dupesByKey := make(map[string][]*bulkT)
 	var canonicals []*bulkT
-
-	for n := queue.head; n != nil; n = n.next {
+	for _, n := range all {
 		key := n.dedupeKey
 		if _, seen := dupesByKey[key]; !seen {
 			dupesByKey[key] = nil // mark key as seen; nil slice = no dupes yet
@@ -264,12 +274,23 @@ func (b *Bulker) flushEnrollSearch(ctx context.Context, queue queueT) error {
 		}
 	}
 
-	// Refresh the index before searching so retries see the most recent writes.
-	if len(canonicals) > 0 && canonicals[0].refreshIndex != "" {
-		refreshReq := esapi.IndicesRefreshRequest{
-			Index: []string{canonicals[0].refreshIndex},
+	if len(canonicals) == 0 {
+		return nil
+	}
+
+	// Refresh all unique indices in the batch before searching so retries see the most recent writes.
+	refreshIndices := make(map[string]struct{})
+	for _, n := range canonicals {
+		if n.refreshIndex != "" {
+			refreshIndices[n.refreshIndex] = struct{}{}
 		}
-		refreshResp, err := refreshReq.Do(ctx, b.es)
+	}
+	if len(refreshIndices) > 0 {
+		idxSlice := make([]string, 0, len(refreshIndices))
+		for idx := range refreshIndices {
+			idxSlice = append(idxSlice, idx)
+		}
+		refreshResp, err := esapi.IndicesRefreshRequest{Index: idxSlice}.Do(ctx, b.es)
 		if err != nil {
 			failQueue(queue, err)
 			return nil
@@ -282,10 +303,6 @@ func (b *Bulker) flushEnrollSearch(ctx context.Context, queue queueT) error {
 			failQueue(queue, err)
 			return nil
 		}
-	}
-
-	if len(canonicals) == 0 {
-		return nil
 	}
 
 	// Build msearch body from canonical items only.
