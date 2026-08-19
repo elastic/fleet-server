@@ -1,21 +1,20 @@
 kind: enhancement
 
-summary: Batch enrollment FindAgent searches with pre-refresh dedup to prevent ghost agents
+summary: Prevent ghost agent documents caused by concurrent enrollment retries
 
 description: |
-  Adds a new kQueueEnrollSearch bulker queue that batches enrollment duplicate-check
-  searches (FindAgent by enrollment_id) and fires a single POST .fleet-agents/_refresh
-  before executing the msearch for the batch. This prevents ghost agent documents that
-  were caused by concurrent enrollment retries searching the index before a previous
-  write was visible due to Elasticsearch's refresh latency.
+  At large scale, concurrent enrollment retries could create duplicate (ghost) agent
+  documents in Elasticsearch. This occurred when an agent retried enrollment before
+  its previous write was visible to search, causing multiple retries to each believe
+  no agent existed and each create a new document.
 
-  Within each batch, requests sharing the same enrollment_id are de-duplicated: only
-  one search is sent to ES per unique enrollment_id; duplicates receive a 429 and retry.
-  The batch flushes after N requests (default: 50) or M seconds (default: 1s), whichever
-  comes first, capping refresh calls at one per fleet-server instance per flush window.
+  Fleet Server now batches enrollment lookups and ensures index visibility before
+  searching, so retries consistently find an existing agent document rather than
+  creating a new one. Duplicate requests within a batch are handled efficiently
+  and prompted to retry, keeping the number of Elasticsearch operations low.
 
-  Both the flush interval and threshold count are configurable via
-  inputs[].server.bulk.enroll_bulker.flush_interval and
-  inputs[].server.bulk.enroll_bulker.flush_threshold_cnt.
+  The batching behaviour is configurable via
+  inputs[].server.bulk.enroll.flush_interval (default: 1s) and
+  inputs[].server.bulk.enroll.flush_threshold_cnt (default: 50).
 
 component: fleet-server
