@@ -243,3 +243,110 @@ func (b *Bulker) flushSearch(ctx context.Context, queue queueT) error {
 
 	return nil
 }
+
+// flushEnrollSearch handles the kQueueEnrollSearch queue. It:
+//  1. Groups items by dedupeKey — first occurrence is canonical, the rest are duplicates.
+//  2. Refreshes the index named by the first item's refreshIndex.
+//  3. Sends an msearch containing only the canonical items.
+//  4. Dispatches results to canonical items; sends ErrEnrollDuplicate to duplicates.
+func (b *Bulker) flushEnrollSearch(ctx context.Context, queue queueT) error {
+	// Group items: first occurrence of each dedupeKey is canonical, rest are dupes.
+	dupesByKey := make(map[string][]*bulkT)
+	var canonicals []*bulkT
+
+	for n := queue.head; n != nil; n = n.next {
+		key := n.dedupeKey
+		if _, seen := dupesByKey[key]; !seen {
+			dupesByKey[key] = nil // mark key as seen; nil slice = no dupes yet
+			canonicals = append(canonicals, n)
+		} else {
+			dupesByKey[key] = append(dupesByKey[key], n)
+		}
+	}
+
+	// Refresh the index before searching so retries see the most recent writes.
+	if len(canonicals) > 0 && canonicals[0].refreshIndex != "" {
+		refreshReq := esapi.IndicesRefreshRequest{
+			Index: []string{canonicals[0].refreshIndex},
+		}
+		refreshResp, err := refreshReq.Do(ctx, b.es)
+		if err != nil {
+			failQueue(queue, err)
+			return nil
+		}
+		if refreshResp.Body != nil {
+			refreshResp.Body.Close()
+		}
+		if refreshResp.IsError() {
+			err = fmt.Errorf("enroll search refresh failed: %s", refreshResp.String())
+			failQueue(queue, err)
+			return nil
+		}
+	}
+
+	if len(canonicals) == 0 {
+		return nil
+	}
+
+	// Build msearch body from canonical items only.
+	const kRoughEstimatePerItem = 256
+	bufSz := max(len(canonicals)*kRoughEstimatePerItem, queue.pending)
+	buf := b.flushBufPool.Get().(*bytes.Buffer) //nolint:errcheck
+	buf.Reset()
+	buf.Grow(bufSz)
+	defer b.flushBufPool.Put(buf)
+
+	for _, n := range canonicals {
+		buf.Write(n.buf.Bytes())
+	}
+
+	span, ctx := apm.StartSpanOptions(ctx, flushSpanNames[queue.ty], queue.Type(), apm.SpanOptions{})
+	defer span.End()
+
+	msearchReq := esapi.MsearchRequest{Body: bytes.NewReader(buf.Bytes())}
+	res, err := msearchReq.Do(ctx, b.es)
+	if err != nil {
+		failQueue(queue, err)
+		return nil
+	}
+	if res.Body != nil {
+		defer res.Body.Close()
+	}
+	if res.IsError() {
+		err = parseError(res, zerolog.Ctx(ctx))
+		failQueue(queue, err)
+		return nil
+	}
+
+	buf.Reset()
+	if _, err = buf.ReadFrom(res.Body); err != nil {
+		return err
+	}
+
+	var blk MsearchResponse
+	blk.Responses = make([]MsearchResponseItem, 0, len(canonicals))
+	if err = easyjson.Unmarshal(buf.Bytes(), &blk); err != nil {
+		return err
+	}
+	if len(blk.Responses) != len(canonicals) {
+		return fmt.Errorf("enroll search queue length mismatch: got %d, want %d", len(blk.Responses), len(canonicals))
+	}
+
+	// WARNING: Once we start pushing items to the queue, the node pointers are invalid.
+	for i, n := range canonicals {
+		response := &blk.Responses[i]
+		select {
+		case n.ch <- respT{err: response.deriveError(), idx: n.idx, data: response}:
+		default:
+			panic("Unexpected blocked response channel on flushEnrollSearch canonical")
+		}
+		for _, dupe := range dupesByKey[n.dedupeKey] {
+			select {
+			case dupe.ch <- respT{err: ErrEnrollDuplicate}:
+			default:
+				panic("Unexpected blocked response channel on flushEnrollSearch dupe")
+			}
+		}
+	}
+	return nil
+}
