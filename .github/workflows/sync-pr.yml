@@ -1,0 +1,25 @@
+name: Sync PR branch
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: PR branch to update
+        required: true
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          echo "$(date -u)" >> .github/.last-sync
+          git add .github/.last-sync
+          git commit -m "chore: sync"
+          git push
