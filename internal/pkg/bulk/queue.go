@@ -18,6 +18,7 @@ const (
 	kQueueRead
 	kQueueSearch
 	kQueueFleetSearch
+	kQueueEnrollSearch
 	kQueueRefreshBulk
 	kQueueRefreshRead
 	kQueueAPIKeyUpdate
@@ -34,6 +35,8 @@ func (q queueT) Type() string {
 		return "search"
 	case kQueueFleetSearch:
 		return "fleetSearch"
+	case kQueueEnrollSearch:
+		return "enrollSearch"
 	case kQueueRefreshBulk:
 		return "refreshBulk"
 	case kQueueRefreshRead:
