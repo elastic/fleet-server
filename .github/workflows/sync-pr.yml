@@ -5,6 +5,11 @@ on:
       branch:
         description: PR branch to update
         required: true
+  push:
+    branches:
+      - sync-pr-workflow
+    paths:
+      - .github/workflows/sync-pr.yml
 
 jobs:
   sync:
@@ -14,7 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.branch }}
+          ref: ${{ inputs.branch || github.ref_name }}
           token: ${{ secrets.GITHUB_TOKEN }}
       - run: |
           git config user.name "github-actions[bot]"
