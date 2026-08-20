@@ -36,6 +36,7 @@ type SecurityInfo struct {
 
 // Authenticate will return the SecurityInfo associated with the APIKey (retrieved from Elasticsearch).
 // Note: Prefer the bulk wrapper on this API
+// add comment
 func (k APIKey) Authenticate(ctx context.Context, client *elasticsearch.Client) (*SecurityInfo, error) {
 
 	token := fmt.Sprintf("%s%s", authPrefix, k.Token())
@@ -47,7 +48,7 @@ func (k APIKey) Authenticate(ctx context.Context, client *elasticsearch.Client) 
 	res, err := req.Do(ctx, client)
 
 	if err != nil {
-		return nil, fmt.Errorf("apikey auth request %s: %w", k.ID, err)
+		return nil, fmt.Errorf("apikey auths request %s: %w", k.ID, err)
 	}
 
 	if res.Body != nil {
