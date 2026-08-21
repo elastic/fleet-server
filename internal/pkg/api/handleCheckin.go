@@ -971,6 +971,13 @@ func convertActionData(aType ActionType, raw json.RawMessage) (ad Action_Data, e
 		if err != nil {
 			return
 		}
+		if d.Sources != nil && len(*d.Sources) > 0 {
+			sourceURI := (*d.Sources)[0]
+			d.SourceUri = &sourceURI
+		} else if d.SourceUri != nil {
+			sources := []string{*d.SourceUri}
+			d.Sources = &sources
+		}
 		err = ad.FromActionUpgrade(d)
 		return
 	case REQUESTDIAGNOSTICS:

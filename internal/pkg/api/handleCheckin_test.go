@@ -125,8 +125,20 @@ func TestConvertActionData(t *testing.T) {
 	}, {
 		name:   "upgrade action",
 		aType:  UPGRADE,
-		raw:    json.RawMessage(`{"source_uri":"https://localhost:8080","version":"1.2.3"}`),
-		expect: Action_Data{json.RawMessage(`{"source_uri":"https://localhost:8080","version":"1.2.3"}`)},
+		raw:    json.RawMessage(`{"sources":["https://localhost:8080"],"version":"1.2.3"}`),
+		expect: Action_Data{json.RawMessage(`{"source_uri":"https://localhost:8080","sources":["https://localhost:8080"],"version":"1.2.3"}`)},
+		hasErr: false,
+	}, {
+		name:   "upgrade action populates source uri from sources",
+		aType:  UPGRADE,
+		raw:    json.RawMessage(`{"sources":["https://first.example.com","https://second.example.com"],"version":"1.2.3"}`),
+		expect: Action_Data{json.RawMessage(`{"source_uri":"https://first.example.com","sources":["https://first.example.com","https://second.example.com"],"version":"1.2.3"}`)},
+		hasErr: false,
+	}, {
+		name:   "upgrade action populates sources from source uri",
+		aType:  UPGRADE,
+		raw:    json.RawMessage(`{"source_uri":"https://legacy.example.com","version":"1.2.3"}`),
+		expect: Action_Data{json.RawMessage(`{"source_uri":"https://legacy.example.com","sources":["https://legacy.example.com"],"version":"1.2.3"}`)},
 		hasErr: false,
 	}, {
 		name:   "request diagnostics action",
@@ -229,6 +241,16 @@ func TestConvertActions(t *testing.T) {
 			Type:    REQUESTDIAGNOSTICS,
 			Signed:  &ActionSignature{Data: "eyJAdGltZXN0YW==", Signature: "U6NOg4ssxpFV="},
 			Data:    Action_Data{json.RawMessage(`{}`)},
+		}},
+		token: "",
+	}, {
+		name:    "upgrade action",
+		actions: []model.Action{{ActionID: "1234", Type: "UPGRADE", Data: json.RawMessage(`{"sources":["https://first.example.com","https://second.example.com"],"version":"9.6.0"}`)}},
+		resp: []Action{{
+			AgentId: "agent-id",
+			Id:      "1234",
+			Type:    UPGRADE,
+			Data:    Action_Data{json.RawMessage(`{"source_uri":"https://first.example.com","sources":["https://first.example.com","https://second.example.com"],"version":"9.6.0"}`)},
 		}},
 		token: "",
 	}, {name: "multiple actions",
