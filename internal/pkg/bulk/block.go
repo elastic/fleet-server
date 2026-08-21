@@ -16,6 +16,7 @@ type Buf = danger.Buf
 // However, the multiOp API's will allocate directly in large blocks.
 
 type bulkT struct {
+<<<<<<< HEAD
 	action   actionT    // requested actions
 	flags    flagsT     // execution flags
 	idx      int32      // idx of originating request, used in mulitOp
@@ -23,6 +24,18 @@ type bulkT struct {
 	buf      Buf        // json payload to be sent to elastic
 	next     *bulkT     // pointer to next bulkT, used for fast internal queueing
 	spanLink *apm.SpanLink
+=======
+	action       actionT    // requested actions
+	flags        flagsT     // execution flags
+	idx          int32      // idx of originating request, used in mulitOp
+	ch           chan respT // response channel, caller is waiting synchronously
+	buf          Buf        // json payload to be sent to elastic
+	next         *bulkT     // pointer to next bulkT, used for fast internal queueing
+	spanLink     apm.SpanLink
+	hasSpanLink  bool
+	dedupeKey    string // enrollment dedup key (enrollment_id); routes to kQueueEnrollSearch when set
+	refreshIndex string // index to refresh before msearch in kQueueEnrollSearch
+>>>>>>> 3890bbb (feat: batch enrollment FindAgent searches with pre-refresh dedup (#7662))
 }
 
 type flagsT int8
@@ -73,7 +86,14 @@ func (blk *bulkT) reset() {
 	blk.idx = 0
 	blk.buf.Reset()
 	blk.next = nil
+<<<<<<< HEAD
 	blk.spanLink = nil
+=======
+	blk.spanLink = apm.SpanLink{}
+	blk.hasSpanLink = false
+	blk.dedupeKey = ""
+	blk.refreshIndex = ""
+>>>>>>> 3890bbb (feat: batch enrollment FindAgent searches with pre-refresh dedup (#7662))
 }
 
 type respT struct {

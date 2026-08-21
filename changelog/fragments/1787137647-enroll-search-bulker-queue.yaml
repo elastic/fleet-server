@@ -1,0 +1,20 @@
+kind: enhancement
+
+summary: Prevent ghost agent documents caused by concurrent enrollment retries
+
+description: |
+  At large scale, concurrent enrollment retries could create duplicate (ghost) agent
+  documents in Elasticsearch. This occurred when an agent retried enrollment before
+  its previous write was visible to search, causing multiple retries to each believe
+  no agent existed and each create a new document.
+
+  Fleet Server now batches enrollment lookups and ensures index visibility before
+  searching, so retries consistently find an existing agent document rather than
+  creating a new one. Duplicate requests within a batch are handled efficiently
+  and prompted to retry, keeping the number of Elasticsearch operations low.
+
+  The batching behaviour is configurable via
+  inputs[].server.bulk.enroll.flush_interval (default: 1s) and
+  inputs[].server.bulk.enroll.flush_threshold_cnt (default: 50).
+
+component: fleet-server
