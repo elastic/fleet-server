@@ -10,9 +10,9 @@ replace (
 require (
 	github.com/Shopify/toxiproxy/v2 v2.12.0
 	github.com/elastic/elastic-agent-client/v7 v7.18.1
-	github.com/elastic/elastic-agent-libs v0.46.2
+	github.com/elastic/elastic-agent-libs v0.46.3
 	github.com/elastic/fleet-server/pkg/api v0.0.0-00010101000000-000000000000
-	github.com/elastic/fleet-server/v7 v7.0.0-00010101000000-000000000000
+	github.com/elastic/fleet-server/v7 v7.17.29
 	github.com/gofrs/uuid/v5 v5.5.0
 	github.com/moby/moby/api v1.55.0
 	github.com/stretchr/testify v1.12.0
