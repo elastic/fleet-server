@@ -1020,9 +1020,13 @@ func convertActions(zlog zerolog.Logger, agentID string, actions []model.Action)
 			zlog.Error().Err(err).Str(ecs.ActionID, action.ActionID).Str(ecs.ActionType, action.Type).Msg("Failed to convert action.Data")
 			continue
 		}
+		var createdAt string
+		if !action.Timestamp.IsZero() {
+			createdAt = action.Timestamp.Format(time.RFC3339Nano)
+		}
 		r := Action{
 			AgentId:   agentID,
-			CreatedAt: action.Timestamp.Format(time.RFC3339Nano),
+			CreatedAt: createdAt,
 			Data:      ad,
 			Id:        action.ActionID,
 			Type:      ActionType(action.Type),

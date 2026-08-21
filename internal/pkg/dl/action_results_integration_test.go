@@ -27,7 +27,7 @@ func createRandomActionResults() ([]model.ActionResult, error) {
 
 	sz := r.Int(1, 9)
 
-	now := time.Now().UTC()
+	now := time.Now().UTC().Truncate(time.Millisecond)
 
 	results := make([]model.ActionResult, sz)
 

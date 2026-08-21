@@ -23,8 +23,8 @@ import (
 )
 
 func createRandomEnrollmentAPIKey(policyID string, active bool) model.EnrollmentAPIKey {
-	now := time.Now().UTC()
-	return model.EnrollmentAPIKey{
+	now := time.Now().UTC().Truncate(time.Millisecond)
+	return model.EnrollmentAPIKey{ //nolint:gosec // G101: test data, not a real credential
 		ESDocument: model.ESDocument{
 			Id: xid.New().String(),
 		},

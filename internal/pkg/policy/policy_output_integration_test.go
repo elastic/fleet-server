@@ -51,7 +51,7 @@ func TestRenderUpdatePainlessScript(t *testing.T) {
 			ctx := testlog.SetLogger(t).WithContext(t.Context())
 			index, bulker := ftesting.SetupCleanIndex(ctx, t, dl.FleetAgents)
 
-			now := time.Now().UTC()
+			now := time.Now().UTC().Truncate(time.Millisecond)
 
 			agentID := uuid.Must(uuid.NewV4()).String()
 			policyID := uuid.Must(uuid.NewV4()).String()
@@ -197,7 +197,7 @@ func TestPolicyOutputESPrepareRealES(t *testing.T) {
 }
 
 func createAgent(ctx context.Context, t *testing.T, index string, bulker bulk.Bulk, outputs map[string]*model.PolicyOutput) string {
-	now := time.Now().UTC()
+	now := time.Now().UTC().Truncate(time.Millisecond)
 
 	agentID := uuid.Must(uuid.NewV4()).String()
 	policyID := uuid.Must(uuid.NewV4()).String()

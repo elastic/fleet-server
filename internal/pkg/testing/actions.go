@@ -90,7 +90,7 @@ func CreateRandomActions(opts ...CreateActionsOpt) ([]model.Action, error) {
 
 	sz = r.Int(c.minActionsCount, c.maxActionsCount)
 
-	now := time.Now().UTC()
+	now := time.Now().UTC().Truncate(time.Millisecond)
 
 	actions := make([]model.Action, sz)
 

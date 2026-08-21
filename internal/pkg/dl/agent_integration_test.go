@@ -26,7 +26,7 @@ func TestFindAgent_NewModel(t *testing.T) {
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetAgents)
 
-	now := time.Now().UTC()
+	now := time.Now().UTC().Truncate(time.Millisecond)
 
 	policyID := uuid.Must(uuid.NewV4()).String()
 	agentID := uuid.Must(uuid.NewV4()).String()
