@@ -38,7 +38,7 @@ func TestRenderUpdatePainlessScript(t *testing.T) {
 		{
 			name: "to_retire_api_key_ids is not empty",
 			existingToRetireAPIKeyIds: []model.ToRetireAPIKeyIdsItems{{
-				ID: "pre_existing_ID", RetiredAt: "pre_existing__RetiredAt"}},
+				ID: "pre_existing_ID"}},
 		},
 	}
 
@@ -51,8 +51,7 @@ func TestRenderUpdatePainlessScript(t *testing.T) {
 			ctx := testlog.SetLogger(t).WithContext(t.Context())
 			index, bulker := ftesting.SetupCleanIndex(ctx, t, dl.FleetAgents)
 
-			now := time.Now().UTC()
-			nowStr := now.Format(time.RFC3339)
+			now := time.Now().UTC().Truncate(time.Millisecond)
 
 			agentID := uuid.Must(uuid.NewV4()).String()
 			policyID := uuid.Must(uuid.NewV4()).String()
@@ -70,17 +69,17 @@ func TestRenderUpdatePainlessScript(t *testing.T) {
 					Type:            OutputTypeElasticsearch,
 					ToRetireAPIKeyIds: append(tt.existingToRetireAPIKeyIds,
 						model.ToRetireAPIKeyIdsItems{
-							ID: previousAPIKey.ID, RetiredAt: nowStr}),
+							ID: previousAPIKey.ID, RetiredAt: now}),
 				},
 			}
 
 			agentModel := model.Agent{
 				PolicyID:          policyID,
 				Active:            true,
-				LastCheckin:       nowStr,
+				LastCheckin:       &now,
 				LastCheckinStatus: "",
-				UpdatedAt:         nowStr,
-				EnrolledAt:        nowStr,
+				UpdatedAt:         &now,
+				EnrolledAt:        now,
 				Outputs: map[string]*model.PolicyOutput{
 					outputName: {
 						Type:            OutputTypeElasticsearch,
@@ -107,7 +106,7 @@ func TestRenderUpdatePainlessScript(t *testing.T) {
 				dl.FieldPolicyOutputAPIKeyID:        outputAPIKey.ID,
 				dl.FieldPolicyOutputPermissionsHash: outputPermissionSha,
 				dl.FieldPolicyOutputToRetireAPIKeyIDs: model.ToRetireAPIKeyIdsItems{
-					ID: previousAPIKey.ID, RetiredAt: nowStr},
+					ID: previousAPIKey.ID, RetiredAt: now},
 			}
 
 			got, err := renderUpdatePainlessScript(outputName, fields)
@@ -198,7 +197,7 @@ func TestPolicyOutputESPrepareRealES(t *testing.T) {
 }
 
 func createAgent(ctx context.Context, t *testing.T, index string, bulker bulk.Bulk, outputs map[string]*model.PolicyOutput) string {
-	const nowStr = "2022-08-12T16:50:05Z"
+	now := time.Now().UTC().Truncate(time.Millisecond)
 
 	agentID := uuid.Must(uuid.NewV4()).String()
 	policyID := uuid.Must(uuid.NewV4()).String()
@@ -206,10 +205,10 @@ func createAgent(ctx context.Context, t *testing.T, index string, bulker bulk.Bu
 	agentModel := model.Agent{
 		PolicyID:          policyID,
 		Active:            true,
-		LastCheckin:       nowStr,
+		LastCheckin:       &now,
 		LastCheckinStatus: "",
-		UpdatedAt:         nowStr,
-		EnrolledAt:        nowStr,
+		UpdatedAt:         &now,
+		EnrolledAt:        now,
 		Outputs:           outputs,
 	}
 

@@ -159,3 +159,6 @@ linters:
       - third_party$
       - builtin$
       - examples$
+    rules:
+      - linters: [gocheckcompilerdirectives]
+        text: 'compiler directive unrecognized: //go:fix'

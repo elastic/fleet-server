@@ -15,7 +15,7 @@ import (
 )
 
 func TestRunProfiler(t *testing.T) {
-	ln, err := net.Listen("tcp", "localhost:8081")
+	ln, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "localhost:8081")
 	if err != nil {
 		t.Skip("Port 8081 must be free to run this test")
 	}
@@ -35,7 +35,7 @@ func TestRunProfiler(t *testing.T) {
 
 	var resp *http.Response
 	for i := range 10 {
-		resp, err = http.DefaultClient.Do(req) //nolint:bodyclose // closed outside the loop
+		resp, err = http.DefaultClient.Do(req)
 		if err == nil {
 			break
 		}

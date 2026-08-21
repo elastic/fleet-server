@@ -29,7 +29,7 @@ func (m *MockSubscription) Output() <-chan []es.HitT {
 	if args.Get(0) == nil {
 		return nil
 	}
-	return args.Get(0).(<-chan []es.HitT)
+	return args.Get(0).(<-chan []es.HitT) //nolint:errcheck // testify mock type assertion: intentional panic on type mismatch
 }
 
 // MockMonitor implements monitor.SimpleMonitor and monitor.Monitor
@@ -46,7 +46,7 @@ func (m *MockMonitor) Subscribe() monitor.Subscription {
 	if args.Get(0) == nil {
 		return nil
 	}
-	return args.Get(0).(monitor.Subscription)
+	return args.Get(0).(monitor.Subscription) //nolint:errcheck // testify mock type assertion: intentional panic on type mismatch
 }
 
 func (m *MockMonitor) Unsubscribe(s monitor.Subscription) {
@@ -63,7 +63,7 @@ func (m *MockMonitor) GetCheckpoint() sqn.SeqNo {
 	if args.Get(0) == nil {
 		return nil
 	}
-	return args.Get(0).(sqn.SeqNo)
+	return args.Get(0).(sqn.SeqNo) //nolint:errcheck // testify mock type assertion: intentional panic on type mismatch
 }
 
 func (m *MockMonitor) Output() <-chan []es.HitT {
@@ -71,10 +71,10 @@ func (m *MockMonitor) Output() <-chan []es.HitT {
 	if args.Get(0) == nil {
 		return nil
 	}
-	return args.Get(0).(<-chan []es.HitT)
+	return args.Get(0).(<-chan []es.HitT) //nolint:errcheck // testify mock type assertion: intentional panic on type mismatch
 }
 
 func (m *MockMonitor) State() client.UnitState {
 	args := m.Called()
-	return args.Get(0).(client.UnitState)
+	return args.Get(0).(client.UnitState) //nolint:errcheck // testify mock type assertion: intentional panic on type mismatch
 }

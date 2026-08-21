@@ -16,6 +16,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 
@@ -30,6 +31,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
+
+func mustParseTime(s string) time.Time {
+	t, err := time.Parse(time.RFC3339Nano, s)
+	if err != nil {
+		panic(err)
+	}
+	return t
+}
 
 func BenchmarkMakeUpdatePolicyBody(b *testing.B) {
 	const policyID = "ed110be4-c2a0-42b8-adc0-94c2f0569207"
@@ -67,7 +76,7 @@ func TestEventToActionResult(t *testing.T) {
 	    }`)})
 		assert.Equal(t, agentID, r.AgentID)
 		assert.Equal(t, "test-action-id", r.ActionID)
-		assert.Equal(t, "2022-02-23T18:26:08.506128Z", r.Timestamp)
+		assert.Equal(t, mustParseTime("2022-02-23T18:26:08.506128Z"), r.Timestamp)
 		assert.Empty(t, r.Error)
 	})
 	t.Run("with error", func(t *testing.T) {
@@ -79,7 +88,7 @@ func TestEventToActionResult(t *testing.T) {
 	    }`)})
 		assert.Equal(t, agentID, r.AgentID)
 		assert.Equal(t, "test-action-id", r.ActionID)
-		assert.Equal(t, "2022-02-23T18:26:08.506128Z", r.Timestamp)
+		assert.Equal(t, mustParseTime("2022-02-23T18:26:08.506128Z"), r.Timestamp)
 		assert.Equal(t, "error message", r.Error)
 	})
 	t.Run("request diagnostics", func(t *testing.T) {
@@ -92,7 +101,7 @@ func TestEventToActionResult(t *testing.T) {
 	    }`)})
 		assert.Equal(t, agentID, r.AgentID)
 		assert.Equal(t, "test-action-id", r.ActionID)
-		assert.Equal(t, "2022-02-23T18:26:08.506128Z", r.Timestamp)
+		assert.Equal(t, mustParseTime("2022-02-23T18:26:08.506128Z"), r.Timestamp)
 		assert.Equal(t, json.RawMessage(`{"upload_id":"upload"}`), r.Data)
 		assert.Equal(t, "error message", r.Error)
 	})
@@ -110,12 +119,12 @@ func TestEventToActionResult(t *testing.T) {
 	    }`)})
 		assert.Equal(t, agentID, r.AgentID)
 		assert.Equal(t, "test-action-id", r.ActionID)
-		assert.Equal(t, "2022-02-23T18:26:08.506128Z", r.Timestamp)
+		assert.Equal(t, mustParseTime("2022-02-23T18:26:08.506128Z"), r.Timestamp)
 		assert.Equal(t, "test-input", r.ActionInputType)
 		assert.Equal(t, json.RawMessage(`{"key1":"value1"}`), r.ActionData)
 		assert.Equal(t, json.RawMessage(`{"key2":"value2"}`), r.ActionResponse)
-		assert.Equal(t, "2022-02-24T18:26:08.506128Z", r.CompletedAt)
-		assert.Equal(t, "2022-02-22T18:26:08.506128Z", r.StartedAt)
+		assert.Equal(t, mustParseTime("2022-02-24T18:26:08.506128Z"), r.CompletedAt)
+		assert.Equal(t, mustParseTime("2022-02-22T18:26:08.506128Z"), r.StartedAt)
 		assert.Equal(t, "error message", r.Error)
 	})
 	t.Run("migrate action", func(t *testing.T) {
@@ -128,7 +137,7 @@ func TestEventToActionResult(t *testing.T) {
 		}`)})
 		assert.Equal(t, agentID, r.AgentID)
 		assert.Equal(t, "test-action-id", r.ActionID)
-		assert.Equal(t, "2022-02-23T18:26:08.506128Z", r.Timestamp)
+		assert.Equal(t, mustParseTime("2022-02-23T18:26:08.506128Z"), r.Timestamp)
 		assert.Equal(t, "error message", r.Error)
 	})
 	t.Run("privilege level change action", func(t *testing.T) {
@@ -141,7 +150,7 @@ func TestEventToActionResult(t *testing.T) {
 		}`)})
 		assert.Equal(t, agentID, r.AgentID)
 		assert.Equal(t, "test-action-id", r.ActionID)
-		assert.Equal(t, "2022-02-23T18:26:08.506128Z", r.Timestamp)
+		assert.Equal(t, mustParseTime("2022-02-23T18:26:08.506128Z"), r.Timestamp)
 		assert.Equal(t, "error message", r.Error)
 	})
 }

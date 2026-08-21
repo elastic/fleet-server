@@ -65,7 +65,7 @@ func (b *Buf) WriteByte(c byte) error {
 // It returns the length of r and a nil error.
 func (b *Buf) WriteRune(r rune) (int, error) {
 	if r < utf8.RuneSelf {
-		b.buf = append(b.buf, byte(r))
+		b.buf = append(b.buf, byte(r)) //nolint:gosec // G115: rune is in ASCII range (< utf8.RuneSelf), safe to convert to byte
 		return 1, nil
 	}
 	l := len(b.buf)

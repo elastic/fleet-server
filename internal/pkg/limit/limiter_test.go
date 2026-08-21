@@ -26,7 +26,7 @@ func (m *mockIncer) IncError(err error) {
 
 func (m *mockIncer) IncStart() func() {
 	args := m.Called()
-	return args.Get(0).(func())
+	return args.Get(0).(func()) //nolint:errcheck // testify mock type assertion: intentional panic on type mismatch
 }
 
 func stubHandle() http.Handler {

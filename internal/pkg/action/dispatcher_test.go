@@ -19,6 +19,14 @@ import (
 	"golang.org/x/time/rate"
 )
 
+func mustParseTime(s string) time.Time {
+	t, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		panic(err)
+	}
+	return t
+}
+
 type mockMonitor struct {
 	mock.Mock
 }
@@ -185,9 +193,9 @@ func Test_Dispatcher_Run(t *testing.T) {
 				ActionID:               "test-action",
 				Agents:                 nil,
 				Data:                   json.RawMessage(`{"key":"value"}`),
-				Expiration:             "2022-01-02T13:00:00Z",
+				Expiration:             mustParseTime("2022-01-02T13:00:00Z"),
 				RolloutDurationSeconds: 600,
-				StartTime:              "2022-01-02T12:00:00Z",
+				StartTime:              mustParseTime("2022-01-02T12:00:00Z"),
 				Type:                   "upgrade",
 			}},
 		},
@@ -210,27 +218,27 @@ func Test_Dispatcher_Run(t *testing.T) {
 				ActionID:               "test-action",
 				Agents:                 nil,
 				Data:                   json.RawMessage(`{"key":"value"}`),
-				Expiration:             "2022-01-02T13:00:00Z",
+				Expiration:             mustParseTime("2022-01-02T13:00:00Z"),
 				RolloutDurationSeconds: 600,
-				StartTime:              "2022-01-02T12:00:00Z",
+				StartTime:              mustParseTime("2022-01-02T12:00:00Z"),
 				Type:                   "upgrade",
 			}},
 			"agent2": []model.Action{model.Action{
 				ActionID:               "test-action",
 				Agents:                 nil,
 				Data:                   json.RawMessage(`{"key":"value"}`),
-				Expiration:             "2022-01-02T13:00:00Z",
+				Expiration:             mustParseTime("2022-01-02T13:00:00Z"),
 				RolloutDurationSeconds: 600,
-				StartTime:              "2022-01-02T12:03:20Z",
+				StartTime:              mustParseTime("2022-01-02T12:03:20Z"),
 				Type:                   "upgrade",
 			}},
 			"agent3": []model.Action{model.Action{
 				ActionID:               "test-action",
 				Agents:                 nil,
 				Data:                   json.RawMessage(`{"key":"value"}`),
-				Expiration:             "2022-01-02T13:00:00Z",
+				Expiration:             mustParseTime("2022-01-02T13:00:00Z"),
 				RolloutDurationSeconds: 600,
-				StartTime:              "2022-01-02T12:06:40Z",
+				StartTime:              mustParseTime("2022-01-02T12:06:40Z"),
 				Type:                   "upgrade",
 			}},
 		},
@@ -312,60 +320,52 @@ func Test_Dispatcher_Run(t *testing.T) {
 func Test_offsetStartTime(t *testing.T) {
 	tests := []struct {
 		name   string
-		start  string
-		end    string
+		start  time.Time
 		dur    int64
 		i      int
 		total  int
-		result string
+		result time.Time
 	}{{
-		name:   "no start",
-		result: "",
+		name: "no start",
 	}, {
 		name:   "first agent",
-		start:  "2022-01-02T12:00:00Z",
-		end:    "2022-01-02T13:00:00Z",
+		start:  mustParseTime("2022-01-02T12:00:00Z"),
 		i:      0,
 		total:  10,
-		result: "2022-01-02T12:00:00Z",
+		result: mustParseTime("2022-01-02T12:00:00Z"),
 	}, {
 		name:   "mid agent no dur",
-		start:  "2022-01-02T12:00:00Z",
-		end:    "2022-01-02T13:00:00Z",
+		start:  mustParseTime("2022-01-02T12:00:00Z"),
 		i:      4,
 		total:  10,
-		result: "2022-01-02T12:00:00Z",
+		result: mustParseTime("2022-01-02T12:00:00Z"),
 	}, {
 		name:   "last agent no dur",
-		start:  "2022-01-02T12:00:00Z",
-		end:    "2022-01-02T13:00:00Z",
+		start:  mustParseTime("2022-01-02T12:00:00Z"),
 		i:      9,
 		total:  10,
-		result: "2022-01-02T12:00:00Z",
+		result: mustParseTime("2022-01-02T12:00:00Z"),
 	}, {
 		name:   "first agent 10m dur",
-		start:  "2022-01-02T12:00:00Z",
-		end:    "2022-01-02T13:00:00Z",
+		start:  mustParseTime("2022-01-02T12:00:00Z"),
 		dur:    600,
 		i:      0,
 		total:  10,
-		result: "2022-01-02T12:00:00Z",
+		result: mustParseTime("2022-01-02T12:00:00Z"),
 	}, {
 		name:   "mid agent 10m dur",
-		start:  "2022-01-02T12:00:00Z",
-		end:    "2022-01-02T13:00:00Z",
+		start:  mustParseTime("2022-01-02T12:00:00Z"),
 		dur:    600,
 		i:      4,
 		total:  10,
-		result: "2022-01-02T12:04:00Z",
+		result: mustParseTime("2022-01-02T12:04:00Z"),
 	}, {
 		name:   "last agent 10m dur",
-		start:  "2022-01-02T12:00:00Z",
-		end:    "2022-01-02T13:00:00Z",
+		start:  mustParseTime("2022-01-02T12:00:00Z"),
 		dur:    600,
 		i:      9,
 		total:  10,
-		result: "2022-01-02T12:09:00Z",
+		result: mustParseTime("2022-01-02T12:09:00Z"),
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

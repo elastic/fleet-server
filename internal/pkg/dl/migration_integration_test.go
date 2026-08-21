@@ -26,10 +26,13 @@ import (
 
 const nowStr = "2022-08-12T16:50:05Z"
 
+// testNow is the parsed form of nowStr, used for model fields that are time.Time.
+var testNow, _ = time.Parse(time.RFC3339, nowStr)
+
 func createSomeAgents(ctx context.Context, t *testing.T, n int, apiKey bulk.APIKey, index string, bulker bulk.Bulk) []string {
 	t.Helper()
 
-	var createdAgents []string
+	createdAgents := make([]string, 0, n)
 
 	for i := range n {
 		outputAPIKey := bulk.APIKey{
@@ -43,17 +46,17 @@ func createSomeAgents(ctx context.Context, t *testing.T, n int, apiKey bulk.APIK
 		agentModel := model.Agent{
 			PolicyID:                    policyID,
 			Active:                      true,
-			LastCheckin:                 nowStr,
+			LastCheckin:                 &testNow,
 			LastCheckinStatus:           "",
-			UpdatedAt:                   nowStr,
-			EnrolledAt:                  nowStr,
+			UpdatedAt:                   &testNow,
+			EnrolledAt:                  testNow,
 			DefaultAPIKeyID:             outputAPIKey.ID,
 			DefaultAPIKey:               outputAPIKey.Agent(),
 			PolicyOutputPermissionsHash: fmt.Sprint("a_output_permission_SHA_", i),
 			DefaultAPIKeyHistory: []model.ToRetireAPIKeyIdsItems{
 				{
 					ID:        "old_" + outputAPIKey.ID,
-					RetiredAt: nowStr,
+					RetiredAt: testNow,
 				},
 			},
 		}
@@ -74,10 +77,8 @@ func createSomeAgents(ctx context.Context, t *testing.T, n int, apiKey bulk.APIK
 func TestMigrateOutputs_withDefaultAPIKeyHistory(t *testing.T) {
 	ctx := testlog.SetLogger(t).WithContext(t.Context())
 
-	now, err := time.Parse(time.RFC3339, nowStr)
-	require.NoError(t, err, "could not parse time "+nowStr)
 	timeNow = func() time.Time {
-		return now
+		return testNow
 	}
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetAgents)
@@ -124,10 +125,10 @@ func TestMigrateOutputs_withDefaultAPIKeyHistory(t *testing.T) {
 			{
 				// Current API should be marked to retire after the migration
 				ID:        fmt.Sprintf("%s%d", apiKey.ID, i),
-				RetiredAt: timeNow().UTC().Format(time.RFC3339)},
+				RetiredAt: timeNow().UTC()},
 			{
 				ID:        fmt.Sprintf("old_%s%d", apiKey.ID, i),
-				RetiredAt: nowStr},
+				RetiredAt: testNow},
 		}
 
 		// Assert new fields
@@ -164,10 +165,8 @@ func TestMigrateOutputs_withDefaultAPIKeyHistory(t *testing.T) {
 func TestMigrateOutputs_dontMigrateTwice(t *testing.T) {
 	ctx := testlog.SetLogger(t).WithContext(t.Context())
 
-	now, err := time.Parse(time.RFC3339, nowStr)
-	require.NoError(t, err, "could not parse time "+nowStr)
 	timeNow = func() time.Time {
-		return now
+		return testNow
 	}
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetAgents)
@@ -193,10 +192,8 @@ func TestMigrateOutputs_nil_DefaultAPIKeyHistory(t *testing.T) {
 
 	wantOutputType := "elasticsearch"
 
-	now, err := time.Parse(time.RFC3339, nowStr)
-	require.NoError(t, err, "could not parse time "+nowStr)
 	timeNow = func() time.Time {
-		return now
+		return testNow
 	}
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetAgents)
@@ -217,10 +214,10 @@ func TestMigrateOutputs_nil_DefaultAPIKeyHistory(t *testing.T) {
 	agentModel := model.Agent{
 		PolicyID:                    policyID,
 		Active:                      true,
-		LastCheckin:                 nowStr,
+		LastCheckin:                 &testNow,
 		LastCheckinStatus:           "",
-		UpdatedAt:                   nowStr,
-		EnrolledAt:                  nowStr,
+		UpdatedAt:                   &testNow,
+		EnrolledAt:                  testNow,
 		DefaultAPIKeyID:             outputAPIKey.ID,
 		DefaultAPIKey:               outputAPIKey.Agent(),
 		PolicyOutputPermissionsHash: fmt.Sprint("a_output_permission_SHA_", i),
@@ -276,7 +273,7 @@ func TestMigrateOutputs_nil_DefaultAPIKeyHistory(t *testing.T) {
 	// Assert ToRetireAPIKeyIds contains the expected values, regardless of the order.
 	if assert.Len(t, got.Outputs["default"].ToRetireAPIKeyIds, 1) {
 		assert.Equal(t,
-			model.ToRetireAPIKeyIdsItems{ID: outputAPIKey.ID, RetiredAt: nowStr},
+			model.ToRetireAPIKeyIdsItems{ID: outputAPIKey.ID, RetiredAt: testNow},
 			got.Outputs["default"].ToRetireAPIKeyIds[0])
 	}
 
@@ -290,10 +287,8 @@ func TestMigrateOutputs_nil_DefaultAPIKeyHistory(t *testing.T) {
 func TestMigrateOutputs_no_agent_document(t *testing.T) {
 	ctx := testlog.SetLogger(t).WithContext(t.Context())
 
-	now, err := time.Parse(time.RFC3339, nowStr)
-	require.NoError(t, err, "could not parse time "+nowStr)
 	timeNow = func() time.Time {
-		return now
+		return testNow
 	}
 
 	_, bulker := ftesting.SetupCleanIndex(ctx, t, FleetAgents)
