@@ -743,6 +743,13 @@ components:
         source_uri:
           description: The source of the upgrade artifact.
           type: string
+          deprecated: true
+          x-deprecated-reason: Replaced by sources.
+        sources:
+          description: An ordered list of sources for the upgrade artifact.
+          type: array
+          items:
+            type: string
         rollback:
           description: Indicates if this version change should be performed as a rollback to a previous version.
           type: boolean
