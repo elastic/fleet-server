@@ -38,6 +38,7 @@ type APIKeyMetadata = apikey.APIKeyMetadata
 var (
 	ErrNoQuotes              = errors.New("quoted literal not supported")
 	ErrTooManyBulkDispatches = errors.New("too many pending bulk dispatches")
+	ErrEnrollDuplicate       = errors.New("enrollment deduplicated: retry")
 )
 
 type MultiOp struct {
@@ -334,6 +335,10 @@ func stopTimer(t *time.Timer) {
 func blkToQueueType(blk *bulkT) queueType {
 	queueIdx := kQueueBulk
 
+	if blk.action == ActionSearch && blk.dedupeKey != "" {
+		return kQueueEnrollSearch
+	}
+
 	forceRefresh := blk.flags.Has(flagRefresh)
 
 	switch blk.action {
@@ -368,6 +373,12 @@ func (b *Bulker) Run(ctx context.Context) error {
 	stopTimer(timer)
 	defer timer.Stop()
 
+	// Separate timer and counter for the enrollment search queue so it can flush
+	// independently at a shorter interval without affecting other queues.
+	enrollTimer := time.NewTimer(b.opts.enrollFlushInterval)
+	stopTimer(enrollTimer)
+	defer enrollTimer.Stop()
+
 	w := semaphore.NewWeighted(int64(b.opts.maxPending))
 
 	var queues [kNumQueues]queueT
@@ -379,29 +390,42 @@ func (b *Bulker) Run(ctx context.Context) error {
 
 	var itemCnt int
 	var byteCnt int
+	var enrollItemCnt int
 
 	doFlush := func() error {
-
 		for i := range queues {
+			if queueType(i) == kQueueEnrollSearch {
+				continue // flushed independently by doFlushEnroll
+			}
 			q := &queues[i]
 			if q.pending > 0 {
-
 				// Pass queue structure by value
 				if err := b.flushQueue(ctx, w, *q); err != nil {
 					return err
 				}
-
 				// Reset local queue stored in array
 				q.cnt = 0
 				q.head = nil
 				q.pending = 0
 			}
 		}
-
 		// Reset threshold counters
 		itemCnt = 0
 		byteCnt = 0
+		return nil
+	}
 
+	doFlushEnroll := func() error {
+		q := &queues[kQueueEnrollSearch]
+		if q.pending > 0 {
+			if err := b.flushQueue(ctx, w, *q); err != nil {
+				return err
+			}
+			q.cnt = 0
+			q.head = nil
+			q.pending = 0
+		}
+		enrollItemCnt = 0
 		return nil
 	}
 
@@ -422,27 +446,49 @@ func (b *Bulker) Run(ctx context.Context) error {
 			q.cnt += 1
 			q.pending += blk.buf.Len()
 
-			// Update threshold counters
-			itemCnt += 1
-			byteCnt += blk.buf.Len()
+			if queueIdx == kQueueEnrollSearch {
+				enrollItemCnt++
+				if enrollItemCnt == 1 {
+					enrollTimer.Reset(b.opts.enrollFlushInterval)
+				}
+				if enrollItemCnt >= b.opts.enrollFlushThresholdCnt {
+					zerolog.Ctx(ctx).Trace().
+						Str("mod", kModBulk).
+						Int("enrollItemCnt", enrollItemCnt).
+						Msg("Flush enroll search on threshold")
+					err = doFlushEnroll()
+					stopTimer(enrollTimer)
+				}
+			} else {
+				// Update threshold counters
+				itemCnt += 1
+				byteCnt += blk.buf.Len()
 
-			// Start timer on first queued item
-			if itemCnt == 1 {
-				timer.Reset(b.opts.flushInterval)
+				// Start timer on first queued item
+				if itemCnt == 1 {
+					timer.Reset(b.opts.flushInterval)
+				}
+
+				// Threshold test, short circuit timer on pending count
+				if itemCnt >= b.opts.flushThresholdCnt || byteCnt >= b.opts.flushThresholdSz {
+					zerolog.Ctx(ctx).Trace().
+						Str("mod", kModBulk).
+						Int("itemCnt", itemCnt).
+						Int("byteCnt", byteCnt).
+						Msg("Flush on threshold")
+
+					err = doFlush()
+
+					stopTimer(timer)
+				}
 			}
 
-			// Threshold test, short circuit timer on pending count
-			if itemCnt >= b.opts.flushThresholdCnt || byteCnt >= b.opts.flushThresholdSz {
-				zerolog.Ctx(ctx).Trace().
-					Str("mod", kModBulk).
-					Int("itemCnt", itemCnt).
-					Int("byteCnt", byteCnt).
-					Msg("Flush on threshold")
-
-				err = doFlush()
-
-				stopTimer(timer)
-			}
+		case <-enrollTimer.C:
+			zerolog.Ctx(ctx).Trace().
+				Str("mod", kModBulk).
+				Int("enrollItemCnt", enrollItemCnt).
+				Msg("Flush enroll search on timer")
+			err = doFlushEnroll()
 
 		case <-timer.C:
 			zerolog.Ctx(ctx).Trace().
@@ -519,6 +565,8 @@ func (b *Bulker) flushQueue(ctx context.Context, w *semaphore.Weighted, queue qu
 			err = b.flushRead(flushCtx, queue)
 		case kQueueSearch, kQueueFleetSearch:
 			err = b.flushSearch(flushCtx, queue)
+		case kQueueEnrollSearch:
+			err = b.flushEnrollSearch(flushCtx, queue)
 		case kQueueAPIKeyUpdate:
 			err = b.flushUpdateAPIKey(flushCtx, queue)
 		default:
@@ -573,6 +621,12 @@ func (b *Bulker) newBlk(action actionT, opts optionsT) *bulkT {
 		blk.flags.Set(flagRefresh)
 	}
 	blk.spanLink = opts.spanLink
+<<<<<<< HEAD
+=======
+	blk.hasSpanLink = opts.hasSpanLink
+	blk.dedupeKey = opts.DedupeKey
+	blk.refreshIndex = opts.RefreshIndex
+>>>>>>> 3890bbb (feat: batch enrollment FindAgent searches with pre-refresh dedup (#7662))
 
 	return blk
 }
