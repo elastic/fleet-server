@@ -40,21 +40,21 @@ type TestSuite struct {
 func (suite *TestSuite) SetupSuite() {
 	suite.T().Helper()
 
-	// get env vars
-	v, ok := os.LookupEnv("FLEET_SERVER_URL")
-	suite.Require().True(ok, "expected FLEET_SERVER_URL to be defined")
+	// get env vars — names match those set by `oblt-cli cluster secrets env`
+	v, ok := os.LookupEnv("FLEET_URL")
+	suite.Require().True(ok, "expected FLEET_URL to be defined")
 	suite.fleetServerURL = v
 
-	v, ok = os.LookupEnv("KIBANA_URL")
-	suite.Require().True(ok, "expected KIBANA_URL to be defined")
+	v, ok = os.LookupEnv("KIBANA_HOST")
+	suite.Require().True(ok, "expected KIBANA_HOST to be defined")
 	suite.kibanaURL = v
 
-	v, ok = os.LookupEnv("ELASTIC_USER")
-	suite.Require().True(ok, "expected ELASTIC_USER to be defined")
+	v, ok = os.LookupEnv("ELASTICSEARCH_USERNAME")
+	suite.Require().True(ok, "expected ELASTICSEARCH_USERNAME to be defined")
 	suite.username = v
 
-	v, ok = os.LookupEnv("ELASTIC_PASS")
-	suite.Require().True(ok, "expected ELASTIC_PASS to be defined")
+	v, ok = os.LookupEnv("ELASTICSEARCH_PASSWORD")
+	suite.Require().True(ok, "expected ELASTICSEARCH_PASSWORD to be defined")
 	suite.password = v
 
 	suite.client = &http.Client{}
