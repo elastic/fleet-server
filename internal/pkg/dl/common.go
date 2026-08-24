@@ -4,8 +4,11 @@
 
 package dl
 
+import "github.com/elastic/fleet-server/v7/internal/pkg/bulk"
+
 type queryOption struct {
 	indexName string
+	bulkOpts  []bulk.Opt
 }
 
 // Option for the operation being made
@@ -17,6 +20,13 @@ type Option func(opt *queryOption)
 func WithIndexName(name string) Option {
 	return func(opt *queryOption) {
 		opt.indexName = name
+	}
+}
+
+// WithBulkOpts passes additional bulk.Opt values to the underlying bulker call.
+func WithBulkOpts(opts ...bulk.Opt) Option {
+	return func(o *queryOption) {
+		o.bulkOpts = append(o.bulkOpts, opts...)
 	}
 }
 

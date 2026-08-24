@@ -215,8 +215,13 @@ func (et *EnrollerT) _enroll(
 		vSpan, vCtx := apm.StartSpan(ctx, "checkEnrollmentID", "validate")
 		enrollmentID = *req.EnrollmentId
 		var err error
-		agent, err = dl.FindAgent(vCtx, et.bulker, dl.QueryAgentByEnrollmentID, dl.FieldEnrollmentID, enrollmentID)
+		agent, err = dl.FindAgent(vCtx, et.bulker, dl.QueryAgentByEnrollmentID, dl.FieldEnrollmentID, enrollmentID,
+			dl.WithBulkOpts(bulk.WithDedupeKey(enrollmentID, dl.FleetAgents)))
 		if err != nil {
+			if errors.Is(err, bulk.ErrEnrollDuplicate) {
+				vSpan.End()
+				return nil, err
+			}
 			zlog.Debug().Err(err).
 				Str("EnrollmentId", enrollmentID).
 				Msg("Agent with EnrollmentId not found")
