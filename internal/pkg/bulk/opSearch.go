@@ -74,7 +74,8 @@ func (b *Bulker) writeMsearchMeta(buf *Buf, index string, moreIndices []string, 
 			return err
 		}
 
-		indices := []string{index}
+		indices := make([]string, 0, 1+len(moreIndices))
+		indices = append(indices, index)
 		indices = append(indices, moreIndices...)
 
 		_, _ = buf.WriteString(`"index": `)
