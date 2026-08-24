@@ -25,14 +25,9 @@ type optionsT struct {
 	Indices            []string
 	WaitForCheckpoints []int64
 	IgnoreUnavailable  bool
-<<<<<<< HEAD
 	spanLink           *apm.SpanLink
-=======
-	spanLink           apm.SpanLink
-	hasSpanLink        bool
 	DedupeKey          string
 	RefreshIndex       string
->>>>>>> 3890bbb (feat: batch enrollment FindAgent searches with pre-refresh dedup (#7662))
 }
 
 type Opt func(*optionsT)
@@ -70,7 +65,6 @@ func WithWaitForCheckpoints(checkpoints []int64) Opt {
 	}
 }
 
-<<<<<<< HEAD
 func withAPMLinkedContext(ctx context.Context) Opt {
 	return func(opt *optionsT) {
 		trace := apm.TransactionFromContext(ctx)
@@ -82,7 +76,9 @@ func withAPMLinkedContext(ctx context.Context) Opt {
 			Trace: tCtx.Trace,
 			Span:  tCtx.Span,
 		}
-=======
+	}
+}
+
 // WithDedupeKey routes a search through kQueueEnrollSearch, which refreshes
 // refreshIndex before executing the msearch and de-dupes concurrent requests
 // with the same key, returning ErrEnrollDuplicate to all but the first.
@@ -90,7 +86,6 @@ func WithDedupeKey(key, refreshIndex string) Opt {
 	return func(opt *optionsT) {
 		opt.DedupeKey = key
 		opt.RefreshIndex = refreshIndex
->>>>>>> 3890bbb (feat: batch enrollment FindAgent searches with pre-refresh dedup (#7662))
 	}
 }
 

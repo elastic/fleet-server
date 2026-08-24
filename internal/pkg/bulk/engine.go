@@ -629,12 +629,8 @@ func (b *Bulker) newBlk(action actionT, opts optionsT) *bulkT {
 		blk.flags.Set(flagRefresh)
 	}
 	blk.spanLink = opts.spanLink
-<<<<<<< HEAD
-=======
-	blk.hasSpanLink = opts.hasSpanLink
 	blk.dedupeKey = opts.DedupeKey
 	blk.refreshIndex = opts.RefreshIndex
->>>>>>> 3890bbb (feat: batch enrollment FindAgent searches with pre-refresh dedup (#7662))
 
 	return blk
 }
