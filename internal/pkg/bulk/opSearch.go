@@ -74,7 +74,8 @@ func (b *Bulker) writeMsearchMeta(buf *Buf, index string, moreIndices []string, 
 			return err
 		}
 
-		indices := []string{index}
+		indices := make([]string, 0, 1+len(moreIndices))
+		indices = append(indices, index)
 		indices = append(indices, moreIndices...)
 
 		_, _ = buf.WriteString(`"index": `)
@@ -236,5 +237,137 @@ func (b *Bulker) flushSearch(ctx context.Context, queue queueT) error {
 		n = next
 	}
 
+	return nil
+}
+
+// flushEnrollSearch handles the kQueueEnrollSearch queue. It:
+//  1. Groups items by dedupeKey — oldest (FIFO) occurrence is canonical, the rest are duplicates.
+//  2. Refreshes all unique refreshIndex values in the batch.
+//  3. Sends an msearch containing only the canonical items.
+//  4. Dispatches results to canonical items; sends ErrEnrollDuplicate to duplicates (or the
+//     canonical's error if the search itself failed, to avoid hiding operational failures).
+func (b *Bulker) flushEnrollSearch(ctx context.Context, queue queueT) error {
+	// Collect items in LIFO order from the queue (queue.head is newest), then reverse to FIFO
+	// so the oldest request becomes canonical for each dedupeKey.
+	var all []*bulkT
+	for n := queue.head; n != nil; n = n.next {
+		all = append(all, n)
+	}
+	for i, j := 0, len(all)-1; i < j; i, j = i+1, j-1 {
+		all[i], all[j] = all[j], all[i]
+	}
+
+	// Group items: oldest occurrence of each dedupeKey is canonical, rest are dupes.
+	dupesByKey := make(map[string][]*bulkT)
+	var canonicals []*bulkT
+	for _, n := range all {
+		key := n.dedupeKey
+		if _, seen := dupesByKey[key]; !seen {
+			dupesByKey[key] = nil // mark key as seen; nil slice = no dupes yet
+			canonicals = append(canonicals, n)
+		} else {
+			dupesByKey[key] = append(dupesByKey[key], n)
+		}
+	}
+
+	if len(canonicals) == 0 {
+		return nil
+	}
+
+	// Refresh all unique indices in the batch before searching so retries see the most recent writes.
+	refreshIndices := make(map[string]struct{})
+	for _, n := range canonicals {
+		if n.refreshIndex != "" {
+			refreshIndices[n.refreshIndex] = struct{}{}
+		}
+	}
+	if len(refreshIndices) > 0 {
+		idxSlice := make([]string, 0, len(refreshIndices))
+		for idx := range refreshIndices {
+			idxSlice = append(idxSlice, idx)
+		}
+		refreshResp, err := esapi.IndicesRefreshRequest{Index: idxSlice}.Do(ctx, b.es)
+		if err != nil {
+			failQueue(queue, err)
+			return nil
+		}
+		if refreshResp.Body != nil {
+			refreshResp.Body.Close()
+		}
+		if refreshResp.IsError() {
+			err = fmt.Errorf("enroll search refresh failed: %s", refreshResp.String())
+			failQueue(queue, err)
+			return nil
+		}
+	}
+
+	// Build msearch body from canonical items only.
+	const kRoughEstimatePerItem = 256
+	bufSz := max(len(canonicals)*kRoughEstimatePerItem, queue.pending)
+	var buf bytes.Buffer
+	buf.Grow(bufSz)
+
+	for _, n := range canonicals {
+		buf.Write(n.buf.Bytes())
+	}
+
+	span, ctx := apm.StartSpanOptions(ctx, "Flush: enrollSearch", "enrollSearch", apm.SpanOptions{})
+	defer span.End()
+
+	msearchReq := esapi.MsearchRequest{Body: bytes.NewReader(buf.Bytes())}
+	res, err := msearchReq.Do(ctx, b.es)
+	if err != nil {
+		failQueue(queue, err)
+		return nil
+	}
+	if res.Body != nil {
+		defer res.Body.Close()
+	}
+	if res.IsError() {
+		err = parseError(res, zerolog.Ctx(ctx))
+		failQueue(queue, err)
+		return nil
+	}
+
+	buf.Reset()
+	if _, err = buf.ReadFrom(res.Body); err != nil {
+		return err
+	}
+
+	var blk MsearchResponse
+	blk.Responses = make([]MsearchResponseItem, 0, len(canonicals))
+	if err = easyjson.Unmarshal(buf.Bytes(), &blk); err != nil {
+		return err
+	}
+	if len(blk.Responses) != len(canonicals) {
+		return fmt.Errorf("enroll search queue length mismatch: got %d, want %d", len(blk.Responses), len(canonicals))
+	}
+
+	// WARNING: Once we start pushing items to the queue, the node pointers are invalid.
+	// Save any fields we need after the channel send before sending — the receiver
+	// calls freeBlk immediately on receipt, which races with any subsequent read of n.
+	for i, n := range canonicals {
+		response := &blk.Responses[i]
+		respErr := response.deriveError()
+		key := n.dedupeKey // must be captured before n.ch send
+		select {
+		case n.ch <- respT{err: respErr, idx: n.idx, data: response}:
+		default:
+			panic("Unexpected blocked response channel on flushEnrollSearch canonical")
+		}
+		// If the canonical's search itself failed, propagate that error to duplicates
+		// instead of ErrEnrollDuplicate so callers don't suppress real failures.
+		dupeErr := ErrEnrollDuplicate
+		if respErr != nil {
+			dupeErr = respErr
+		}
+		for _, dupe := range dupesByKey[key] {
+			select {
+			case dupe.ch <- respT{err: dupeErr}:
+			default:
+				panic("Unexpected blocked response channel on flushEnrollSearch dupe")
+			}
+		}
+	}
 	return nil
 }

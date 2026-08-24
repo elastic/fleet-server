@@ -26,6 +26,8 @@ type optionsT struct {
 	WaitForCheckpoints []int64
 	IgnoreUnavailable  bool
 	spanLink           *apm.SpanLink
+	DedupeKey          string
+	RefreshIndex       string
 }
 
 type Opt func(*optionsT)
@@ -77,6 +79,16 @@ func withAPMLinkedContext(ctx context.Context) Opt {
 	}
 }
 
+// WithDedupeKey routes a search through kQueueEnrollSearch, which refreshes
+// refreshIndex before executing the msearch and de-dupes concurrent requests
+// with the same key, returning ErrEnrollDuplicate to all but the first.
+func WithDedupeKey(key, refreshIndex string) Opt {
+	return func(opt *optionsT) {
+		opt.DedupeKey = key
+		opt.RefreshIndex = refreshIndex
+	}
+}
+
 //-----
 // Bulk API options
 
@@ -92,6 +104,8 @@ type bulkOptT struct {
 	maxConcurrentSecretReads int
 	policyTokens             []config.PolicyToken
 	bi                       build.Info
+	enrollFlushInterval      time.Duration
+	enrollFlushThresholdCnt  int
 }
 
 type BulkOpt func(*bulkOptT)
@@ -176,6 +190,17 @@ func WithBi(bi build.Info) BulkOpt {
 	}
 }
 
+// WithEnrollFlushInterval sets the flush interval for the kQueueEnrollSearch queue.
+func WithEnrollFlushInterval(d time.Duration) BulkOpt {
+	return func(opt *bulkOptT) { opt.enrollFlushInterval = d }
+}
+
+// WithEnrollFlushThresholdCount sets the item count that triggers an early flush
+// of the kQueueEnrollSearch queue.
+func WithEnrollFlushThresholdCount(cnt int) BulkOpt {
+	return func(opt *bulkOptT) { opt.enrollFlushThresholdCnt = cnt }
+}
+
 func parseBulkOpts(opts ...BulkOpt) bulkOptT {
 	bopt := bulkOptT{
 		flushInterval:            defaultFlushInterval,
@@ -188,6 +213,8 @@ func parseBulkOpts(opts ...BulkOpt) bulkOptT {
 		maxPendingBulkDispatches: defaultMaxPendingBulkDispatches,
 		maxConcurrentSecretReads: defaultMaxConcurrentSecretReads,
 		policyTokens:             []config.PolicyToken{}, // default is empty
+		enrollFlushInterval:      time.Second,
+		enrollFlushThresholdCnt:  50,
 	}
 
 	for _, f := range opts {
@@ -207,6 +234,8 @@ func (o *bulkOptT) MarshalZerologObject(e *zerolog.Event) {
 	e.Int("apikeyMaxReqSize", o.apikeyMaxReqSize)
 	e.Int64("maxPendingBulkDispatches", o.maxPendingBulkDispatches)
 	e.Int("maxConcurrentSecretReads", o.maxConcurrentSecretReads)
+	e.Dur("enrollFlushInterval", o.enrollFlushInterval)
+	e.Int("enrollFlushThresholdCnt", o.enrollFlushThresholdCnt)
 }
 
 // BulkOptsFromCfg transforms config to a slize of BulkOpt
@@ -232,5 +261,7 @@ func BulkOptsFromCfg(cfg *config.Config) []BulkOpt {
 		WithAPIKeyMaxRequestSize(cfg.Output.Elasticsearch.MaxContentLength),
 		WithMaxPendingBulkDispatches(bulkCfg.MaxPendingBulkDispatches),
 		WithPolicyTokens(policyTokens),
+		WithEnrollFlushInterval(bulkCfg.EnrollBulker.FlushInterval),
+		WithEnrollFlushThresholdCount(bulkCfg.EnrollBulker.FlushThresholdCount),
 	}
 }

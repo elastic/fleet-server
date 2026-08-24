@@ -26,12 +26,12 @@ func Search(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, index string,
 	return &res.HitsT, nil
 }
 
-func SearchWithOneParam(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, index string, name string, v interface{}) (*es.HitsT, error) {
+func SearchWithOneParam(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, index string, name string, v interface{}, opts ...bulk.Opt) (*es.HitsT, error) {
 	query, err := tmpl.RenderOne(name, v)
 	if err != nil {
 		return nil, err
 	}
-	res, err := bulker.Search(ctx, index, query)
+	res, err := bulker.Search(ctx, index, query, opts...)
 	if err != nil {
 		return nil, err
 	}
