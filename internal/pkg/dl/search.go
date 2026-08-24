@@ -26,11 +26,7 @@ func Search(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, index string,
 	return &res.HitsT, nil
 }
 
-<<<<<<< HEAD
-func SearchWithOneParam(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, index string, name string, v interface{}) (*es.HitsT, error) {
-=======
-func SearchWithOneParam(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, index string, name string, v any, opts ...bulk.Opt) (*es.HitsT, error) {
->>>>>>> 3890bbb (feat: batch enrollment FindAgent searches with pre-refresh dedup (#7662))
+func SearchWithOneParam(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, index string, name string, v interface{}, opts ...bulk.Opt) (*es.HitsT, error) {
 	query, err := tmpl.RenderOne(name, v)
 	if err != nil {
 		return nil, err

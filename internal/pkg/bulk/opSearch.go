@@ -303,16 +303,14 @@ func (b *Bulker) flushEnrollSearch(ctx context.Context, queue queueT) error {
 	// Build msearch body from canonical items only.
 	const kRoughEstimatePerItem = 256
 	bufSz := max(len(canonicals)*kRoughEstimatePerItem, queue.pending)
-	buf := b.flushBufPool.Get().(*bytes.Buffer) //nolint:errcheck // we control what is placed in the pool
-	buf.Reset()
+	var buf bytes.Buffer
 	buf.Grow(bufSz)
-	defer b.flushBufPool.Put(buf)
 
 	for _, n := range canonicals {
 		buf.Write(n.buf.Bytes())
 	}
 
-	span, ctx := apm.StartSpanOptions(ctx, flushSpanNames[queue.ty], queue.Type(), apm.SpanOptions{})
+	span, ctx := apm.StartSpanOptions(ctx, "Flush: enrollSearch", "enrollSearch", apm.SpanOptions{})
 	defer span.End()
 
 	msearchReq := esapi.MsearchRequest{Body: bytes.NewReader(buf.Bytes())}
