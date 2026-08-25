@@ -296,7 +296,7 @@ func (b *Bulker) flushEnrollSearch(ctx context.Context, queue queueT) error {
 			return nil
 		}
 		if refreshResp.Body != nil {
-			refreshResp.Body.Close()
+			defer refreshResp.Body.Close()
 		}
 		if refreshResp.IsError() {
 			err = fmt.Errorf("enroll search refresh failed: %s", refreshResp.String())
