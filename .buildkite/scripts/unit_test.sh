@@ -9,4 +9,7 @@ with_go
 with_mage
 
 echo "Starting the unit tests..."
-mage test:unit test:junitReport
+test_status=0
+mage test:unit || test_status=$?
+mage test:junitReport
+exit "$test_status"

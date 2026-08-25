@@ -131,6 +131,25 @@ func TestRenderUpdatePainlessScript(t *testing.T) {
 	}
 }
 
+func TestRenderRemoveOutputPainlessScript(t *testing.T) {
+	const outputName = `x"); ctx._source.pwned=("true`
+
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
+	index, bulker := ftesting.SetupCleanIndex(ctx, t, dl.FleetAgents)
+	agentID := createAgent(ctx, t, index, bulker, map[string]*model.PolicyOutput{
+		outputName: {},
+	})
+
+	body, err := renderRemoveOutputPainlessScript(outputName)
+	require.NoError(t, err)
+	require.NoError(t, bulker.Update(ctx, dl.FleetAgents, agentID, body, bulk.WithRefresh()))
+
+	agent, err := dl.FindAgent(
+		ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+	require.NoError(t, err)
+	assert.Empty(t, agent.Outputs)
+}
+
 func TestPolicyOutputESPrepareRealES(t *testing.T) {
 	ctx := testlog.SetLogger(t).WithContext(t.Context())
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, dl.FleetAgents)
@@ -155,7 +174,7 @@ func TestPolicyOutputESPrepareRealES(t *testing.T) {
 	}
 
 	err = output.prepareElasticsearch(
-		ctx, zerolog.Nop(), bulker, bulker, &agent, policyMap, false)
+		ctx, zerolog.Nop(), bulker, bulker, &agent, policyMap, false, nil)
 	require.NoError(t, err)
 
 	// need to wait a bit before querying the agent again
@@ -231,7 +250,7 @@ func TestPolicyOutputESPrepareRemoteES(t *testing.T) {
 	}
 
 	err = output.prepareElasticsearch(
-		ctx, zerolog.Nop(), bulker, bulker, &agent, policyMap, false)
+		ctx, zerolog.Nop(), bulker, bulker, &agent, policyMap, false, nil)
 	require.NoError(t, err)
 
 	ftesting.Retry(t, ctx, func(ctx context.Context) error {
@@ -283,7 +302,7 @@ func TestPolicyOutputESPrepareESRetireRemoteAPIKeys(t *testing.T) {
 	}
 
 	err = output.prepareElasticsearch(
-		ctx, zerolog.Nop(), bulker, bulker, &agent, policyMap, false)
+		ctx, zerolog.Nop(), bulker, bulker, &agent, policyMap, false, nil)
 	require.NoError(t, err)
 
 	// need to wait a bit before querying the agent again

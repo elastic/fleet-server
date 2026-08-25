@@ -56,6 +56,8 @@ type Fleet struct {
 	// Used for diagnostics reporting
 	l   sync.RWMutex
 	cfg *config.Config
+
+	checkinT *api.CheckinT
 }
 
 // NewFleet creates the actual fleet server service.
@@ -524,16 +526,27 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 	bc := checkin.NewBulk(bulker)
 	g.Go(loggedRunFunc(ctx, "Bulk checkin", bc.Run))
 
+	outputSecretReconciler := gc.NewOrphanedOutputSecretReconciler(bulker)
+	g.Go(loggedRunFunc(ctx, "Orphaned output secret reconciler", outputSecretReconciler.Run))
+
 	// Samples the checkin capacity-rejection counter into a rate gauge, exposed via
 	// /stats for use as an autoscaling signal. See api.RunCheckinRejectionRateSampler.
 	g.Go(loggedRunFunc(ctx, "Checkin rejection rate sampler", func(ctx context.Context) error {
-		return api.RunCheckinRejectionRateSampler(ctx, api.CheckinRateSampleInterval)
+		return api.RunCheckinRejectionRateSampler(ctx, api.RejectionRateSampleInterval)
+	}))
+	// Samples the connection-cap rejection counter into a rate gauge, exposed via
+	// /stats for use as an autoscaling signal. See api.RunConnRejectionRateSampler.
+	g.Go(loggedRunFunc(ctx, "Connection rejection rate sampler", func(ctx context.Context) error {
+		return api.RunConnRejectionRateSampler(ctx, api.RejectionRateSampleInterval)
 	}))
 
-	ct, err := api.NewCheckinT(f.verCon, &cfg.Inputs[0].Server, f.cache, bc, pm, am, ad, bulker)
+	ct, err := api.NewCheckinT(f.verCon, &cfg.Inputs[0].Server, f.cache, bc, pm, am, ad, bulker,
+		api.WithOutputSecretCandidateCollector(outputSecretReconciler))
 	if err != nil {
 		return err
 	}
+	f.checkinT = ct
+	g.Go(loggedRunFunc(ctx, "Invalid API key state cleaner", ct.RunInvalidKeyStateCleaner))
 	et, err := api.NewEnrollerT(f.verCon, &cfg.Inputs[0].Server, bulker, f.cache)
 	if err != nil {
 		return err

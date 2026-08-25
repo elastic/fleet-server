@@ -28,7 +28,7 @@ func newRouter(cfg *config.ServerLimits, si ServerInterface, tracer *apm.Tracer)
 	r.Use(logger.Middleware) // Attach middlewares to router directly so the occur before any request parsing/validation
 	r.Use(middleware.Recoverer)
 	if cfg.MaxConnections > 0 {
-		r.Use(middleware.Throttle(cfg.MaxConnections))
+		r.Use(throttleWithCount(cfg.MaxConnections))
 	}
 	r.Use(Limiter(cfg).middleware)
 	return HandlerWithOptions(si, ChiServerOptions{
@@ -72,6 +72,47 @@ func Limiter(cfg *config.ServerLimits) *limiter {
 		getPGPKey:      limit.NewLimiter(&cfg.GetPGPKey),
 		auditUnenroll:  limit.NewLimiter(&cfg.AuditUnenrollLimit),
 	}
+}
+
+// throttleWithCount wraps chi's Throttle middleware and increments
+// cntHTTPRejected whenever a request is rejected with HTTP 429 due to the
+// per-pod connection cap. The count is rate-sampled by RunConnRejectionRateSampler
+// and exposed as http_server.tcp_rejected_rate for use as an EPA scaling trigger.
+func throttleWithCount(limit int) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		throttled := middleware.Throttle(limit)(next)
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			rw := &statusRecorder{ResponseWriter: w}
+			throttled.ServeHTTP(rw, r)
+			if rw.status == http.StatusTooManyRequests {
+				cntHTTPRejected.Add(1)
+			}
+		})
+	}
+}
+
+// statusRecorder captures the HTTP status code written by a downstream handler.
+type statusRecorder struct {
+	http.ResponseWriter
+	status int
+}
+
+func (s *statusRecorder) Write(buf []byte) (int, error) {
+	if s.status == 0 {
+		s.WriteHeader(http.StatusOK)
+	}
+	return s.ResponseWriter.Write(buf)
+}
+
+func (s *statusRecorder) WriteHeader(code int) {
+	if s.status == 0 {
+		s.status = code
+	}
+	s.ResponseWriter.WriteHeader(code)
+}
+
+func (s *statusRecorder) Unwrap() http.ResponseWriter {
+	return s.ResponseWriter
 }
 
 var pgpReg = regexp.MustCompile(`\/api\/agents\/upgrades\/[0-9]+\.[0-9]+\.[0-9]+\/pgp-public-key`)

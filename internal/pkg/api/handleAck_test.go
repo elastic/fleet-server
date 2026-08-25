@@ -19,6 +19,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
@@ -458,6 +459,38 @@ func TestHandleAckEvents(t *testing.T) {
 			err: &HTTPError{Status: http.StatusNotFound},
 		},
 		{
+			name: "action find error, too many bulk dispatches",
+			events: []AckRequest_Events_Item{{
+				json.RawMessage(`{
+				"action_id": "2b12dcd8-bde0-4045-92dc-c4b27668d733"
+			    }`),
+			}},
+			res: newAckResponse(true, []AckResponseItem{newAckResponseItem(http.StatusTooManyRequests)}),
+			bulker: func(t *testing.T) *ftesting.MockBulk {
+				m := ftesting.NewMockBulk()
+				m.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{}, bulk.ErrTooManyBulkDispatches)
+				return m
+			},
+			err: &HTTPError{Status: http.StatusTooManyRequests},
+		},
+		{
+			// Policy action ID format: "policy:<policyID>:<revisionIdx>"
+			// Agent's PolicyID is "" and PolicyRevisionIdx is 0, so "policy::1" triggers an update.
+			name: "policy action, update agent too many bulk dispatches",
+			events: []AckRequest_Events_Item{{
+				json.RawMessage(`{
+				"action_id": "policy::1"
+			    }`),
+			}},
+			res: newAckResponse(true, []AckResponseItem{newAckResponseItem(http.StatusTooManyRequests)}),
+			bulker: func(t *testing.T) *ftesting.MockBulk {
+				m := ftesting.NewMockBulk()
+				m.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(bulk.ErrTooManyBulkDispatches)
+				return m
+			},
+			err: &HTTPError{Status: http.StatusTooManyRequests},
+		},
+		{
 			name: "upgrade action failed",
 			events: []AckRequest_Events_Item{{
 				json.RawMessage(`{
@@ -800,4 +833,48 @@ func TestValidateAckRequest(t *testing.T) {
 			assert.Equal(t, tc.expAck, ackRes)
 		})
 	}
+}
+
+func TestDeleteRetiredSecrets(t *testing.T) {
+	logger := testlog.SetLogger(t)
+	_ = logger
+
+	t.Run("deletes secrets for items with a SecretID", func(t *testing.T) {
+		bulker := ftesting.NewMockBulk()
+		bulker.On("DeleteSecret", mock.Anything, "secret-1").Return(nil).Once()
+		bulker.On("DeleteSecret", mock.Anything, "secret-2").Return(nil).Once()
+
+		items := []model.ToRetireAPIKeyIdsItems{
+			{ID: "key-1", SecretID: "secret-1"},
+			{ID: "key-2", SecretID: "secret-2"},
+			{ID: "key-3"}, // no SecretID — plaintext key, no cleanup needed
+		}
+
+		deleteRetiredSecrets(context.Background(), testlog.SetLogger(t), bulker, items)
+		bulker.AssertExpectations(t)
+		bulker.AssertNotCalled(t, "DeleteSecret", mock.Anything, "")
+	})
+
+	t.Run("logs warning on delete failure but does not return error", func(t *testing.T) {
+		bulker := ftesting.NewMockBulk()
+		bulker.On("DeleteSecret", mock.Anything, "secret-bad").Return(errors.New("delete failed")).Once()
+
+		items := []model.ToRetireAPIKeyIdsItems{
+			{ID: "key-1", SecretID: "secret-bad"},
+		}
+
+		// Should not panic or propagate the error.
+		deleteRetiredSecrets(context.Background(), testlog.SetLogger(t), bulker, items)
+		bulker.AssertExpectations(t)
+	})
+
+	t.Run("no-op when all items lack a SecretID", func(t *testing.T) {
+		bulker := ftesting.NewMockBulk()
+		items := []model.ToRetireAPIKeyIdsItems{
+			{ID: "key-1"},
+			{ID: "key-2"},
+		}
+		deleteRetiredSecrets(context.Background(), testlog.SetLogger(t), bulker, items)
+		bulker.AssertNotCalled(t, "DeleteSecret", mock.Anything, mock.Anything)
+	})
 }

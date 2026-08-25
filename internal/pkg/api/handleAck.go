@@ -28,6 +28,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger/ecs"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
+	"github.com/elastic/fleet-server/v7/internal/pkg/secret"
 	"github.com/elastic/fleet-server/v7/internal/pkg/smap"
 )
 
@@ -73,6 +74,8 @@ func (a *AckResponse) SetError(pos int, err error) {
 	var esErr *es.ErrElastic
 	if errors.As(err, &esErr) {
 		a.setMessage(pos, esErr.Status, esErr.Reason)
+	} else if errors.Is(err, bulk.ErrTooManyBulkDispatches) {
+		a.SetResult(pos, http.StatusTooManyRequests)
 	} else {
 		a.SetResult(pos, http.StatusInternalServerError)
 	}
@@ -230,6 +233,8 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 		var esErr *es.ErrElastic
 		if errors.As(err, &esErr) {
 			setResult(pos, esErr.Status)
+		} else if errors.Is(err, bulk.ErrTooManyBulkDispatches) {
+			setResult(pos, http.StatusTooManyRequests)
 		} else {
 			setResult(pos, http.StatusInternalServerError)
 		}
@@ -503,6 +508,7 @@ func updateAPIKey(ctx context.Context,
 			}
 		}
 		invalidateAPIKeys(ctx, zlog, bulk, toRetireAPIKeyIDs, apiKeyID)
+		deleteRetiredSecrets(ctx, zlog, bulk, toRetireAPIKeyIDs)
 	}
 
 	return nil
@@ -580,6 +586,17 @@ func (ack *AckT) handleUnenroll(ctx context.Context, zlog zerolog.Logger, agent 
 	apiKeys := agent.APIKeyIDs()
 	zlog.Info().Any("fleet.policy.apiKeyIDsToRetire", apiKeys).Msg("handleUnenroll invalidate API keys")
 	ack.invalidateAPIKeys(ctx, zlog, apiKeys, "")
+
+	// Delete secrets for all output API keys: retired ones (carried in apiKeys via SecretID)
+	// and the current active ones (secret ID embedded in output.APIKey as a reference string).
+	allSecretItems := make([]model.ToRetireAPIKeyIdsItems, 0, len(apiKeys)+len(agent.Outputs))
+	allSecretItems = append(allSecretItems, apiKeys...)
+	for _, output := range agent.Outputs {
+		if secretID, ok := secret.ParseSecretReference(output.APIKey); ok {
+			allSecretItems = append(allSecretItems, model.ToRetireAPIKeyIdsItems{SecretID: secretID})
+		}
+	}
+	deleteRetiredSecrets(ctx, zlog, ack.bulk, allSecretItems)
 
 	now := time.Now().UTC().Format(time.RFC3339)
 	doc := bulk.UpdateFields{
@@ -737,6 +754,17 @@ func invalidateAPIKeys(ctx context.Context, zlog zerolog.Logger, bulk bulk.Bulk,
 			if err := outputBulk.APIKeyInvalidate(ctx, outputIds...); err != nil {
 				zlog.Info().Err(err).Strs("ids", outputIds).Str(ecs.PolicyOutputName, outputName).Msg("Failed to invalidate API keys")
 			}
+		}
+	}
+}
+
+func deleteRetiredSecrets(ctx context.Context, zlog zerolog.Logger, bulk bulk.Bulk, toRetireAPIKeyIDs []model.ToRetireAPIKeyIdsItems) {
+	for _, k := range toRetireAPIKeyIDs {
+		if k.SecretID == "" {
+			continue
+		}
+		if err := bulk.DeleteSecret(ctx, k.SecretID); err != nil {
+			zlog.Warn().Err(err).Str("secret_id", k.SecretID).Msg("Failed to delete retired output API key secret")
 		}
 	}
 }

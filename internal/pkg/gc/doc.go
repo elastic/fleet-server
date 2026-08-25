@@ -2,5 +2,6 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-// Package gc provides utilities to cleanup expired (elastic-agent) actions.
+// Package gc provides utilities to clean up expired Elastic Agent actions and
+// orphaned Fleet Server resources.
 package gc

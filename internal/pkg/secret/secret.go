@@ -76,7 +76,7 @@ func ProcessInputsSecrets(data *model.PolicyData, secretValues map[string]string
 // the values of secret refs in inputs and input streams properties using the old format
 // for specifying secrets: <path>: $co.elastic.secret{<secret ref>}
 func processInputsWithInlineSecrets(data *model.PolicyData, secretValues map[string]string) ([]map[string]any, []string) {
-	result := make([]map[string]any, 0)
+	result := make([]map[string]any, 0, len(data.Inputs))
 	keys := make([]string, 0)
 	for i, input := range data.Inputs {
 		replacedInput, ks := replaceInlineSecretRefsInMap(input, secretValues)
@@ -92,7 +92,7 @@ func processInputsWithInlineSecrets(data *model.PolicyData, secretValues map[str
 // the values of secret refs in inputs and input streams properties using the new format
 // for specifying secrets: secrets.<path-to-key>.<key>.id:<secret ref>
 func processInputsWithPathSecrets(data *model.PolicyData, secretValues map[string]string) ([]map[string]any, []string) {
-	result := make([]map[string]any, 0)
+	result := make([]map[string]any, 0, len(data.Inputs))
 	keys := make([]string, 0)
 
 	for i, inp := range data.Inputs {
@@ -158,7 +158,7 @@ func replacePathSecretRefsInMap(m smap.Map, secretValues map[string]string) (map
 
 func replacePathSecretRefsInSlice(arr []any, secretValues map[string]string) ([]any, []string) {
 	result := make([]any, len(arr))
-	keys := make([]string, 0)
+	keys := make([]string, 0, len(arr))
 
 	for i, v := range arr {
 		var r any
@@ -346,8 +346,8 @@ func processMapWithPathSecrets(m smap.Map, secretValues map[string]string) []str
 	secrets := m.GetMap(FieldSecrets)
 
 	delete(m, FieldSecrets)
-	secretReferences := make([]model.SecretReferencesItems, 0)
 	outputSecrets := getSecretIDAndPath(secrets)
+	secretReferences := make([]model.SecretReferencesItems, 0, len(outputSecrets))
 	keys := make([]string, 0, len(outputSecrets))
 
 	for _, secret := range outputSecrets {
@@ -399,6 +399,20 @@ func ProcessMapSecrets(m smap.Map, secretValues map[string]string) ([]string, er
 
 	keys = append(keys, k...)
 	return keys, nil
+}
+
+// ParseSecretReference returns the secret ID if value is a $co.elastic.secret{id} reference, otherwise returns ("", false).
+func ParseSecretReference(value string) (string, bool) {
+	matches := secretRegex.FindStringSubmatch(value)
+	if len(matches) > 1 {
+		return matches[1], true
+	}
+	return "", false
+}
+
+// MakeSecretReference formats a secret ID as a $co.elastic.secret{id} reference string.
+func MakeSecretReference(secretID string) string {
+	return "$co.elastic.secret{" + secretID + "}"
 }
 
 // replaceStringRef replaces values matching a secret ref regex, e.g. $co.elastic.secret{<secret ref>} -> <secret value>

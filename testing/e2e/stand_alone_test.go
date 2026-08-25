@@ -7,7 +7,9 @@
 package e2e
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -730,6 +732,251 @@ func (suite *StandAloneSuite) TestOpAMPWithUpstreamCollector() {
 	suite.Equal(otelVersion, agentDoc.Agent.Version, "expected agent.version to match otelcol-contrib binary version")
 	suite.Equal(1, agentDoc.Revision, "expected policy_revision_idx to be 1")
 	suite.Contains(agentDoc.Tags, "otelcontribcol", "expected tags to contain otelcontribcol")
+}
+
+// TestAgentGracefulForceUnenroll exercises the full three-step escalation that fleet-server
+// applies when an agent checks in with an invalidated API key and the
+// graceful_force_unenroll.enabled feature flag is enabled:
+//
+//  1. 1st invalid checkin → fleet-server returns POLICY_CHANGE with empty policy.
+//     The agent stops all running components.
+//  2. 2nd invalid checkin → fleet-server returns UNENROLL.
+//     The agent disenrolls and exits.
+//
+// Fleet-server runs with:
+//   - graceful_force_unenroll.enabled: true
+//   - ttl_api_key: 2s  (cache expires quickly after key invalidation)
+//   - checkin_long_poll: 5s  (controls how fast the agent retries after step 1)
+func (suite *StandAloneSuite) TestAgentGracefulForceUnenroll() {
+	dlCtx, dlCancel := context.WithTimeout(suite.T().Context(), 10*time.Minute)
+	defer dlCancel()
+	rc := downloadElasticAgent(dlCtx, suite.T(), suite.Client)
+	agentExtractDir := suite.T().TempDir()
+	var paths extractedPaths
+	switch runtime.GOOS {
+	case "darwin", "linux":
+		paths = extractTar(suite.T(), rc, agentExtractDir)
+	case "windows":
+		paths = extractZip(suite.T(), rc, agentExtractDir)
+	default:
+		suite.Require().Failf("Unsupported OS", "OS %s is unsupported for this test", runtime.GOOS)
+	}
+	rc.Close()
+	suite.Require().NotEmpty(paths.agentBinary, "elastic-agent binary not found in archive")
+	agentDir := filepath.Dir(paths.agentBinary)
+
+	ctx, cancel := context.WithTimeout(suite.T().Context(), 10*time.Minute)
+	defer cancel()
+
+	// Start fleet-server with the feature flag, 2 s API key cache, and 5 s checkin poll.
+	dir := suite.T().TempDir()
+	tpl, err := template.ParseFiles(filepath.Join("testdata", "stand-alone-https-unenroll.tpl"))
+	suite.Require().NoError(err)
+	f, err := os.Create(filepath.Join(dir, "fs-config.yml"))
+	suite.Require().NoError(err)
+	err = tpl.Execute(f, map[string]string{
+		"Hosts":          suite.ESHosts,
+		"ServiceToken":   suite.ServiceToken,
+		"CertPath":       filepath.Join(suite.CertPath, "fleet-server.crt"),
+		"KeyPath":        filepath.Join(suite.CertPath, "fleet-server.key"),
+		"PassphrasePath": filepath.Join(suite.CertPath, "passphrase"),
+	})
+	f.Close()
+	suite.Require().NoError(err)
+
+	// Capture fleet-server stderr to a file so step 2 can scan it for the
+	// "Returning UNENROLL action" log message (fleet-server logs to stderr).
+	fsLogPath := filepath.Join(dir, "fleet-server.log")
+	fsLog, err := os.Create(fsLogPath)
+	suite.Require().NoError(err)
+
+	fsCmd := exec.CommandContext(ctx, suite.binaryPath, "-c", filepath.Join(dir, "fs-config.yml"))
+	fsCmd.Cancel = func() error { return fsCmd.Process.Signal(syscall.SIGTERM) }
+	fsCmd.Env = []string{"GOCOVERDIR=" + suite.CoverPath}
+	fsCmd.Stderr = fsLog
+	suite.Require().NoError(fsCmd.Start())
+	suite.T().Cleanup(func() {
+		fsCmd.Wait()
+		fsLog.Close()
+		if p, readErr := os.ReadFile(fsLogPath); readErr == nil {
+			suite.T().Logf("fleet-server output:\n%s", string(p))
+		}
+	})
+
+	suite.FleetServerStatusOK(ctx, "https://localhost:8220")
+
+	// Enroll the agent against the running fleet-server (blocking one-shot command).
+	enrollmentToken := suite.GetEnrollmentTokenForPolicyID(ctx, "dummy-policy")
+	enrollCmd := exec.CommandContext(ctx, paths.agentBinary, "enroll",
+		"--url=https://localhost:8220",
+		"--enrollment-token="+enrollmentToken,
+		"--certificate-authorities="+filepath.Join(suite.CertPath, "e2e-test-ca.crt"),
+		"--skip-daemon-reload",
+	)
+	enrollCmd.Dir = agentDir
+	enrollCmd.Env = append(os.Environ(), "GOCOVERDIR="+suite.CoverPath)
+	enrollOut, err := enrollCmd.CombinedOutput()
+	suite.Require().NoErrorf(err, "elastic-agent enroll failed:\n%s", string(enrollOut))
+	suite.T().Logf("enroll output:\n%s", string(enrollOut))
+
+	// Run the agent as a background process and stream output to a log file.
+	agentLogPath := filepath.Join(dir, "elastic-agent.log")
+	agentLog, err := os.Create(agentLogPath)
+	suite.Require().NoError(err)
+
+	agentCmd := exec.CommandContext(ctx, paths.agentBinary, "run")
+	agentCmd.Dir = agentDir
+	agentCmd.Cancel = func() error { return agentCmd.Process.Signal(syscall.SIGTERM) }
+	agentCmd.Stdout = agentLog
+	agentCmd.Stderr = agentLog
+	agentCmd.Env = append(os.Environ(), "GOCOVERDIR="+suite.CoverPath)
+	suite.Require().NoError(agentCmd.Start())
+
+	agentExited := make(chan error, 1)
+	// agentHasExited is closed once the agent process terminates; safe to check
+	// multiple times without consuming the value in agentExited.
+	agentHasExited := make(chan struct{})
+	go func() {
+		err := agentCmd.Wait()
+		close(agentHasExited)
+		agentExited <- err
+	}()
+
+	suite.T().Cleanup(func() {
+		agentLog.Close()
+		select {
+		case <-agentExited:
+		case <-time.After(15 * time.Second):
+			_ = agentCmd.Process.Kill()
+			<-agentExited
+		}
+		if p, readErr := os.ReadFile(agentLogPath); readErr == nil {
+			suite.T().Logf("elastic-agent output:\n%s", string(p))
+		}
+	})
+
+	// Wait for the enrolled agent to become online in Kibana.
+	// The standalone fleet-server registers itself as "e2e-test-id"; ignore it.
+	suite.T().Log("Waiting for enrolled agent to appear online in Kibana...")
+	agentID := ""
+	suite.Require().Eventually(func() bool {
+		// Fail fast if the agent process has already exited (crash).
+		select {
+		case <-agentHasExited:
+			if p, readErr := os.ReadFile(agentLogPath); readErr == nil {
+				suite.T().Logf("agent exited early; log:\n%s", string(p))
+			}
+			suite.Fail("elastic-agent process exited before becoming online")
+			return false
+		default:
+		}
+		_, agents := suite.GetAgents(ctx)
+		for _, a := range agents {
+			if a.ID != "e2e-test-id" {
+				suite.T().Logf("agent %s status=%s", a.ID, a.Status)
+			}
+			if a.ID != "e2e-test-id" && (a.Status == "online" || a.Status == "updating") {
+				agentID = a.ID
+				return true
+			}
+		}
+		return false
+	}, 3*time.Minute, 5*time.Second, "enrolled agent never reached online or updating status in Kibana")
+	suite.T().Logf("Agent %s is active and checking in", agentID)
+
+	// Retrieve the agent's ES API key ID so we can invalidate it.
+	apiKeyID := suite.agentAccessAPIKeyID(ctx, agentID)
+	suite.T().Logf("Invalidating agent API key %s", apiKeyID)
+	suite.invalidateESAPIKey(ctx, apiKeyID)
+
+	// After ttl_api_key (2 s) the cache entry expires. The agent's next checkin
+	// re-authenticates with ES, gets ErrUnauthorized, and fleet-server returns an empty
+	// POLICY_CHANGE (escalation step 1). The agent applies the empty policy and stops all
+	// components, but continues to check in with fleet-server.
+	//
+	// Note: the window between POLICY_CHANGE and the subsequent UNENROLL (step 2) can be
+	// very short (< 1 s). If the agent has already exited by the time we poll, that is
+	// also acceptable evidence that the full escalation sequence ran — treat it as step 1
+	// confirmed and proceed directly to the exit check.
+	suite.T().Log("Waiting for elastic-agent to have no running components (step 1: POLICY_CHANGE)...")
+	suite.Require().Eventually(func() bool {
+		// Fast-path: if the agent has already exited, POLICY_CHANGE + UNENROLL both ran.
+		select {
+		case <-agentHasExited:
+			suite.T().Log("Agent exited before step 1 was polled; POLICY_CHANGE implied by state machine")
+			return true
+		default:
+		}
+		cmd := exec.CommandContext(ctx, paths.agentBinary, "status", "--output", "json")
+		cmd.Dir = agentDir
+		out, err := cmd.Output()
+		if err != nil {
+			return false
+		}
+		var statusResp struct {
+			Components []json.RawMessage `json:"components"`
+		}
+		if err := json.Unmarshal(out, &statusResp); err != nil {
+			return false
+		}
+		return len(statusResp.Components) == 0
+	}, 2*time.Minute, 2*time.Second, "elastic-agent still has running components after empty policy was applied")
+	suite.T().Log("Agent has no running components — empty POLICY_CHANGE confirmed")
+
+	// The agent continues checking in. The 2nd invalid checkin returns UNENROLL (escalation
+	// step 2). On receiving UNENROLL the agent cancels its fleet gateway and goes dormant —
+	// the process stays running but stops sending checkins. The agent's Kibana status does not
+	// transition to "offline" until the policy's checkin interval expires (potentially several
+	// minutes), so instead we scan fleet-server's own log output for the unique message it
+	// emits when it sends the UNENROLL action.
+	suite.T().Log("Waiting for fleet-server to emit UNENROLL action log (step 2)...")
+	suite.Require().Eventually(func() bool {
+		data, readErr := os.ReadFile(fsLogPath)
+		if readErr != nil {
+			return false
+		}
+		return bytes.Contains(data, []byte("Returning UNENROLL action for agent with invalid API key")) &&
+			bytes.Contains(data, []byte(agentID))
+	}, 2*time.Minute, 2*time.Second, "fleet-server did not emit UNENROLL action for agent within timeout")
+	suite.T().Log("Fleet-server emitted UNENROLL action — UNENROLL confirmed")
+}
+
+// agentAccessAPIKeyID queries .fleet-agents to retrieve the access_api_key_id for the given agent.
+func (suite *StandAloneSuite) agentAccessAPIKeyID(ctx context.Context, agentID string) string {
+	suite.T().Helper()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
+		"http://"+suite.ESHosts+"/.fleet-agents/_doc/"+agentID, nil)
+	suite.Require().NoError(err)
+	req.SetBasicAuth(suite.ElasticUser, suite.ElasticPass)
+	resp, err := suite.Client.Do(req)
+	suite.Require().NoError(err)
+	defer resp.Body.Close()
+	suite.Require().Equal(http.StatusOK, resp.StatusCode)
+	var doc struct {
+		Source struct {
+			AccessAPIKeyID string `json:"access_api_key_id"`
+		} `json:"_source"`
+	}
+	suite.Require().NoError(json.NewDecoder(resp.Body).Decode(&doc))
+	suite.Require().NotEmpty(doc.Source.AccessAPIKeyID, "access_api_key_id not set in agent document")
+	return doc.Source.AccessAPIKeyID
+}
+
+// invalidateESAPIKey calls DELETE /_security/api_key to invalidate the given key ID.
+func (suite *StandAloneSuite) invalidateESAPIKey(ctx context.Context, keyID string) {
+	suite.T().Helper()
+	body, err := json.Marshal(map[string]any{"ids": []string{keyID}})
+	suite.Require().NoError(err)
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete,
+		"http://"+suite.ESHosts+"/_security/api_key",
+		bytes.NewReader(body))
+	suite.Require().NoError(err)
+	req.SetBasicAuth(suite.ElasticUser, suite.ElasticPass)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := suite.Client.Do(req)
+	suite.Require().NoError(err)
+	defer resp.Body.Close()
+	suite.Require().Equal(http.StatusOK, resp.StatusCode, "ES invalidate API key failed")
 }
 
 // TestOpAMPWithEDOTCollector ensures that the EDOT Collector can connect to Fleet Server

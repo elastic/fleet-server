@@ -67,7 +67,7 @@ func GetAgent(ctx context.Context, bulker bulk.Bulk, agentID string, opt ...Opti
 
 func FindAgent(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, name string, v any, opt ...Option) (model.Agent, error) {
 	o := newOption(FleetAgents, opt...)
-	res, err := SearchWithOneParam(ctx, bulker, tmpl, o.indexName, name, v)
+	res, err := SearchWithOneParam(ctx, bulker, tmpl, o.indexName, name, v, o.bulkOpts...)
 	if err != nil {
 		return model.Agent{}, fmt.Errorf("failed searching for agent: %w", err)
 	}

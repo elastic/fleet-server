@@ -198,6 +198,9 @@ type Agent struct {
 	// Packages array
 	Packages []string `json:"packages,omitempty"`
 
+	// The base policy ID (policy_id without version suffix) for efficient querying.
+	PolicyBaseID string `json:"policy_base_id,omitempty"`
+
 	// The current policy coordinator for the Elastic Agent
 	PolicyCoordinatorIdx int64 `json:"policy_coordinator_idx,omitempty"`
 
@@ -603,6 +606,9 @@ type ToRetireAPIKeyIdsItems struct {
 
 	// Date/time the API key was retired
 	RetiredAt string `json:"retired_at,omitempty"`
+
+	// Fleet secret ID for the retired API key, if the key was stored in .fleet-secrets
+	SecretID string `json:"secret_id,omitempty"`
 }
 
 // UnitsItems

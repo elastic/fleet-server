@@ -10,12 +10,12 @@ Third party libraries used by the Elastic Beats project:
 
 
 --------------------------------------------------------------------------------
-Dependency : github.com/cenkalti/backoff/v4
-Version: v4.3.0
+Dependency : github.com/cenkalti/backoff/v7
+Version: v7.0.0
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/cenkalti/backoff/v4@v4.3.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/cenkalti/backoff/v7@v7.0.0/LICENSE:
 
 The MIT License (MIT)
 
@@ -40,12 +40,12 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 --------------------------------------------------------------------------------
-Dependency : github.com/dgraph-io/ristretto
-Version: v0.2.0
+Dependency : github.com/dgraph-io/ristretto/v2
+Version: v2.4.2
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/dgraph-io/ristretto@v0.2.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/dgraph-io/ristretto/v2@v2.4.2/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -661,11 +661,11 @@ SOFTWARE
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/elastic-agent-libs
-Version: v0.46.2
+Version: v0.46.3
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-libs@v0.46.2/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-libs@v0.46.3/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -872,11 +872,11 @@ Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-l
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/elastic-agent-system-metrics
-Version: v0.14.4
+Version: v0.14.5
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-system-metrics@v0.14.4/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-system-metrics@v0.14.5/LICENSE.txt:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -1083,11 +1083,11 @@ Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-s
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/go-elasticsearch/v8
-Version: v8.19.6
+Version: v8.19.7
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/go-elasticsearch/v8@v8.19.6/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/go-elasticsearch/v8@v8.19.7/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -1565,11 +1565,11 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/gofrs/uuid/v5
-Version: v5.4.0
+Version: v5.5.0
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/gofrs/uuid/v5@v5.4.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/gofrs/uuid/v5@v5.5.0/LICENSE:
 
 Copyright (C) 2013-2018 by Maxim Bublis <b@codemonkey.ru>
 
@@ -2846,11 +2846,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/prometheus/client_golang
-Version: v1.24.0
+Version: v1.24.1
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/prometheus/client_golang@v1.24.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/prometheus/client_golang@v1.24.1/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -5159,11 +5159,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : google.golang.org/grpc
-Version: v1.82.1
+Version: v1.83.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/google.golang.org/grpc@v1.82.1/LICENSE:
+Contents of probable licence file $GOMODCACHE/google.golang.org/grpc@v1.83.0/LICENSE:
 
 
                                  Apache License
@@ -7846,11 +7846,11 @@ Contents of probable licence file $GOMODCACHE/github.com/prometheus/client_model
 
 --------------------------------------------------------------------------------
 Dependency : github.com/prometheus/common
-Version: v0.70.0
+Version: v0.70.1
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/prometheus/common@v0.70.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/prometheus/common@v0.70.1/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -10167,11 +10167,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : google.golang.org/genproto/googleapis/rpc
-Version: v0.0.0-20260414002931-afd174a4e478
+Version: v0.0.0-20260526163538-3dc84a4a5aaa
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/google.golang.org/genproto/googleapis/rpc@v0.0.0-20260414002931-afd174a4e478/LICENSE:
+Contents of probable licence file $GOMODCACHE/google.golang.org/genproto/googleapis/rpc@v0.0.0-20260526163538-3dc84a4a5aaa/LICENSE:
 
 
                                  Apache License

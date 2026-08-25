@@ -22,6 +22,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger/ecs"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
+	"github.com/elastic/fleet-server/v7/internal/pkg/secret"
 	"github.com/elastic/fleet-server/v7/internal/pkg/smap"
 )
 
@@ -46,9 +47,43 @@ type Output struct {
 	Role         *RoleT
 }
 
+// OutputSecretCandidate identifies a secret whose reference may or may not have
+// been committed to an agent document after an ambiguous update failure.
+type OutputSecretCandidate struct {
+	AgentID    string
+	OutputName string
+	SecretID   string
+	SecretRef  string
+}
+
+// OutputSecretCandidateCollector accepts secrets for out-of-band reconciliation.
+type OutputSecretCandidateCollector interface {
+	Add(OutputSecretCandidate) bool
+}
+
+type outputPrepareConfig struct {
+	secretCandidateCollector OutputSecretCandidateCollector
+}
+
+// OutputPrepareOption configures output preparation.
+type OutputPrepareOption func(*outputPrepareConfig)
+
+// WithOutputSecretCandidateCollector records secrets created before ambiguous
+// agent update failures so they can be reconciled outside the request path.
+func WithOutputSecretCandidateCollector(collector OutputSecretCandidateCollector) OutputPrepareOption {
+	return func(c *outputPrepareConfig) {
+		c.secretCandidateCollector = collector
+	}
+}
+
 // Prepare prepares the output p to be sent to the elastic-agent
 // The agent might be mutated for an elasticsearch output
-func (p *Output) Prepare(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agent *model.Agent, outputMap map[string]map[string]any) error {
+func (p *Output) Prepare(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agent *model.Agent, outputMap map[string]map[string]any, opts ...OutputPrepareOption) error {
+	cfg := outputPrepareConfig{}
+	for _, opt := range opts {
+		opt(&cfg)
+	}
+
 	span, ctx := apm.StartSpan(ctx, "prepareOutput", "process")
 	defer span.End()
 	span.Context.SetLabel("output_type", p.Type)
@@ -59,7 +94,7 @@ func (p *Output) Prepare(ctx context.Context, zlog zerolog.Logger, bulker bulk.B
 	switch p.Type {
 	case OutputTypeElasticsearch:
 		zlog.Debug().Msg("preparing elasticsearch output")
-		if err := p.prepareElasticsearch(ctx, zlog, bulker, bulker, agent, outputMap, false); err != nil {
+		if err := p.prepareElasticsearch(ctx, zlog, bulker, bulker, agent, outputMap, false, cfg.secretCandidateCollector); err != nil {
 			return fmt.Errorf("failed to prepare elasticsearch output %q: %w", p.Name, err)
 		}
 	case OutputTypeRemoteElasticsearch:
@@ -69,7 +104,7 @@ func (p *Output) Prepare(ctx context.Context, zlog zerolog.Logger, bulker bulk.B
 			return err
 		}
 		// the outputBulker is different for remote ES, it is used to create/update Api keys in the remote ES client
-		if err := p.prepareElasticsearch(ctx, zlog, bulker, newBulker, agent, outputMap, hasConfigChanged); err != nil {
+		if err := p.prepareElasticsearch(ctx, zlog, bulker, newBulker, agent, outputMap, hasConfigChanged, cfg.secretCandidateCollector); err != nil {
 			return fmt.Errorf("failed to prepare remote elasticsearch output %q: %w", p.Name, err)
 		}
 	case OutputTypeLogstash:
@@ -92,7 +127,8 @@ func (p *Output) prepareElasticsearch(
 	outputBulker bulk.Bulk,
 	agent *model.Agent,
 	outputMap map[string]map[string]any,
-	hasConfigChanged bool) error {
+	hasConfigChanged bool,
+	secretCandidateCollector OutputSecretCandidateCollector) error {
 	// The role is required to do api key management
 	if p.Role == nil {
 		zlog.Error().
@@ -129,11 +165,15 @@ func (p *Output) prepareElasticsearch(
 		}
 		if !found {
 			zlog.Info().Str(ecs.APIKeyID, agentOutput.APIKeyID).Str(ecs.PolicyOutputName, agentOutputName).Msg("Output removed, will retire API key")
-			toRetireAPIKeys = &model.ToRetireAPIKeyIdsItems{
+			retiring := model.ToRetireAPIKeyIdsItems{
 				ID:        agentOutput.APIKeyID,
 				RetiredAt: time.Now().UTC().Format(time.RFC3339),
 				Output:    agentOutputName,
 			}
+			if secretID, ok := secret.ParseSecretReference(agentOutput.APIKey); ok {
+				retiring.SecretID = secretID
+			}
+			toRetireAPIKeys = &retiring
 			removedOutputName = agentOutputName
 			break
 		}
@@ -158,12 +198,7 @@ func (p *Output) prepareElasticsearch(
 		}
 
 		// remove output from agent doc
-		body, err = json.Marshal(map[string]any{
-			"script": map[string]any{
-				"lang":   "painless",
-				"source": fmt.Sprintf("ctx._source['outputs'].remove(\"%s\")", removedOutputName),
-			},
-		})
+		body, err = renderRemoveOutputPainlessScript(removedOutputName)
 		if err != nil {
 			return fmt.Errorf("could not create request body to update agent: %w", err)
 		}
@@ -307,8 +342,14 @@ func (p *Output) prepareElasticsearch(
 			Str(ecs.DefaultOutputAPIKeyID, outputAPIKey.ID).
 			Msg("Updating agent record to pick up default output key.")
 
+		secretID, err := bulker.WriteSecret(ctx, outputAPIKey.Agent())
+		if err != nil {
+			return fmt.Errorf("failed writing output API key secret: %w", err)
+		}
+		apiKeyRef := secret.MakeSecretReference(secretID)
+
 		fields := map[string]any{
-			dl.FieldPolicyOutputAPIKey:          outputAPIKey.Agent(),
+			dl.FieldPolicyOutputAPIKey:          apiKeyRef,
 			dl.FieldPolicyOutputAPIKeyID:        outputAPIKey.ID,
 			dl.FieldPolicyOutputPermissionsHash: p.Role.Sha2,
 		}
@@ -317,11 +358,15 @@ func (p *Output) prepareElasticsearch(
 			fields[dl.FiledType] = OutputTypeElasticsearch
 		}
 		if output.APIKeyID != "" {
-			fields[dl.FieldPolicyOutputToRetireAPIKeyIDs] = model.ToRetireAPIKeyIdsItems{
+			retiring := model.ToRetireAPIKeyIdsItems{
 				ID:        output.APIKeyID,
 				RetiredAt: time.Now().UTC().Format(time.RFC3339),
 				Output:    p.Name,
 			}
+			if secretID, ok := secret.ParseSecretReference(output.APIKey); ok {
+				retiring.SecretID = secretID
+			}
+			fields[dl.FieldPolicyOutputToRetireAPIKeyIDs] = retiring
 		}
 
 		// Using painless script to append the old keys to the history
@@ -332,6 +377,21 @@ func (p *Output) prepareElasticsearch(
 
 		if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
 			zlog.Error().Err(err).Msg("fail update agent record")
+			// The update may have been committed by Elasticsearch even when the client
+			// returns an error, for example when the request context expires while
+			// waiting for the response. Deleting the secret here can therefore leave
+			// the agent document pointing at a missing secret.
+			if secretCandidateCollector != nil {
+				candidate := OutputSecretCandidate{
+					AgentID:    agent.Id,
+					OutputName: p.Name,
+					SecretID:   secretID,
+					SecretRef:  apiKeyRef,
+				}
+				if !secretCandidateCollector.Add(candidate) {
+					zlog.Warn().Str("secret.id", secretID).Msg("failed to enqueue output secret reconciliation candidate")
+				}
+			}
 			return fmt.Errorf("fail update agent record: %w", err)
 		}
 
@@ -340,7 +400,7 @@ func (p *Output) prepareElasticsearch(
 		// data is correct and in sync with ES, so it can be safely used after
 		// this method returns.
 		output.Type = OutputTypeElasticsearch
-		output.APIKey = outputAPIKey.Agent()
+		output.APIKey = apiKeyRef
 		output.APIKeyID = outputAPIKey.ID
 		output.PermissionsHash = p.Role.Sha2 // for the sake of consistency
 	}
@@ -362,7 +422,19 @@ func (p *Output) prepareElasticsearch(
 	// in place to reduce number of agent policy allocation when sending the updated
 	// agent policy to multiple agents.
 	// See: https://github.com/elastic/fleet-server/issues/1301
-	outputMap[p.Name]["api_key"] = output.APIKey
+	apiKey := output.APIKey
+	if secretID, ok := secret.ParseSecretReference(apiKey); ok {
+		resolved, err := bulker.ReadSecrets(ctx, []string{secretID})
+		if err != nil {
+			return fmt.Errorf("failed resolving output API key secret: %w", err)
+		}
+		val, ok := resolved[secretID]
+		if !ok || val == "" {
+			return fmt.Errorf("output API key secret %q not found", secretID)
+		}
+		apiKey = val
+	}
+	outputMap[p.Name]["api_key"] = apiKey
 	return nil
 }
 
@@ -476,41 +548,53 @@ func renderUpdatePainlessScript(outputName string, fields map[string]any) ([]byt
 	var source strings.Builder
 
 	// prepare agent.elasticsearch_outputs[OUTPUT_NAME]
-	source.WriteString(fmt.Sprintf(`
+	source.WriteString(`
 if (ctx._source['outputs']==null)
   {ctx._source['outputs']=new HashMap();}
-if (ctx._source['outputs']['%s']==null)
-  {ctx._source['outputs']['%s']=new HashMap();}
-`, outputName, outputName))
+if (ctx._source['outputs'][params.output_name]==null)
+  {ctx._source['outputs'][params.output_name]=new HashMap();}
+`)
 
 	for field := range fields {
 		if field == dl.FieldPolicyOutputToRetireAPIKeyIDs {
 			// dl.FieldPolicyOutputToRetireAPIKeyIDs is a special case.
 			// It's an array that gets deleted when the keys are invalidated.
 			// Thus, append the old API key ID, create the field if necessary.
-			source.WriteString(fmt.Sprintf(`
-if (ctx._source['outputs']['%s'].%s==null)
-  {ctx._source['outputs']['%s'].%s=new ArrayList();}
-if (!ctx._source['outputs']['%s'].%s.contains(params.%s))
-  {ctx._source['outputs']['%s'].%s.add(params.%s);}
-`, outputName, field, outputName, field, outputName, field, field, outputName, field, field))
+			fmt.Fprintf(&source, `
+if (ctx._source['outputs'][params.output_name].%s==null)
+  {ctx._source['outputs'][params.output_name].%s=new ArrayList();}
+if (!ctx._source['outputs'][params.output_name].%s.contains(params.%s))
+  {ctx._source['outputs'][params.output_name].%s.add(params.%s);}
+`, field, field, field, field, field, field)
 		} else {
 			// Update the other fields
-			source.WriteString(fmt.Sprintf(`
-ctx._source['outputs']['%s'].%s=params.%s;`,
-				outputName, field, field))
+			fmt.Fprintf(&source, `
+ctx._source['outputs'][params.output_name].%s=params.%s;`, field, field)
 		}
 	}
+	params := make(map[string]any, len(fields)+1)
+	maps.Copy(params, fields)
+	params["output_name"] = outputName
 
 	body, err := json.Marshal(map[string]any{
 		"script": map[string]any{
 			"lang":   "painless",
 			"source": source.String(),
-			"params": fields,
+			"params": params,
 		},
 	})
 
 	return body, err
+}
+
+func renderRemoveOutputPainlessScript(outputName string) ([]byte, error) {
+	return json.Marshal(map[string]any{
+		"script": map[string]any{
+			"lang":   "painless",
+			"source": "ctx._source['outputs'].remove(params.output_name)",
+			"params": map[string]any{"output_name": outputName},
+		},
+	})
 }
 
 func generateOutputAPIKey(

@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -33,9 +34,13 @@ import (
 var (
 	registry *metricsRegistry
 
-	cntHTTPNew    *statsCounter
-	cntHTTPClose  *statsCounter
-	cntHTTPActive *statsGauge
+	cntHTTPNew          *statsCounter
+	cntHTTPClose        *statsCounter
+	cntHTTPActive       *statsGauge
+	cntHTTPRejectedRate *statsGauge
+	// cntHTTPRejected is an internal-only accumulator; only the derived rate is
+	// exposed in /stats. Not registered with the metrics registry.
+	cntHTTPRejected atomic.Uint64
 
 	cntCheckin       routeStats
 	cntEnroll        routeStats
@@ -61,6 +66,7 @@ func init() {
 	cntHTTPNew = newCounter(registry, "tcp_open")
 	cntHTTPClose = newCounter(registry, "tcp_close")
 	cntHTTPActive = newGauge(registry, "tcp_active")
+	cntHTTPRejectedRate = newGauge(registry, "tcp_rejected_rate")
 
 	routesRegistry := registry.newRegistry("routes")
 
@@ -326,9 +332,9 @@ func attachPrometheusEndpoint(router metricsRouter, reg *prometheus.Registry, bi
 	router.AddRoute("/metrics", promhttp.InstrumentMetricHandler(reg, h).ServeHTTP)
 }
 
-// CheckinRateSampleInterval is how often RunCheckinRejectionRateSampler recomputes
-// the checkin capacity-rejection rate.
-const CheckinRateSampleInterval = 10 * time.Second
+// RejectionRateSampleInterval is how often the rejection-rate samplers recompute
+// the checkin and connection-cap rejection rates.
+const RejectionRateSampleInterval = 10 * time.Second
 
 // computeRate returns the count of rejections (cur-prev) divided by an elapsed
 // time (dt), rounded to the nearest integer. It returns 0 if dt is non-positive
@@ -350,6 +356,45 @@ func computeRate(prev, cur uint64, dt time.Duration) uint64 {
 		return 0
 	}
 	return uint64(float64(cur-prev)/dt.Seconds() + 0.5)
+}
+
+// RunConnRejectionRateSampler periodically samples the connection-cap rejection
+// counter (http_server.tcp_rejected) and publishes the resulting rate as the
+// tcp_rejected_rate gauge.
+//
+// tcp_rejected_rate is a saturation signal that complements tcp_active:
+//   - tcp_active is a utilization signal — EPA uses it to maintain headroom by
+//     scaling before pods fill up. It works well at steady state but understates
+//     demand when connections are short-lived (e.g. an enrollment burst), because
+//     the metric lags behind a burst that arrives and clears between sample points.
+//   - tcp_rejected_rate fires only when the pod is already at its connection
+//     ceiling and actively turning clients away (HTTP 429 from the chi Throttle
+//     middleware). It catches bursts that tcp_active misses, triggering an
+//     immediate scale-up rather than waiting for the next utilization sample.
+//
+// Together, EPA can scale both proactively (tcp_active: maintain headroom during
+// steady-state load) and reactively (tcp_rejected_rate: act the moment a burst
+// overwhelms a pod). EPA takes the maximum desired replica count across all
+// configured metrics, so tcp_rejected_rate can only make scale-up more aggressive,
+// never suppress it.
+//
+// Run blocks until ctx is canceled, following the same lifecycle contract as the
+// other subsystems started in Fleet.runSubsystems.
+func RunConnRejectionRateSampler(ctx context.Context, interval time.Duration) error {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	prev, prevT := cntHTTPRejected.Load(), time.Now()
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case now := <-ticker.C:
+			cur := cntHTTPRejected.Load()
+			cntHTTPRejectedRate.Set(computeRate(prev, cur, now.Sub(prevT)))
+			prev, prevT = cur, now
+		}
+	}
 }
 
 // RunCheckinRejectionRateSampler periodically samples the checkin route's
