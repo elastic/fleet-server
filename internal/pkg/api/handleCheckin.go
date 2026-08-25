@@ -979,7 +979,10 @@ func convertActionData(aType ActionType, raw json.RawMessage) (ad Action_Data, e
 				d.SourceUri = nil
 			}
 		} else if d.SourceUri != nil {
-			sources := []string{*d.SourceUri}
+			sources := []string{}
+			if *d.SourceUri != "" {
+				sources = append(sources, *d.SourceUri)
+			}
 			d.Sources = &sources
 		}
 		err = ad.FromActionUpgrade(d)
