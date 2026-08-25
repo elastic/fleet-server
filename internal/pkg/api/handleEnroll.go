@@ -306,7 +306,10 @@ func (et *EnrollerT) _enroll(
 
 			// confirm that its on the same policy
 			// it is not supported to have it the same ID enroll into different policies
-			if agent.PolicyID != policyID {
+			// compare base policy IDs: the agent may have been reassigned to a
+			// version-specific policy variant (e.g. "policy#9.6") while enrollment
+			// API keys are only ever bound to the base policy
+			if policyBaseID(agent.PolicyID) != policyBaseID(policyID) {
 				zlog.Warn().
 					Str("AgentId", agent.Id).
 					Str("PolicyId", policyID).
