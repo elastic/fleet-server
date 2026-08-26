@@ -1,0 +1,22 @@
+kind: bug-fix
+
+summary: Fix enrollment deadlock on fresh Serverless projects caused by _refresh on non-existent .fleet-agents index
+
+description: |
+  Fleet Server PR #7662 introduced a pre-enrollment _refresh call on .fleet-agents
+  to make prior writes visible before the deduplication msearch. On a fresh Serverless
+  project the index does not yet exist, so _refresh returned HTTP 404, which caused
+  failQueue to be called and every enrollment attempt to fail permanently — the index
+  is never created because enrollment always fails before the first write can land.
+
+  Fix: pass ignore_unavailable=true to the refresh request. When the index does not
+  exist the refresh becomes a no-op (HTTP 200, zero shards), enrollment proceeds to
+  the msearch, and the first successful write creates the index via ES auto-creation.
+  Subsequent retries with the same enrollment_id then deduplicate correctly.
+
+  The body-close ordering (refreshResp.Body.Close() before String()) that previously
+  hid the real error is also corrected in this PR.
+
+component: fleet-server
+
+pr: https://github.com/elastic/fleet-server/pull/7688

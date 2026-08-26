@@ -290,7 +290,10 @@ func (b *Bulker) flushEnrollSearch(ctx context.Context, queue queueT) error {
 		for idx := range refreshIndices {
 			idxSlice = append(idxSlice, idx)
 		}
-		refreshResp, err := esapi.IndicesRefreshRequest{Index: idxSlice}.Do(ctx, b.es)
+		refreshResp, err := esapi.IndicesRefreshRequest{
+			Index:             idxSlice,
+			IgnoreUnavailable: esapi.BoolPtr(true),
+		}.Do(ctx, b.es)
 		if err != nil {
 			failQueue(queue, err)
 			return nil
