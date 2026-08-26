@@ -147,6 +147,18 @@ func TestConvertActionData(t *testing.T) {
 		expect: Action_Data{json.RawMessage(`{"source_uri":"https://new.example.com","sources":["https://new.example.com"],"version":"1.2.3"}`)},
 		hasErr: false,
 	}, {
+		name:   "upgrade action uses empty sources over source uri",
+		aType:  UPGRADE,
+		raw:    json.RawMessage(`{"source_uri":"https://legacy.example.com","sources":[],"version":"1.2.3"}`),
+		expect: Action_Data{json.RawMessage(`{"sources":[],"version":"1.2.3"}`)},
+		hasErr: false,
+	}, {
+		name:   "upgrade action does not populate sources from empty source uri",
+		aType:  UPGRADE,
+		raw:    json.RawMessage(`{"source_uri":"","version":"1.2.3"}`),
+		expect: Action_Data{json.RawMessage(`{"source_uri":"","sources":[],"version":"1.2.3"}`)},
+		hasErr: false,
+	}, {
 		name:   "request diagnostics action",
 		aType:  REQUESTDIAGNOSTICS,
 		expect: Action_Data{},
