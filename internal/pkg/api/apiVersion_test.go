@@ -5,6 +5,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -59,7 +60,7 @@ func TestAPIVersion_middleware(t *testing.T) {
 
 			resp := httptest.NewRecorder()
 
-			req := httptest.NewRequest("GET", "/api/test", nil)
+			req := httptest.NewRequestWithContext(context.Background(), "GET", "/api/test", nil)
 
 			nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
 

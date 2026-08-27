@@ -225,7 +225,7 @@ func Test_Agent_Remote_ES_Output(t *testing.T) {
 	}()
 
 	remoteAPIKey, actionID := Checkin(t, ctx, srvCopy, resp.Item.Id, resp.Item.AccessApiKey, true, "POLICY_CHANGE")
-	apiKeyID := strings.Split(remoteAPIKey, ":")[0]
+	apiKeyID, _, _ := strings.Cut(remoteAPIKey, ":")
 
 	verifyRemoteAPIKey(t, ctx, apiKeyID, false)
 
@@ -379,7 +379,7 @@ func Test_Agent_Remote_ES_Output_ForceUnenroll(t *testing.T) {
 	}()
 
 	remoteAPIKey, actionID := Checkin(t, ctx, srvCopy, resp.Item.Id, resp.Item.AccessApiKey, true, "POLICY_CHANGE")
-	apiKeyID := strings.Split(remoteAPIKey, ":")[0]
+	apiKeyID, _, _ := strings.Cut(remoteAPIKey, ":")
 
 	verifyRemoteAPIKey(t, ctx, apiKeyID, false)
 
@@ -500,7 +500,7 @@ func Test_Agent_Remote_ES_Output_Unenroll(t *testing.T) {
 	}()
 
 	remoteAPIKey, actionID := Checkin(t, ctx, srvCopy, resp.Item.Id, resp.Item.AccessApiKey, true, "POLICY_CHANGE")
-	apiKeyID := strings.Split(remoteAPIKey, ":")[0]
+	apiKeyID, _, _ := strings.Cut(remoteAPIKey, ":")
 
 	verifyRemoteAPIKey(t, ctx, apiKeyID, false)
 

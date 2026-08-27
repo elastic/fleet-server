@@ -27,7 +27,7 @@ func createRandomActionResults() ([]model.ActionResult, error) {
 
 	sz := r.Int(1, 9)
 
-	now := time.Now().UTC()
+	now := time.Now().UTC().Truncate(time.Millisecond)
 
 	results := make([]model.ActionResult, sz)
 
@@ -51,7 +51,7 @@ func createRandomActionResults() ([]model.ActionResult, error) {
 			ESDocument: model.ESDocument{
 				Id: actionID + ":" + agentID,
 			},
-			Timestamp: r.Time(now, 2, 5, time.Second, rnd.TimeBefore).Format(time.RFC3339),
+			Timestamp: r.Time(now, 2, 5, time.Second, rnd.TimeBefore),
 			AgentID:   agentID,
 			ActionID:  actionID,
 			Error:     errmsg,

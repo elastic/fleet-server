@@ -104,7 +104,7 @@ func TestAPMHTTPTransportOptions(t *testing.T) {
 		srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintln(w, "Hello, world!")
 		}))
-		srv.TLS = &tls.Config{Certificates: []tls.Certificate{cert}} //nolint:gosec // test case
+		srv.TLS = &tls.Config{Certificates: []tls.Certificate{cert}}
 		srv.StartTLS()
 		defer srv.Close()
 
@@ -161,7 +161,7 @@ func TestAPMHTTPTransportOptions(t *testing.T) {
 	})
 
 	t.Run("api key file does not exist", func(t *testing.T) {
-		i := &Instrumentation{
+		i := &Instrumentation{ //nolint:gosec // G101: test data, not a real credential
 			APIKeyPath: "/path/does/not/exist",
 		}
 		_, err := i.APMHTTPTransportOptions()

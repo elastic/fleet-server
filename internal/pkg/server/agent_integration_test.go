@@ -463,7 +463,7 @@ func (s *StubV2Control) Port() int {
 }
 
 func (s *StubV2Control) Start(opt ...grpc.ServerOption) error {
-	lis, err := net.Listen("tcp", "localhost:0")
+	lis, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "localhost:0")
 	if err != nil {
 		return err
 	}

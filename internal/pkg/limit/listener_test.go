@@ -5,6 +5,7 @@
 package limit
 
 import (
+	"context"
 	"net"
 	"testing"
 	"time"
@@ -28,7 +29,7 @@ func TestLimitListener(t *testing.T) {
 
 	t.Log("Form 1st connection")
 	go func() {
-		_, err := net.Dial("tcp", l.Addr().String())
+		_, err := (&net.Dialer{}).DialContext(context.Background(), "tcp", l.Addr().String())
 		require.NoError(t, err)
 	}()
 	// should accept a connection
@@ -37,7 +38,7 @@ func TestLimitListener(t *testing.T) {
 
 	t.Log("Form 2nd connection")
 	go func() {
-		conn, err := net.Dial("tcp", l.Addr().String())
+		conn, err := (&net.Dialer{}).DialContext(context.Background(), "tcp", l.Addr().String())
 		require.NoError(t, err)
 
 		select {

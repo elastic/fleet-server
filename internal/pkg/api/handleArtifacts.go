@@ -135,7 +135,7 @@ func (at ArtifactT) processRequest(ctx context.Context, zlog zerolog.Logger, age
 		Int64("decodedSz", artifact.DecodedSize).
 		Str("compression", artifact.CompressionAlgorithm).
 		Str("encryption", artifact.EncryptionAlgorithm).
-		Str("created", artifact.Created).
+		Time("created", artifact.Created).
 		Msg("Artifact GET")
 
 	// Write the payload

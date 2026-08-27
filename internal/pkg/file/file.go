@@ -99,7 +99,7 @@ type Info struct {
 // convenience functions for computing current "Status" based on the fields
 func (i Info) Expired(timeout time.Duration) bool { return time.Now().After(i.Start.Add(timeout)) }
 func (i Info) StatusCanUpload() bool { // returns true if more chunks can be uploaded. False if the upload process has completed (with or without error)
-	return !(i.Status == StatusFail || i.Status == StatusDone || i.Status == StatusDel)
+	return i.Status != StatusFail && i.Status != StatusDone && i.Status != StatusDel
 }
 
 type Chunk struct {

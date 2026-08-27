@@ -136,8 +136,8 @@ func DeleteExpiredForIndex(ctx context.Context, index string, bulker bulk.Bulk, 
 		return 0, err
 	}
 
-	res, err := bulker.Client().API.DeleteByQuery([]string{index}, bytes.NewReader(query),
-		bulker.Client().API.DeleteByQuery.WithContext(ctx))
+	res, err := bulker.Client().DeleteByQuery([]string{index}, bytes.NewReader(query),
+		bulker.Client().DeleteByQuery.WithContext(ctx))
 
 	if err != nil {
 		return 0, err

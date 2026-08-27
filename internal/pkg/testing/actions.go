@@ -90,7 +90,7 @@ func CreateRandomActions(opts ...CreateActionsOpt) ([]model.Action, error) {
 
 	sz = r.Int(c.minActionsCount, c.maxActionsCount)
 
-	now := time.Now().UTC()
+	now := time.Now().UTC().Truncate(time.Millisecond)
 
 	actions := make([]model.Action, sz)
 
@@ -124,8 +124,8 @@ func CreateRandomActions(opts ...CreateActionsOpt) ([]model.Action, error) {
 				Id: xid.New().String(),
 			},
 			ActionID:   uuid.Must(uuid.NewV4()).String(),
-			Timestamp:  timestamp.Format(time.RFC3339),
-			Expiration: expiration.Format(time.RFC3339),
+			Timestamp:  timestamp,
+			Expiration: expiration,
 			Type:       "APP_ACTION",
 			InputType:  "osquery",
 			Agents:     aid,

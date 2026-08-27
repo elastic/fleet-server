@@ -21,8 +21,8 @@ func CreateActionResult(ctx context.Context, bulker bulk.Bulk, acr model.ActionR
 }
 
 func createActionResult(ctx context.Context, bulker bulk.Bulk, index string, acr model.ActionResult) error {
-	if acr.Timestamp == "" {
-		acr.Timestamp = time.Now().UTC().Format(time.RFC3339)
+	if acr.Timestamp.IsZero() {
+		acr.Timestamp = time.Now().UTC()
 	}
 	body, err := json.Marshal(acr)
 	if err != nil {

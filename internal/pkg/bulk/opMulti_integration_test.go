@@ -25,7 +25,7 @@ func benchmarkMultiUpdate(n int, b *testing.B) {
 	index, bulker := SetupIndexWithBulk(ctx, b, testPolicy, WithFlushThresholdCount(n), WithFlushInterval(time.Millisecond*10))
 
 	// Create N samples
-	var ops []MultiOp
+	ops := make([]MultiOp, 0, n)
 	for range n {
 		sample := NewRandomSample()
 		ops = append(ops, MultiOp{

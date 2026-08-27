@@ -26,8 +26,7 @@ func TestFindAgent_NewModel(t *testing.T) {
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetAgents)
 
-	now := time.Now().UTC()
-	nowStr := now.Format(time.RFC3339)
+	now := time.Now().UTC().Truncate(time.Millisecond)
 
 	policyID := uuid.Must(uuid.NewV4()).String()
 	agentID := uuid.Must(uuid.NewV4()).String()
@@ -39,7 +38,7 @@ func TestFindAgent_NewModel(t *testing.T) {
 			ToRetireAPIKeyIds: []model.ToRetireAPIKeyIdsItems{
 				{
 					ID:        "TestFindNewModelAgent_APIKeyID_invalidated",
-					RetiredAt: "TestFindNewModelAgent_APIKeyID_invalidated_at"},
+					RetiredAt: now},
 			},
 			APIKeyID:        "TestFindNewModelAgent_APIKeyID",
 			PermissionsHash: "TestFindNewModelAgent_PermisPolicysionsHash",
@@ -48,10 +47,10 @@ func TestFindAgent_NewModel(t *testing.T) {
 	body, err := json.Marshal(model.Agent{
 		PolicyID:          policyID,
 		Active:            true,
-		LastCheckin:       nowStr,
+		LastCheckin:       &now,
 		LastCheckinStatus: "",
-		UpdatedAt:         nowStr,
-		EnrolledAt:        nowStr,
+		UpdatedAt:         &now,
+		EnrolledAt:        now,
 		Outputs:           wantOutputs,
 	})
 	require.NoError(t, err)

@@ -6,8 +6,8 @@ package api
 
 // ptr is a helper function to get a pointer to whatever is passed, including a literal
 //
-//nolint:deadcode,unused // used in tests at the moment
 //go:fix inline
+//nolint:deadcode,unused // used in tests at the moment
 func ptr[T any](v T) *T {
 	return new(v)
 }

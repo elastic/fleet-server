@@ -52,7 +52,7 @@ type Logging struct {
 }
 
 func (c *Logging) EqualExcludeLevel(cfg Logging) bool {
-	if !(c.ToStderr == cfg.ToStderr && c.ToFiles == cfg.ToFiles && c.Pretty == cfg.Pretty) {
+	if c.ToStderr != cfg.ToStderr || c.ToFiles != cfg.ToFiles || c.Pretty != cfg.Pretty {
 		return false
 	}
 	af := c.Files

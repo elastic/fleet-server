@@ -23,15 +23,15 @@ import (
 )
 
 func createRandomEnrollmentAPIKey(policyID string, active bool) model.EnrollmentAPIKey {
-	now := time.Now().UTC()
-	return model.EnrollmentAPIKey{
+	now := time.Now().UTC().Truncate(time.Millisecond)
+	return model.EnrollmentAPIKey{ //nolint:gosec // G101: test data, not a real credential
 		ESDocument: model.ESDocument{
 			Id: xid.New().String(),
 		},
 		Active:    active,
 		APIKey:    "d2JndlFIWUJJUVVxWDVia2NJTV86X0d6ZmljZGNTc1d4R1otbklrZFFRZw==",
 		APIKeyID:  xid.New().String(),
-		CreatedAt: now.Format(time.RFC3339),
+		CreatedAt: now,
 		Name:      "Default (db3f8318-05f0-4625-a808-9deddb0112b5)",
 		PolicyID:  policyID,
 	}
@@ -41,7 +41,7 @@ func createRandomEnrollmentAPIKey(policyID string, active bool) model.Enrollment
 func storeRandomEnrollmentAPIKey(ctx context.Context, bulker bulk.Bulk, index string, policyID string, active bool) (model.EnrollmentAPIKey, error) {
 	rec := createRandomEnrollmentAPIKey(policyID, active)
 
-	body, err := json.Marshal(rec)
+	body, err := json.Marshal(rec) //nolint:gosec // G117: marshaling enrollment API key for test setup is intentional
 	if err != nil {
 		return rec, err
 	}
