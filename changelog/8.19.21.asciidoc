@@ -1,0 +1,42 @@
+// begin 8.19.21 relnotes
+
+[[release-notes-8.19.21]]
+==  8.19.21
+
+Review important information about the  8.19.21 release.
+
+
+
+
+
+
+
+
+
+
+
+
+[discrete]
+[[enhancements-8.19.21]]
+=== Enhancements
+
+
+
+
+* Update Go to 1.26.6. https://github.com/elastic/fleet-server/pull/7644[#7644] 
+* Prevent ghost agent documents caused by concurrent enrollment retries. https://github.com/elastic/fleet-server/pull/7654[#7654] https://github.com/elastic/fleet-server/pull/7705[#7705] 
+
+
+
+
+[discrete]
+[[bug-fixes-8.19.21]]
+=== Bug fixes
+
+
+
+
+* Reject stale policy revisions before secret resolution in the policy monitor. https://github.com/elastic/fleet-server/pull/7572[#7572] https://github.com/elastic/fleet-server/issues/7570[#7570]
+* Read cgroup memory limit for cache sizing when GOMEMLIMIT is not set. https://github.com/elastic/fleet-server/pull/7654[#7654] https://github.com/elastic/fleet-server/pull/7705[#7705] 
+
+// end 8.19.21 relnotes
