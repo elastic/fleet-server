@@ -5,7 +5,6 @@ summary: Log Elasticsearch 429 rejections at warn level instead of error
 description: |
   When Elasticsearch returns a 429 (es_rejected_execution_exception), fleet-server
   was logging it at ERROR level. A 429 is transient backpressure — the agent retries
-  on its next check-in — so WARN is the appropriate level. Logging at ERROR inflated
-  the error-log rate measured by the serverless quality gate.
+  on its next check-in — so WARN is the appropriate level.
 
 component: fleet-server
