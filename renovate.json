@@ -81,6 +81,16 @@
       "prConcurrentLimit": 10
     },
     {
+      "description": "Ignore internal fleet-server module references used in replace directives",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchPackageNames": [
+        "/^github\\.com/elastic/fleet-server/"
+      ],
+      "enabled": false
+    },
+    {
       "description": "GitHub Actions: keep macOS runner updates manual",
       "matchManagers": [
         "github-actions"
