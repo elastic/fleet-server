@@ -5,7 +5,7 @@
 ### Features and enhancements [fleet-server-9.4.6-features-enhancements]
 
 
-* Add graceful_force_unenroll feature flag to gracefully unenroll agents with invalid API keys. [#7686](https://github.com/elastic/fleet-server/pull/7686) [#7706](https://github.com/elastic/fleet-server/pull/7706) 
+* Add graceful_force_unenroll feature flag to gracefully unenroll agents with invalid API keys. [#7593](https://github.com/elastic/fleet-server/pull/7593) 
 
   Fleet Server now supports a new `graceful_force_unenroll` block under
   `inputs[].server.feature_flags`. When enabled, a checkin request that arrives
@@ -28,7 +28,7 @@
   `enabled: true` is set explicitly.
   
 * Update Go to 1.26.6. [#7644](https://github.com/elastic/fleet-server/pull/7644) 
-* Prevent ghost agent documents caused by concurrent enrollment retries. [#7686](https://github.com/elastic/fleet-server/pull/7686) [#7706](https://github.com/elastic/fleet-server/pull/7706) 
+* Prevent ghost agent documents caused by concurrent enrollment retries. [#7662](https://github.com/elastic/fleet-server/pull/7662) 
 
   At large scale, concurrent enrollment retries could create duplicate (ghost) agent
   documents in Elasticsearch. This occurred when an agent retried enrollment before
@@ -58,7 +58,7 @@
   or resolve its secrets. Stale revisions are dropped with a warning log and do
   not overwrite the cached policy.
   
-* Read cgroup memory limit for cache sizing when GOMEMLIMIT is not set. [#7686](https://github.com/elastic/fleet-server/pull/7686) [#7706](https://github.com/elastic/fleet-server/pull/7706) 
+* Read cgroup memory limit for cache sizing when GOMEMLIMIT is not set. [#7573](https://github.com/elastic/fleet-server/pull/7573) 
 
   containerMemoryMB() now falls back to the cgroup memory limit (v2 then v1) before host RAM. This ensures fleet-server is correctly sized for the container even in deployments that do not explicitly set GOMEMLIMIT.
   
