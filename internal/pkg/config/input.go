@@ -104,6 +104,44 @@ type (
 		TokenKey string `config:"token_key"`
 		PolicyID string `config:"policy_id"`
 	}
+<<<<<<< HEAD
+=======
+
+	// FeatureFlags contains toggles to enable new behaviour, or restore old behaviour.
+	FeatureFlags struct {
+		// IgnoreCheckinPolicyID when true will ignore the agent_policy_id and policy_revision_idx attributes in checkin request bodies.
+		// This setting restores previous behaviour where all POLICY_CHANGE actions need an explicit ack.
+		IgnoreCheckinPolicyID bool `config:"ignore_checkin_policy_id"`
+
+		// EnableOpAMP controls whether the OpAMP endpoint is enabled. Defaults to true.
+		EnableOpAMP bool `config:"enable_opamp"`
+
+		// GracefulForceUnenroll configures the three-step escalation applied to agents that
+		// check in with an invalid or disabled API key.
+		GracefulForceUnenroll GracefulForceUnenrollConfig `config:"graceful_force_unenroll"`
+
+		// SyncEnrollmentWrite (config key: feature_flags._sync_enrollment_write) selects the enrollment write strategy.
+		// When false (default), agent documents are written via the async bulk queue — existing behavior.
+		// When true, agent documents are written synchronously with refresh=wait_for, making the document
+		// immediately searchable before the enrollment response is sent and eliminating ghost agents.
+		SyncEnrollmentWrite bool `config:"_sync_enrollment_write"`
+	}
+
+	// GracefulForceUnenrollConfig controls the graceful-force-unenroll feature.
+	GracefulForceUnenrollConfig struct {
+		// Enabled activates the three-step escalation: (1) POLICY_CHANGE with empty policy
+		// to stop all inputs, (2) UNENROLL to disenroll the agent, (3) pass-through 401 for
+		// up to one hour, then the cycle resets.
+		Enabled bool `config:"enabled"`
+
+		// MaxBytes is the memory cap in bytes for the in-memory LRU that tracks per-agent
+		// escalation state. Each entry costs ~250 bytes; the default 50000000 (50 MB) holds
+		// ~200,000 entries. When full, the least-recently-used entry is evicted, resetting
+		// that agent's escalation back to step 1 on its next check-in. A value of 0 uses
+		// the default.
+		MaxBytes int64 `config:"max_bytes"`
+	}
+>>>>>>> d6324c7 (feat: add synchronous enrollment write strategy to prevent ghost agents (#7712))
 )
 
 // InitDefaults initializes the defaults for the configuration.
