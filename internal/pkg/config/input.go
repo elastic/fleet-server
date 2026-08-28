@@ -128,7 +128,7 @@ type (
 		// When false (default), agent documents are written via the async bulk queue — existing behaviour.
 		// When true, agent documents are written synchronously with refresh=wait_for, making the document
 		// immediately searchable before the enrollment response is sent and eliminating ghost agents.
-		SyncEnrollmentWrite bool `config:"sync_enrollment_write"`
+		SyncEnrollmentWrite bool `config:"_sync_enrollment_write"`
 	}
 
 	// GracefulForceUnenrollConfig controls the graceful-force-unenroll feature.

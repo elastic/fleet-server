@@ -9,7 +9,7 @@ description: |
   retry would create a second, duplicate agent document ("ghost agent"). Ghost agents
   accumulate over time and do not resolve on their own.
 
-  A new feature flag, inputs[].server.feature_flags.sync_enrollment_write (default:
+  A new feature flag, inputs[].server.feature_flags._sync_enrollment_write (default:
   false), selects the enrollment write strategy. When set to true, fleet-server writes
   the agent document synchronously with refresh=wait_for, ensuring it is immediately
   searchable before the enrollment response is sent. Any retry on any instance finds the
