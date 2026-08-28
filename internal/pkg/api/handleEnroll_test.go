@@ -608,9 +608,16 @@ func TestCreateFleetAgentVersionConflictSucceeds(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func assertSyncEnrollParams(t *testing.T, req *http.Request) {
+	t.Helper()
+	require.Equal(t, "create", req.URL.Query().Get("op_type"), "op_type must be create to prevent duplicate documents")
+	require.Equal(t, "wait_for", req.URL.Query().Get("refresh"), "refresh must be wait_for so the document is visible before the response is sent")
+}
+
 func TestCreateFleetAgentSyncWrite409Succeeds(t *testing.T) {
 	mt := &MockTransport{}
 	mt.RoundTripFn = func(req *http.Request) (*http.Response, error) {
+		assertSyncEnrollParams(t, req)
 		return &http.Response{
 			StatusCode: http.StatusConflict,
 			Body:       io.NopCloser(strings.NewReader(`{}`)),
@@ -630,6 +637,7 @@ func TestCreateFleetAgentSyncWrite409Succeeds(t *testing.T) {
 func TestCreateFleetAgentSyncWriteErrorSurfaces(t *testing.T) {
 	mt := &MockTransport{}
 	mt.RoundTripFn = func(req *http.Request) (*http.Response, error) {
+		assertSyncEnrollParams(t, req)
 		return &http.Response{
 			StatusCode: http.StatusInternalServerError,
 			Body:       io.NopCloser(strings.NewReader(`{}`)),
