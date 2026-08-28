@@ -1,0 +1,131 @@
+version: 9.4.6
+entries:
+    - kind: unknown
+      summary: Limit concurrent secret reads to reduce memory pressure under high agent check-in load
+      description: |
+        Under high concurrent agent check-in load, fleet-server could open an
+        unbounded number of concurrent connections to Elasticsearch to resolve
+        policy secret references, contributing to out-of-memory conditions on
+        large deployments.
+
+        Secret reads are now capped at 32 concurrent in-flight requests.
+        Excess reads wait until a slot is available.
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/7686
+        - https://github.com/elastic/fleet-server/pull/7706
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1786037058
+      file:
+        name: 1786037058-rate-limit-read-secrets.yaml
+        checksum: 0bd4fb4d3e57b4338bf99b6bd9f6606a1d7887f2
+    - kind: bug-fix
+      summary: Reject stale policy revisions before secret resolution in the policy monitor
+      description: |
+        After a Kibana index migration, the `.fleet-policies` change-feed can deliver
+        older revision documents (with higher _seq_no values) after the policy monitor
+        has already cached a newer revision. Fleet Server now checks the incoming
+        revision_idx against the cached revision before attempting to parse the policy
+        or resolve its secrets. Stale revisions are dropped with a warning log and do
+        not overwrite the cached policy.
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/7572
+      issue:
+        - https://github.com/elastic/fleet-server/issues/7570
+      impact: ""
+      action: ""
+      timestamp: 1786053515
+      file:
+        name: 1786053515-revision-guard-policy-monitor.yaml
+        checksum: 7d6f4ee30d0ec5e252c2bf38c8ecda740a165d79
+    - kind: bug-fix
+      summary: Read cgroup memory limit for cache sizing when GOMEMLIMIT is not set
+      description: |
+        containerMemoryMB() now falls back to the cgroup memory limit (v2 then v1) before host RAM. This ensures fleet-server is correctly sized for the container even in deployments that do not explicitly set GOMEMLIMIT.
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/7686
+        - https://github.com/elastic/fleet-server/pull/7706
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1786058255
+      file:
+        name: 1786058255-fix-cgroup-aware-cache-memory.yaml
+        checksum: a1c87c2fa0388de76da99c7302bdfcbef3f80a8e
+    - kind: enhancement
+      summary: Add graceful_force_unenroll feature flag to gracefully unenroll agents with invalid API keys
+      description: |
+        Fleet Server now supports a new `graceful_force_unenroll` block under
+        `inputs[].server.feature_flags`. When enabled, a checkin request that arrives
+        with an invalid, expired, or disabled API key triggers a three-step escalation
+        instead of the default HTTP 401 response:
+
+        1. First occurrence: HTTP 200 with a POLICY_CHANGE action carrying an empty policy,
+           causing the agent to stop all running inputs.
+        2. Second occurrence: HTTP 200 with an UNENROLL action, causing the agent to
+           disenroll itself and exit.
+        3. Third and subsequent occurrences: HTTP 401 pass-through for up to one hour,
+           after which the cycle resets from step 1.
+
+        Per-agent escalation state is stored in a memory-bounded LRU (default 50 MB,
+        ~200,000 entries). The cap is configurable via `max_bytes` (integer bytes; the
+        default 50000000 holds ~200,000 entries). When the LRU is full, the least-recently-used
+        entry is evicted, resetting that agent's escalation back to step 1.
+
+        The feature is disabled by default; existing behaviour is unchanged unless
+        `enabled: true` is set explicitly.
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/7686
+        - https://github.com/elastic/fleet-server/pull/7706
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1786137338
+      file:
+        name: 1786137338-unenroll-on-invalid-api-key.yaml
+        checksum: 69d6d17b5b5767adcd9dbb1ab2a9f90ca9473495
+    - kind: enhancement
+      summary: Update Go to 1.26.6
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/7644
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1786744867
+      file:
+        name: 1786744867-main.yaml
+        checksum: b5064446d5707253beb501a40821c301c671310c
+    - kind: enhancement
+      summary: Prevent ghost agent documents caused by concurrent enrollment retries
+      description: |
+        At large scale, concurrent enrollment retries could create duplicate (ghost) agent
+        documents in Elasticsearch. This occurred when an agent retried enrollment before
+        its previous write was visible to search, causing multiple retries to each believe
+        no agent existed and each create a new document.
+
+        Fleet Server now batches enrollment lookups and ensures index visibility before
+        searching, so retries consistently find an existing agent document rather than
+        creating a new one. Duplicate requests within a batch are handled efficiently
+        and prompted to retry, keeping the number of Elasticsearch operations low.
+
+        The batching behaviour is configurable via
+        inputs[].server.bulk.enroll.flush_interval (default: 1s) and
+        inputs[].server.bulk.enroll.flush_threshold_cnt (default: 50).
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/7686
+        - https://github.com/elastic/fleet-server/pull/7706
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1787137647
+      file:
+        name: 1787137647-enroll-search-bulker-queue.yaml
+        checksum: 6b3682cdc297a208201f59ce3eb94601346ad36f
