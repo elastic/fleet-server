@@ -24,7 +24,6 @@ import (
 	"go.elastic.co/apm/v2"
 
 	"github.com/elastic/elastic-agent-libs/str"
-	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
@@ -35,6 +34,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/rollback"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
+	"github.com/elastic/go-elasticsearch/v8/esapi"
 
 	"github.com/gofrs/uuid/v5"
 	"github.com/hashicorp/go-version"

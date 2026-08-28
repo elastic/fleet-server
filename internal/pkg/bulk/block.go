@@ -16,11 +16,11 @@ type Buf = danger.Buf
 // However, the multiOp API's will allocate directly in large blocks.
 
 type bulkT struct {
-	action       actionT    // requested actions
-	flags        flagsT     // execution flags
-	idx          int32      // idx of originating request, used in mulitOp
-	ch           chan respT // response channel, caller is waiting synchronously
-	buf          Buf        // json payload to be sent to elastic
+	action      actionT    // requested actions
+	flags       flagsT     // execution flags
+	idx         int32      // idx of originating request, used in mulitOp
+	ch          chan respT // response channel, caller is waiting synchronously
+	buf         Buf        // json payload to be sent to elastic
 	next        *bulkT     // pointer to next bulkT, used for fast internal queueing
 	spanLink    apm.SpanLink
 	hasSpanLink bool

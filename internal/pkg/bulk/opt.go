@@ -173,7 +173,7 @@ func parseBulkOpts(opts ...BulkOpt) bulkOptT {
 		apikeyMaxReqSize:         defaultApikeyMaxReqSize,
 		maxPendingBulkDispatches: defaultMaxPendingBulkDispatches,
 		maxConcurrentSecretReads: defaultMaxConcurrentSecretReads,
-		policyTokens: []config.PolicyToken{}, // default is empty
+		policyTokens:             []config.PolicyToken{}, // default is empty
 	}
 
 	for _, f := range opts {

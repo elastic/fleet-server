@@ -243,4 +243,3 @@ func (b *Bulker) flushSearch(ctx context.Context, queue queueT) error {
 
 	return nil
 }
-
