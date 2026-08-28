@@ -364,6 +364,11 @@ func (et *EnrollerT) _enroll(
 
 	// Existing agent, only update a subset of the fields
 	if agent.Id != "" {
+		prevVer := ""
+		if agent.Agent != nil {
+			prevVer = agent.Agent.Version
+		}
+
 		agent.Active = true
 		agent.Namespaces = namespaces
 		agent.LocalMetadata = localMeta
@@ -393,6 +398,10 @@ func (et *EnrollerT) _enroll(
 			dl.FieldUnenrolledAt:          nil,
 			dl.FieldUnenrolledReason:      nil,
 			dl.FieldUpdatedAt:             now.UTC().Format(time.RFC3339),
+		}
+		// stamp upgraded_at so Kibana knows it should evaluate which version-specific policy it should receive
+		if prevVer != "" && prevVer != ver {
+			doc[dl.FieldUpgradedAt] = now.UTC().Format(time.RFC3339)
 		}
 		err = updateFleetAgent(ctx, et.bulker, agentID, doc)
 		if err != nil {
