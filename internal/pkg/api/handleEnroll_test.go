@@ -600,7 +600,7 @@ func TestCreateFleetAgentVersionConflictSucceeds(t *testing.T) {
 	bulker.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return("", es.ErrElasticVersionConflict)
 
-	err := createFleetAgent(t.Context(), bulker, "test-agent-id", model.Agent{})
+	err := createFleetAgent(t.Context(), bulker, "test-agent-id", model.Agent{}, false)
 	assert.NoError(t, err)
 }
 
