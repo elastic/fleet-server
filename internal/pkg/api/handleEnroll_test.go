@@ -11,13 +11,17 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
 	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
@@ -602,6 +606,44 @@ func TestCreateFleetAgentVersionConflictSucceeds(t *testing.T) {
 
 	err := createFleetAgent(t.Context(), bulker, "test-agent-id", model.Agent{}, false)
 	assert.NoError(t, err)
+}
+
+func TestCreateFleetAgentSyncWrite409Succeeds(t *testing.T) {
+	mt := &MockTransport{}
+	mt.RoundTripFn = func(req *http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusConflict,
+			Body:       io.NopCloser(strings.NewReader(`{}`)),
+			Header:     http.Header{"X-Elastic-Product": []string{"Elasticsearch"}},
+		}, nil
+	}
+	cli, err := elasticsearch.NewClient(elasticsearch.Config{Transport: mt})
+	require.NoError(t, err)
+
+	bulker := ftesting.NewMockBulk()
+	bulker.On("Client").Return(cli)
+
+	err = createFleetAgent(t.Context(), bulker, "test-agent-id", model.Agent{}, true)
+	require.NoError(t, err)
+}
+
+func TestCreateFleetAgentSyncWriteErrorSurfaces(t *testing.T) {
+	mt := &MockTransport{}
+	mt.RoundTripFn = func(req *http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusInternalServerError,
+			Body:       io.NopCloser(strings.NewReader(`{}`)),
+			Header:     http.Header{"X-Elastic-Product": []string{"Elasticsearch"}},
+		}, nil
+	}
+	cli, err := elasticsearch.NewClient(elasticsearch.Config{Transport: mt})
+	require.NoError(t, err)
+
+	bulker := ftesting.NewMockBulk()
+	bulker.On("Client").Return(cli)
+
+	err = createFleetAgent(t.Context(), bulker, "test-agent-id", model.Agent{}, true)
+	require.Error(t, err)
 }
 
 func TestValidateEnrollRequest(t *testing.T) {
