@@ -355,6 +355,24 @@ func TestEnrollWithAgentIDExistingActive_WrongPolicy(t *testing.T) {
 	}
 }
 
+// replaceUpdateDoc extracts the doc body from the first Update call on the mock bulker.
+func replaceUpdateDoc(t *testing.T, bulker *ftesting.MockBulk) map[string]any {
+	t.Helper()
+	var updateBody []byte
+	for _, c := range bulker.Calls {
+		if c.Method == "Update" {
+			updateBody = c.Arguments.Get(3).([]byte)
+			break
+		}
+	}
+	require.NotEmpty(t, updateBody, "no Update call on bulker")
+	var doc struct {
+		Doc map[string]any `json:"doc"`
+	}
+	require.NoError(t, json.Unmarshal(updateBody, &doc))
+	return doc.Doc
+}
+
 func TestEnrollWithAgentIDExistingActive(t *testing.T) {
 	ctx := t.Context()
 	rb := &rollback.Rollback{}
@@ -413,18 +431,9 @@ func TestEnrollWithAgentIDExistingActive(t *testing.T) {
 		t.Fatalf("agent ID should have been %s (not %s)", agentID, resp.Item.Id)
 	}
 
-	var updateBody []byte
-	for _, c := range bulker.Calls {
-		if c.Method == "Update" {
-			updateBody = c.Arguments.Get(3).([]byte)
-			break
-		}
-	}
-	var updateDoc struct {
-		Doc map[string]any `json:"doc"`
-	}
-	assert.NoError(t, json.Unmarshal(updateBody, &updateDoc))
-	assert.Equal(t, "my-policy", updateDoc.Doc[dl.FieldPolicyBaseID])
+	doc := replaceUpdateDoc(t, bulker)
+	assert.Equal(t, "my-policy", doc[dl.FieldPolicyBaseID])
+	assert.NotContains(t, doc, dl.FieldUpgradedAt)
 }
 
 // TestEnrollWithAgentIDExistingActive_VersionedPolicy covers replace-enrollment of an
@@ -495,18 +504,140 @@ func TestEnrollWithAgentIDExistingActive_VersionedPolicy(t *testing.T) {
 		t.Fatalf("agent ID should have been %s (not %s)", agentID, resp.Item.Id)
 	}
 
-	var updateBody []byte
-	for _, c := range bulker.Calls {
-		if c.Method == "Update" {
-			updateBody = c.Arguments.Get(3).([]byte)
-			break
-		}
+	doc := replaceUpdateDoc(t, bulker)
+	assert.Equal(t, "my-policy", doc[dl.FieldPolicyBaseID])
+	assert.NotContains(t, doc, dl.FieldUpgradedAt)
+}
+
+func TestEnrollWithAgentIDExistingActive_UpgradedAtOnVersionChange(t *testing.T) {
+	ctx := t.Context()
+	rb := &rollback.Rollback{}
+	zlog := zerolog.Logger{}
+	agentID := "1234"
+	replaceToken := "replace_token"
+	var pbkdf2Cfg config.PBKDF2
+	pbkdf2Cfg.InitDefaults()
+	replaceHash, err := hashReplaceToken(replaceToken, pbkdf2Cfg)
+	require.NoError(t, err)
+	req := &EnrollRequest{
+		Type: "PERMANENT",
+		Id:   &agentID,
+		Metadata: EnrollMetadata{
+			UserProvided: []byte("{}"),
+			Local:        []byte("{}"),
+		},
+		ReplaceToken: &replaceToken,
 	}
-	var updateDoc struct {
-		Doc map[string]any `json:"doc"`
+	verCon := mustBuildConstraints("9.0.0")
+	cfg := &config.Server{}
+	cfg.InitDefaults()
+	c, _ := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
+	bulker := ftesting.NewMockBulk()
+	et, _ := NewEnrollerT(verCon, cfg, bulker, c)
+
+	source := fmt.Sprintf(`{"active":true,"agent":{"id":"1234","version":"8.9.0"},"type":"PERMANENT","policy_id":"my-policy","replace_token":"%s"}`, replaceHash)
+	bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{
+		HitsT: es.HitsT{Hits: []es.HitT{{ID: "1234", Index: dl.FleetAgents, Source: []byte(source)}}},
+	}, nil)
+	bulker.On("APIKeyRead", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&apikey.APIKeyMetadata{ID: "1234"}, nil)
+	bulker.On("APIKeyInvalidate", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	bulker.On("APIKeyCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&apikey.APIKey{ID: "1234", Key: "1234"}, nil)
+	bulker.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+	resp, err := et._enroll(ctx, rb, zlog, req, "my-policy", []string{}, "9.0.0")
+	require.NoError(t, err)
+	assert.Equal(t, "created", resp.Action)
+
+	doc := replaceUpdateDoc(t, bulker)
+	assert.Contains(t, doc, dl.FieldUpgradedAt)
+	assert.NotEmpty(t, doc[dl.FieldUpgradedAt])
+}
+
+func TestEnrollWithAgentIDExistingActive_UpgradedAtOnDowngrade(t *testing.T) {
+	ctx := t.Context()
+	rb := &rollback.Rollback{}
+	zlog := zerolog.Logger{}
+	agentID := "1234"
+	replaceToken := "replace_token"
+	var pbkdf2Cfg config.PBKDF2
+	pbkdf2Cfg.InitDefaults()
+	replaceHash, err := hashReplaceToken(replaceToken, pbkdf2Cfg)
+	require.NoError(t, err)
+	req := &EnrollRequest{
+		Type: "PERMANENT",
+		Id:   &agentID,
+		Metadata: EnrollMetadata{
+			UserProvided: []byte("{}"),
+			Local:        []byte("{}"),
+		},
+		ReplaceToken: &replaceToken,
 	}
-	assert.NoError(t, json.Unmarshal(updateBody, &updateDoc))
-	assert.Equal(t, "my-policy", updateDoc.Doc[dl.FieldPolicyBaseID])
+	verCon := mustBuildConstraints("9.0.0")
+	cfg := &config.Server{}
+	cfg.InitDefaults()
+	c, _ := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
+	bulker := ftesting.NewMockBulk()
+	et, _ := NewEnrollerT(verCon, cfg, bulker, c)
+
+	source := fmt.Sprintf(`{"active":true,"agent":{"id":"1234","version":"9.0.0"},"type":"PERMANENT","policy_id":"my-policy","replace_token":"%s"}`, replaceHash)
+	bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{
+		HitsT: es.HitsT{Hits: []es.HitT{{ID: "1234", Index: dl.FleetAgents, Source: []byte(source)}}},
+	}, nil)
+	bulker.On("APIKeyRead", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&apikey.APIKeyMetadata{ID: "1234"}, nil)
+	bulker.On("APIKeyInvalidate", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	bulker.On("APIKeyCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&apikey.APIKey{ID: "1234", Key: "1234"}, nil)
+	bulker.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+	resp, err := et._enroll(ctx, rb, zlog, req, "my-policy", []string{}, "8.9.0")
+	require.NoError(t, err)
+	assert.Equal(t, "created", resp.Action)
+
+	doc := replaceUpdateDoc(t, bulker)
+	assert.Contains(t, doc, dl.FieldUpgradedAt)
+	assert.NotEmpty(t, doc[dl.FieldUpgradedAt])
+}
+
+func TestEnrollWithAgentIDExistingActive_NoUpgradedAtOnSameVersion(t *testing.T) {
+	ctx := t.Context()
+	rb := &rollback.Rollback{}
+	zlog := zerolog.Logger{}
+	agentID := "1234"
+	replaceToken := "replace_token"
+	var pbkdf2Cfg config.PBKDF2
+	pbkdf2Cfg.InitDefaults()
+	replaceHash, err := hashReplaceToken(replaceToken, pbkdf2Cfg)
+	require.NoError(t, err)
+	req := &EnrollRequest{
+		Type: "PERMANENT",
+		Id:   &agentID,
+		Metadata: EnrollMetadata{
+			UserProvided: []byte("{}"),
+			Local:        []byte("{}"),
+		},
+		ReplaceToken: &replaceToken,
+	}
+	verCon := mustBuildConstraints("8.9.0")
+	cfg := &config.Server{}
+	cfg.InitDefaults()
+	c, _ := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
+	bulker := ftesting.NewMockBulk()
+	et, _ := NewEnrollerT(verCon, cfg, bulker, c)
+
+	source := fmt.Sprintf(`{"active":true,"agent":{"id":"1234","version":"8.9.0"},"type":"PERMANENT","policy_id":"my-policy","replace_token":"%s"}`, replaceHash)
+	bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{
+		HitsT: es.HitsT{Hits: []es.HitT{{ID: "1234", Index: dl.FleetAgents, Source: []byte(source)}}},
+	}, nil)
+	bulker.On("APIKeyRead", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&apikey.APIKeyMetadata{ID: "1234"}, nil)
+	bulker.On("APIKeyInvalidate", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	bulker.On("APIKeyCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&apikey.APIKey{ID: "1234", Key: "1234"}, nil)
+	bulker.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+	resp, err := et._enroll(ctx, rb, zlog, req, "my-policy", []string{}, "8.9.0")
+	require.NoError(t, err)
+	assert.Equal(t, "created", resp.Action)
+
+	doc := replaceUpdateDoc(t, bulker)
+	assert.NotContains(t, doc, dl.FieldUpgradedAt)
 }
 
 func TestEnrollerT_retrieveStaticTokenEnrollmentToken(t *testing.T) {

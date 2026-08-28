@@ -1,0 +1,15 @@
+kind: bug-fix
+
+summary: Stamp upgraded_at on replace-enrollment when the agent version changes
+
+description: |
+  Agentless agents are upgraded by replacing their container with a new image rather
+  than via a Fleet upgrade action, so upgraded_at was never set for them. Kibana's
+  version-specific policy assignment task uses upgraded_at to detect that an agent
+  needs to be moved to a new policy variant; without it, the agent remained pinned
+  to the variant for its previous minor version after a pod roll, causing it to
+  silently receive inputs compiled for the wrong agent version. The replace-enrollment
+  path now stamps upgraded_at whenever the incoming agent version differs from the
+  version recorded in the existing agent document.
+
+component: fleet-server
