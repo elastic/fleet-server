@@ -240,12 +240,15 @@ func startTestServer(t *testing.T, ctx context.Context, policyD model.PolicyData
 		return srv.Run(srvCtx, cfg)
 	})
 
+	tsrv := &tserver{cfg: cfg, g: g, srv: srv, enrollKey: key.Token(), bulker: bulker}
+
 	t.Cleanup(func() {
 		srvCancel()
-		g.Wait() //nolint:errcheck
+		if err := tsrv.waitExit(); err != nil {
+			t.Errorf("fleet server exited with unexpected error: %v", err)
+		}
 	})
 
-	tsrv := &tserver{cfg: cfg, g: g, srv: srv, enrollKey: key.Token(), bulker: bulker}
 	err = tsrv.waitServerUp(srvCtx, testWaitServerUp)
 	if err != nil {
 		return nil, fmt.Errorf("unable to start server: %w", err)
