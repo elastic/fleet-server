@@ -123,6 +123,12 @@ type (
 		// GracefulForceUnenroll configures the three-step escalation applied to agents that
 		// check in with an invalid or disabled API key.
 		GracefulForceUnenroll GracefulForceUnenrollConfig `config:"graceful_force_unenroll"`
+
+		// SyncEnrollmentWrite selects the enrollment write strategy.
+		// When false (default), agent documents are written via the async bulk queue — existing behaviour.
+		// When true, agent documents are written synchronously with refresh=wait_for, making the document
+		// immediately searchable before the enrollment response is sent and eliminating ghost agents.
+		SyncEnrollmentWrite bool `config:"sync_enrollment_write"`
 	}
 
 	// GracefulForceUnenrollConfig controls the graceful-force-unenroll feature.

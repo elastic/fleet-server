@@ -1,0 +1,18 @@
+kind: enhancement
+
+summary: Add synchronous enrollment write strategy to prevent ghost agent documents
+
+description: |
+  Under high enrollment load, a network interruption after fleet-server committed an
+  agent record but before the response reached the agent could cause the agent to retry
+  on a different fleet-server instance. If the record was not yet visible to search, the
+  retry would create a second, duplicate agent document ("ghost agent"). Ghost agents
+  accumulate over time and do not resolve on their own.
+
+  A new feature flag, inputs[].server.feature_flags.sync_enrollment_write (default:
+  false), selects the enrollment write strategy. When set to true, fleet-server writes
+  the agent document synchronously with refresh=wait_for, ensuring it is immediately
+  searchable before the enrollment response is sent. Any retry on any instance finds the
+  existing record rather than creating a new one.
+
+component: fleet-server
