@@ -21,11 +21,9 @@ type bulkT struct {
 	idx          int32      // idx of originating request, used in mulitOp
 	ch           chan respT // response channel, caller is waiting synchronously
 	buf          Buf        // json payload to be sent to elastic
-	next         *bulkT     // pointer to next bulkT, used for fast internal queueing
-	spanLink     apm.SpanLink
-	hasSpanLink  bool
-	dedupeKey    string // enrollment dedup key (enrollment_id); routes to kQueueEnrollSearch when set
-	refreshIndex string // index to refresh before msearch in kQueueEnrollSearch
+	next        *bulkT     // pointer to next bulkT, used for fast internal queueing
+	spanLink    apm.SpanLink
+	hasSpanLink bool
 }
 
 type flagsT int8
@@ -81,8 +79,6 @@ func (blk *bulkT) reset() {
 	blk.next = nil
 	blk.spanLink = apm.SpanLink{}
 	blk.hasSpanLink = false
-	blk.dedupeKey = ""
-	blk.refreshIndex = ""
 }
 
 type respT struct {

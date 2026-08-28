@@ -206,15 +206,6 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 			},
 		},
 		{
-			bulk.ErrEnrollDuplicate,
-			HTTPErrResp{
-				http.StatusTooManyRequests,
-				"EnrollDuplicate",
-				"concurrent enrollment for same id: retry",
-				zerolog.DebugLevel,
-			},
-		},
-		{
 			os.ErrDeadlineExceeded,
 			HTTPErrResp{
 				http.StatusRequestTimeout,

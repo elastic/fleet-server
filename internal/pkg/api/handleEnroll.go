@@ -5,6 +5,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"crypto/hmac"
 	"crypto/pbkdf2"
@@ -23,12 +24,12 @@ import (
 	"go.elastic.co/apm/v2"
 
 	"github.com/elastic/elastic-agent-libs/str"
+	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
-	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/rollback"
@@ -215,13 +216,8 @@ func (et *EnrollerT) _enroll(
 		vSpan, vCtx := apm.StartSpan(ctx, "checkEnrollmentID", "validate")
 		enrollmentID = *req.EnrollmentId
 		var err error
-		agent, err = dl.FindAgent(vCtx, et.bulker, dl.QueryAgentByEnrollmentID, dl.FieldEnrollmentID, enrollmentID,
-			dl.WithBulkOpts(bulk.WithDedupeKey(enrollmentID, dl.FleetAgents)))
+		agent, err = dl.FindAgent(vCtx, et.bulker, dl.QueryAgentByEnrollmentID, dl.FieldEnrollmentID, enrollmentID)
 		if err != nil {
-			if errors.Is(err, bulk.ErrEnrollDuplicate) {
-				vSpan.End()
-				return nil, err
-			}
 			zlog.Debug().Err(err).
 				Str("EnrollmentId", enrollmentID).
 				Msg("Agent with EnrollmentId not found")
@@ -660,13 +656,29 @@ func createFleetAgent(ctx context.Context, bulker bulk.Bulk, id string, agent mo
 		return err
 	}
 
-	_, err = bulker.Create(ctx, dl.FleetAgents, id, data, bulk.WithRefresh())
-	// A 409 on op_type:create is a definitive signal the document already exists; treat as success.
-	if errors.Is(err, es.ErrElasticVersionConflict) {
+	// Write synchronously with refresh=wait_for so the document is immediately
+	// visible to any retry pod's FindAgent search, preventing ghost agents.
+	req := esapi.IndexRequest{
+		Index:      dl.FleetAgents,
+		DocumentID: id,
+		Body:       bytes.NewReader(data),
+		OpType:     "create",
+		Refresh:    "wait_for",
+	}
+	res, err := req.Do(ctx, bulker.Client())
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	if res.StatusCode == http.StatusConflict {
+		// 409 from op_type:create means the document already exists; treat as success.
 		zerolog.Ctx(ctx).Debug().Str("agent_id", id).Msg("agent document already exists on enrollment create, treating as success")
 		return nil
 	}
-	return err
+	if res.IsError() {
+		return fmt.Errorf("createFleetAgent: %s", res.String())
+	}
+	return nil
 }
 
 func generateAccessAPIKey(ctx context.Context, bulk bulk.Bulk, agentID string) (*apikey.APIKey, error) {
