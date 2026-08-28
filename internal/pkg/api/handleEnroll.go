@@ -30,6 +30,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/rollback"
@@ -419,7 +420,7 @@ func (et *EnrollerT) _enroll(
 			ReplaceToken: replaceHash,
 		}
 
-		err = createFleetAgent(ctx, et.bulker, agentID, agent)
+		err = createFleetAgent(ctx, et.bulker, agentID, agent, et.cfg.Features.SyncEnrollmentWrite)
 		if err != nil {
 			return nil, err
 		}
@@ -647,7 +648,7 @@ func updateFleetAgent(ctx context.Context, bulker bulk.Bulk, id string, doc bulk
 	return bulker.Update(ctx, dl.FleetAgents, id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3))
 }
 
-func createFleetAgent(ctx context.Context, bulker bulk.Bulk, id string, agent model.Agent) error {
+func createFleetAgent(ctx context.Context, bulker bulk.Bulk, id string, agent model.Agent, syncWrite bool) error {
 	span, ctx := apm.StartSpan(ctx, "createAgent", "create")
 	defer span.End()
 
@@ -656,7 +657,18 @@ func createFleetAgent(ctx context.Context, bulker bulk.Bulk, id string, agent mo
 		return err
 	}
 
-	// Write synchronously with refresh=wait_for so the document is immediately
+	if !syncWrite {
+		// Async path: write via bulk queue. May produce ghost agents when the write
+		// is still buffered and a retry lands on a different pod.
+		_, err = bulker.Create(ctx, dl.FleetAgents, id, data, bulk.WithRefresh())
+		if errors.Is(err, es.ErrElasticVersionConflict) {
+			zerolog.Ctx(ctx).Debug().Str("agent_id", id).Msg("agent document already exists on enrollment create, treating as success")
+			return nil
+		}
+		return err
+	}
+
+	// Sync path: write directly with refresh=wait_for so the document is immediately
 	// visible to any retry pod's FindAgent search, preventing ghost agents.
 	req := esapi.IndexRequest{
 		Index:      dl.FleetAgents,
@@ -671,7 +683,6 @@ func createFleetAgent(ctx context.Context, bulker bulk.Bulk, id string, agent mo
 	}
 	defer res.Body.Close()
 	if res.StatusCode == http.StatusConflict {
-		// 409 from op_type:create means the document already exists; treat as success.
 		zerolog.Ctx(ctx).Debug().Str("agent_id", id).Msg("agent document already exists on enrollment create, treating as success")
 		return nil
 	}
