@@ -104,8 +104,6 @@ type (
 		TokenKey string `config:"token_key"`
 		PolicyID string `config:"policy_id"`
 	}
-<<<<<<< HEAD
-=======
 
 	// FeatureFlags contains toggles to enable new behaviour, or restore old behaviour.
 	FeatureFlags struct {
@@ -141,7 +139,6 @@ type (
 		// the default.
 		MaxBytes int64 `config:"max_bytes"`
 	}
->>>>>>> d6324c7 (feat: add synchronous enrollment write strategy to prevent ghost agents (#7712))
 )
 
 // InitDefaults initializes the defaults for the configuration.
