@@ -5,6 +5,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"crypto/hmac"
 	"crypto/pbkdf2"
@@ -33,6 +34,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/rollback"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
+	"github.com/elastic/go-elasticsearch/v8/esapi"
 
 	"github.com/gofrs/uuid"
 	"github.com/hashicorp/go-version"
@@ -421,7 +423,7 @@ func (et *EnrollerT) _enroll(
 			ReplaceToken: replaceHash,
 		}
 
-		err = createFleetAgent(ctx, et.bulker, agentID, agent)
+		err = createFleetAgent(ctx, et.bulker, agentID, agent, et.cfg.Features.SyncEnrollmentWrite)
 		if err != nil {
 			return nil, err
 		}
@@ -649,13 +651,38 @@ func updateFleetAgent(ctx context.Context, bulker bulk.Bulk, id string, doc bulk
 	return bulker.Update(ctx, dl.FleetAgents, id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3))
 }
 
-func createFleetAgent(ctx context.Context, bulker bulk.Bulk, id string, agent model.Agent) error {
+func createFleetAgent(ctx context.Context, bulker bulk.Bulk, id string, agent model.Agent, syncWrite bool) error {
 	span, ctx := apm.StartSpan(ctx, "createAgent", "create")
 	defer span.End()
 
 	data, err := json.Marshal(agent)
 	if err != nil {
 		return err
+	}
+
+	if syncWrite {
+		// Sync path: write directly with refresh=wait_for so the document is immediately
+		// visible to any retry pod's FindAgent search, preventing ghost agents.
+		req := esapi.IndexRequest{
+			Index:      dl.FleetAgents,
+			DocumentID: id,
+			Body:       bytes.NewReader(data),
+			OpType:     "create",
+			Refresh:    "wait_for",
+		}
+		res, err := req.Do(ctx, bulker.Client())
+		if err != nil {
+			return err
+		}
+		defer res.Body.Close()
+		if res.StatusCode == http.StatusConflict {
+			zerolog.Ctx(ctx).Debug().Str("agent_id", id).Msg("agent document already exists on enrollment create, treating as success")
+			return nil
+		}
+		if res.IsError() {
+			return fmt.Errorf("createFleetAgent: %s", res.String())
+		}
+		return nil
 	}
 
 	_, err = bulker.Create(ctx, dl.FleetAgents, id, data, bulk.WithRefresh())
