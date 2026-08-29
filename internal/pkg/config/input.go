@@ -90,6 +90,7 @@ type (
 		StaticPolicyTokens StaticPolicyTokens      `config:"static_policy_tokens"`
 		PGP                PGP                     `config:"pgp"`
 		PDKDF2             PBKDF2                  `config:"pdkdf2"`
+		Features           FeatureFlags            `config:"feature_flags"`
 	}
 
 	StaticPolicyTokens struct {
