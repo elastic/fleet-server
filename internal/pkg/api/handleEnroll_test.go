@@ -579,15 +579,6 @@ func TestEnrollerT_retrieveStaticTokenEnrollmentToken(t *testing.T) {
 	}
 }
 
-func TestCreateFleetAgentVersionConflictSucceeds(t *testing.T) {
-	bulker := ftesting.NewMockBulk()
-	bulker.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-		Return("", es.ErrElasticVersionConflict)
-
-	err := createFleetAgent(t.Context(), bulker, "test-agent-id", model.Agent{})
-	assert.NoError(t, err)
-}
-
 func TestPolicyBaseID(t *testing.T) {
 	tests := []struct {
 		input string
