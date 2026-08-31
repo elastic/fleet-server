@@ -399,7 +399,7 @@ func (et *EnrollerT) _enroll(
 			dl.FieldUnenrolledReason:      nil,
 			dl.FieldUpdatedAt:             now.UTC().Format(time.RFC3339),
 		}
-		// stamp upgraded_at so Kibana knows it should evaluate which version-specific policy it should receive
+		// stamp upgraded_at so Kibana's version-specific policy assignment task will re-evaluate this agent
 		if prevVer != "" && prevVer != ver {
 			doc[dl.FieldUpgradedAt] = now.UTC().Format(time.RFC3339)
 		}
