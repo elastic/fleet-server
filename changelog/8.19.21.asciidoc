@@ -37,6 +37,6 @@ Review important information about the  8.19.21 release.
 
 
 * Reject stale policy revisions before secret resolution in the policy monitor. https://github.com/elastic/fleet-server/pull/7572[#7572] https://github.com/elastic/fleet-server/issues/7570[#7570]
-* Read cgroup memory limit for cache sizing when GOMEMLIMIT is not set. https://github.com/elastic/fleet-server/pull/7573[#7573]
+* Read `cgroup` memory limit for cache sizing when `GOMEMLIMIT` is not set. https://github.com/elastic/fleet-server/pull/7573[#7573]
 
 // end 8.19.21 relnotes
