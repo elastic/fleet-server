@@ -654,7 +654,6 @@ func TestCreateFleetAgentSyncWriteErrorSurfaces(t *testing.T) {
 	require.Error(t, err)
 }
 
-
 func TestValidateEnrollRequest(t *testing.T) {
 	t.Run("invalid json", func(t *testing.T) {
 		req, err := validateRequest(context.Background(), strings.NewReader("not a json"))
