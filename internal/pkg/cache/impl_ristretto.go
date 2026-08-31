@@ -13,7 +13,7 @@ import (
 )
 
 func newCache(cfg config.Cache) (Cacher, error) {
-	rcfg := &ristretto.Config{
+	rcfg := &ristretto.Config[string, any]{
 		NumCounters: cfg.NumCounters,
 		MaxCost:     cfg.MaxCost,
 		BufferItems: 64,
