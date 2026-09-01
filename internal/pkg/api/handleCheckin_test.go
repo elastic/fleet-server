@@ -1873,7 +1873,10 @@ func TestProcessPolicySecretPathsConcurrentDispatch(t *testing.T) {
 		"outputs": {
 			"remote": {
 				"type": "remote_elasticsearch",
-				"secrets": {"service_token": {"id": "ST_ID"}}
+				"secrets": {
+					"service_token": {"id": "ST_ID"},
+					"ssl": {"key": {"id": "SSL_KEY_ID"}}
+				}
 			}
 		},
 		"output_permissions": {
@@ -1941,7 +1944,7 @@ func TestProcessPolicySecretPathsConcurrentDispatch(t *testing.T) {
 
 	for a := range agents {
 		require.NoError(t, errs[a])
-		assert.NotContains(t, secretPaths[a], "", "agent %d received a corrupt empty secret path", a)
+		assert.Equal(t, []string{"outputs.remote.ssl.key"}, secretPaths[a], "agent %d received incorrect secret paths", a)
 	}
 	assert.Equal(t, baseline, pp.SecretKeys, "shared ParsedPolicy.SecretKeys was mutated")
 }
