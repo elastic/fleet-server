@@ -400,7 +400,7 @@ func (et *EnrollerT) _enroll(
 			dl.FieldUpdatedAt:             now.UTC().Format(time.RFC3339),
 		}
 		// stamp upgraded_at so Kibana's version-specific policy assignment task will re-evaluate this agent
-		if req.ReplaceToken != nil && prevVer != "" && prevVer != ver {
+		if req.ReplaceToken != nil && *req.ReplaceToken != "" && prevVer != "" && prevVer != ver {
 			doc[dl.FieldUpgradedAt] = now.UTC().Format(time.RFC3339)
 		}
 		err = updateFleetAgent(ctx, et.bulker, agentID, doc)
