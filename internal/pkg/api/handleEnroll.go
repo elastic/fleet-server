@@ -663,28 +663,7 @@ func createFleetAgent(ctx context.Context, bulker bulk.Bulk, id string, agent mo
 	}
 
 	if syncWrite {
-		// Sync path: write directly with refresh=wait_for so the document is immediately
-		// visible to any retry pod's FindAgent search, preventing ghost agents.
-		req := esapi.IndexRequest{
-			Index:      dl.FleetAgents,
-			DocumentID: id,
-			Body:       bytes.NewReader(data),
-			OpType:     "create",
-			Refresh:    "wait_for",
-		}
-		res, err := req.Do(ctx, bulker.Client())
-		if err != nil {
-			return err
-		}
-		defer res.Body.Close()
-		if res.StatusCode == http.StatusConflict {
-			zerolog.Ctx(ctx).Debug().Str("agent_id", id).Msg("agent document already exists on enrollment create, treating as success")
-			return nil
-		}
-		if res.IsError() {
-			return fmt.Errorf("createFleetAgent: %s", res.String())
-		}
-		return nil
+		return createFleetAgentSync(ctx, bulker, id, data)
 	}
 
 	_, err = bulker.Create(ctx, dl.FleetAgents, id, data, bulk.WithRefresh())
@@ -694,6 +673,55 @@ func createFleetAgent(ctx context.Context, bulker bulk.Bulk, id string, agent mo
 		return nil
 	}
 	return err
+}
+
+// createFleetAgentSync writes the agent document using op_type=create + refresh=wait_for.
+// It retries once on failure because in stateless ES the primary shard can commit the
+// write and upload it to blob storage before the search-shard refresh notification
+// times out (e.g. when the search shard is bootstrapping onto a new node after cluster
+// scale-out). In that window the client receives an error even though the document IS
+// durable; a retry with op_type=create on the same document ID gets 409 Conflict, which
+// this function treats as success — preventing the caller from creating a second
+// document for the same agent (a ghost).
+func createFleetAgentSync(ctx context.Context, bulker bulk.Bulk, id string, data []byte) error {
+	zlog := zerolog.Ctx(ctx)
+	var lastErr error
+	for attempt := 0; attempt < 2; attempt++ {
+		if attempt > 0 {
+			// Before retrying, confirm the outer request context is still alive.
+			// If it has expired there is no point issuing another ES request.
+			if ctx.Err() != nil {
+				return lastErr
+			}
+			zlog.Warn().Str("agent_id", id).Err(lastErr).Msg("retrying enrollment write after transient failure")
+		}
+
+		req := esapi.IndexRequest{
+			Index:      dl.FleetAgents,
+			DocumentID: id,
+			Body:       bytes.NewReader(data),
+			OpType:     "create",
+			Refresh:    "wait_for",
+		}
+		res, doErr := req.Do(ctx, bulker.Client())
+		if doErr != nil {
+			lastErr = doErr
+			continue
+		}
+		if res.StatusCode == http.StatusConflict {
+			_ = res.Body.Close()
+			zlog.Debug().Str("agent_id", id).Msg("agent document already exists on enrollment create, treating as success")
+			return nil
+		}
+		if res.IsError() {
+			lastErr = fmt.Errorf("createFleetAgent: %s", res.String())
+			_ = res.Body.Close()
+			continue
+		}
+		_ = res.Body.Close()
+		return nil
+	}
+	return lastErr
 }
 
 func generateAccessAPIKey(ctx context.Context, bulk bulk.Bulk, agentID string) (*apikey.APIKey, error) {

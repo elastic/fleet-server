@@ -1,0 +1,19 @@
+kind: bug-fix
+
+summary: Retry enrollment write on transient refresh-wait failure to prevent ghost agents
+
+description: |
+  In stateless Elasticsearch, a synchronous enrollment write (op_type=create +
+  refresh=wait_for) can commit the agent document to blob storage and then time out
+  while waiting for a search shard to acknowledge the refresh — for example when the
+  search shard is bootstrapping onto a new node after cluster scale-out. Fleet-server
+  received an error and returned 500, causing the agent to retry enrollment and create
+  a second document for the same agent. The first, now-orphaned document became a
+  "ghost" agent visible in Fleet.
+
+  fleet-server now retries the same op_type=create write once before surfacing the
+  error. If the original write committed, the retry gets 409 Conflict, which is treated
+  as success — the caller receives a valid enrollment response and no ghost is created.
+  The retry is skipped when the outer HTTP request context has expired.
+
+component: fleet-server

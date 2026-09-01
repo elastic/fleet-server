@@ -654,6 +654,100 @@ func TestCreateFleetAgentSyncWriteErrorSurfaces(t *testing.T) {
 	require.Error(t, err)
 }
 
+// TestCreateFleetAgentSyncWriteRetry covers the ghost-agent prevention retry path:
+// when the primary shard commits the enrollment write but the search-shard
+// refresh notification times out (a known stateless-ES failure mode during shard
+// bootstrapping), fleet-server retries the same op_type=create. If ES returns 409
+// Conflict the original write is confirmed durable and we treat it as success.
+func TestCreateFleetAgentSyncWriteRetry(t *testing.T) {
+	syncResponse := func(code int) *http.Response {
+		return &http.Response{
+			StatusCode: code,
+			Body:       io.NopCloser(strings.NewReader(`{}`)),
+			Header:     http.Header{"X-Elastic-Product": []string{"Elasticsearch"}},
+		}
+	}
+	// DisableRetry prevents the go-elasticsearch transport from adding its own
+	// retry loop on top of the retry loop we're testing here.
+	noRetryClient := func(t *testing.T, mt *MockTransport) *elasticsearch.Client {
+		t.Helper()
+		cli, err := elasticsearch.NewClient(elasticsearch.Config{Transport: mt, DisableRetry: true})
+		require.NoError(t, err)
+		return cli
+	}
+
+	t.Run("transient error then 409 succeeds", func(t *testing.T) {
+		attempt := 0
+		mt := &MockTransport{}
+		mt.RoundTripFn = func(req *http.Request) (*http.Response, error) {
+			assertSyncEnrollParams(t, req)
+			attempt++
+			if attempt == 1 {
+				return nil, errors.New("context deadline exceeded")
+			}
+			return syncResponse(http.StatusConflict), nil
+		}
+		bulker := ftesting.NewMockBulk()
+		bulker.On("Client").Return(noRetryClient(t, mt))
+
+		err := createFleetAgent(t.Context(), bulker, "test-agent-id", model.Agent{}, true)
+		require.NoError(t, err)
+		require.Equal(t, 2, attempt)
+	})
+
+	t.Run("transient error then 201 succeeds", func(t *testing.T) {
+		attempt := 0
+		mt := &MockTransport{}
+		mt.RoundTripFn = func(req *http.Request) (*http.Response, error) {
+			assertSyncEnrollParams(t, req)
+			attempt++
+			if attempt == 1 {
+				return nil, errors.New("context deadline exceeded")
+			}
+			return syncResponse(http.StatusCreated), nil
+		}
+		bulker := ftesting.NewMockBulk()
+		bulker.On("Client").Return(noRetryClient(t, mt))
+
+		err := createFleetAgent(t.Context(), bulker, "test-agent-id", model.Agent{}, true)
+		require.NoError(t, err)
+		require.Equal(t, 2, attempt)
+	})
+
+	t.Run("persistent error on both attempts surfaces error", func(t *testing.T) {
+		attempt := 0
+		mt := &MockTransport{}
+		mt.RoundTripFn = func(req *http.Request) (*http.Response, error) {
+			assertSyncEnrollParams(t, req)
+			attempt++
+			return nil, errors.New("persistent error")
+		}
+		bulker := ftesting.NewMockBulk()
+		bulker.On("Client").Return(noRetryClient(t, mt))
+
+		err := createFleetAgent(t.Context(), bulker, "test-agent-id", model.Agent{}, true)
+		require.Error(t, err)
+		require.Equal(t, 2, attempt)
+	})
+
+	t.Run("context cancelled before retry aborts with last error", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(t.Context())
+		attempt := 0
+		mt := &MockTransport{}
+		mt.RoundTripFn = func(req *http.Request) (*http.Response, error) {
+			attempt++
+			cancel() // cancel context so the retry guard sees an expired ctx
+			return nil, errors.New("transient error")
+		}
+		bulker := ftesting.NewMockBulk()
+		bulker.On("Client").Return(noRetryClient(t, mt))
+
+		err := createFleetAgent(ctx, bulker, "test-agent-id", model.Agent{}, true)
+		require.Error(t, err)
+		require.Equal(t, 1, attempt) // only one attempt; retry aborted due to cancelled ctx
+	})
+}
+
 func TestValidateEnrollRequest(t *testing.T) {
 	t.Run("invalid json", func(t *testing.T) {
 		req, err := validateRequest(context.Background(), strings.NewReader("not a json"))
