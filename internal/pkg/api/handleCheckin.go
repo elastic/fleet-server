@@ -1068,6 +1068,7 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 	}
 
 	data := model.ClonePolicyData(pp.Policy.Data)
+	secretKeys := slices.Clone(pp.SecretKeys)
 	for name, policyOutput := range data.Outputs {
 		// NOTE: Not sure if output secret keys collected here include new entries, but they are collected for completeness
 		ks, err := secret.ProcessOutputSecret(policyOutput, secretValues)
@@ -1075,7 +1076,7 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 			return nil, fmt.Errorf("failed to process output secret for output %q: %w", name, err)
 		}
 		for _, key := range ks {
-			pp.SecretKeys = append(pp.SecretKeys, "outputs."+name+"."+key)
+			secretKeys = append(secretKeys, "outputs."+name+"."+key)
 		}
 	}
 	// Iterate through the policy outputs and prepare them
@@ -1095,7 +1096,7 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 		}
 		if _, ok := data.Outputs[name][policy.FieldOutputServiceToken]; !ok {
 			prefixed := "outputs." + name + "." + policy.FieldOutputServiceToken
-			pp.SecretKeys = slices.DeleteFunc(pp.SecretKeys, func(key string) bool {
+			secretKeys = slices.DeleteFunc(secretKeys, func(key string) bool {
 				return key == prefixed
 			})
 		}
@@ -1119,8 +1120,8 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 		return nil, err
 	}
 	// remove duplicates from secretkeys
-	slices.Sort(pp.SecretKeys)
-	keys := slices.Compact(pp.SecretKeys)
+	slices.Sort(secretKeys)
+	keys := slices.Compact(secretKeys)
 	d.SecretPaths = keys
 	ad := Action_Data{}
 	err = ad.FromActionPolicyChange(ActionPolicyChange{d})
