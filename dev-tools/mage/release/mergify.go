@@ -27,8 +27,8 @@ func UpdateMergify(version string) error {
 	}
 
 	parts := strings.Split(version, ".")
-	if len(parts) < 2 {
-		return fmt.Errorf("invalid version format: %s (expected X.Y.Z)", version)
+	if len(parts) != 2 && len(parts) != 3 {
+		return fmt.Errorf("invalid version format: %s (expected X.Y or X.Y.Z)", version)
 	}
 	branchVersion := fmt.Sprintf("%s.%s", parts[0], parts[1])
 
