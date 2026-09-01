@@ -854,12 +854,24 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 	}
 
 	data := model.ClonePolicyData(pp.Policy.Data)
+<<<<<<< HEAD
 	for policyName, policyOutput := range data.Outputs {
+=======
+	secretKeys := slices.Clone(pp.SecretKeys)
+	for name, policyOutput := range data.Outputs {
+>>>>>>> d012fac (Fix processPolicy using shared secret keys between agents (#7740))
 		// NOTE: Not sure if output secret keys collected here include new entries, but they are collected for completeness
 		ks, err := policy.ProcessOutputSecret(ctx, policyOutput, bulker) // makes a bulk request to get secret values
 		if err != nil {
+<<<<<<< HEAD
 			return nil, fmt.Errorf("failed to process output secrets %q: %w",
 				policyName, err)
+=======
+			return nil, fmt.Errorf("failed to process output secret for output %q: %w", name, err)
+		}
+		for _, key := range ks {
+			secretKeys = append(secretKeys, "outputs."+name+"."+key)
+>>>>>>> d012fac (Fix processPolicy using shared secret keys between agents (#7740))
 		}
 		pp.SecretKeys = append(pp.SecretKeys, ks...)
 	}
@@ -870,6 +882,29 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 				policyOutput.Name, err)
 		}
 	}
+<<<<<<< HEAD
+=======
+
+	// Do not advertise remote ES service_token in secret_paths once Prepare(...) has
+	// deleted it from the policy sent to agents. Use pp.Outputs for type because
+	// Prepare rewrites data.Outputs type to elasticsearch.
+	for name, out := range pp.Outputs {
+		if out.Type != policy.OutputTypeRemoteElasticsearch {
+			continue
+		}
+		if _, ok := data.Outputs[name][policy.FieldOutputServiceToken]; !ok {
+			prefixed := "outputs." + name + "." + policy.FieldOutputServiceToken
+			secretKeys = slices.DeleteFunc(secretKeys, func(key string) bool {
+				return key == prefixed
+			})
+		}
+	}
+	// Prepare OTel exporters from the information in outputs.
+	if err := prepareOTelExporters(data.Outputs, data.Exporters); err != nil {
+		return nil, fmt.Errorf("failed to prepare OTel exporters: %w", err)
+	}
+
+>>>>>>> d012fac (Fix processPolicy using shared secret keys between agents (#7740))
 	// Add replace inputs with agent prepared version.
 	data.Inputs = pp.Inputs
 
@@ -884,9 +919,15 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 		return nil, err
 	}
 	// remove duplicates from secretkeys
+<<<<<<< HEAD
 	slices.Sort(pp.SecretKeys)
 	keys := slices.Compact(pp.SecretKeys)
 	d.SecretPaths = &keys
+=======
+	slices.Sort(secretKeys)
+	keys := slices.Compact(secretKeys)
+	d.SecretPaths = keys
+>>>>>>> d012fac (Fix processPolicy using shared secret keys between agents (#7740))
 	ad := Action_Data{}
 	err = ad.FromActionPolicyChange(ActionPolicyChange{d})
 	if err != nil {

@@ -16,7 +16,9 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -1160,3 +1162,411 @@ func TestValidateCheckinRequest(t *testing.T) {
 		})
 	}
 }
+<<<<<<< HEAD
+=======
+
+func TestProcessPolicyDetails(t *testing.T) {
+	policyID := "policy-id"
+	revIDX2 := int64(2)
+	tests := []struct {
+		name             string
+		agent            *model.Agent
+		req              *CheckinRequest
+		getPolicyMonitor func() *mockPolicyMonitor
+		revIDX           int64
+		returnsOpts      bool
+		err              error
+	}{{
+		name: "request has no policy details",
+		agent: &model.Agent{
+			PolicyRevisionIdx: 1,
+		},
+		req: &CheckinRequest{},
+		getPolicyMonitor: func() *mockPolicyMonitor {
+			return &mockPolicyMonitor{}
+		},
+		revIDX:      1,
+		returnsOpts: false,
+		err:         nil,
+	}, {
+		name: "policy reassign detected",
+		agent: &model.Agent{
+			Agent: &model.AgentMetadata{
+				ID: "agent-id",
+			},
+			PolicyID:          "new-policy-id",
+			AgentPolicyID:     policyID,
+			PolicyRevisionIdx: 2,
+		},
+		req: &CheckinRequest{
+			AgentPolicyId:     &policyID,
+			PolicyRevisionIdx: &revIDX2,
+		},
+		getPolicyMonitor: func() *mockPolicyMonitor {
+			return &mockPolicyMonitor{}
+		},
+		revIDX:      0,
+		returnsOpts: false,
+		err:         nil,
+	}, {
+		name: "revision updated",
+		agent: &model.Agent{
+			Agent: &model.AgentMetadata{
+				ID: "agent-id",
+			},
+			PolicyID:          policyID,
+			AgentPolicyID:     policyID,
+			PolicyRevisionIdx: 1,
+		},
+		req: &CheckinRequest{
+			AgentPolicyId:     &policyID,
+			PolicyRevisionIdx: &revIDX2,
+		},
+		getPolicyMonitor: func() *mockPolicyMonitor {
+			pm := &mockPolicyMonitor{}
+			pm.On("LatestRev", mock.Anything, policyID).Return(int64(2)).Once()
+			return pm
+		},
+		revIDX:      2,
+		returnsOpts: true,
+		err:         nil,
+	}, {
+		name: "checkin revision is greater than the policy's latest revision",
+		agent: &model.Agent{
+			Agent: &model.AgentMetadata{
+				ID: "agent-id",
+			},
+			PolicyID:          policyID,
+			AgentPolicyID:     policyID,
+			PolicyRevisionIdx: 1,
+		},
+		req: &CheckinRequest{
+			AgentPolicyId:     &policyID,
+			PolicyRevisionIdx: &revIDX2,
+		},
+		getPolicyMonitor: func() *mockPolicyMonitor {
+			pm := &mockPolicyMonitor{}
+			pm.On("LatestRev", mock.Anything, policyID).Return(int64(1)).Once()
+			return pm
+		},
+		revIDX:      0,
+		returnsOpts: true,
+		err:         nil,
+	}, {
+		name: "agent_policy_id has changed",
+		agent: &model.Agent{
+			Agent: &model.AgentMetadata{
+				ID: "agent-id",
+			},
+			PolicyID:          policyID,
+			AgentPolicyID:     "old-policy-id",
+			PolicyRevisionIdx: 1,
+		},
+		req: &CheckinRequest{
+			AgentPolicyId:     &policyID,
+			PolicyRevisionIdx: &revIDX2,
+		},
+		getPolicyMonitor: func() *mockPolicyMonitor {
+			pm := &mockPolicyMonitor{}
+			pm.On("LatestRev", mock.Anything, policyID).Return(int64(2)).Once()
+			return pm
+		},
+		revIDX:      2,
+		returnsOpts: true,
+		err:         nil,
+	}, {
+		name: "agent does not have agent_policy_id present",
+		agent: &model.Agent{
+			Agent: &model.AgentMetadata{
+				ID: "agent-id",
+			},
+			PolicyID:          policyID,
+			PolicyRevisionIdx: 2,
+		},
+		req: &CheckinRequest{
+			AgentPolicyId:     &policyID,
+			PolicyRevisionIdx: &revIDX2,
+		},
+		getPolicyMonitor: func() *mockPolicyMonitor {
+			pm := &mockPolicyMonitor{}
+			pm.On("LatestRev", mock.Anything, policyID).Return(int64(2)).Once()
+			return pm
+		},
+		revIDX:      2,
+		returnsOpts: true,
+		err:         nil,
+	}, {
+		name: "details present with no changes from agent doc",
+		agent: &model.Agent{
+			Agent: &model.AgentMetadata{
+				ID: "agent-id",
+			},
+			AgentPolicyID:     policyID,
+			PolicyID:          policyID,
+			PolicyRevisionIdx: revIDX2,
+		},
+		req: &CheckinRequest{
+			AgentPolicyId:     &policyID,
+			PolicyRevisionIdx: &revIDX2,
+		},
+		getPolicyMonitor: func() *mockPolicyMonitor {
+			pm := &mockPolicyMonitor{}
+			pm.On("LatestRev", mock.Anything, policyID).Return(int64(2)).Once()
+			return pm
+		},
+		revIDX:      2,
+		returnsOpts: false,
+		err:         nil,
+	}}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			logger := testlog.SetLogger(t)
+			pm := tc.getPolicyMonitor()
+			checkin := &CheckinT{
+				cfg:    &config.Server{},
+				bulker: ftesting.NewMockBulk(),
+				pm:     pm,
+			}
+
+			revIDX, opts, err := checkin.processPolicyDetails(t.Context(), logger, tc.agent, tc.req)
+			assert.Equal(t, tc.revIDX, revIDX)
+			if tc.returnsOpts {
+				assert.NotEmpty(t, opts)
+			} else {
+				assert.Empty(t, opts)
+			}
+			if tc.err != nil {
+				assert.ErrorIs(t, tc.err, err)
+			} else {
+				assert.NoError(t, err)
+			}
+			pm.AssertExpectations(t)
+		})
+	}
+
+	t.Run("IgnoreCheckinPolicyID flag is set", func(t *testing.T) {
+		logger := testlog.SetLogger(t)
+		checkin := &CheckinT{
+			cfg: &config.Server{
+				Features: config.FeatureFlags{
+					IgnoreCheckinPolicyID: true,
+				},
+			},
+		}
+		revIDX, opts, err := checkin.processPolicyDetails(t.Context(), logger,
+			&model.Agent{
+				PolicyID:          policyID,
+				PolicyRevisionIdx: 1,
+			},
+			&CheckinRequest{
+				AgentPolicyId:     &policyID,
+				PolicyRevisionIdx: &revIDX2,
+			},
+		)
+		assert.NoError(t, err)
+		assert.Equal(t, int64(1), revIDX)
+		assert.Empty(t, opts)
+	})
+}
+
+// TestProcessPolicyRemoteESServiceTokenSecretPaths ensures secret_path does not
+// contain service_token for remote ES output as they are stripped before sending the policy to the agents
+
+func TestProcessPolicyRemoteESServiceTokenSecretPaths(t *testing.T) {
+	logger := testlog.SetLogger(t)
+
+	const policyPayload = `{
+  "id": "remote-with-secrets",
+  "revision": 1,
+  "outputs": {
+    "default": {
+      "type": "elasticsearch",
+      "hosts": ["https://local.es.example:443"]
+    },
+    "OUTPUT_ID": {
+      "type": "remote_elasticsearch",
+      "hosts": ["https://remote.es.example:443"],
+      "service_token": null,
+      "secrets": {
+        "service_token": {"id": "SERVICE_TOKEN_ID"},
+        "ssl": {"key": {"id": "SSL_KEY_ID"}}
+      }
+    }
+  },
+  "output_permissions": {
+    "default": {
+      "_fallback": {
+        "cluster": ["monitor"],
+        "indices": [{"names": ["logs-*", "metrics-*"], "privileges": ["auto_configure", "create_doc"]}]
+      }
+    },
+    "OUTPUT_ID": {
+      "_fallback": {
+        "cluster": ["monitor"],
+        "indices": [{"names": ["logs-*", "metrics-*"], "privileges": ["auto_configure", "create_doc"]}]
+      }
+    }
+  },
+  "inputs": [],
+  "secret_references": [
+    {"id": "SERVICE_TOKEN_ID"},
+    {"id": "SSL_KEY_ID"}
+  ],
+  "agent": {
+    "monitoring": {
+      "enabled": true,
+      "use_output": "OUTPUT_ID",
+      "logs": true,
+      "metrics": true
+    }
+  },
+  "fleet": {
+    "hosts": ["http://localhost:8220"]
+  }
+}`
+
+	var d model.PolicyData
+	err := json.Unmarshal([]byte(policyPayload), &d)
+	require.NoError(t, err)
+
+	bulker := ftesting.NewMockBulk()
+	pp, err := policy.NewParsedPolicy(t.Context(), bulker, model.Policy{
+		PolicyID:    "policy1",
+		RevisionIdx: 1,
+		Data:        &d,
+	})
+	require.NoError(t, err)
+
+	defaultOut := pp.Outputs["default"]
+	remoteOut := pp.Outputs["OUTPUT_ID"]
+	require.NotNil(t, defaultOut.Role)
+	require.NotNil(t, remoteOut.Role)
+
+	outputBulker := ftesting.NewMockBulk()
+	bulker.On("CreateAndGetBulker", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(outputBulker, false, nil)
+
+	defaultKey := bulk.APIKey{ID: "default-id", Key: "default-key"}
+	remoteKey := bulk.APIKey{ID: "remote-id", Key: "remote-key"}
+	agent := &model.Agent{
+		ESDocument: model.ESDocument{Id: "agent1"},
+		Outputs: map[string]*model.PolicyOutput{
+			"default": {
+				APIKey:          defaultKey.Agent(),
+				APIKeyID:        defaultKey.ID,
+				PermissionsHash: defaultOut.Role.Sha2,
+				Type:            policy.OutputTypeElasticsearch,
+			},
+			"OUTPUT_ID": {
+				APIKey:          remoteKey.Agent(),
+				APIKeyID:        remoteKey.ID,
+				PermissionsHash: remoteOut.Role.Sha2,
+				Type:            policy.OutputTypeRemoteElasticsearch,
+			},
+		},
+	}
+
+	action, err := processPolicy(t.Context(), logger, bulker, agent, pp, nil)
+	require.NoError(t, err)
+
+	pc, err := action.Data.AsActionPolicyChange()
+	require.NoError(t, err)
+
+	assert.NotContains(t, pc.Policy.SecretPaths, "outputs.OUTPUT_ID.service_token")
+	assert.Contains(t, pc.Policy.SecretPaths, "outputs.OUTPUT_ID.ssl.key")
+
+	remotePolicy, ok := pc.Policy.Outputs["OUTPUT_ID"].(map[string]any)
+	require.True(t, ok)
+	_, hasServiceToken := remotePolicy["service_token"]
+	assert.False(t, hasServiceToken, "service_token should be deleted by Prepare before delivery to agents")
+	assert.Equal(t, policy.OutputTypeElasticsearch, remotePolicy["type"])
+}
+
+// TestProcessPolicySecretPathsConcurrentDispatch ensures processPolicy does not
+// mutate the shared ParsedPolicy.SecretKeys when concurrent checkin goroutines
+// process the same policy fan-out.
+// Regression test for https://github.com/elastic/fleet-server/issues/7739
+func TestProcessPolicySecretPathsConcurrentDispatch(t *testing.T) {
+	logger := testlog.SetLogger(t)
+
+	const payload = `{
+		"outputs": {
+			"remote": {
+				"type": "remote_elasticsearch",
+				"secrets": {
+					"service_token": {"id": "ST_ID"},
+					"ssl": {"key": {"id": "SSL_KEY_ID"}}
+				}
+			}
+		},
+		"output_permissions": {
+			"remote": {
+				"_fallback": {
+					"indices": [{"names": ["logs-*"], "privileges": ["auto_configure", "create_doc"]}]
+				}
+			}
+		}
+	}`
+
+	const agents = 2
+
+	var d model.PolicyData
+	err := json.Unmarshal([]byte(payload), &d)
+	require.NoError(t, err)
+
+	bulker := ftesting.NewMockBulk()
+	pp, err := policy.NewParsedPolicy(t.Context(), bulker, model.Policy{
+		PolicyID:    "policy1",
+		RevisionIdx: 1,
+		Data:        &d,
+	})
+	require.NoError(t, err)
+
+	remoteOut := pp.Outputs["remote"]
+	require.NotNil(t, remoteOut.Role)
+
+	bulker.On("CreateAndGetBulker", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(ftesting.NewMockBulk(), false, nil)
+
+	baseline := slices.Clone(pp.SecretKeys)
+	remoteKey := bulk.APIKey{ID: "remote-id", Key: "remote-key"}
+
+	var wg sync.WaitGroup
+	secretPaths := make([][]string, agents)
+	errs := make([]error, agents)
+	for a := range agents {
+		agent := &model.Agent{
+			ESDocument: model.ESDocument{Id: fmt.Sprintf("agent%d", a)},
+			Outputs: map[string]*model.PolicyOutput{
+				"remote": {
+					APIKey:          remoteKey.Agent(),
+					APIKeyID:        remoteKey.ID,
+					PermissionsHash: remoteOut.Role.Sha2,
+					Type:            policy.OutputTypeRemoteElasticsearch,
+				},
+			},
+		}
+		wg.Go(func() {
+			action, err := processPolicy(t.Context(), logger, bulker, agent, pp, nil)
+			if err != nil {
+				errs[a] = err
+				return
+			}
+			pc, err := action.Data.AsActionPolicyChange()
+			if err != nil {
+				errs[a] = err
+				return
+			}
+			secretPaths[a] = pc.Policy.SecretPaths
+		})
+	}
+	wg.Wait()
+
+	for a := range agents {
+		require.NoError(t, errs[a])
+		assert.Equal(t, []string{"outputs.remote.ssl.key"}, secretPaths[a], "agent %d received incorrect secret paths", a)
+	}
+	assert.Equal(t, baseline, pp.SecretKeys, "shared ParsedPolicy.SecretKeys was mutated")
+}
+>>>>>>> d012fac (Fix processPolicy using shared secret keys between agents (#7740))
