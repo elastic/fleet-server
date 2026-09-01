@@ -308,7 +308,10 @@ func (et *EnrollerT) _enroll(
 
 			// confirm that its on the same policy
 			// it is not supported to have it the same ID enroll into different policies
-			if agent.PolicyID != policyID {
+			// compare base policy IDs: the agent may have been reassigned to a
+			// version-specific policy variant (e.g. "policy#9.6") while enrollment
+			// API keys are only ever bound to the base policy
+			if policyBaseID(agent.PolicyID) != policyBaseID(policyID) {
 				zlog.Warn().
 					Str("AgentId", agent.Id).
 					Str("PolicyId", policyID).
@@ -361,6 +364,11 @@ func (et *EnrollerT) _enroll(
 
 	// Existing agent, only update a subset of the fields
 	if agent.Id != "" {
+		prevVer := ""
+		if agent.Agent != nil {
+			prevVer = agent.Agent.Version
+		}
+
 		agent.Active = true
 		agent.Namespaces = namespaces
 		agent.LocalMetadata = localMeta
@@ -390,6 +398,10 @@ func (et *EnrollerT) _enroll(
 			dl.FieldUnenrolledAt:          nil,
 			dl.FieldUnenrolledReason:      nil,
 			dl.FieldUpdatedAt:             now.UTC().Format(time.RFC3339),
+		}
+		// stamp upgraded_at so Kibana's version-specific policy assignment task will re-evaluate this agent
+		if req.ReplaceToken != nil && *req.ReplaceToken != "" && prevVer != "" && prevVer != ver {
+			doc[dl.FieldUpgradedAt] = now.UTC().Format(time.RFC3339)
 		}
 		err = updateFleetAgent(ctx, et.bulker, agentID, doc)
 		if err != nil {
