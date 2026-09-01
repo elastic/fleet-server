@@ -227,3 +227,51 @@ func TestUpdateMergifyIdempotent(t *testing.T) {
 		t.Error("UpdateMergify() is not idempotent - content changed on second run")
 	}
 }
+
+func TestUpdateMergifyDoesNotFalseMatchVersionPrefix(t *testing.T) {
+	tmpDir := t.TempDir()
+	mergifyFile := filepath.Join(tmpDir, ".mergify.yml")
+
+	initialContent := `pull_request_rules:
+  - name: backport patches to 9.10 branch
+    conditions:
+      - merged
+      - label=backport-9.10
+    actions:
+      backport:
+        branches:
+          - "9.10"
+`
+	err := os.WriteFile(mergifyFile, []byte(initialContent), 0o644)
+	if err != nil {
+		t.Fatalf("failed to write initial file: %v", err)
+	}
+
+	origDir, _ := os.Getwd()
+	defer func() {
+		_ = os.Chdir(origDir)
+	}()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("failed to change to temp directory: %v", err)
+	}
+
+	err = UpdateMergify("9.1.0")
+	if err != nil {
+		t.Fatalf("UpdateMergify() failed: %v", err)
+	}
+
+	content, err := os.ReadFile(mergifyFile)
+	if err != nil {
+		t.Fatalf("failed to read updated file: %v", err)
+	}
+	contentStr := string(content)
+	if !strings.Contains(contentStr, "backport patches to 9.1 branch") {
+		t.Errorf("UpdateMergify() should add rule for 9.1 when only 9.10 exists; got:\n%s", contentStr)
+	}
+	if !strings.Contains(contentStr, "label=backport-9.1") {
+		t.Errorf("UpdateMergify() missing label=backport-9.1; got:\n%s", contentStr)
+	}
+	if !strings.Contains(contentStr, "backport patches to 9.10 branch") {
+		t.Error("UpdateMergify() removed existing 9.10 rule")
+	}
+}

@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/google/go-github/v68/github"
@@ -212,5 +213,76 @@ func TestCreatePRCreatesWhenNoneExists(t *testing.T) {
 	}
 	if createCalls != 1 {
 		t.Errorf("CreatePR() called create API %d times, want 1", createCalls)
+	}
+}
+
+func TestSplitPRReviewers(t *testing.T) {
+	users, teams := splitPRReviewers([]string{
+		"elastic/elastic-agent-control-plane",
+		"some-user",
+		" elastic/other-team ",
+		"",
+		"  ",
+		"solo",
+	})
+	if got, want := strings.Join(users, ","), "some-user,solo"; got != want {
+		t.Errorf("users = %q, want %q", got, want)
+	}
+	if got, want := strings.Join(teams, ","), "elastic-agent-control-plane,other-team"; got != want {
+		t.Errorf("teams = %q, want %q", got, want)
+	}
+}
+
+func TestCreatePRRequestsTeamReviewers(t *testing.T) {
+	newPR := &github.PullRequest{
+		Number:  github.Ptr(7),
+		HTMLURL: github.Ptr("https://github.com/elastic/fleet-server/pull/7"),
+	}
+	var reviewersBody github.ReviewersRequest
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/repos/elastic/fleet-server/pulls":
+			w.Header().Set("Content-Type", "application/json")
+			if err := json.NewEncoder(w).Encode([]*github.PullRequest{}); err != nil {
+				t.Errorf("failed to encode empty PR list response: %v", err)
+			}
+		case r.Method == http.MethodPost && r.URL.Path == "/repos/elastic/fleet-server/pulls":
+			w.Header().Set("Content-Type", "application/json")
+			if err := json.NewEncoder(w).Encode(newPR); err != nil {
+				t.Errorf("failed to encode create PR response: %v", err)
+			}
+		case r.Method == http.MethodPost && r.URL.Path == "/repos/elastic/fleet-server/pulls/7/requested_reviewers":
+			if err := json.NewDecoder(r.Body).Decode(&reviewersBody); err != nil {
+				t.Errorf("failed to decode reviewers request: %v", err)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			if err := json.NewEncoder(w).Encode(newPR); err != nil {
+				t.Errorf("failed to encode reviewers response: %v", err)
+			}
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			http.NotFound(w, r)
+		}
+	})
+
+	ghClient := newTestGitHubClient(t, handler)
+	_, err := ghClient.CreatePR(PROptions{
+		Owner:     "elastic",
+		Repo:      "fleet-server",
+		Title:     "Release PR",
+		Head:      "ff-prep-main-9.6.0",
+		Base:      "main",
+		Body:      "body",
+		Reviewers: []string{"elastic/elastic-agent-control-plane", "alice"},
+	})
+	if err != nil {
+		t.Fatalf("CreatePR() error = %v", err)
+	}
+	if len(reviewersBody.Reviewers) != 1 || reviewersBody.Reviewers[0] != "alice" {
+		t.Errorf("Reviewers = %v, want [alice]", reviewersBody.Reviewers)
+	}
+	if len(reviewersBody.TeamReviewers) != 1 || reviewersBody.TeamReviewers[0] != "elastic-agent-control-plane" {
+		t.Errorf("TeamReviewers = %v, want [elastic-agent-control-plane]", reviewersBody.TeamReviewers)
 	}
 }

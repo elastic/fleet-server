@@ -38,16 +38,9 @@ func UpdateMergify(version string) error {
 	}
 
 	label := fmt.Sprintf("backport-%s", branchVersion)
-	for _, rule := range rules {
-		ruleMap, ok := rule.(map[string]interface{})
-		if !ok {
-			continue
-		}
-		name, ok := ruleMap["name"].(string)
-		if ok && strings.Contains(name, branchVersion) {
-			fmt.Printf("Backport rule for %s already exists\n", branchVersion)
-			return nil
-		}
+	if mergifyHasBackportRule(rules, branchVersion, label) {
+		fmt.Printf("Backport rule for %s already exists\n", branchVersion)
+		return nil
 	}
 
 	newRule := map[string]interface{}{
@@ -78,4 +71,47 @@ func UpdateMergify(version string) error {
 
 	fmt.Printf("Added backport rule for %s to %s\n", branchVersion, mergifyFile)
 	return nil
+}
+
+// mergifyHasBackportRule reports whether pull_request_rules already contains a
+// backport rule for branchVersion. Matching is exact (label condition, rule name,
+// or backport branch) so prefixes like "9.1" do not match "9.10".
+func mergifyHasBackportRule(rules []interface{}, branchVersion, label string) bool {
+	labelCond := fmt.Sprintf("label=%s", label)
+	expectedName := fmt.Sprintf("backport patches to %s branch", branchVersion)
+
+	for _, rule := range rules {
+		ruleMap, ok := rule.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if name, ok := ruleMap["name"].(string); ok && name == expectedName {
+			return true
+		}
+		if conditions, ok := ruleMap["conditions"].([]interface{}); ok {
+			for _, c := range conditions {
+				if s, ok := c.(string); ok && s == labelCond {
+					return true
+				}
+			}
+		}
+		actions, ok := ruleMap["actions"].(map[string]interface{})
+		if !ok {
+			continue
+		}
+		backport, ok := actions["backport"].(map[string]interface{})
+		if !ok {
+			continue
+		}
+		branches, ok := backport["branches"].([]interface{})
+		if !ok {
+			continue
+		}
+		for _, b := range branches {
+			if s, ok := b.(string); ok && s == branchVersion {
+				return true
+			}
+		}
+	}
+	return false
 }

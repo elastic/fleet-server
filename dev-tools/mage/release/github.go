@@ -88,12 +88,16 @@ func (gh *GitHubClient) CreatePR(opts PROptions) (*github.PullRequest, error) {
 	}
 
 	if len(opts.Reviewers) > 0 {
-		reviewersReq := github.ReviewersRequest{
-			Reviewers: opts.Reviewers,
-		}
-		_, _, err = gh.client.PullRequests.RequestReviewers(gh.ctx, opts.Owner, opts.Repo, pr.GetNumber(), reviewersReq)
-		if err != nil {
-			fmt.Printf("Warning: failed to add reviewers: %v\n", err)
+		users, teams := splitPRReviewers(opts.Reviewers)
+		if len(users) > 0 || len(teams) > 0 {
+			reviewersReq := github.ReviewersRequest{
+				Reviewers:     users,
+				TeamReviewers: teams,
+			}
+			_, _, err = gh.client.PullRequests.RequestReviewers(gh.ctx, opts.Owner, opts.Repo, pr.GetNumber(), reviewersReq)
+			if err != nil {
+				fmt.Printf("Warning: failed to add reviewers: %v\n", err)
+			}
 		}
 	}
 
@@ -101,6 +105,27 @@ func (gh *GitHubClient) CreatePR(opts PROptions) (*github.PullRequest, error) {
 
 	fmt.Printf("Created PR #%d: %s\n", pr.GetNumber(), pr.GetHTMLURL())
 	return pr, nil
+}
+
+// splitPRReviewers separates GitHub user logins from org/team references.
+// Values containing "/" are treated as org/team-slug and mapped to TeamReviewers
+// (API expects the team slug only). Bare values go to Reviewers.
+func splitPRReviewers(reviewers []string) (users, teams []string) {
+	for _, r := range reviewers {
+		r = strings.TrimSpace(r)
+		if r == "" {
+			continue
+		}
+		if _, team, ok := strings.Cut(r, "/"); ok {
+			team = strings.TrimSpace(team)
+			if team != "" {
+				teams = append(teams, team)
+			}
+			continue
+		}
+		users = append(users, r)
+	}
+	return users, teams
 }
 
 // FindOpenPR returns an open pull request for the given head and base branches, if one exists.

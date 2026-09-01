@@ -21,7 +21,7 @@ mage release:runMajorMinor
 export CURRENT_RELEASE="9.6.1"   # must already match version on the release branch
 mage release:runPatch
 
-go test ./dev-tools/mage/release/... -count=1
+go test -C dev-tools/mage/release ./... -count=1
 ```
 
 Use plain `X.Y.Z` semver for `CURRENT_RELEASE` (no `-test` or `-SNAPSHOT` suffixes).

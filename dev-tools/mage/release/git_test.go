@@ -11,6 +11,8 @@ import (
 	"testing"
 
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/config"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
@@ -78,6 +80,64 @@ func TestEnsureBranchFrom(t *testing.T) {
 
 	if err := gitRepo.EnsureBranchFrom("master", "9.6"); err != nil {
 		t.Fatalf("second EnsureBranchFrom() failed: %v", err)
+	}
+}
+
+func TestEnsureBranchFromRemoteOnlyBase(t *testing.T) {
+	upstream, _ := createTestGitRepo(t)
+	if err := upstream.CreateBranch("9.5"); err != nil {
+		t.Fatalf("CreateBranch(9.5) failed: %v", err)
+	}
+
+	bareDir := t.TempDir()
+	_, err := git.PlainInit(bareDir, true)
+	if err != nil {
+		t.Fatalf("failed to init bare repo: %v", err)
+	}
+	if err := upstream.SetRemoteURL("origin", bareDir); err != nil {
+		t.Fatalf("SetRemoteURL failed: %v", err)
+	}
+
+	// Local file remotes need no auth; GitRepo.Push requires GITHUB_TOKEN.
+	err = upstream.repo.Push(&git.PushOptions{
+		RemoteName: "origin",
+		RefSpecs: []config.RefSpec{
+			"refs/heads/master:refs/heads/master",
+			"refs/heads/9.5:refs/heads/9.5",
+		},
+	})
+	if err != nil {
+		t.Fatalf("push to bare remote failed: %v", err)
+	}
+
+	cloneDir := t.TempDir()
+	cloned, err := git.PlainClone(cloneDir, false, &git.CloneOptions{
+		URL:           bareDir,
+		ReferenceName: plumbing.NewBranchReferenceName("master"),
+		SingleBranch:  false,
+	})
+	if err != nil {
+		t.Fatalf("PlainClone failed: %v", err)
+	}
+
+	gitRepo := &GitRepo{repo: cloned, path: cloneDir}
+	exists, err := gitRepo.BranchExists("9.5")
+	if err != nil {
+		t.Fatalf("BranchExists failed: %v", err)
+	}
+	if exists {
+		t.Fatal("expected 9.5 to exist only as a remote-tracking branch after clone")
+	}
+
+	if err := gitRepo.EnsureBranchFrom("9.5", "patch-release-9.5.1"); err != nil {
+		t.Fatalf("EnsureBranchFrom() with remote-only base failed: %v", err)
+	}
+	branch, err := gitRepo.GetCurrentBranch()
+	if err != nil {
+		t.Fatalf("GetCurrentBranch() failed: %v", err)
+	}
+	if branch != "patch-release-9.5.1" {
+		t.Fatalf("expected branch patch-release-9.5.1, got %s", branch)
 	}
 }
 

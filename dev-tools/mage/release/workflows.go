@@ -316,7 +316,7 @@ func ensureMajorMinorCurrentReleaseMatchesBase(repo *GitRepo, cfg *ReleaseConfig
 	if base == "" {
 		base = "main"
 	}
-	if err := repo.CheckoutBranch(base); err != nil {
+	if err := repo.EnsureBranch(base); err != nil {
 		return err
 	}
 	branchVersion, err := ReadFleetVersion()
@@ -399,7 +399,7 @@ func RunPatchRelease(cfg *ReleaseConfig) error {
 }
 
 func ensurePatchCurrentReleaseMatchesBranch(repo *GitRepo, cfg *ReleaseConfig) error {
-	if err := repo.CheckoutBranch(cfg.ReleaseBranch); err != nil {
+	if err := repo.EnsureBranch(cfg.ReleaseBranch); err != nil {
 		return err
 	}
 	branchVersion, err := ReadFleetVersion()

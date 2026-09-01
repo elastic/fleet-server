@@ -2,7 +2,7 @@
 // enter the main fleet-server go.mod / NOTICE.txt.
 module github.com/elastic/fleet-server/dev-tools/mage/release
 
-go 1.26.5
+go 1.26.7
 
 require (
 	github.com/go-git/go-git/v5 v5.17.0

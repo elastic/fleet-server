@@ -76,9 +76,10 @@ func (g *GitRepo) CreateBranch(branchName string) error {
 	return nil
 }
 
-// EnsureBranchFrom checks out baseBranch and creates or checks out branchName from that point.
+// EnsureBranchFrom checks out baseBranch (creating a local branch from origin when
+// needed) and creates or checks out branchName from that point.
 func (g *GitRepo) EnsureBranchFrom(baseBranch, branchName string) error {
-	if err := g.CheckoutBranch(baseBranch); err != nil {
+	if err := g.EnsureBranch(baseBranch); err != nil {
 		return fmt.Errorf("failed to checkout base branch %s: %w", baseBranch, err)
 	}
 
