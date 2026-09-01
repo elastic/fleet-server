@@ -509,28 +509,39 @@ func TestEnrollWithAgentIDExistingActive_VersionedPolicy(t *testing.T) {
 
 func TestEnrollWithAgentIDExistingActive_UpgradedAt(t *testing.T) {
 	tests := []struct {
-		name           string
-		storedVersion  string
-		enrollVersion  string
-		wantUpgradedAt bool
+		name            string
+		storedVersion   string
+		enrollVersion   string
+		useReplaceToken bool
+		wantUpgradedAt  bool
 	}{
 		{
-			name:           "version change stamps upgraded_at",
-			storedVersion:  "8.9.0",
-			enrollVersion:  "9.0.0",
-			wantUpgradedAt: true,
+			name:            "version change stamps upgraded_at",
+			storedVersion:   "8.9.0",
+			enrollVersion:   "9.0.0",
+			useReplaceToken: true,
+			wantUpgradedAt:  true,
 		},
 		{
-			name:           "downgrade stamps upgraded_at",
-			storedVersion:  "9.0.0",
-			enrollVersion:  "8.9.0",
-			wantUpgradedAt: true,
+			name:            "downgrade stamps upgraded_at",
+			storedVersion:   "9.0.0",
+			enrollVersion:   "8.9.0",
+			useReplaceToken: true,
+			wantUpgradedAt:  true,
 		},
 		{
-			name:           "same version does not stamp upgraded_at",
-			storedVersion:  "8.9.0",
-			enrollVersion:  "8.9.0",
-			wantUpgradedAt: false,
+			name:            "same version does not stamp upgraded_at",
+			storedVersion:   "8.9.0",
+			enrollVersion:   "8.9.0",
+			useReplaceToken: true,
+			wantUpgradedAt:  false,
+		},
+		{
+			name:            "enrollment-id re-enrollment without replace token does not stamp upgraded_at",
+			storedVersion:   "8.9.0",
+			enrollVersion:   "9.0.0",
+			useReplaceToken: false,
+			wantUpgradedAt:  false,
 		},
 	}
 	for _, tt := range tests {
@@ -538,21 +549,6 @@ func TestEnrollWithAgentIDExistingActive_UpgradedAt(t *testing.T) {
 			ctx := t.Context()
 			rb := &rollback.Rollback{}
 			zlog := zerolog.Logger{}
-			agentID := "1234"
-			replaceToken := "replace_token"
-			var pbkdf2Cfg config.PBKDF2
-			pbkdf2Cfg.InitDefaults()
-			replaceHash, err := hashReplaceToken(replaceToken, pbkdf2Cfg)
-			require.NoError(t, err)
-			req := &EnrollRequest{
-				Type: "PERMANENT",
-				Id:   &agentID,
-				Metadata: EnrollMetadata{
-					UserProvided: []byte("{}"),
-					Local:        []byte("{}"),
-				},
-				ReplaceToken: &replaceToken,
-			}
 			verCon := mustBuildConstraints("9.0.0")
 			cfg := &config.Server{}
 			cfg.InitDefaults()
@@ -560,12 +556,44 @@ func TestEnrollWithAgentIDExistingActive_UpgradedAt(t *testing.T) {
 			bulker := ftesting.NewMockBulk()
 			et, _ := NewEnrollerT(verCon, cfg, bulker, c)
 
-			source := fmt.Sprintf(`{"active":true,"agent":{"id":"1234","version":"%s"},"type":"PERMANENT","policy_id":"my-policy","replace_token":"%s"}`, tt.storedVersion, replaceHash)
+			var req *EnrollRequest
+			var source string
+			if tt.useReplaceToken {
+				agentID := "1234"
+				replaceToken := "replace_token"
+				var pbkdf2Cfg config.PBKDF2
+				pbkdf2Cfg.InitDefaults()
+				replaceHash, err := hashReplaceToken(replaceToken, pbkdf2Cfg)
+				require.NoError(t, err)
+				req = &EnrollRequest{
+					Type: "PERMANENT",
+					Id:   &agentID,
+					Metadata: EnrollMetadata{
+						UserProvided: []byte("{}"),
+						Local:        []byte("{}"),
+					},
+					ReplaceToken: &replaceToken,
+				}
+				source = fmt.Sprintf(`{"active":true,"agent":{"id":"1234","version":"%s"},"type":"PERMANENT","policy_id":"my-policy","replace_token":"%s"}`, tt.storedVersion, replaceHash)
+				bulker.On("APIKeyRead", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&apikey.APIKeyMetadata{ID: "1234"}, nil)
+				bulker.On("APIKeyInvalidate", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+			} else {
+				enrollmentID := "enrollment-123"
+				req = &EnrollRequest{
+					Type:         "PERMANENT",
+					EnrollmentId: &enrollmentID,
+					Metadata: EnrollMetadata{
+						UserProvided: []byte("{}"),
+						Local:        []byte("{}"),
+					},
+				}
+				// Agent found by enrollment-id has already checked in, so it is not deleted.
+				source = fmt.Sprintf(`{"active":true,"agent":{"id":"existing-id","version":"%s"},"type":"PERMANENT","policy_id":"my-policy","enrollment_id":"enrollment-123","last_checkin":"2024-01-01T00:00:00Z"}`, tt.storedVersion)
+			}
+
 			bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{
 				HitsT: es.HitsT{Hits: []es.HitT{{ID: "1234", Index: dl.FleetAgents, Source: []byte(source)}}},
 			}, nil)
-			bulker.On("APIKeyRead", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&apikey.APIKeyMetadata{ID: "1234"}, nil)
-			bulker.On("APIKeyInvalidate", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 			bulker.On("APIKeyCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&apikey.APIKey{ID: "1234", Key: "1234"}, nil)
 			bulker.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
