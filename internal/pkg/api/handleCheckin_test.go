@@ -18,7 +18,9 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -1858,4 +1860,88 @@ func TestProcessPolicyRemoteESServiceTokenSecretPaths(t *testing.T) {
 	_, hasServiceToken := remotePolicy["service_token"]
 	assert.False(t, hasServiceToken, "service_token should be deleted by Prepare before delivery to agents")
 	assert.Equal(t, policy.OutputTypeElasticsearch, remotePolicy["type"])
+}
+
+// TestProcessPolicySecretPathsConcurrentDispatch ensures processPolicy does not
+// mutate the shared ParsedPolicy.SecretKeys when concurrent checkin goroutines
+// process the same policy fan-out.
+// Regression test for https://github.com/elastic/fleet-server/issues/7739
+func TestProcessPolicySecretPathsConcurrentDispatch(t *testing.T) {
+	logger := testlog.SetLogger(t)
+
+	const payload = `{
+		"outputs": {
+			"remote": {
+				"type": "remote_elasticsearch",
+				"secrets": {"service_token": {"id": "ST_ID"}}
+			}
+		},
+		"output_permissions": {
+			"remote": {
+				"_fallback": {
+					"indices": [{"names": ["logs-*"], "privileges": ["auto_configure", "create_doc"]}]
+				}
+			}
+		}
+	}`
+
+	const agents = 2
+
+	var d model.PolicyData
+	err := json.Unmarshal([]byte(payload), &d)
+	require.NoError(t, err)
+
+	bulker := ftesting.NewMockBulk()
+	pp, err := policy.NewParsedPolicy(t.Context(), bulker, model.Policy{
+		PolicyID:    "policy1",
+		RevisionIdx: 1,
+		Data:        &d,
+	})
+	require.NoError(t, err)
+
+	remoteOut := pp.Outputs["remote"]
+	require.NotNil(t, remoteOut.Role)
+
+	bulker.On("CreateAndGetBulker", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(ftesting.NewMockBulk(), false, nil)
+
+	baseline := slices.Clone(pp.SecretKeys)
+	remoteKey := bulk.APIKey{ID: "remote-id", Key: "remote-key"}
+
+	var wg sync.WaitGroup
+	secretPaths := make([][]string, agents)
+	errs := make([]error, agents)
+	for a := range agents {
+		agent := &model.Agent{
+			ESDocument: model.ESDocument{Id: fmt.Sprintf("agent%d", a)},
+			Outputs: map[string]*model.PolicyOutput{
+				"remote": {
+					APIKey:          remoteKey.Agent(),
+					APIKeyID:        remoteKey.ID,
+					PermissionsHash: remoteOut.Role.Sha2,
+					Type:            policy.OutputTypeRemoteElasticsearch,
+				},
+			},
+		}
+		wg.Go(func() {
+			action, err := processPolicy(t.Context(), logger, bulker, agent, pp, nil)
+			if err != nil {
+				errs[a] = err
+				return
+			}
+			pc, err := action.Data.AsActionPolicyChange()
+			if err != nil {
+				errs[a] = err
+				return
+			}
+			secretPaths[a] = pc.Policy.SecretPaths
+		})
+	}
+	wg.Wait()
+
+	for a := range agents {
+		require.NoError(t, errs[a])
+		assert.NotContains(t, secretPaths[a], "", "agent %d received a corrupt empty secret path", a)
+	}
+	assert.Equal(t, baseline, pp.SecretKeys, "shared ParsedPolicy.SecretKeys was mutated")
 }
