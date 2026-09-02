@@ -25,12 +25,7 @@ if [[ "${VERSION}" == "" ]]; then
     exit 1
 fi
 
-# mage getVersion only appends "-SNAPSHOT" when the SNAPSHOT env var is set,
-# which only happens in the separate package.sh job -- append it here too so
-# stack_version matches the packaged snapshot artifacts.
-if [[ "${TYPE}" == "snapshot" ]]; then
-    VERSION="${VERSION}-SNAPSHOT"
-fi
+VERSION="$(resolve_dra_version "${VERSION}" "${TYPE}")"
 
 if [[ "${TYPE}" == "staging" && "${VERSION}" == *"-SNAPSHOT"* ]]; then
     echo "ERROR: VERSION unexpectedly contains '-SNAPSHOT' for a staging build: ${VERSION}" >&2
