@@ -17,6 +17,10 @@ WORKFLOW="${1:?workflow required}"
 
 buildkite-agent artifact download "artifacts/dra/fleet-server/*/manifest-*.json" . --step "dra-prep-${WORKFLOW}"
 manifest=$(find artifacts/dra/fleet-server -name "manifest-*.json" | head -1)
+if [[ -z "${manifest}" ]]; then
+  echo "ERROR: no DRA manifest found for workflow ${WORKFLOW}" >&2
+  exit 1
+fi
 build_id=$(jq -r '.build_id' "${manifest}")
 version=$(jq -r '.version' "${manifest}")
 url="https://artifacts-${WORKFLOW}.elastic.co/dra-builds/${BUILDKITE_PIPELINE_SLUG}/${BUILDKITE_BUILD_NUMBER}/${build_id}/summary-${version}.html"
