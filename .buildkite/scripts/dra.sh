@@ -30,9 +30,9 @@ if [[ "${TYPE}" == "staging" && "${VERSION}" == *"-SNAPSHOT"* ]]; then
     exit 1
 fi
 
-# Dry run enabled skips annotation and uploads.
+# Dry run skips annotation and uploads.
 DRA_UPLOAD=true
-if [[ "${BUILDKITE_PULL_REQUEST}" != "false" ]]; then
+if [[ "${BUILDKITE_PULL_REQUEST}" != "false" || "${DRY_RUN:-}" == "true" ]]; then
     DRA_UPLOAD=false
 fi
 
