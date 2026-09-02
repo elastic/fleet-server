@@ -21,13 +21,7 @@ WORKFLOW="${DRA_WORKFLOW:?DRA_WORKFLOW is required}"
 FOLDER_PATH="build/distributions"
 BASE_DIR="${WORKSPACE}/${FOLDER_PATH}"
 VERSION="$(mage getVersion)"
-
-# mage getVersion only appends "-SNAPSHOT" when the SNAPSHOT env var is set,
-# which only happens in the separate package.sh job -- append it here too so
-# the dependency report filename matches the packaged snapshot artifacts.
-if [[ "${WORKFLOW}" == "snapshot" ]]; then
-    VERSION="${VERSION}-SNAPSHOT"
-fi
+VERSION="$(resolve_dra_version "${VERSION}" "${WORKFLOW}")"
 
 echo "--- Downloading ${WORKFLOW} packages from GCS"
 download_mbp_packages_from_gcp_bucket "${FOLDER_PATH}" "${WORKFLOW}"
