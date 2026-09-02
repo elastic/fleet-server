@@ -21,12 +21,12 @@ readonly TYPE="${1:-snapshot}"
 VERSION="$(mage getVersion)"
 
 if [[ "${VERSION}" == "" ]]; then
-    echo "The 'version' parameter is required."
+    echo "ERROR: version discovery failed (mage getVersion returned empty)." >&2
     exit 1
 fi
 
 if [[ "${TYPE}" == "staging" && "${VERSION}" == *"-SNAPSHOT"* ]]; then
-    echo "VERSION unexpectedly contains '-SNAPSHOT' for a staging build: ${VERSION}"
+    echo "ERROR: VERSION unexpectedly contains '-SNAPSHOT' for a staging build: ${VERSION}" >&2
     exit 1
 fi
 
