@@ -437,8 +437,6 @@ func TestEnrollWithAgentIDExistingActive(t *testing.T) {
 	if resp.Item.Id != agentID {
 		t.Fatalf("agent ID should have been %s (not %s)", agentID, resp.Item.Id)
 	}
-<<<<<<< HEAD
-=======
 
 	doc := replaceUpdateDoc(t, bulker)
 	assert.Equal(t, "my-policy", doc[dl.FieldPolicyBaseID])
@@ -619,7 +617,6 @@ func TestEnrollWithAgentIDExistingActive_UpgradedAt(t *testing.T) {
 			}
 		})
 	}
->>>>>>> 34d16bc (Fix agentless replacement enrollments when policies are versioned (#7719))
 }
 
 func TestEnrollerT_retrieveStaticTokenEnrollmentToken(t *testing.T) {
