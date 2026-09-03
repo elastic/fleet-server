@@ -52,6 +52,7 @@ var (
 	ErrNoPolicyOutput         = errors.New("output section not found")
 	ErrFailInjectAPIKey       = errors.New("failure to inject api key")
 	ErrInvalidUpgradeMetadata = errors.New("invalid upgrade metadata")
+	ErrTooManyUpgradeSources  = errors.New("too many upgrade sources")
 )
 
 const (
@@ -63,6 +64,8 @@ const (
 	invalidKeyStateCleanInterval = 5 * time.Minute
 
 	invalidKeyLRUEntryBytes = 250
+
+	maxUpgradeSources = 20
 )
 
 // validActionTypes is a map of action.type and if they are valid
@@ -972,6 +975,10 @@ func convertActionData(aType ActionType, raw json.RawMessage) (ad Action_Data, e
 			return
 		}
 		if d.Sources != nil {
+			if len(*d.Sources) > maxUpgradeSources {
+				err = fmt.Errorf("%w: %d exceeds limit of %d", ErrTooManyUpgradeSources, len(*d.Sources), maxUpgradeSources)
+				return
+			}
 			if len(*d.Sources) > 0 {
 				sourceURI := (*d.Sources)[0]
 				d.SourceUri = &sourceURI

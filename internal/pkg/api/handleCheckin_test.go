@@ -165,6 +165,12 @@ func TestConvertActionData(t *testing.T) {
 		expect: Action_Data{json.RawMessage(`{"source_uri":"","sources":[],"version":"1.2.3"}`)},
 		hasErr: false,
 	}, {
+		name:   "upgrade action fails with too many sources",
+		aType:  UPGRADE,
+		raw:    json.RawMessage(`{"sources":["https://s1","https://s2","https://s3","https://s4","https://s5","https://s6","https://s7","https://s8","https://s9","https://s10","https://s11","https://s12","https://s13","https://s14","https://s15","https://s16","https://s17","https://s18","https://s19","https://s20","https://s21"],"version":"1.2.3"}`),
+		expect: Action_Data{},
+		hasErr: true,
+	}, {
 		name:   "request diagnostics action",
 		aType:  REQUESTDIAGNOSTICS,
 		expect: Action_Data{},
