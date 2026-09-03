@@ -159,6 +159,12 @@ func TestConvertActionData(t *testing.T) {
 		expect: Action_Data{json.RawMessage(`{"source_uri":"","sources":[],"version":"1.2.3"}`)},
 		hasErr: false,
 	}, {
+		name:   "upgrade action handles empty source_uri and sources",
+		aType:  UPGRADE,
+		raw:    json.RawMessage(`{"version":"1.2.3"}`),
+		expect: Action_Data{json.RawMessage(`{"source_uri":"","sources":[],"version":"1.2.3"}`)},
+		hasErr: false,
+	}, {
 		name:   "request diagnostics action",
 		aType:  REQUESTDIAGNOSTICS,
 		expect: Action_Data{},
