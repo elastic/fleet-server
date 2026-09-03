@@ -242,9 +242,12 @@ func startTestServer(t *testing.T, ctx context.Context, policyD model.PolicyData
 
 	tsrv := &tserver{cfg: cfg, g: g, srv: srv, enrollKey: key.Token(), bulker: bulker}
 
+	// serverUp gates whether cleanup reports exit errors: if startup failed, the
+	// exit error is a consequence of that failure and should not be reported separately.
+	serverUp := false
 	t.Cleanup(func() {
 		srvCancel()
-		if err := tsrv.waitExit(); err != nil {
+		if err := tsrv.waitExit(); err != nil && serverUp {
 			t.Errorf("fleet server exited with unexpected error: %v", err)
 		}
 	})
@@ -253,6 +256,7 @@ func startTestServer(t *testing.T, ctx context.Context, policyD model.PolicyData
 	if err != nil {
 		return nil, fmt.Errorf("unable to start server: %w", err)
 	}
+	serverUp = true
 	return tsrv, nil
 }
 
