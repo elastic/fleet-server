@@ -405,11 +405,13 @@ func (bc *Bulk) flush(ctx context.Context) error {
 func logCheckinBulkErrors(zlog *zerolog.Logger, items []bulk.BulkIndexerResponseItem) {
 	var totalErr, versionConflicts int
 	var sampleID string
+	var sampleStatus int
 	var sampleErr json.RawMessage
 	for _, item := range items {
 		if item.Status >= http.StatusBadRequest {
 			if totalErr == 0 {
 				sampleID = item.DocumentID
+				sampleStatus = item.Status
 				sampleErr = item.Error
 			}
 			totalErr++
@@ -423,7 +425,8 @@ func logCheckinBulkErrors(zlog *zerolog.Logger, items []bulk.BulkIndexerResponse
 			Int("failed", totalErr).
 			Int("version_conflicts", versionConflicts).
 			Int("total", len(items)).
-			Str("sample_agent_id", sampleID)
+			Str("sample_agent_id", sampleID).
+			Int("sample_status", sampleStatus)
 		if len(sampleErr) > 0 {
 			ev = ev.RawJSON("sample_error", sampleErr)
 		}
