@@ -672,17 +672,21 @@ func createFleetAgent(ctx context.Context, bulker bulk.Bulk, id string, agent mo
 			OpType:     "create",
 			Refresh:    "wait_for",
 		}
-		res, err := req.Do(ctx, bulker.Client())
-		if err != nil {
-			return err
+		zlog := zerolog.Ctx(ctx)
+		res, doErr := req.Do(ctx, bulker.Client())
+		if doErr != nil {
+			zlog.Warn().Str("agent_id", id).Err(doErr).Msg("enrollment write transport error")
+			return doErr
 		}
 		defer res.Body.Close()
 		if res.StatusCode == http.StatusConflict {
-			zerolog.Ctx(ctx).Debug().Str("agent_id", id).Msg("agent document already exists on enrollment create, treating as success")
+			zlog.Debug().Str("agent_id", id).Msg("agent document already exists on enrollment create, treating as success")
 			return nil
 		}
 		if res.IsError() {
-			return fmt.Errorf("createFleetAgent: %s", res.String())
+			esResp := res.String()
+			zlog.Warn().Str("agent_id", id).Int("status_code", res.StatusCode).Str("es_response", esResp).Msg("enrollment write ES error")
+			return fmt.Errorf("createFleetAgent: %s", esResp)
 		}
 		return nil
 	}
