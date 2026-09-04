@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"sync"
 	"time"
 
@@ -278,7 +279,7 @@ func (bc *Bulk) flush(ctx context.Context) error {
 		opts = append(opts, bulk.WithRefresh())
 	}
 
-	_, err = bc.bulker.MUpdate(ctx, updates, opts...)
+	items, err := bc.bulker.MUpdate(ctx, updates, opts...)
 
 	zerolog.Ctx(ctx).Trace().
 		Err(err).
@@ -287,9 +288,111 @@ func (bc *Bulk) flush(ctx context.Context) error {
 		Bool("refresh", needRefresh).
 		Msg("Flush updates")
 
+	logCheckinBulkErrors(zerolog.Ctx(ctx), items)
+
 	return err
 }
 
+<<<<<<< HEAD
+=======
+// logCheckinBulkErrors logs a summary when MUpdate returns per-item ES failures.
+// Version conflicts on updating→online transitions are otherwise silently dropped.
+func logCheckinBulkErrors(zlog *zerolog.Logger, items []bulk.BulkIndexerResponseItem) {
+	var totalErr, versionConflicts int
+	var sampleID string
+	var sampleStatus int
+	var sampleErr json.RawMessage
+	for _, item := range items {
+		if item.Status >= http.StatusBadRequest {
+			if totalErr == 0 {
+				sampleID = item.DocumentID
+				sampleStatus = item.Status
+				sampleErr = item.Error
+			}
+			totalErr++
+			if item.Status == http.StatusConflict {
+				versionConflicts++
+			}
+		}
+	}
+	if totalErr > 0 {
+		ev := zlog.Warn().
+			Int("failed", totalErr).
+			Int("version_conflicts", versionConflicts).
+			Int("total", len(items)).
+			Str("sample_agent_id", sampleID).
+			Int("sample_status", sampleStatus)
+		if len(sampleErr) > 0 {
+			ev = ev.RawJSON("sample_error", sampleErr)
+		}
+		ev.Msg("checkin bulk: per-item ES write failures")
+	}
+}
+
+func toUpdateBody(now string, pending pendingT) ([]byte, error) {
+	fields := bulk.UpdateFields{
+		dl.FieldUpdatedAt:          now,             // Set "updated_at" to the current timestamp
+		dl.FieldLastCheckin:        pending.ts,      // Set the checkin timestamp
+		dl.FieldLastCheckinStatus:  pending.status,  // Set the pending status
+		dl.FieldLastCheckinMessage: pending.message, // Set the status message
+		dl.FieldUnhealthyReason:    pending.unhealthyReason,
+		dl.FieldSequenceNum:        pending.sequenceNum,
+	}
+	if pending.agentPolicyID != "" {
+		fields[dl.FieldAgentPolicyID] = pending.agentPolicyID
+		fields[dl.FieldPolicyRevisionIdx] = pending.revisionIDX
+	}
+	if pending.extra != nil {
+		// If the agent version is not empty it needs to be updated
+		// Assuming the agent can by upgraded keeping the same id, but incrementing the version
+		if pending.extra.ver != "" {
+			fields[dl.FieldAgent] = map[string]any{
+				dl.FieldAgentVersion: pending.extra.ver,
+			}
+		}
+
+		// Update local metadata if provided
+		if pending.extra.meta != nil {
+			// Surprise: The json encoder compacts this raw JSON during
+			// the encode process, so there my be unexpected memory overhead:
+			// https://github.com/golang/go/blob/de5d7eccb99088e3ab42c0d907da6852d8f9cebe/src/encoding/json/encode.go#L503-L507
+			fields[dl.FieldLocalMetadata] = json.RawMessage(pending.extra.meta)
+		}
+
+		// Update components if provided
+		if pending.extra.components != nil {
+			fields[dl.FieldComponents] = json.RawMessage(pending.extra.components)
+		}
+
+		if pending.extra.health != nil {
+			fields[dl.FieldHealth] = json.RawMessage(pending.extra.health)
+		}
+
+		if pending.extra.capabilities != nil {
+			fields[dl.FieldCapabilities] = pending.extra.capabilities
+		}
+
+		if pending.extra.effectiveConfig != nil {
+			fields[dl.FieldEffectiveConfig] = json.RawMessage(pending.extra.effectiveConfig)
+		}
+
+		// If seqNo changed, set the field appropriately
+		if pending.extra.seqNo.IsSet() {
+			fields[dl.FieldActionSeqNo] = pending.extra.seqNo
+		}
+
+		if pending.extra.availableRollbacks != nil {
+			if upgradeInfo, ok := fields[dl.FieldUpgradeInfo].(bulk.UpdateFields); ok {
+				upgradeInfo[dl.FieldAvailableRollbacks] = json.RawMessage(pending.extra.availableRollbacks)
+			} else {
+				fields[dl.FieldUpgradeInfo] = bulk.UpdateFields{dl.FieldAvailableRollbacks: json.RawMessage(pending.extra.availableRollbacks)}
+			}
+		}
+	}
+	return fields.Marshal()
+}
+
+>>>>>>> d3b508c (feat(checkin): log per-item ES write failures from checkin bulk flush (#7763))
 func encodeParams(now string, data pendingT) (map[string]json.RawMessage, error) {
 	var (
 		tsNow      json.RawMessage
