@@ -229,17 +229,34 @@ func startTestServer(t *testing.T, ctx context.Context, policyD model.PolicyData
 		return nil, fmt.Errorf("unable to create server: %w", err)
 	}
 
-	g, ctx := errgroup.WithContext(ctx)
+	// Derive a cancellable context so we can guarantee the fleet server goroutine
+	// exits before testing.T is torn down. Without this, loggedRunFunc can race
+	// with the test cleanup when it logs via the zerolog TestWriter after the test
+	// has already finished.
+	srvCtx, srvCancel := context.WithCancel(ctx)
+	g, srvCtx := errgroup.WithContext(srvCtx)
 
 	g.Go(func() error {
-		return srv.Run(ctx, cfg)
+		return srv.Run(srvCtx, cfg)
 	})
 
 	tsrv := &tserver{cfg: cfg, g: g, srv: srv, enrollKey: key.Token(), bulker: bulker}
-	err = tsrv.waitServerUp(ctx, testWaitServerUp)
+
+	// serverUp gates whether cleanup reports exit errors: if startup failed, the
+	// exit error is a consequence of that failure and should not be reported separately.
+	serverUp := false
+	t.Cleanup(func() {
+		srvCancel()
+		if err := tsrv.waitExit(); err != nil && serverUp {
+			t.Errorf("fleet server exited with unexpected error: %v", err)
+		}
+	})
+
+	err = tsrv.waitServerUp(srvCtx, testWaitServerUp)
 	if err != nil {
 		return nil, fmt.Errorf("unable to start server: %w", err)
 	}
+	serverUp = true
 	return tsrv, nil
 }
 
