@@ -100,28 +100,28 @@ func (et *EnrollerT) handleEnroll(zlog zerolog.Logger, w http.ResponseWriter, r 
 		return err
 	}
 
-	resp, err := et.processRequest(zlog, w, r, rb, key, ver)
+	resp, enrollmentID, err := et.processRequest(zlog, w, r, rb, key, ver)
 	if err != nil {
 		return err
 	}
 
 	ts, _ := logger.CtxStartTime(r.Context())
-	return writeResponse(r.Context(), zlog, w, resp, ts)
+	return writeResponse(r.Context(), zlog, w, resp, enrollmentID, ts)
 }
 
-func (et *EnrollerT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, rb *rollback.Rollback, enrollmentAPIKey *apikey.APIKey, ver string) (*EnrollResponse, error) {
+func (et *EnrollerT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, rb *rollback.Rollback, enrollmentAPIKey *apikey.APIKey, ver string) (*EnrollResponse, string, error) {
 	// Validate that an enrollment record exists for a key with this id.
 	var enrollAPI *model.EnrollmentAPIKey
 	enrollAPI, err := et.retrieveStaticTokenEnrollmentToken(r.Context(), zlog, enrollmentAPIKey)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	if enrollAPI == nil {
 		zlog.Debug().Msgf("Checking enrollment key from database %s", enrollmentAPIKey.ID)
 		key, err := et.fetchEnrollmentKeyRecord(r.Context(), enrollmentAPIKey.ID)
 		if err != nil {
-			return nil, err
+			return nil, "", err
 		}
 		zlog.Debug().Msgf("Found enrollment key %s", key.APIKeyID)
 		enrollAPI = key
@@ -138,12 +138,18 @@ func (et *EnrollerT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, 
 	// Parse the request body
 	req, err := validateRequest(r.Context(), readCounter)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	cntEnroll.bodyIn.Add(readCounter.Count())
 
-	return et._enroll(r.Context(), rb, zlog, req, enrollAPI.PolicyID, enrollAPI.Namespaces, ver)
+	var enrollmentID string
+	if req.EnrollmentId != nil {
+		enrollmentID = *req.EnrollmentId
+	}
+
+	resp, err := et._enroll(r.Context(), rb, zlog, req, enrollAPI.PolicyID, enrollAPI.Namespaces, ver)
+	return resp, enrollmentID, err
 }
 
 // retrieveStaticTokenEnrollmentToken fetches the enrollment key record from the config static tokens.
@@ -570,7 +576,7 @@ LOOP:
 	return nil
 }
 
-func writeResponse(ctx context.Context, zlog zerolog.Logger, w http.ResponseWriter, resp *EnrollResponse, start time.Time) error {
+func writeResponse(ctx context.Context, zlog zerolog.Logger, w http.ResponseWriter, resp *EnrollResponse, enrollmentID string, start time.Time) error {
 	span, _ := apm.StartSpan(ctx, "response", "write")
 	defer span.End()
 
@@ -590,6 +596,7 @@ func writeResponse(ctx context.Context, zlog zerolog.Logger, w http.ResponseWrit
 		Str(LogAgentID, resp.Item.Id).
 		Str(LogPolicyID, resp.Item.PolicyId).
 		Str(LogAccessAPIKeyID, resp.Item.AccessApiKeyId).
+		Str("enrollment_id", enrollmentID).
 		Int(ECSHTTPResponseBodyBytes, numWritten).
 		Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
 		Msg("Elastic Agent successfully enrolled")
