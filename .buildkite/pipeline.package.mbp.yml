@@ -159,17 +159,16 @@ steps:
       - *oidc_plugin
       - *docker_elastic_login_plugin
 
-  - label: "DRA snapshot"
+  - label: ":pipeline: Generate DRA steps (snapshot)"
     if: "${FILE_EXISTS_IN_REPO} && build.env('VERSION_QUALIFIER') == null"
     key: "dra-snapshot"
-    command: ".buildkite/scripts/dra_release.sh snapshot"
+    command: ".buildkite/scripts/dra.sh snapshot"
     agents:
       provider: "gcp"
       image: "${IMAGE_UBUNTU_X86_64}"
       machineType: "c2-standard-16"
     plugins:
       - *oidc_plugin
-      - *docker_elastic_login_plugin
     depends_on:
       - step: "package-x86-64-snapshot"
         allow_failure: false
@@ -180,21 +179,20 @@ steps:
       - step: "package-fips-arm-snapshot"
         allow_failure: false
 
-  - label: "DRA release staging"
+  - label: ":pipeline: Generate DRA steps (staging)"
     # we don't usually build staging from the main branch, but we exceptionally allow it for prereleases
     # details in https://github.com/elastic/ingest-dev/issues/4855
     if: "${FILE_EXISTS_IN_REPO} == true && (build.env('BUILDKITE_BRANCH') != 'main' || build.env('VERSION_QUALIFIER') != null)"
     key: "dra-staging"
     command: |
       source .buildkite/scripts/version_qualifier.sh
-      .buildkite/scripts/dra_release.sh staging
+      .buildkite/scripts/dra.sh staging
     agents:
       provider: "gcp"
       image: "${IMAGE_UBUNTU_X86_64}"
       machineType: "c2-standard-16"
     plugins:
       - *oidc_plugin
-      - *docker_elastic_login_plugin
     depends_on:
       - step: "package-x86-64-staging"
         allow_failure: false
