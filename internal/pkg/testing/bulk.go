@@ -7,7 +7,7 @@ package testing
 import (
 	"context"
 
-	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v9"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"go.elastic.co/apm/v2"

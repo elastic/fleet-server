@@ -13,7 +13,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v9"
 	"github.com/elastic/go-ucfg/yaml"
 	"github.com/rs/xid"
 
