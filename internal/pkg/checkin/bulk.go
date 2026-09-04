@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"sync"
 	"time"
 
@@ -385,7 +386,7 @@ func (bc *Bulk) flush(ctx context.Context) error {
 		opts = append(opts, bulk.WithRefresh())
 	}
 
-	_, err = bc.bulker.MUpdate(ctx, updates, opts...)
+	items, err := bc.bulker.MUpdate(ctx, updates, opts...)
 
 	zerolog.Ctx(ctx).Trace().
 		Err(err).
@@ -394,7 +395,43 @@ func (bc *Bulk) flush(ctx context.Context) error {
 		Bool("refresh", needRefresh).
 		Msg("Flush updates")
 
+	logCheckinBulkErrors(zerolog.Ctx(ctx), items)
+
 	return err
+}
+
+// logCheckinBulkErrors logs a summary when MUpdate returns per-item ES failures.
+// Version conflicts on updating→online transitions are otherwise silently dropped.
+func logCheckinBulkErrors(zlog *zerolog.Logger, items []bulk.BulkIndexerResponseItem) {
+	var totalErr, versionConflicts int
+	var sampleID string
+	var sampleStatus int
+	var sampleErr json.RawMessage
+	for _, item := range items {
+		if item.Status >= http.StatusBadRequest {
+			if totalErr == 0 {
+				sampleID = item.DocumentID
+				sampleStatus = item.Status
+				sampleErr = item.Error
+			}
+			totalErr++
+			if item.Status == http.StatusConflict {
+				versionConflicts++
+			}
+		}
+	}
+	if totalErr > 0 {
+		ev := zlog.Warn().
+			Int("failed", totalErr).
+			Int("version_conflicts", versionConflicts).
+			Int("total", len(items)).
+			Str("sample_agent_id", sampleID).
+			Int("sample_status", sampleStatus)
+		if len(sampleErr) > 0 {
+			ev = ev.RawJSON("sample_error", sampleErr)
+		}
+		ev.Msg("checkin bulk: per-item ES write failures")
+	}
 }
 
 func toUpdateBody(now string, pending pendingT) ([]byte, error) {
