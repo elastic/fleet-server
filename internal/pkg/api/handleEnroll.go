@@ -592,11 +592,14 @@ func writeResponse(ctx context.Context, zlog zerolog.Logger, w http.ResponseWrit
 		return fmt.Errorf("fail send enroll response: %w", err)
 	}
 
-	zlog.Info().
+	logEvent := zlog.Info().
 		Str(LogAgentID, resp.Item.Id).
 		Str(LogPolicyID, resp.Item.PolicyId).
-		Str(LogAccessAPIKeyID, resp.Item.AccessApiKeyId).
-		Str("enrollment_id", enrollmentID).
+		Str(LogAccessAPIKeyID, resp.Item.AccessApiKeyId)
+	if enrollmentID != "" {
+		logEvent = logEvent.Str("enrollment_id", enrollmentID)
+	}
+	logEvent.
 		Int(ECSHTTPResponseBodyBytes, numWritten).
 		Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
 		Msg("Elastic Agent successfully enrolled")
