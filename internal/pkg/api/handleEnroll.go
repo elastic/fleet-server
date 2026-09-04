@@ -597,7 +597,7 @@ func writeResponse(ctx context.Context, zlog zerolog.Logger, w http.ResponseWrit
 		Str(LogPolicyID, resp.Item.PolicyId).
 		Str(LogAccessAPIKeyID, resp.Item.AccessApiKeyId)
 	if enrollmentID != "" {
-		logEvent = logEvent.Str("enrollment_id", enrollmentID)
+		logEvent = logEvent.Str(dl.FieldEnrollmentID, enrollmentID)
 	}
 	logEvent.
 		Int(ECSHTTPResponseBodyBytes, numWritten).
