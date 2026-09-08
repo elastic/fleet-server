@@ -2090,3 +2090,88 @@ func TestProcessPolicySecretPathsConcurrentDispatch(t *testing.T) {
 	}
 	assert.Equal(t, baseline, pp.SecretKeys, "shared ParsedPolicy.SecretKeys was mutated")
 }
+
+func TestPrepareOTelExportersOTLP(t *testing.T) {
+	const (
+		outputName = "my-otlp-output"
+		rawAPIKey  = "key-id:key-secret"
+	)
+	wantHeader := "ApiKey " + base64.StdEncoding.EncodeToString([]byte(rawAPIKey))
+
+	tests := []struct {
+		name        string
+		exporterID  string
+		outputType  string
+		apiKey      string
+		wantErr     bool
+		wantHeader  string
+		wantNoWrite bool // exporter config must be unchanged (no headers injected)
+	}{
+		{
+			name:       "otlp exporter with mOTLP api_key — injects Authorization header",
+			exporterID: "otlp/" + outputName,
+			outputType: policy.OutputTypeOTLP,
+			apiKey:     rawAPIKey,
+			wantHeader: wantHeader,
+		},
+		{
+			name:       "otlphttp exporter with mOTLP api_key — injects Authorization header",
+			exporterID: "otlphttp/" + outputName,
+			outputType: policy.OutputTypeOTLP,
+			apiKey:     rawAPIKey,
+			wantHeader: wantHeader,
+		},
+		{
+			name:        "otlp exporter with no api_key — external OTLP, config unchanged",
+			exporterID:  "otlp/" + outputName,
+			outputType:  policy.OutputTypeOTLP,
+			apiKey:      "",
+			wantNoWrite: true,
+		},
+		{
+			name:        "otlphttp exporter with no api_key — external OTLP, config unchanged",
+			exporterID:  "otlphttp/" + outputName,
+			outputType:  policy.OutputTypeOTLP,
+			apiKey:      "",
+			wantNoWrite: true,
+		},
+		{
+			name:       "otlp exporter with wrong output type — returns error",
+			exporterID: "otlp/" + outputName,
+			outputType: policy.OutputTypeElasticsearch,
+			apiKey:     rawAPIKey,
+			wantErr:    true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			outputs := map[string]map[string]any{
+				outputName: {"type": tc.outputType},
+			}
+			if tc.apiKey != "" {
+				outputs[outputName]["api_key"] = tc.apiKey
+			}
+			exporters := map[string]any{
+				tc.exporterID: map[string]any{},
+			}
+
+			err := prepareOTelExporters(outputs, exporters)
+
+			if tc.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+
+			cfg := exporters[tc.exporterID].(map[string]any)
+			if tc.wantNoWrite {
+				assert.Empty(t, cfg["headers"], "headers must not be injected for external OTLP output")
+			} else {
+				headers, ok := cfg["headers"].(map[string]any)
+				require.True(t, ok, "headers must be a map")
+				assert.Equal(t, tc.wantHeader, headers["Authorization"])
+			}
+		})
+	}
+}

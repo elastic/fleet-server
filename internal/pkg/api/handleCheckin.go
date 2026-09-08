@@ -1262,6 +1262,22 @@ func prepareOTelExporters(outputs map[string]map[string]any, exporters map[strin
 				return fmt.Errorf("api key not found in output %q for exporter %q", name, id)
 			}
 			config["api_key"] = base64.StdEncoding.EncodeToString([]byte(apiKey))
+		case "otlp", "otlphttp":
+			ot, ok := output["type"].(string)
+			if !ok || ot != policy.OutputTypeOTLP {
+				return fmt.Errorf("unexpected output type %q found for exporter %q", ot, id)
+			}
+			apiKey, _ := output["api_key"].(string)
+			if apiKey == "" {
+				// External OTLP output — auth is already embedded in the exporter config by Kibana.
+				break
+			}
+			headers, _ := config["headers"].(map[string]any)
+			if headers == nil {
+				headers = make(map[string]any)
+			}
+			headers["Authorization"] = "ApiKey " + base64.StdEncoding.EncodeToString([]byte(apiKey))
+			config["headers"] = headers
 		default:
 			return fmt.Errorf("OTel exporter %q not supported", exporterType)
 		}
