@@ -13,10 +13,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -1159,4 +1162,86 @@ func TestValidateCheckinRequest(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestProcessPolicySecretPathsConcurrentDispatch ensures processPolicy does not
+// mutate the shared ParsedPolicy.SecretKeys when concurrent checkin goroutines
+// process the same policy revision fan-out.
+// Regression test for https://github.com/elastic/fleet-server/issues/7739
+func TestProcessPolicySecretPathsConcurrentDispatch(t *testing.T) {
+	logger := testlog.SetLogger(t)
+
+	// Two input-level secrets so the sort in processPolicy has real work to do.
+	const payload = `{
+		"outputs": {
+			"default": {
+				"type": "logstash"
+			}
+		},
+		"inputs": [
+			{
+				"type": "logfile",
+				"vars": {
+					"username": "$co.elastic.secret{SEC_A}",
+					"password": "$co.elastic.secret{SEC_B}"
+				}
+			}
+		],
+		"secret_references": [
+			{"id": "SEC_A"},
+			{"id": "SEC_B"}
+		]
+	}`
+
+	const agents = 2
+
+	var d model.PolicyData
+	err := json.Unmarshal([]byte(payload), &d)
+	require.NoError(t, err)
+
+	bulker := ftesting.NewMockBulk()
+	pp, err := policy.NewParsedPolicy(t.Context(), bulker, model.Policy{
+		PolicyID:    "policy1",
+		RevisionIdx: 1,
+		Data:        &d,
+	})
+	require.NoError(t, err)
+
+	baseline := slices.Clone(pp.SecretKeys)
+	require.Len(t, baseline, 2, "expected two input secret keys from NewParsedPolicy")
+
+	var wg sync.WaitGroup
+	secretPaths := make([][]string, agents)
+	errs := make([]error, agents)
+	for a := range agents {
+		wg.Add(1)
+		a := a
+		go func() {
+			defer wg.Done()
+			agent := &model.Agent{
+				ESDocument: model.ESDocument{Id: fmt.Sprintf("agent%d", a)},
+			}
+			action, err := processPolicy(t.Context(), logger, bulker, agent, pp)
+			if err != nil {
+				errs[a] = err
+				return
+			}
+			pc, err := action.Data.AsActionPolicyChange()
+			if err != nil {
+				errs[a] = err
+				return
+			}
+			if pc.Policy.SecretPaths != nil {
+				secretPaths[a] = *pc.Policy.SecretPaths
+			}
+		}()
+	}
+	wg.Wait()
+
+	for a := range agents {
+		require.NoError(t, errs[a], "agent %d processPolicy failed", a)
+		assert.Equal(t, []string{"inputs.0.vars.password", "inputs.0.vars.username"}, secretPaths[a],
+			"agent %d received incorrect secret paths", a)
+	}
+	assert.Equal(t, baseline, pp.SecretKeys, "shared ParsedPolicy.SecretKeys was mutated")
 }
