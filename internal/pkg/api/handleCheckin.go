@@ -854,6 +854,9 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 	}
 
 	data := model.ClonePolicyData(pp.Policy.Data)
+	// Clone pp.SecretKeys so concurrent processPolicy calls for the same policy
+	// revision do not race on the shared ParsedPolicy field.
+	secretKeys := slices.Clone(pp.SecretKeys)
 	for policyName, policyOutput := range data.Outputs {
 		// NOTE: Not sure if output secret keys collected here include new entries, but they are collected for completeness
 		ks, err := policy.ProcessOutputSecret(ctx, policyOutput, bulker) // makes a bulk request to get secret values
@@ -861,7 +864,7 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 			return nil, fmt.Errorf("failed to process output secrets %q: %w",
 				policyName, err)
 		}
-		pp.SecretKeys = append(pp.SecretKeys, ks...)
+		secretKeys = append(secretKeys, ks...)
 	}
 	// Iterate through the policy outputs and prepare them
 	for _, policyOutput := range pp.Outputs {
@@ -884,8 +887,8 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 		return nil, err
 	}
 	// remove duplicates from secretkeys
-	slices.Sort(pp.SecretKeys)
-	keys := slices.Compact(pp.SecretKeys)
+	slices.Sort(secretKeys)
+	keys := slices.Compact(secretKeys)
 	d.SecretPaths = &keys
 	ad := Action_Data{}
 	err = ad.FromActionPolicyChange(ActionPolicyChange{d})
