@@ -475,7 +475,7 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 
 	// Handle upgrade details for agents using the new 8.11 upgrade details field of the checkin.
 	// Older agents will communicate any issues with upgrades via the Ack endpoint.
-	if err := ct.processUpgradeDetails(r.Context(), agent, req.UpgradeDetails); err != nil {
+	if err := ct.processUpgradeDetails(r.Context(), agent, req.UpgradeDetails, ver); err != nil {
 		return fmt.Errorf("failed to update upgrade_details: %w", err)
 	}
 
@@ -647,9 +647,10 @@ func (ct *CheckinT) verifyActionExists(vCtx context.Context, vSpan *apm.Span, ag
 // if the agent doc and checkin details are both nil the method is a nop
 // if the checkin upgrade_details is nil but there was a previous value in the agent doc, fleet-server treats it as a successful upgrade
 // otherwise the details are validated; action_id is checked and upgrade_details.metadata is validated based on upgrade_details.state and the agent doc is updated.
-func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agent, details *UpgradeDetails) error {
+// ver is the agent's new version string if it differs from the stored version, or empty if unchanged.
+func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agent, details *UpgradeDetails, ver string) error {
 	if details == nil {
-		err := ct.markUpgradeComplete(ctx, agent)
+		err := ct.markUpgradeComplete(ctx, agent, ver)
 		if err != nil {
 			return err
 		}
@@ -754,17 +755,23 @@ func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agen
 	return ct.bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3))
 }
 
-func (ct *CheckinT) markUpgradeComplete(ctx context.Context, agent *model.Agent) error {
-	// nop if neither the agent doc nor the checkin have upgrade details, and no upgrade is in progress.
-	// When upgrade_started_at is set but upgrade_details is nil, the agent completed its upgrade
-	// before Fleet Server observed any upgrade_details states (fast upgrade race). Treat as success.
+func (ct *CheckinT) markUpgradeComplete(ctx context.Context, agent *model.Agent, ver string) error {
+	// NOP: no upgrade in progress and no stored upgrade state to clear.
 	if agent.UpgradeDetails == nil && agent.UpgradeStartedAt == "" {
+		return nil
+	}
+	// NOP: upgrade was dispatched (upgrade_started_at is set) but the agent has not yet changed
+	// version and has sent no upgrade_details — it has not yet received or completed the upgrade
+	// action. Do not prematurely clear upgrade_started_at on the first checkin after dispatch.
+	// ver is non-empty only when the agent's reported version differs from its stored version.
+	if agent.UpgradeDetails == nil && agent.UpgradeStartedAt != "" && ver == "" {
 		return nil
 	}
 	span, ctx := apm.StartSpan(ctx, "Mark update complete", "update")
 	span.Context.SetLabel("agent_id", agent.Agent.ID)
 	defer span.End()
-	// if the checkin had no details, but agent has details (or upgrade_started_at set), treat like a successful upgrade
+	// Checkin had no upgrade_details but agent either had stored details (normal upgrade path) or
+	// changed version without intermediate details (fast upgrade race). Treat as successful upgrade.
 	doc := bulk.UpdateFields{
 		dl.FieldUpgradeDetails:   nil,
 		dl.FieldUpgradeStartedAt: nil,

@@ -403,6 +403,7 @@ func TestProcessUpgradeDetails(t *testing.T) {
 		name    string
 		agent   *model.Agent
 		details *UpgradeDetails
+		ver     string
 		bulk    func() *ftesting.MockBulk
 		cache   func() *testcache.MockCache
 		err     error
@@ -419,8 +420,9 @@ func TestProcessUpgradeDetails(t *testing.T) {
 		err: nil,
 	}, {
 		name:    "agent has upgrade_started_at but no upgrade_details, checkin details are nil (fast upgrade race)",
-		agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}, UpgradeStartedAt: "2024-01-01T00:00:00Z"},
+		agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent", Version: "8.19.0"}, UpgradeStartedAt: "2024-01-01T00:00:00Z"},
 		details: nil,
+		ver:     "8.20.0", // agent restarted at new version
 		bulk: func() *ftesting.MockBulk {
 			mBulk := ftesting.NewMockBulk()
 			mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.MatchedBy(func(p []byte) bool {
@@ -436,6 +438,18 @@ func TestProcessUpgradeDetails(t *testing.T) {
 				return doc.Doc[dl.FieldUpgradeDetails] == nil && doc.Doc[dl.FieldUpgradeStartedAt] == nil && ok && isStr && upgradedAtStr != ""
 			}), mock.Anything, mock.Anything).Return(nil)
 			return mBulk
+		},
+		cache: func() *testcache.MockCache {
+			return testcache.NewMockCache()
+		},
+		err: nil,
+	}, {
+		name:    "agent has upgrade_started_at but no upgrade_details, first checkin after dispatch (same version, upgrade not yet received)",
+		agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent", Version: "8.19.0"}, UpgradeStartedAt: "2024-01-01T00:00:00Z"},
+		details: nil,
+		ver:     "", // version unchanged — upgrade action not yet received by agent
+		bulk: func() *ftesting.MockBulk {
+			return ftesting.NewMockBulk() // no Update call expected
 		},
 		cache: func() *testcache.MockCache {
 			return testcache.NewMockCache()
@@ -819,7 +833,7 @@ func TestProcessUpgradeDetails(t *testing.T) {
 				bulker: mBulk,
 			}
 
-			err := ct.processUpgradeDetails(context.Background(), tc.agent, tc.details)
+			err := ct.processUpgradeDetails(context.Background(), tc.agent, tc.details, tc.ver)
 			if tc.err == nil {
 				assert.NoError(t, err)
 			} else {
