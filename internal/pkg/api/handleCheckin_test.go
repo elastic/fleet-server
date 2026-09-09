@@ -481,6 +481,31 @@ func TestProcessUpgradeDetails(t *testing.T) {
 		},
 		err: nil,
 	}, {
+		name: "agent has stale upgrade_started_at with fractional seconds (RFC3339Nano), same version (self-heal)",
+		// upgrade_started_at uses fractional seconds as Kibana may produce; must still parse and self-heal
+		agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent", Version: "8.19.0"}, UpgradeStartedAt: time.Now().Add(-3 * time.Hour).UTC().Format(time.RFC3339Nano)},
+		details: nil,
+		ver:     "",
+		bulk: func() *ftesting.MockBulk {
+			mBulk := ftesting.NewMockBulk()
+			mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.MatchedBy(func(p []byte) bool {
+				doc := struct {
+					Doc map[string]any `json:"doc"`
+				}{}
+				if err := json.Unmarshal(p, &doc); err != nil {
+					t.Logf("bulk match unmarshal error: %v", err)
+					return false
+				}
+				_, hasUpgradedAt := doc.Doc[dl.FieldUpgradedAt]
+				return doc.Doc[dl.FieldUpgradeDetails] == nil && doc.Doc[dl.FieldUpgradeStartedAt] == nil && !hasUpgradedAt
+			}), mock.Anything, mock.Anything).Return(nil)
+			return mBulk
+		},
+		cache: func() *testcache.MockCache {
+			return testcache.NewMockCache()
+		},
+		err: nil,
+	}, {
 		name:    "agent has details checkin details are nil",
 		agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}, UpgradeDetails: &model.UpgradeDetails{}},
 		details: nil,

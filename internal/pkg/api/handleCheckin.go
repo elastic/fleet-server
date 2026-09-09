@@ -779,6 +779,9 @@ func (ct *CheckinT) markUpgradeComplete(ctx context.Context, agent *model.Agent,
 	// In the stale case upgraded_at is NOT set because the upgrade outcome is unknown.
 	if agent.UpgradeDetails == nil && agent.UpgradeStartedAt != "" && ver == "" {
 		t, err := time.Parse(time.RFC3339, agent.UpgradeStartedAt)
+		if err != nil {
+			t, err = time.Parse(time.RFC3339Nano, agent.UpgradeStartedAt)
+		}
 		if err != nil || time.Since(t) < ct.stalenessThreshold() {
 			return nil
 		}
