@@ -27,7 +27,7 @@ Known issues are significant defects or limitations that may impact your impleme
 
 **Applies to: {{fleet}} 9.4.6, 9.5.3**
 
-On August 28, 2026, a known issue was discoverd where {{agent}} can enter a crash-restart loop immediately after startup
+On August 28, 2026, a known issue was discovered where {{agent}} can enter a crash-restart loop immediately after startup
 or after a policy update when the agent policy is configured to use a remote Elasticsearch output for agent monitoring.
 The {{agent}} crashes with
 
