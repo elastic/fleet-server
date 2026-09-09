@@ -755,14 +755,16 @@ func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agen
 }
 
 func (ct *CheckinT) markUpgradeComplete(ctx context.Context, agent *model.Agent) error {
-	// nop if there are no checkin details, and the agent has no details
-	if agent.UpgradeDetails == nil {
+	// nop if neither the agent doc nor the checkin have upgrade details, and no upgrade is in progress.
+	// When upgrade_started_at is set but upgrade_details is nil, the agent completed its upgrade
+	// before Fleet Server observed any upgrade_details states (fast upgrade race). Treat as success.
+	if agent.UpgradeDetails == nil && agent.UpgradeStartedAt == "" {
 		return nil
 	}
 	span, ctx := apm.StartSpan(ctx, "Mark update complete", "update")
 	span.Context.SetLabel("agent_id", agent.Agent.ID)
 	defer span.End()
-	// if the checkin had no details, but agent has details treat like a successful upgrade
+	// if the checkin had no details, but agent has details (or upgrade_started_at set), treat like a successful upgrade
 	doc := bulk.UpdateFields{
 		dl.FieldUpgradeDetails:   nil,
 		dl.FieldUpgradeStartedAt: nil,

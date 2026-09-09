@@ -418,6 +418,28 @@ func TestProcessUpgradeDetails(t *testing.T) {
 		},
 		err: nil,
 	}, {
+		name:    "agent has upgrade_started_at but no upgrade_details, checkin details are nil (fast upgrade race)",
+		agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}, UpgradeStartedAt: "2024-01-01T00:00:00Z"},
+		details: nil,
+		bulk: func() *ftesting.MockBulk {
+			mBulk := ftesting.NewMockBulk()
+			mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.MatchedBy(func(p []byte) bool {
+				doc := struct {
+					Doc map[string]any `json:"doc"`
+				}{}
+				if err := json.Unmarshal(p, &doc); err != nil {
+					t.Logf("bulk match unmarshal error: %v", err)
+					return false
+				}
+				return doc.Doc[dl.FieldUpgradeDetails] == nil && doc.Doc[dl.FieldUpgradeStartedAt] == nil && doc.Doc[dl.FieldUpgradedAt] != ""
+			}), mock.Anything, mock.Anything).Return(nil)
+			return mBulk
+		},
+		cache: func() *testcache.MockCache {
+			return testcache.NewMockCache()
+		},
+		err: nil,
+	}, {
 		name:    "agent has details checkin details are nil",
 		agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}, UpgradeDetails: &model.UpgradeDetails{}},
 		details: nil,
