@@ -16,7 +16,7 @@ require (
 	github.com/aclements/go-moremath v0.0.0-20210112150236-f10218a38794 // indirect
 	github.com/cyphar/filepath-securejoin v0.4.1 // indirect
 	github.com/dprotaso/go-yit v0.0.0-20220510233725-9ba8df137936 // indirect
-	github.com/elastic/go-json-schema-generate v0.0.0-20220323152209-ec19b88f6b5e // indirect
+	github.com/elastic/go-json-schema-generate v0.0.0-20220519132038-c708d18d6ca2 // indirect
 	github.com/elastic/go-licenser v0.4.2 // indirect
 	github.com/getkin/kin-openapi v0.132.0 // indirect
 	github.com/go-openapi/jsonpointer v0.21.0 // indirect
