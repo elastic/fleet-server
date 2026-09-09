@@ -28,7 +28,7 @@ Known issues are significant defects or limitations that may impact your impleme
 **Applies to: {{fleet}} 9.4.6, 9.5.3**
 
 On August 28, 2026, a known issue was discoverd where {{agent}} can enter a crash-restart loop immediately after startup
-or after a policy update when the agent policy is configured to use a remote {{es}} output for agent monitoring.
+or after a policy update when the agent policy is configured to use a remote Elasticsearch output for agent monitoring.
 The {{agent}} crashes with
 
 ```shell
@@ -38,8 +38,9 @@ making {{agent}} unreachable. A fix will be included in {{fleet}} 9.4.7 and 9.5.
 
 **Workaround**
 
-In {{fleet}}, navigate to the affected agent policy and change the Output for agent monitoring from the remote {{es}}
-output to the local (default) {{es}} output. This prevents the corrupted policy from being generated.
+In {{fleet}}, navigate to the affected agent policy and change the Output for agent monitoring from the remote 
+Elasticsearch output to the local (default) Elasticsearch output. This prevents the corrupted policy from
+being generated.
 
 For agents already stuck in a crash loop, stop the agent service and delete `state.enc` from the {{agent}} `data` directory,
 then restart. Restarting clears the corrupted state without requiring re-enrollment.
