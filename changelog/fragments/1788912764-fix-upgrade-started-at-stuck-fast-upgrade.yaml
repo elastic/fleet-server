@@ -2,10 +2,6 @@ kind: bug-fix
 
 summary: Fix agent permanently stuck in "updating" state after fast upgrade
 
-# When an agent upgrades faster than one checkin interval, Fleet Server never
-# observes any upgrade_details states. markUpgradeComplete was a NOP when
-# upgrade_details was nil on both the checkin body and the agent doc, leaving
-# upgrade_started_at set indefinitely and the agent permanently "updating".
 description: |
   When an Elastic Agent completes an upgrade faster than one checkin interval
   (~60 s), Fleet Server never observes any intermediate upgrade_details states
@@ -16,10 +12,20 @@ description: |
   upgrade_started_at was never cleared. This left the agent permanently in the
   "updating" state in Fleet UI, even though it had successfully upgraded.
 
-  The fix extends the NOP guard to also check upgrade_started_at: if an upgrade
-  was dispatched (upgrade_started_at is set) but no upgrade_details were ever
-  recorded (fast upgrade race), Fleet Server now correctly clears
-  upgrade_started_at on the next checkin with nil upgrade_details and marks the
-  upgrade complete.
+  Two related fixes are included:
+
+  1. Fast-upgrade race: if upgrade_started_at is set and the agent's reported
+     version differs from its stored version (indicating the agent restarted
+     after a fast upgrade), Fleet Server now correctly clears upgrade_started_at
+     and marks the upgrade complete on the next checkin with nil upgrade_details.
+
+  2. Stale self-heal: in mixed-version deployments (rolling fleet-server
+     upgrade), an older instance may update the agent version without clearing
+     upgrade_started_at, leaving the agent stuck with no future version change
+     to trigger fix (1). As a safety net, if upgrade_started_at is older than
+     2× the configured checkin_max_poll with no associated upgrade_details,
+     Fleet Server now clears upgrade_started_at unconditionally to unblock the
+     Fleet UI. In this case upgraded_at is not set because the upgrade outcome
+     cannot be determined from available state.
 
 component: fleet-server
