@@ -445,11 +445,36 @@ func TestProcessUpgradeDetails(t *testing.T) {
 		err: nil,
 	}, {
 		name:    "agent has upgrade_started_at but no upgrade_details, first checkin after dispatch (same version, upgrade not yet received)",
-		agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent", Version: "8.19.0"}, UpgradeStartedAt: "2024-01-01T00:00:00Z"},
+		agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent", Version: "8.19.0"}, UpgradeStartedAt: time.Now().UTC().Format(time.RFC3339)},
 		details: nil,
-		ver:     "", // version unchanged — upgrade action not yet received by agent
+		ver:     "", // version unchanged — upgrade action not yet received by agent; upgrade_started_at is fresh so staleness guard applies
 		bulk: func() *ftesting.MockBulk {
 			return ftesting.NewMockBulk() // no Update call expected
+		},
+		cache: func() *testcache.MockCache {
+			return testcache.NewMockCache()
+		},
+		err: nil,
+	}, {
+		name:    "agent has stale upgrade_started_at but no upgrade_details, same version (self-heal after rolling fleet-server upgrade)",
+		agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent", Version: "8.19.0"}, UpgradeStartedAt: time.Now().Add(-upgradeStartedAtStalenessThreshold - time.Minute).UTC().Format(time.RFC3339)},
+		details: nil,
+		ver:     "", // version matches stored — upgrade_started_at is stale so we clear it anyway
+		bulk: func() *ftesting.MockBulk {
+			mBulk := ftesting.NewMockBulk()
+			mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.MatchedBy(func(p []byte) bool {
+				doc := struct {
+					Doc map[string]any `json:"doc"`
+				}{}
+				if err := json.Unmarshal(p, &doc); err != nil {
+					t.Logf("bulk match unmarshal error: %v", err)
+					return false
+				}
+				upgradedAt, ok := doc.Doc[dl.FieldUpgradedAt]
+				upgradedAtStr, isStr := upgradedAt.(string)
+				return doc.Doc[dl.FieldUpgradeDetails] == nil && doc.Doc[dl.FieldUpgradeStartedAt] == nil && ok && isStr && upgradedAtStr != ""
+			}), mock.Anything, mock.Anything).Return(nil)
+			return mBulk
 		},
 		cache: func() *testcache.MockCache {
 			return testcache.NewMockCache()

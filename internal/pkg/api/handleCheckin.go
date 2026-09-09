@@ -62,6 +62,15 @@ const (
 	invalidKeyStateReset         = time.Hour
 	invalidKeyStateCleanInterval = 5 * time.Minute
 
+	// upgradeStartedAtStalenessThreshold is the age beyond which an upgrade_started_at value
+	// with no associated upgrade_details is treated as stale and cleared. This covers the case
+	// where the agent completed a fast upgrade (no intermediate upgrade_details), but a prior
+	// Fleet Server instance (rolling upgrade) already updated the agent version in the document
+	// without clearing upgrade_started_at — so ver == "" on subsequent checkins even though the
+	// upgrade is done. The threshold must exceed the maximum poll duration to avoid prematurely
+	// clearing upgrade_started_at on the first checkin after bulk_upgrade (before action delivery).
+	upgradeStartedAtStalenessThreshold = 10 * time.Minute
+
 	invalidKeyLRUEntryBytes = 250
 )
 
@@ -644,9 +653,16 @@ func (ct *CheckinT) verifyActionExists(vCtx context.Context, vSpan *apm.Span, ag
 }
 
 // processUpgradeDetails will verify and set the upgrade_details section of an agent document based on checkin value.
-// if the agent doc and checkin details are both nil the method is a nop
-// if the checkin upgrade_details is nil but there was a previous value in the agent doc, fleet-server treats it as a successful upgrade
-// otherwise the details are validated; action_id is checked and upgrade_details.metadata is validated based on upgrade_details.state and the agent doc is updated.
+// When the checkin upgrade_details is nil, markUpgradeComplete is called, which handles three cases:
+//   - NOP if there is no upgrade in progress (upgrade_started_at empty and no stored upgrade_details).
+//   - NOP if an upgrade was dispatched (upgrade_started_at set) but the agent has not yet changed version
+//     or reported any upgrade_details — the upgrade action has not been received/completed yet. This guard
+//     is bypassed for stale upgrade_started_at values (older than upgradeStartedAtStalenessThreshold).
+//   - Mark complete if the agent had stored upgrade_details (normal upgrade path) or changed version
+//     without any intermediate details (fast upgrade race: upgrade completed in < 1 checkin interval).
+//
+// When the checkin upgrade_details is non-nil, the details are validated: action_id is checked and
+// upgrade_details.metadata is validated based on upgrade_details.state, then the agent doc is updated.
 // ver is the agent's new version string if it differs from the stored version, or empty if unchanged.
 func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agent, details *UpgradeDetails, ver string) error {
 	if details == nil {
@@ -764,8 +780,17 @@ func (ct *CheckinT) markUpgradeComplete(ctx context.Context, agent *model.Agent,
 	// version and has sent no upgrade_details — it has not yet received or completed the upgrade
 	// action. Do not prematurely clear upgrade_started_at on the first checkin after dispatch.
 	// ver is non-empty only when the agent's reported version differs from its stored version.
+	//
+	// Exception: if upgrade_started_at is stale (older than upgradeStartedAtStalenessThreshold),
+	// clear it anyway. This self-heals agents that completed a fast upgrade but whose version
+	// was already updated by a prior Fleet Server instance (e.g. during a rolling fleet-server
+	// upgrade), leaving ver == "" on subsequent checkins.
 	if agent.UpgradeDetails == nil && agent.UpgradeStartedAt != "" && ver == "" {
-		return nil
+		t, err := time.Parse(time.RFC3339, agent.UpgradeStartedAt)
+		if err != nil || time.Since(t) < upgradeStartedAtStalenessThreshold {
+			return nil
+		}
+		// fall through to clear the stale upgrade_started_at below
 	}
 	span, ctx := apm.StartSpan(ctx, "Mark update complete", "update")
 	span.Context.SetLabel("agent_id", agent.Agent.ID)
