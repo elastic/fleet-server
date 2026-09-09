@@ -456,10 +456,11 @@ func TestProcessUpgradeDetails(t *testing.T) {
 		},
 		err: nil,
 	}, {
-		name:    "agent has stale upgrade_started_at but no upgrade_details, same version (self-heal after rolling fleet-server upgrade)",
-		agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent", Version: "8.19.0"}, UpgradeStartedAt: time.Now().Add(-upgradeStartedAtStalenessThreshold - time.Minute).UTC().Format(time.RFC3339)},
+		name: "agent has stale upgrade_started_at but no upgrade_details, same version (self-heal after rolling fleet-server upgrade)",
+		// upgrade_started_at older than 2× default CheckinMaxPoll (2h); cfg is nil in tests so fallback = 2h
+		agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent", Version: "8.19.0"}, UpgradeStartedAt: time.Now().Add(-3 * time.Hour).UTC().Format(time.RFC3339)},
 		details: nil,
-		ver:     "", // version matches stored — upgrade_started_at is stale so we clear it anyway
+		ver:     "", // version matches stored — upgrade_started_at is stale so we clear it; upgraded_at NOT set (outcome unknown)
 		bulk: func() *ftesting.MockBulk {
 			mBulk := ftesting.NewMockBulk()
 			mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.MatchedBy(func(p []byte) bool {
@@ -470,9 +471,8 @@ func TestProcessUpgradeDetails(t *testing.T) {
 					t.Logf("bulk match unmarshal error: %v", err)
 					return false
 				}
-				upgradedAt, ok := doc.Doc[dl.FieldUpgradedAt]
-				upgradedAtStr, isStr := upgradedAt.(string)
-				return doc.Doc[dl.FieldUpgradeDetails] == nil && doc.Doc[dl.FieldUpgradeStartedAt] == nil && ok && isStr && upgradedAtStr != ""
+				_, hasUpgradedAt := doc.Doc[dl.FieldUpgradedAt]
+				return doc.Doc[dl.FieldUpgradeDetails] == nil && doc.Doc[dl.FieldUpgradeStartedAt] == nil && !hasUpgradedAt
 			}), mock.Anything, mock.Anything).Return(nil)
 			return mBulk
 		},

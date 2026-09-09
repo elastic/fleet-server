@@ -62,15 +62,6 @@ const (
 	invalidKeyStateReset         = time.Hour
 	invalidKeyStateCleanInterval = 5 * time.Minute
 
-	// upgradeStartedAtStalenessThreshold is the age beyond which an upgrade_started_at value
-	// with no associated upgrade_details is treated as stale and cleared. This covers the case
-	// where the agent completed a fast upgrade (no intermediate upgrade_details), but a prior
-	// Fleet Server instance (rolling upgrade) already updated the agent version in the document
-	// without clearing upgrade_started_at — so ver == "" on subsequent checkins even though the
-	// upgrade is done. The threshold must exceed the maximum poll duration to avoid prematurely
-	// clearing upgrade_started_at on the first checkin after bulk_upgrade (before action delivery).
-	upgradeStartedAtStalenessThreshold = 10 * time.Minute
-
 	invalidKeyLRUEntryBytes = 250
 )
 
@@ -781,16 +772,29 @@ func (ct *CheckinT) markUpgradeComplete(ctx context.Context, agent *model.Agent,
 	// action. Do not prematurely clear upgrade_started_at on the first checkin after dispatch.
 	// ver is non-empty only when the agent's reported version differs from its stored version.
 	//
-	// Exception: if upgrade_started_at is stale (older than upgradeStartedAtStalenessThreshold),
-	// clear it anyway. This self-heals agents that completed a fast upgrade but whose version
-	// was already updated by a prior Fleet Server instance (e.g. during a rolling fleet-server
-	// upgrade), leaving ver == "" on subsequent checkins.
+	// Exception: if upgrade_started_at is clearly stale (older than 2× CheckinMaxPoll), clear it
+	// to self-heal agents stuck in the updating state after a rolling fleet-server upgrade where
+	// the version was already updated by an older instance. The threshold uses 2× CheckinMaxPoll
+	// so a legitimately long-running poll (up to CheckinMaxPoll) cannot be mistaken for staleness.
+	// In the stale case upgraded_at is NOT set because the upgrade outcome is unknown.
 	if agent.UpgradeDetails == nil && agent.UpgradeStartedAt != "" && ver == "" {
 		t, err := time.Parse(time.RFC3339, agent.UpgradeStartedAt)
-		if err != nil || time.Since(t) < upgradeStartedAtStalenessThreshold {
+		if err != nil || time.Since(t) < ct.stalenessThreshold() {
 			return nil
 		}
-		// fall through to clear the stale upgrade_started_at below
+		// Stale: clear upgrade_started_at without setting upgraded_at (outcome unknown).
+		span, ctx := apm.StartSpan(ctx, "Clear stale upgrade", "update")
+		span.Context.SetLabel("agent_id", agent.Agent.ID)
+		defer span.End()
+		doc := bulk.UpdateFields{
+			dl.FieldUpgradeDetails:   nil,
+			dl.FieldUpgradeStartedAt: nil,
+		}
+		body, err := doc.Marshal()
+		if err != nil {
+			return err
+		}
+		return ct.bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3))
 	}
 	span, ctx := apm.StartSpan(ctx, "Mark update complete", "update")
 	span.Context.SetLabel("agent_id", agent.Agent.ID)
@@ -807,6 +811,16 @@ func (ct *CheckinT) markUpgradeComplete(ctx context.Context, agent *model.Agent,
 		return err
 	}
 	return ct.bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3))
+}
+
+// stalenessThreshold returns the age beyond which an upgrade_started_at value with no associated
+// upgrade_details is treated as stale and cleared. It is set to 2× CheckinMaxPoll so that a
+// legitimately long-running poll (up to CheckinMaxPoll) cannot be mistaken for a stuck upgrade.
+func (ct *CheckinT) stalenessThreshold() time.Duration {
+	if ct.cfg == nil {
+		return 2 * time.Hour // fallback to 2× the default CheckinMaxPoll of 1h
+	}
+	return 2 * ct.cfg.Timeouts.CheckinMaxPoll
 }
 
 func (ct *CheckinT) writeResponse(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, agent *model.Agent, resp CheckinResponse) error {
