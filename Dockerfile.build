@@ -2,12 +2,8 @@ ARG GO_VERSION
 ARG SUFFIX # Should be main-debian11 or arm
 FROM docker.elastic.co/beats-dev/golang-crossbuild:${GO_VERSION}-${SUFFIX}
 
-# TEMPORARY WORKAROUND: Debian 11 (Bullseye) reached EOL and its security
-# repo InRelease file has expired. check-valid-until=false bypasses the expiry
-# check so the build can proceed. Revert this once the upstream base image fix
-# is merged and published: https://github.com/elastic/golang-crossbuild/pull/754
 RUN \
-  apt-get -o Acquire::Check-Valid-Until=false update \
+  apt-get update \
   && apt-get install --no-install-recommends -y zip \
   && apt-get clean
 
