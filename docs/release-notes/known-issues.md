@@ -28,8 +28,8 @@ Known issues are significant defects or limitations that may impact your impleme
 **Applies to: {{fleet}} 9.4.6, 9.5.3**
 
 On August 28, 2026, a known issue was discovered where {{agent}} can enter a crash-restart loop immediately after startup
-or after a policy update when the agent policy is configured to use a remote Elasticsearch output.
-The {{agent}} crashes with
+or after a policy update when the agent policy is configured to use a remote Elasticsearch output for agent monitoring.
+The {{agent}} crashes with:
 
 ```shell
 panic: runtime error: index out of range [-1] in diagnostics.addSecretMarkers and exits with status INVALIDARGUMENT
@@ -46,7 +46,7 @@ For agents already stuck in a crash loop, stop the agent service and delete `sta
 then restart. Restarting clears the corrupted state without requiring re-enrollment.
 
 For more information, check [Issue #7739](https://github.com/elastic/fleet-server/issues/7739).
-::::
+:::
 
 :::{dropdown} Manual DEB/RPM upgrades of {{fleet}}-managed agents fail when "Agent tamper protection" is enabled
 
