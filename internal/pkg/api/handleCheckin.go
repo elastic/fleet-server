@@ -817,13 +817,14 @@ func (ct *CheckinT) markUpgradeComplete(ctx context.Context, agent *model.Agent,
 }
 
 // stalenessThreshold returns the age beyond which an upgrade_started_at value with no associated
-// upgrade_details is treated as stale and cleared. It is set to 2× CheckinMaxPoll so that a
-// legitimately long-running poll (up to CheckinMaxPoll) cannot be mistaken for a stuck upgrade.
+// upgrade_details is treated as stale and cleared. It is set to 2× the effective CheckinMaxPoll
+// so that a legitimately long-running poll (up to CheckinMaxPoll) cannot be mistaken for a stuck
+// upgrade. The effective minimum of 1m matches the same floor used by the long-poll logic (line 415).
 func (ct *CheckinT) stalenessThreshold() time.Duration {
 	if ct.cfg == nil {
 		return 2 * time.Hour // fallback to 2× the default CheckinMaxPoll of 1h
 	}
-	return 2 * ct.cfg.Timeouts.CheckinMaxPoll
+	return 2 * max(ct.cfg.Timeouts.CheckinMaxPoll, time.Minute)
 }
 
 func (ct *CheckinT) writeResponse(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, agent *model.Agent, resp CheckinResponse) error {
