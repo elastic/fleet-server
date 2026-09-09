@@ -23,7 +23,7 @@ Known issues are significant defects or limitations that may impact your impleme
 % Workaround description.
 % :::
 
-::::{dropdown} {{agent}} crash-loop when a remote Elasticsearch monitoring output is configured.
+:::{dropdown} {{agent}} crash-loop when a remote Elasticsearch monitoring output is configured.
 
 **Applies to: {{fleet}} 9.4.6, 9.5.3**
 
