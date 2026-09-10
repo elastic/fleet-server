@@ -306,12 +306,13 @@ func (m *monitorT) dispatchPending(ctx context.Context) {
 			return
 		}
 
+		cloned := policy.pp.Clone()
 		select {
 		case <-ctx.Done():
 			m.pendingQ.pushFront(s) // context cancelled before sub is handled, put it back
 			m.log.Debug().Err(ctx.Err()).Msg("context termination detected in policy dispatch")
 			return
-		case s.ch <- &policy.pp:
+		case s.ch <- cloned:
 			m.log.Debug().
 				Str(ecs.PolicyID, s.policyID).
 				Int64("subscription_revision_idx", s.revIdx).
