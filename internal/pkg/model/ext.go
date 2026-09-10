@@ -148,7 +148,6 @@ func deepCloneSliceAny(s []any) []any {
 	return r
 }
 
-
 // cloneMap does a deep copy on a map of objects
 // TODO generics?
 func cloneMap(m map[string]map[string]interface{}) map[string]map[string]interface{} {
@@ -158,24 +157,6 @@ func cloneMap(m map[string]map[string]interface{}) map[string]map[string]interfa
 	r := make(map[string]map[string]interface{})
 	for k, v := range m {
 		r[k] = deepCloneMapAny(v)
-	}
-	return r
-}
-
-// cloneOTelSection deep-clones a map[string]any where values are map[string]any
-// component configs. prepareOTelExporters mutates these inner maps in-place, so a
-// shallow clone of the outer map is not enough for concurrent safety.
-func cloneOTelSection(m map[string]any) map[string]any {
-	if m == nil {
-		return nil
-	}
-	r := make(map[string]any, len(m))
-	for k, v := range m {
-		if vmap, ok := v.(map[string]any); ok {
-			r[k] = deepCloneMapAny(vmap)
-		} else {
-			r[k] = v
-		}
 	}
 	return r
 }
