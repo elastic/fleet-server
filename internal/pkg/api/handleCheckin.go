@@ -853,31 +853,78 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 		return nil, ErrNoPolicyOutput
 	}
 
+<<<<<<< HEAD
 	data := model.ClonePolicyData(pp.Policy.Data)
 	// Clone pp.SecretKeys so concurrent processPolicy calls for the same policy
 	// revision do not race on the shared ParsedPolicy field.
 	secretKeys := slices.Clone(pp.SecretKeys)
 	for policyName, policyOutput := range data.Outputs {
+=======
+	// Get secret values so secret references in outputs and inputs can be replaced
+	// with their corresponding values.
+	secretValues, err := secret.GetSecretValues(ctx, pp.Policy.Data.SecretReferences, bulker)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get secret values: %w", err)
+	}
+
+	for name, policyOutput := range pp.Policy.Data.Outputs {
+>>>>>>> c907276 (refactor: clone ParsedPolicy in processPolicy to prevent shared-state races (#7794))
 		// NOTE: Not sure if output secret keys collected here include new entries, but they are collected for completeness
 		ks, err := policy.ProcessOutputSecret(ctx, policyOutput, bulker) // makes a bulk request to get secret values
 		if err != nil {
+<<<<<<< HEAD
 			return nil, fmt.Errorf("failed to process output secrets %q: %w",
 				policyName, err)
+=======
+			return nil, fmt.Errorf("failed to process output secret for output %q: %w", name, err)
+		}
+		for _, key := range ks {
+			pp.SecretKeys = append(pp.SecretKeys, "outputs."+name+"."+key)
+>>>>>>> c907276 (refactor: clone ParsedPolicy in processPolicy to prevent shared-state races (#7794))
 		}
 		secretKeys = append(secretKeys, ks...)
 	}
 	// Iterate through the policy outputs and prepare them
 	for _, policyOutput := range pp.Outputs {
+<<<<<<< HEAD
 		if err := policyOutput.Prepare(ctx, zlog, bulker, agent, data.Outputs); err != nil {
+=======
+		if err := policyOutput.Prepare(ctx, zlog, bulker, agent, pp.Policy.Data.Outputs, policy.WithOutputSecretCandidateCollector(secretCandidateCollector)); err != nil {
+>>>>>>> c907276 (refactor: clone ParsedPolicy in processPolicy to prevent shared-state races (#7794))
 			return nil, fmt.Errorf("failed to prepare output %q: %w",
 				policyOutput.Name, err)
 		}
 	}
+<<<<<<< HEAD
 	// Add replace inputs with agent prepared version.
 	data.Inputs = pp.Inputs
+=======
+
+	// Do not advertise remote ES service_token in secret_paths once Prepare(...) has
+	// deleted it from the policy sent to agents. Use pp.Outputs for type because
+	// Prepare rewrites pp.Policy.Data.Outputs type to elasticsearch.
+	for name, out := range pp.Outputs {
+		if out.Type != policy.OutputTypeRemoteElasticsearch {
+			continue
+		}
+		if _, ok := pp.Policy.Data.Outputs[name][policy.FieldOutputServiceToken]; !ok {
+			prefixed := "outputs." + name + "." + policy.FieldOutputServiceToken
+			pp.SecretKeys = slices.DeleteFunc(pp.SecretKeys, func(key string) bool {
+				return key == prefixed
+			})
+		}
+	}
+	// Prepare OTel exporters from the information in outputs.
+	if err := prepareOTelExporters(pp.Policy.Data.Outputs, pp.Policy.Data.Exporters); err != nil {
+		return nil, fmt.Errorf("failed to prepare OTel exporters: %w", err)
+	}
+
+	// Replace raw inputs with the secret-substituted version built during policy parsing.
+	pp.Policy.Data.Inputs = pp.Inputs
+>>>>>>> c907276 (refactor: clone ParsedPolicy in processPolicy to prevent shared-state races (#7794))
 
 	// JSON transformations to turn a model.PolicyData into an Action.data
-	p, err := json.Marshal(data)
+	p, err := json.Marshal(pp.Policy.Data)
 	if err != nil {
 		return nil, err
 	}
@@ -887,9 +934,15 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 		return nil, err
 	}
 	// remove duplicates from secretkeys
+<<<<<<< HEAD
 	slices.Sort(secretKeys)
 	keys := slices.Compact(secretKeys)
 	d.SecretPaths = &keys
+=======
+	slices.Sort(pp.SecretKeys)
+	keys := slices.Compact(pp.SecretKeys)
+	d.SecretPaths = keys
+>>>>>>> c907276 (refactor: clone ParsedPolicy in processPolicy to prevent shared-state races (#7794))
 	ad := Action_Data{}
 	err = ad.FromActionPolicyChange(ActionPolicyChange{d})
 	if err != nil {

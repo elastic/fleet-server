@@ -1214,6 +1214,7 @@ func TestProcessPolicySecretPathsConcurrentDispatch(t *testing.T) {
 	secretPaths := make([][]string, agents)
 	errs := make([]error, agents)
 	for a := range agents {
+<<<<<<< HEAD
 		wg.Add(1)
 		a := a
 		go func() {
@@ -1222,6 +1223,21 @@ func TestProcessPolicySecretPathsConcurrentDispatch(t *testing.T) {
 				ESDocument: model.ESDocument{Id: fmt.Sprintf("agent%d", a)},
 			}
 			action, err := processPolicy(t.Context(), logger, bulker, agent, pp)
+=======
+		agent := &model.Agent{
+			ESDocument: model.ESDocument{Id: fmt.Sprintf("agent%d", a)},
+			Outputs: map[string]*model.PolicyOutput{
+				"remote": {
+					APIKey:          remoteKey.Agent(),
+					APIKeyID:        remoteKey.ID,
+					PermissionsHash: remoteOut.Role.Sha2,
+					Type:            policy.OutputTypeRemoteElasticsearch,
+				},
+			},
+		}
+		wg.Go(func() {
+			action, err := processPolicy(t.Context(), logger, bulker, agent, pp.Clone(), nil)
+>>>>>>> c907276 (refactor: clone ParsedPolicy in processPolicy to prevent shared-state races (#7794))
 			if err != nil {
 				errs[a] = err
 				return

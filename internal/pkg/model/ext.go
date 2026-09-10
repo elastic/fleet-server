@@ -5,6 +5,7 @@
 package model
 
 import (
+	"bytes"
 	"maps"
 	"time"
 )
@@ -85,17 +86,36 @@ func ClonePolicyData(d *PolicyData) *PolicyData {
 		return nil
 	}
 	res := &PolicyData{
-		Agent:             d.Agent,
-		Fleet:             d.Fleet,
+		Agent:             maps.Clone(d.Agent),
+		Fleet:             maps.Clone(d.Fleet),
 		ID:                d.ID,
+<<<<<<< HEAD
 		Inputs:            make([]map[string]interface{}, 0, len(d.Inputs)),
 		OutputPermissions: d.OutputPermissions,
 		Outputs:           cloneMap(d.Outputs),
 		Revision:          d.Revision,
 		SecretReferences:  make([]SecretReferencesItems, 0, len(d.SecretReferences)),
+=======
+		Inputs:            nil, // populated below; stays nil when d.Inputs is nil
+		OutputPermissions: bytes.Clone(d.OutputPermissions),
+		Outputs:           cloneMap(d.Outputs),
+		Revision:          d.Revision,
+		SecretReferences:  slices.Clone(d.SecretReferences),
+
+		// OTel config: deep-clone so prepareOTelExporters can mutate per-component
+		// maps in-place without racing across concurrent processPolicy calls.
+		Connectors: cloneOTelSection(d.Connectors),
+		Exporters:  cloneOTelSection(d.Exporters),
+		Extensions: cloneOTelSection(d.Extensions),
+		Processors: cloneOTelSection(d.Processors),
+		Receivers:  cloneOTelSection(d.Receivers),
+>>>>>>> c907276 (refactor: clone ParsedPolicy in processPolicy to prevent shared-state races (#7794))
 	}
-	for _, m := range d.Inputs {
-		res.Inputs = append(res.Inputs, maps.Clone(m))
+	if len(d.Inputs) > 0 {
+		res.Inputs = make([]map[string]any, len(d.Inputs))
+		for i, m := range d.Inputs {
+			res.Inputs[i] = maps.Clone(m)
+		}
 	}
 	res.SecretReferences = append(res.SecretReferences, d.SecretReferences...)
 	if d.Signed != nil {
@@ -107,6 +127,64 @@ func ClonePolicyData(d *PolicyData) *PolicyData {
 	return res
 }
 
+<<<<<<< HEAD
+=======
+func cloneOTelService(s *Service) *Service {
+	var clone Service
+	clone.Extensions = slices.Clone(s.Extensions)
+	if len(s.Pipelines) > 0 {
+		clone.Pipelines = make(map[string]*PipelinesItem)
+		for id, pipeline := range s.Pipelines {
+			clone.Pipelines[id] = &PipelinesItem{
+				Exporters:  slices.Clone(pipeline.Exporters),
+				Processors: slices.Clone(pipeline.Processors),
+				Receivers:  slices.Clone(pipeline.Receivers),
+			}
+		}
+	}
+	return &clone
+}
+
+// deepCloneMapAny recursively deep-clones a map[string]any. This is required
+// for output and OTel configs because secret.ProcessOutputSecret/setSecretPath
+// and prepareOTelExporters mutate nested map entries in-place.
+func deepCloneMapAny(m map[string]any) map[string]any {
+	if m == nil {
+		return nil
+	}
+	r := make(map[string]any, len(m))
+	for k, v := range m {
+		switch vt := v.(type) {
+		case map[string]any:
+			r[k] = deepCloneMapAny(vt)
+		case []any:
+			r[k] = deepCloneSliceAny(vt)
+		default:
+			r[k] = v
+		}
+	}
+	return r
+}
+
+func deepCloneSliceAny(s []any) []any {
+	if s == nil {
+		return nil
+	}
+	r := make([]any, len(s))
+	for i, v := range s {
+		switch vt := v.(type) {
+		case map[string]any:
+			r[i] = deepCloneMapAny(vt)
+		case []any:
+			r[i] = deepCloneSliceAny(vt)
+		default:
+			r[i] = v
+		}
+	}
+	return r
+}
+
+>>>>>>> c907276 (refactor: clone ParsedPolicy in processPolicy to prevent shared-state races (#7794))
 // cloneMap does a deep copy on a map of objects
 // TODO generics?
 func cloneMap(m map[string]map[string]interface{}) map[string]map[string]interface{} {
@@ -115,7 +193,25 @@ func cloneMap(m map[string]map[string]interface{}) map[string]map[string]interfa
 	}
 	r := make(map[string]map[string]interface{})
 	for k, v := range m {
-		r[k] = maps.Clone(v)
+		r[k] = deepCloneMapAny(v)
+	}
+	return r
+}
+
+// cloneOTelSection deep-clones a map[string]any where values are map[string]any
+// component configs. prepareOTelExporters mutates these inner maps in-place, so a
+// shallow clone of the outer map is not enough for concurrent safety.
+func cloneOTelSection(m map[string]any) map[string]any {
+	if m == nil {
+		return nil
+	}
+	r := make(map[string]any, len(m))
+	for k, v := range m {
+		if vmap, ok := v.(map[string]any); ok {
+			r[k] = deepCloneMapAny(vmap)
+		} else {
+			r[k] = v
+		}
 	}
 	return r
 }
