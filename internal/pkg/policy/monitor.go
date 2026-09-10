@@ -306,6 +306,13 @@ func (m *monitorT) dispatchPending(ctx context.Context) {
 			return
 		}
 
+		// Guard the clone: ctx may have been cancelled between m.limit.Wait and
+		// here, and Clone() should not run unnecessarily while holding m.mut.
+		if err := ctx.Err(); err != nil {
+			m.pendingQ.pushFront(s)
+			m.log.Debug().Err(err).Msg("context termination detected in policy dispatch")
+			return
+		}
 		cloned := policy.pp.Clone()
 		select {
 		case <-ctx.Done():
