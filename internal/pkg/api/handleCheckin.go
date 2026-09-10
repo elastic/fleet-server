@@ -1090,11 +1090,7 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 	}
 	// Iterate through the policy outputs and prepare them
 	for _, policyOutput := range pp.Outputs {
-<<<<<<< HEAD
-		if err := policyOutput.Prepare(ctx, zlog, bulker, agent, data.Outputs); err != nil {
-=======
-		if err := policyOutput.Prepare(ctx, zlog, bulker, agent, pp.Policy.Data.Outputs, policy.WithOutputSecretCandidateCollector(secretCandidateCollector)); err != nil {
->>>>>>> c907276 (refactor: clone ParsedPolicy in processPolicy to prevent shared-state races (#7794))
+		if err := policyOutput.Prepare(ctx, zlog, bulker, agent, pp.Policy.Data.Outputs); err != nil {
 			return nil, fmt.Errorf("failed to prepare output %q: %w",
 				policyOutput.Name, err)
 		}

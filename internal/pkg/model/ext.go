@@ -90,13 +90,8 @@ func ClonePolicyData(d *PolicyData) *PolicyData {
 		Agent:             maps.Clone(d.Agent),
 		Fleet:             maps.Clone(d.Fleet),
 		ID:                d.ID,
-<<<<<<< HEAD
-		Inputs:            make([]map[string]interface{}, 0, len(d.Inputs)),
-		OutputPermissions: d.OutputPermissions,
-=======
 		Inputs:            nil, // populated below; stays nil when d.Inputs is nil
 		OutputPermissions: bytes.Clone(d.OutputPermissions),
->>>>>>> c907276 (refactor: clone ParsedPolicy in processPolicy to prevent shared-state races (#7794))
 		Outputs:           cloneMap(d.Outputs),
 		Revision:          d.Revision,
 		SecretReferences:  slices.Clone(d.SecretReferences),
