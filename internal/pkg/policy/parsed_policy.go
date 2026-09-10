@@ -5,10 +5,12 @@
 package policy
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 
 	"go.elastic.co/apm/v2"
 
@@ -54,6 +56,42 @@ type ParsedPolicy struct {
 	Fleet      map[string]any
 	SecretKeys []string
 	Links      apm.SpanLink
+}
+
+// Clone returns a copy of pp with independent backing storage for every field
+// that processPolicy mutates during concurrent fan-out. Inputs elements are not
+// mutated in processPolicy (only the slice header is overwritten), so a slice
+// clone suffices. Agent and Fleet are derived from the cloned Policy.Data to
+// preserve the aliasing invariant established in NewParsedPolicy.
+func (pp *ParsedPolicy) Clone() *ParsedPolicy {
+	clone := &ParsedPolicy{
+		Policy:     pp.Policy,
+		Default:    pp.Default,
+		Links:      pp.Links,
+		SecretKeys: slices.Clone(pp.SecretKeys),
+		// Inputs elements are not mutated in processPolicy (only the slice header is
+		// overwritten via pp.Policy.Data.Inputs = pp.Inputs); a slice clone suffices.
+		Inputs:  slices.Clone(pp.Inputs),
+		Roles:   make(RoleMapT, len(pp.Roles)),
+		Outputs: make(map[string]Output, len(pp.Outputs)),
+	}
+	clone.Policy.Data = model.ClonePolicyData(pp.Policy.Data)
+	// Agent and Fleet alias Policy.Data.Agent/Fleet (as set in NewParsedPolicy);
+	// point them at the cloned maps to preserve that invariant.
+	clone.Agent = clone.Policy.Data.Agent
+	clone.Fleet = clone.Policy.Data.Fleet
+	clone.Policy.Namespaces = slices.Clone(pp.Policy.Namespaces)
+	for k, r := range pp.Roles {
+		clone.Roles[k] = RoleT{Raw: bytes.Clone(r.Raw), Sha2: r.Sha2}
+	}
+	for k, out := range pp.Outputs {
+		if out.Role != nil {
+			roleCopy := RoleT{Raw: bytes.Clone(out.Role.Raw), Sha2: out.Role.Sha2}
+			out.Role = &roleCopy
+		}
+		clone.Outputs[k] = out
+	}
+	return clone
 }
 
 func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*ParsedPolicy, error) {
