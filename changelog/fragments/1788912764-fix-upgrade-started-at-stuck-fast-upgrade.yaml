@@ -3,29 +3,8 @@ kind: bug-fix
 summary: Fix agent permanently stuck in "updating" state after fast upgrade
 
 description: |
-  When an Elastic Agent completes an upgrade faster than one checkin interval
-  (~60 s), Fleet Server never observes any intermediate upgrade_details states
-  (downloading, extracting, watching). In this case the agent document has
-  upgrade_details: null while upgrade_started_at remains set from the original
-  bulk upgrade request. The markUpgradeComplete function previously returned
-  early (NOP) whenever upgrade_details was nil on the agent document, so
-  upgrade_started_at was never cleared. This left the agent permanently in the
-  "updating" state in Fleet UI, even though it had successfully upgraded.
-
-  Two related fixes are included:
-
-  1. Fast-upgrade race: if upgrade_started_at is set and the agent's reported
-     version differs from its stored version (indicating the agent restarted
-     after a fast upgrade), Fleet Server now correctly clears upgrade_started_at
-     and marks the upgrade complete on the next checkin with nil upgrade_details.
-
-  2. Stale self-heal: in mixed-version deployments (rolling fleet-server
-     upgrade), an older instance may update the agent version without clearing
-     upgrade_started_at, leaving the agent stuck with no future version change
-     to trigger fix (1). As a safety net, if upgrade_started_at is older than
-     2× the configured checkin_max_poll with no associated upgrade_details,
-     Fleet Server now clears upgrade_started_at unconditionally to unblock the
-     Fleet UI. In this case upgraded_at is not set because the upgrade outcome
-     cannot be determined from available state.
+  Agents that completed an upgrade faster than one checkin interval (~60 s)
+  were permanently shown as "updating" in the Fleet UI. Fleet Server now
+  detects the completed upgrade and clears the stuck state on the next checkin.
 
 component: fleet-server
