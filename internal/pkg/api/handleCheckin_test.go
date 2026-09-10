@@ -1928,7 +1928,11 @@ func TestProcessPolicySecretPathsConcurrentDispatch(t *testing.T) {
 			},
 		}
 		wg.Go(func() {
+<<<<<<< HEAD
 			action, err := processPolicy(t.Context(), logger, bulker, agent, pp)
+=======
+			action, err := processPolicy(t.Context(), logger, bulker, agent, pp.Clone(), nil)
+>>>>>>> c907276 (refactor: clone ParsedPolicy in processPolicy to prevent shared-state races (#7794))
 			if err != nil {
 				errs[a] = err
 				return
