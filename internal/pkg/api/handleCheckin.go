@@ -412,7 +412,7 @@ func (ct *CheckinT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, 
 	// sets timeout is set to max(1m, min(pDur-2m, max poll time))
 	// sets the response write timeout to max(2m, timeout+1m)
 	if pDur != time.Duration(0) {
-		pollDuration = max(min(pDur-(2*time.Minute), ct.cfg.Timeouts.CheckinMaxPoll), time.Minute)
+		pollDuration = max(min(pDur-(2*time.Minute), ct.cfg.Timeouts.CheckinMaxPoll), config.CheckinMaxPollFloor)
 
 		wTime := pollDuration + time.Minute
 		rc := http.NewResponseController(w)
