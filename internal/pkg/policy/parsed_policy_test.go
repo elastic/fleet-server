@@ -192,10 +192,8 @@ func TestParsedPolicyCloneIsolation(t *testing.T) {
 	clone.Policy.Namespaces = append(clone.Policy.Namespaces, "ns2")
 	require.Equal(t, []string{"ns1"}, original.Policy.Namespaces, "Policy.Namespaces: clone mutation affected original")
 
-	// Mutate Agent map on the clone.
-	clone.Agent["__clone_marker__"] = "mutated"
-	_, tainted := original.Agent["__clone_marker__"]
-	require.False(t, tainted, "Agent: clone mutation affected original")
+	// Agent and Fleet are shared references in Clone() (processPolicy never
+	// mutates them), so no isolation assertion is made for those fields.
 }
 
 // TestParsedPolicyMixedSecretsReplacement tests that secrets specified in a policy

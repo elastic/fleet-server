@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"maps"
 	"slices"
 
 	"go.elastic.co/apm/v2"
@@ -59,25 +58,27 @@ type ParsedPolicy struct {
 	Links      apm.SpanLink
 }
 
-// Clone returns a copy of pp where every slice, map, and pointer field has its
-// own backing storage, so concurrent goroutines can mutate their copy without racing.
+// Clone returns a copy of pp with independent backing storage for every field
+// that processPolicy mutates during concurrent fan-out. Fields that processPolicy
+// only reads (Agent, Fleet) or whose elements it never mutates (Inputs) are
+// shared by reference — callers must not mutate those fields on the clone.
 func (pp *ParsedPolicy) Clone() *ParsedPolicy {
 	clone := &ParsedPolicy{
 		Policy:     pp.Policy,
 		Default:    pp.Default,
 		Links:      pp.Links,
 		SecretKeys: slices.Clone(pp.SecretKeys),
-		Agent:      maps.Clone(pp.Agent),
-		Fleet:      maps.Clone(pp.Fleet),
-		Inputs:     make([]map[string]any, len(pp.Inputs)),
-		Roles:      make(RoleMapT, len(pp.Roles)),
-		Outputs:    make(map[string]Output, len(pp.Outputs)),
+		// Agent and Fleet are never accessed in processPolicy; shared reference is safe.
+		Agent: pp.Agent,
+		Fleet: pp.Fleet,
+		// Inputs elements are not mutated in processPolicy (only the slice header is
+		// overwritten via pp.Policy.Data.Inputs = pp.Inputs); a slice clone suffices.
+		Inputs:  slices.Clone(pp.Inputs),
+		Roles:   make(RoleMapT, len(pp.Roles)),
+		Outputs: make(map[string]Output, len(pp.Outputs)),
 	}
 	clone.Policy.Data = model.ClonePolicyData(pp.Policy.Data)
 	clone.Policy.Namespaces = slices.Clone(pp.Policy.Namespaces)
-	for i, m := range pp.Inputs {
-		clone.Inputs[i] = maps.Clone(m)
-	}
 	for k, r := range pp.Roles {
 		clone.Roles[k] = RoleT{Raw: bytes.Clone(r.Raw), Sha2: r.Sha2}
 	}
