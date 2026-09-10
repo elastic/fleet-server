@@ -396,17 +396,7 @@ func (ct *CheckinT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, 
 	// sets timeout is set to max(1m, min(pDur-2m, max poll time))
 	// sets the response write timeout to max(2m, timeout+1m)
 	if pDur != time.Duration(0) {
-<<<<<<< HEAD
-		pollDuration = pDur - (2 * time.Minute)
-		if pollDuration > ct.cfg.Timeouts.CheckinMaxPoll {
-			pollDuration = ct.cfg.Timeouts.CheckinMaxPoll
-		}
-		if pollDuration < time.Minute {
-			pollDuration = time.Minute
-		}
-=======
 		pollDuration = max(min(pDur-(2*time.Minute), ct.cfg.Timeouts.CheckinMaxPoll), config.CheckinMaxPollFloor)
->>>>>>> 8e8ca9b (fix: clear upgrade_started_at when agent upgrades faster than one checkin interval (#7784))
 
 		wTime := pollDuration + time.Minute
 		rc := http.NewResponseController(w)
