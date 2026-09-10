@@ -899,31 +899,28 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 		return nil, ErrNoPolicyOutput
 	}
 
-	data := model.ClonePolicyData(pp.Policy.Data)
-	// Clone pp.SecretKeys so concurrent processPolicy calls for the same policy
-	// revision do not race on the shared ParsedPolicy field.
-	secretKeys := slices.Clone(pp.SecretKeys)
-	for policyName, policyOutput := range data.Outputs {
+	// pp is exclusively owned (Clone happens at the dispatch site in monitor.go).
+	for policyName, policyOutput := range pp.Policy.Data.Outputs {
 		// NOTE: Not sure if output secret keys collected here include new entries, but they are collected for completeness
 		ks, err := policy.ProcessOutputSecret(ctx, policyOutput, bulker) // makes a bulk request to get secret values
 		if err != nil {
 			return nil, fmt.Errorf("failed to process output secrets %q: %w",
 				policyName, err)
 		}
-		secretKeys = append(secretKeys, ks...)
+		pp.SecretKeys = append(pp.SecretKeys, ks...)
 	}
 	// Iterate through the policy outputs and prepare them
 	for _, policyOutput := range pp.Outputs {
-		if err := policyOutput.Prepare(ctx, zlog, bulker, agent, data.Outputs); err != nil {
+		if err := policyOutput.Prepare(ctx, zlog, bulker, agent, pp.Policy.Data.Outputs); err != nil {
 			return nil, fmt.Errorf("failed to prepare output %q: %w",
 				policyOutput.Name, err)
 		}
 	}
 	// Add replace inputs with agent prepared version.
-	data.Inputs = pp.Inputs
+	pp.Policy.Data.Inputs = pp.Inputs
 
 	// JSON transformations to turn a model.PolicyData into an Action.data
-	p, err := json.Marshal(data)
+	p, err := json.Marshal(pp.Policy.Data)
 	if err != nil {
 		return nil, err
 	}
@@ -933,8 +930,8 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 		return nil, err
 	}
 	// remove duplicates from secretkeys
-	slices.Sort(secretKeys)
-	keys := slices.Compact(secretKeys)
+	slices.Sort(pp.SecretKeys)
+	keys := slices.Compact(pp.SecretKeys)
 	d.SecretPaths = &keys
 	ad := Action_Data{}
 	err = ad.FromActionPolicyChange(ActionPolicyChange{d})
