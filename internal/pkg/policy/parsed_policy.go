@@ -59,8 +59,7 @@ type ParsedPolicy struct {
 // Clone returns a copy of pp with independent backing storage for every field
 // that processPolicy mutates during concurrent fan-out. Inputs elements are not
 // mutated in processPolicy (only the slice header is overwritten), so a slice
-// clone suffices. Agent and Fleet are derived from the cloned Policy.Data to
-// preserve the aliasing invariant established in NewParsedPolicy.
+// clone suffices.
 func (pp *ParsedPolicy) Clone() *ParsedPolicy {
 	clone := &ParsedPolicy{
 		Policy:     pp.Policy,
@@ -74,10 +73,6 @@ func (pp *ParsedPolicy) Clone() *ParsedPolicy {
 		Outputs: make(map[string]Output, len(pp.Outputs)),
 	}
 	clone.Policy.Data = model.ClonePolicyData(pp.Policy.Data)
-	// Agent and Fleet alias Policy.Data.Agent/Fleet (as set in NewParsedPolicy);
-	// point them at the cloned maps to preserve that invariant.
-	clone.Agent = clone.Policy.Data.Agent
-	clone.Fleet = clone.Policy.Data.Fleet
 	clone.Policy.Namespaces = slices.Clone(pp.Policy.Namespaces)
 	for k, r := range pp.Roles {
 		clone.Roles[k] = RoleT{Raw: bytes.Clone(r.Raw), Sha2: r.Sha2}

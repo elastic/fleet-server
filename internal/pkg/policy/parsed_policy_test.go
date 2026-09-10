@@ -102,8 +102,6 @@ func TestNewParsedPolicyRemoteES(t *testing.T) {
 	// Validate that default was found
 	require.Equal(t, "remote", pp.Default.Name)
 }
-<<<<<<< HEAD
-=======
 
 // TestParsedPolicyCloneIsolation verifies that mutating any field of a cloned
 // ParsedPolicy does not affect the original, covering the fields that processPolicy
@@ -185,94 +183,4 @@ func TestParsedPolicyCloneIsolation(t *testing.T) {
 	// Mutate Policy.Namespaces on the clone.
 	clone.Policy.Namespaces = append(clone.Policy.Namespaces, "ns2")
 	require.Equal(t, []string{"ns1"}, original.Policy.Namespaces, "Policy.Namespaces: clone mutation affected original")
-
-	// Agent and Fleet are derived from the cloned Policy.Data in Clone(), so
-	// top-level mutations on the clone must not affect the original.
-	clone.Agent["__clone_marker__"] = "mutated"
-	_, tainted := original.Agent["__clone_marker__"]
-	require.False(t, tainted, "Agent: clone mutation affected original")
 }
-
-// TestParsedPolicyMixedSecretsReplacement tests that secrets specified in a policy
-// using either the `secrets.<path-to-key>.<key>.id:<secret ref>` format or the
-// `<path>: $co.elastic.secret{<secret ref>}` format are both replaced correctly.
-func TestParsedPolicyMixedSecretsReplacement(t *testing.T) {
-	// Load the model into the policy object
-	var m model.Policy
-	var d model.PolicyData
-	err := json.Unmarshal([]byte(policyWithSecretsMixed), &d)
-	require.NoError(t, err)
-
-	m.Data = &d
-
-	bulker := ftesting.NewMockBulk()
-	pp, err := NewParsedPolicy(context.TODO(), bulker, m)
-	require.NoError(t, err)
-
-	// Validate that secrets were identified
-	require.Len(t, pp.SecretKeys, 8)
-	require.Contains(t, pp.SecretKeys, "outputs.fs-output.type")
-	require.Contains(t, pp.SecretKeys, "outputs.fs-output.ssl.key")
-	require.Contains(t, pp.SecretKeys, "inputs.0.streams.0.auth.basic.password")
-	require.Contains(t, pp.SecretKeys, "inputs.0.streams.1.auth.basic.password")
-	require.Contains(t, pp.SecretKeys, "agent.download.sourceURI")
-	require.Contains(t, pp.SecretKeys, "agent.download.ssl.key")
-	require.Contains(t, pp.SecretKeys, "fleet.hosts.0")
-	require.Contains(t, pp.SecretKeys, "fleet.ssl.key")
-
-	// Validate that secret references were replaced
-	firstInputStreams := pp.Inputs[0]["streams"].([]any)
-	firstInputFirstStream := firstInputStreams[0].(map[string]any)
-	firstInputSecondStream := firstInputStreams[1].(map[string]any)
-	require.Equal(t, "0Mx2UZoBTAyw4gQKSaao_value", firstInputFirstStream["auth.basic.password"])
-	require.Equal(t, "0Mx2UZoBTAyw4gQKSaao_value", firstInputSecondStream["auth.basic.password"])
-	require.Equal(t, "abcdef123_value", pp.Policy.Data.Outputs["fs-output"]["type"])
-	require.Equal(t, "w8yELZoBTAyw4gQK9KZ7_value", pp.Policy.Data.Outputs["fs-output"]["ssl"].(map[string]any)["key"])
-	require.Equal(t, "bcdefg234_value", pp.Policy.Data.Agent["download"].(map[string]any)["sourceURI"])
-	require.Equal(t, "rwXzUJoBxE9I-QCxFt9m_value", pp.Policy.Data.Agent["download"].(map[string]any)["ssl"].(map[string]any)["key"])
-	require.Equal(t, "abcdef123_value", pp.Policy.Data.Fleet["hosts"].([]any)[0])
-	require.Equal(t, "w8yELZoBTAyw4gQK9KZ7_value", pp.Policy.Data.Fleet["ssl"].(map[string]any)["key"])
-}
-
-// TestParsedPolicyOTELSecretsReplacement tests that secrets in OTEL sections of a policy
-// (receivers, exporters, processors, extensions, connectors) are replaced correctly.
-func TestParsedPolicyOTELSecretsReplacement(t *testing.T) {
-	var m model.Policy
-	var d model.PolicyData
-	err := json.Unmarshal(policyWithOtelSecrets, &d)
-	require.NoError(t, err)
-
-	m.Data = &d
-
-	bulker := ftesting.NewMockBulk()
-	pp, err := NewParsedPolicy(t.Context(), bulker, m)
-	require.NoError(t, err)
-
-	// Validate that OTEL secret keys were identified
-	require.Contains(t, pp.SecretKeys, "receivers.otlp.auth")
-	require.Contains(t, pp.SecretKeys, "exporters.otlphttp/default.headers.authorization")
-	require.Contains(t, pp.SecretKeys, "processors.batch.api_key")
-	require.Contains(t, pp.SecretKeys, "extensions.basicauth.password")
-	require.Contains(t, pp.SecretKeys, "connectors.spanmetrics.token")
-
-	// Validate that inline secret references were replaced in receivers
-	otlpMap := pp.Policy.Data.Receivers["otlp"].(map[string]any)
-	require.Equal(t, "receiver-auth-id_value", otlpMap["auth"])
-
-	// Validate that path-based secret references were replaced in exporters
-	otlphttpMap := pp.Policy.Data.Exporters["otlphttp/default"].(map[string]any)
-	require.Equal(t, "exporter-auth-id_value", otlphttpMap["headers"].(map[string]any)["authorization"])
-
-	// Validate that inline secret references were replaced in processors
-	batchMap := pp.Policy.Data.Processors["batch"].(map[string]any)
-	require.Equal(t, "processor-key-id_value", batchMap["api_key"])
-
-	// Validate that path-based secret references were replaced in extensions
-	basicauthMap := pp.Policy.Data.Extensions["basicauth"].(map[string]any)
-	require.Equal(t, "extension-password-id_value", basicauthMap["password"])
-
-	// Validate that inline secret references were replaced in connectors
-	spanmetricsMap := pp.Policy.Data.Connectors["spanmetrics"].(map[string]any)
-	require.Equal(t, "connector-token-id_value", spanmetricsMap["token"])
-}
->>>>>>> c907276 (refactor: clone ParsedPolicy in processPolicy to prevent shared-state races (#7794))

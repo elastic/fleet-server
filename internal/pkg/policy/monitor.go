@@ -258,16 +258,12 @@ func (m *monitorT) dispatchPending(ctx context.Context) {
 		// If too many (checkin) responses are written concurrently memory usage may explode due to allocating gzip writers.
 		err := m.limit.Wait(ctx)
 		if err != nil {
-<<<<<<< HEAD
-			m.log.Warn().Err(err).Msg("Policy limit error")
-=======
 			m.mut.Lock()
 			m.pendingQ.pushFront(s) // context cancelled before sub is handled, put it back
 			m.mut.Unlock()
 			if !errors.Is(err, context.Canceled) {
 				m.log.Warn().Err(err).Msg("Policy limit error")
 			}
->>>>>>> c907276 (refactor: clone ParsedPolicy in processPolicy to prevent shared-state races (#7794))
 			return
 		}
 
@@ -296,12 +292,9 @@ func (m *monitorT) dispatchPending(ctx context.Context) {
 		cloned := policy.pp.Clone()
 		select {
 		case <-ctx.Done():
-<<<<<<< HEAD
-=======
 			m.mut.Lock()
 			m.pendingQ.pushFront(s) // context cancelled before sub is handled, put it back
 			m.mut.Unlock()
->>>>>>> c907276 (refactor: clone ParsedPolicy in processPolicy to prevent shared-state races (#7794))
 			m.log.Debug().Err(ctx.Err()).Msg("context termination detected in policy dispatch")
 			return
 		case s.ch <- cloned:

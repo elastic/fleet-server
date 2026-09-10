@@ -7,6 +7,7 @@ package model
 import (
 	"bytes"
 	"maps"
+	"slices"
 	"time"
 )
 
@@ -86,30 +87,14 @@ func ClonePolicyData(d *PolicyData) *PolicyData {
 		return nil
 	}
 	res := &PolicyData{
-		Agent:             maps.Clone(d.Agent),
-		Fleet:             maps.Clone(d.Fleet),
+		Agent:             bytes.Clone(d.Agent),
+		Fleet:             bytes.Clone(d.Fleet),
 		ID:                d.ID,
-<<<<<<< HEAD
-		Inputs:            make([]map[string]interface{}, 0, len(d.Inputs)),
-		OutputPermissions: d.OutputPermissions,
-		Outputs:           cloneMap(d.Outputs),
-		Revision:          d.Revision,
-		SecretReferences:  make([]SecretReferencesItems, 0, len(d.SecretReferences)),
-=======
 		Inputs:            nil, // populated below; stays nil when d.Inputs is nil
 		OutputPermissions: bytes.Clone(d.OutputPermissions),
 		Outputs:           cloneMap(d.Outputs),
 		Revision:          d.Revision,
 		SecretReferences:  slices.Clone(d.SecretReferences),
-
-		// OTel config: deep-clone so prepareOTelExporters can mutate per-component
-		// maps in-place without racing across concurrent processPolicy calls.
-		Connectors: cloneOTelSection(d.Connectors),
-		Exporters:  cloneOTelSection(d.Exporters),
-		Extensions: cloneOTelSection(d.Extensions),
-		Processors: cloneOTelSection(d.Processors),
-		Receivers:  cloneOTelSection(d.Receivers),
->>>>>>> c907276 (refactor: clone ParsedPolicy in processPolicy to prevent shared-state races (#7794))
 	}
 	if len(d.Inputs) > 0 {
 		res.Inputs = make([]map[string]any, len(d.Inputs))
@@ -117,7 +102,6 @@ func ClonePolicyData(d *PolicyData) *PolicyData {
 			res.Inputs[i] = maps.Clone(m)
 		}
 	}
-	res.SecretReferences = append(res.SecretReferences, d.SecretReferences...)
 	if d.Signed != nil {
 		res.Signed = &Signed{
 			Data:      d.Signed.Data,
@@ -127,27 +111,7 @@ func ClonePolicyData(d *PolicyData) *PolicyData {
 	return res
 }
 
-<<<<<<< HEAD
-=======
-func cloneOTelService(s *Service) *Service {
-	var clone Service
-	clone.Extensions = slices.Clone(s.Extensions)
-	if len(s.Pipelines) > 0 {
-		clone.Pipelines = make(map[string]*PipelinesItem)
-		for id, pipeline := range s.Pipelines {
-			clone.Pipelines[id] = &PipelinesItem{
-				Exporters:  slices.Clone(pipeline.Exporters),
-				Processors: slices.Clone(pipeline.Processors),
-				Receivers:  slices.Clone(pipeline.Receivers),
-			}
-		}
-	}
-	return &clone
-}
-
-// deepCloneMapAny recursively deep-clones a map[string]any. This is required
-// for output and OTel configs because secret.ProcessOutputSecret/setSecretPath
-// and prepareOTelExporters mutate nested map entries in-place.
+// deepCloneMapAny recursively deep-clones a map[string]any.
 func deepCloneMapAny(m map[string]any) map[string]any {
 	if m == nil {
 		return nil
@@ -184,7 +148,7 @@ func deepCloneSliceAny(s []any) []any {
 	return r
 }
 
->>>>>>> c907276 (refactor: clone ParsedPolicy in processPolicy to prevent shared-state races (#7794))
+
 // cloneMap does a deep copy on a map of objects
 // TODO generics?
 func cloneMap(m map[string]map[string]interface{}) map[string]map[string]interface{} {
