@@ -475,13 +475,9 @@ func TestProcessUpgradeDetails(t *testing.T) {
 					t.Logf("bulk match unmarshal error: %v", err)
 					return false
 				}
-<<<<<<< HEAD
-				return doc.Doc[dl.FieldUpgradeDetails] == nil && doc.Doc[dl.FieldUpgradeStartedAt] == nil && doc.Doc[dl.FieldUpgradeStatus] == nil && doc.Doc[dl.FieldUpgradedAt] != ""
-=======
 				upgradedAt, ok := doc.Doc[dl.FieldUpgradedAt]
 				upgradedAtStr, isStr := upgradedAt.(string)
-				return doc.Doc[dl.FieldUpgradeDetails] == nil && doc.Doc[dl.FieldUpgradeStartedAt] == nil && ok && isStr && upgradedAtStr != ""
->>>>>>> 8e8ca9b (fix: clear upgrade_started_at when agent upgrades faster than one checkin interval (#7784))
+				return doc.Doc[dl.FieldUpgradeDetails] == nil && doc.Doc[dl.FieldUpgradeStartedAt] == nil && doc.Doc[dl.FieldUpgradeStatus] == nil && ok && isStr && upgradedAtStr != ""
 			}), mock.Anything, mock.Anything).Return(nil)
 			return mBulk
 		},
