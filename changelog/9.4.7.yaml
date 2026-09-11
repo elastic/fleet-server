@@ -15,7 +15,7 @@ entries:
         into a genuinely different policy is still rejected.
       component: fleet-server
       pr:
-        - https://github.com/elastic/fleet-server/pull/7779
+        - https://github.com/elastic/fleet-server/pull/7746
       issue: []
       impact: ""
       action: ""
@@ -36,7 +36,7 @@ entries:
         version recorded in the existing agent document.
       component: fleet-server
       pr:
-        - https://github.com/elastic/fleet-server/pull/7779
+        - https://github.com/elastic/fleet-server/pull/7746
       issue: []
       impact: ""
       action: ""
@@ -49,8 +49,9 @@ entries:
       description: ""
       component: fleet-server
       pr:
-        - https://github.com/elastic/fleet-server/pull/7779
-      issue: []
+        - https://github.com/elastic/fleet-server/pull/7743
+      issue:
+        - https://github.com/elastic/fleet-server/issues/7739
       impact: ""
       action: ""
       timestamp: 1788278234

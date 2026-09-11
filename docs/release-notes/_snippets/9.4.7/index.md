@@ -11,7 +11,7 @@
 ### Fixes [fleet-server-9.4.7-fixes]
 
 
-* Allow replace-enrollment of agents assigned to version-specific policy variants. [#7779](https://github.com/elastic/fleet-server/pull/7779) 
+* Allow replace-enrollment of agents assigned to version-specific policy variants. [#7746](https://github.com/elastic/fleet-server/pull/7746) 
 
   The enroll-with-replace path rejected any agent whose document had been
   reassigned to a version-specific policy variant (e.g. &#34;policy#9.6&#34;) by
@@ -24,7 +24,7 @@
   version-suffixed assignment no longer blocks replacement while enrolling
   into a genuinely different policy is still rejected.
   
-* Stamp upgraded_at on replace-enrollment when the agent version changes. [#7779](https://github.com/elastic/fleet-server/pull/7779) 
+* Stamp upgraded_at on replace-enrollment when the agent version changes. [#7746](https://github.com/elastic/fleet-server/pull/7746) 
 
   Agentless agents are upgraded by replacing their container with a new image rather
   than via a Fleet upgrade action, so upgraded_at was never set for them. Kibana&#39;s
@@ -35,5 +35,5 @@
   path now stamps upgraded_at whenever the incoming agent version differs from the
   version recorded in the existing agent document.
   
-* Fix secret keys corruption in policy processing. [#7779](https://github.com/elastic/fleet-server/pull/7779) 
+* Fix secret keys corruption in policy processing. [#7743](https://github.com/elastic/fleet-server/pull/7743) [#7739](https://github.com/elastic/fleet-server/issues/7739)
 
