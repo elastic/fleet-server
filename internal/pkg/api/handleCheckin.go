@@ -899,44 +899,31 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 		return nil, ErrNoPolicyOutput
 	}
 
-	for name, policyOutput := range pp.Policy.Data.Outputs {
+	data := model.ClonePolicyData(pp.Policy.Data)
+	// Clone pp.SecretKeys so concurrent processPolicy calls for the same policy
+	// revision do not race on the shared ParsedPolicy field.
+	secretKeys := slices.Clone(pp.SecretKeys)
+	for policyName, policyOutput := range data.Outputs {
 		// NOTE: Not sure if output secret keys collected here include new entries, but they are collected for completeness
 		ks, err := policy.ProcessOutputSecret(ctx, policyOutput, bulker) // makes a bulk request to get secret values
 		if err != nil {
-			return nil, fmt.Errorf("failed to process output secret for output %q: %w", name, err)
+			return nil, fmt.Errorf("failed to process output secrets %q: %w",
+				policyName, err)
 		}
-		for _, key := range ks {
-			pp.SecretKeys = append(pp.SecretKeys, "outputs."+name+"."+key)
-		}
+		secretKeys = append(secretKeys, ks...)
 	}
 	// Iterate through the policy outputs and prepare them
 	for _, policyOutput := range pp.Outputs {
-		if err := policyOutput.Prepare(ctx, zlog, bulker, agent, pp.Policy.Data.Outputs); err != nil {
+		if err := policyOutput.Prepare(ctx, zlog, bulker, agent, data.Outputs); err != nil {
 			return nil, fmt.Errorf("failed to prepare output %q: %w",
 				policyOutput.Name, err)
 		}
 	}
-
-	// Do not advertise remote ES service_token in secret_paths once Prepare(...) has
-	// deleted it from the policy sent to agents. Use pp.Outputs for type because
-	// Prepare rewrites pp.Policy.Data.Outputs type to elasticsearch.
-	for name, out := range pp.Outputs {
-		if out.Type != policy.OutputTypeRemoteElasticsearch {
-			continue
-		}
-		if _, ok := pp.Policy.Data.Outputs[name][policy.FieldOutputServiceToken]; !ok {
-			prefixed := "outputs." + name + "." + policy.FieldOutputServiceToken
-			pp.SecretKeys = slices.DeleteFunc(pp.SecretKeys, func(key string) bool {
-				return key == prefixed
-			})
-		}
-	}
-
-	// Replace raw inputs with the secret-substituted version built during policy parsing.
-	pp.Policy.Data.Inputs = pp.Inputs
+	// Add replace inputs with agent prepared version.
+	data.Inputs = pp.Inputs
 
 	// JSON transformations to turn a model.PolicyData into an Action.data
-	p, err := json.Marshal(pp.Policy.Data)
+	p, err := json.Marshal(data)
 	if err != nil {
 		return nil, err
 	}
@@ -946,8 +933,8 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 		return nil, err
 	}
 	// remove duplicates from secretkeys
-	slices.Sort(pp.SecretKeys)
-	keys := slices.Compact(pp.SecretKeys)
+	slices.Sort(secretKeys)
+	keys := slices.Compact(secretKeys)
 	d.SecretPaths = &keys
 	ad := Action_Data{}
 	err = ad.FromActionPolicyChange(ActionPolicyChange{d})

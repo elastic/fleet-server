@@ -5,12 +5,10 @@
 package policy
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"slices"
 
 	"go.elastic.co/apm/v2"
 
@@ -54,37 +52,6 @@ type ParsedPolicy struct {
 	Inputs     []map[string]interface{}
 	SecretKeys []string
 	Links      apm.SpanLink
-}
-
-// Clone returns a copy of pp with independent backing storage for every field
-// that processPolicy mutates during concurrent fan-out. Inputs elements are not
-// mutated in processPolicy (only the slice header is overwritten), so a slice
-// clone suffices.
-func (pp *ParsedPolicy) Clone() *ParsedPolicy {
-	clone := &ParsedPolicy{
-		Policy:     pp.Policy,
-		Default:    pp.Default,
-		Links:      pp.Links,
-		SecretKeys: slices.Clone(pp.SecretKeys),
-		// Inputs elements are not mutated in processPolicy (only the slice header is
-		// overwritten via pp.Policy.Data.Inputs = pp.Inputs); a slice clone suffices.
-		Inputs:  slices.Clone(pp.Inputs),
-		Roles:   make(RoleMapT, len(pp.Roles)),
-		Outputs: make(map[string]Output, len(pp.Outputs)),
-	}
-	clone.Policy.Data = model.ClonePolicyData(pp.Policy.Data)
-	clone.Policy.Namespaces = slices.Clone(pp.Policy.Namespaces)
-	for k, r := range pp.Roles {
-		clone.Roles[k] = RoleT{Raw: bytes.Clone(r.Raw), Sha2: r.Sha2}
-	}
-	for k, out := range pp.Outputs {
-		if out.Role != nil {
-			roleCopy := RoleT{Raw: bytes.Clone(out.Role.Raw), Sha2: out.Role.Sha2}
-			out.Role = &roleCopy
-		}
-		clone.Outputs[k] = out
-	}
-	return clone
 }
 
 func NewParsedPolicy(ctx context.Context, bulker bulk.Bulk, p model.Policy) (*ParsedPolicy, error) {
