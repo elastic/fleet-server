@@ -1,0 +1,29 @@
+version: 9.5.4
+entries:
+    - kind: bug-fix
+      summary: Fix secret keys corruption in policy processing
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/7759
+        - https://github.com/elastic/fleet-server/pull/7790
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1788278234
+      file:
+        name: 1788278234-fix-secret-keys-corruption.yaml
+        checksum: ffb5d73e2d1e6a72f7f766e5e645c1715677e811
+    - kind: enhancement
+      summary: Update Go to 1.26.8
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/7757
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1788469748
+      file:
+        name: 1788469748-update-go-to-1.26.8.yaml
+        checksum: 144e69d3358b535f03ba3b6a41fa93b1e05626ad
