@@ -359,6 +359,7 @@ func TestProcessUpgradeDetails(t *testing.T) {
 		name    string
 		agent   *model.Agent
 		details *UpgradeDetails
+		ver     string
 		bulk    func() *ftesting.MockBulk
 		cache   func() *testcache.MockCache
 		err     error
@@ -368,6 +369,93 @@ func TestProcessUpgradeDetails(t *testing.T) {
 		details: nil,
 		bulk: func() *ftesting.MockBulk {
 			return ftesting.NewMockBulk()
+		},
+		cache: func() *testcache.MockCache {
+			return testcache.NewMockCache()
+		},
+		err: nil,
+	}, {
+		name:    "agent has upgrade_started_at but no upgrade_details, checkin details are nil (fast upgrade race)",
+		agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent", Version: "8.19.0"}, UpgradeStartedAt: "2024-01-01T00:00:00Z"},
+		details: nil,
+		ver:     "8.20.0", // agent restarted at new version
+		bulk: func() *ftesting.MockBulk {
+			mBulk := ftesting.NewMockBulk()
+			mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.MatchedBy(func(p []byte) bool {
+				doc := struct {
+					Doc map[string]any `json:"doc"`
+				}{}
+				if err := json.Unmarshal(p, &doc); err != nil {
+					t.Logf("bulk match unmarshal error: %v", err)
+					return false
+				}
+				upgradedAt, ok := doc.Doc[dl.FieldUpgradedAt]
+				upgradedAtStr, isStr := upgradedAt.(string)
+				return doc.Doc[dl.FieldUpgradeDetails] == nil && doc.Doc[dl.FieldUpgradeStartedAt] == nil && ok && isStr && upgradedAtStr != ""
+			}), mock.Anything, mock.Anything).Return(nil)
+			return mBulk
+		},
+		cache: func() *testcache.MockCache {
+			return testcache.NewMockCache()
+		},
+		err: nil,
+	}, {
+		name:    "agent has upgrade_started_at but no upgrade_details, first checkin after dispatch (same version, upgrade not yet received)",
+		agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent", Version: "8.19.0"}, UpgradeStartedAt: time.Now().UTC().Format(time.RFC3339)},
+		details: nil,
+		ver:     "", // version unchanged — upgrade action not yet received by agent; upgrade_started_at is fresh so staleness guard applies
+		bulk: func() *ftesting.MockBulk {
+			return ftesting.NewMockBulk() // no Update call expected
+		},
+		cache: func() *testcache.MockCache {
+			return testcache.NewMockCache()
+		},
+		err: nil,
+	}, {
+		name: "agent has stale upgrade_started_at but no upgrade_details, same version (self-heal after rolling fleet-server upgrade)",
+		// upgrade_started_at older than 2× default CheckinMaxPoll (2h); cfg is nil in tests so fallback = 2h
+		agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent", Version: "8.19.0"}, UpgradeStartedAt: time.Now().Add(-3 * time.Hour).UTC().Format(time.RFC3339)},
+		details: nil,
+		ver:     "", // version matches stored — upgrade_started_at is stale so we clear it; upgraded_at NOT set (outcome unknown)
+		bulk: func() *ftesting.MockBulk {
+			mBulk := ftesting.NewMockBulk()
+			mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.MatchedBy(func(p []byte) bool {
+				doc := struct {
+					Doc map[string]any `json:"doc"`
+				}{}
+				if err := json.Unmarshal(p, &doc); err != nil {
+					t.Logf("bulk match unmarshal error: %v", err)
+					return false
+				}
+				_, hasUpgradedAt := doc.Doc[dl.FieldUpgradedAt]
+				return doc.Doc[dl.FieldUpgradeDetails] == nil && doc.Doc[dl.FieldUpgradeStartedAt] == nil && !hasUpgradedAt
+			}), mock.Anything, mock.Anything).Return(nil)
+			return mBulk
+		},
+		cache: func() *testcache.MockCache {
+			return testcache.NewMockCache()
+		},
+		err: nil,
+	}, {
+		name: "agent has stale upgrade_started_at with fractional seconds (RFC3339Nano), same version (self-heal)",
+		// upgrade_started_at uses fractional seconds as Kibana may produce; must still parse and self-heal
+		agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent", Version: "8.19.0"}, UpgradeStartedAt: time.Now().Add(-3 * time.Hour).UTC().Format(time.RFC3339Nano)},
+		details: nil,
+		ver:     "",
+		bulk: func() *ftesting.MockBulk {
+			mBulk := ftesting.NewMockBulk()
+			mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.MatchedBy(func(p []byte) bool {
+				doc := struct {
+					Doc map[string]any `json:"doc"`
+				}{}
+				if err := json.Unmarshal(p, &doc); err != nil {
+					t.Logf("bulk match unmarshal error: %v", err)
+					return false
+				}
+				_, hasUpgradedAt := doc.Doc[dl.FieldUpgradedAt]
+				return doc.Doc[dl.FieldUpgradeDetails] == nil && doc.Doc[dl.FieldUpgradeStartedAt] == nil && !hasUpgradedAt
+			}), mock.Anything, mock.Anything).Return(nil)
+			return mBulk
 		},
 		cache: func() *testcache.MockCache {
 			return testcache.NewMockCache()
@@ -387,7 +475,9 @@ func TestProcessUpgradeDetails(t *testing.T) {
 					t.Logf("bulk match unmarshal error: %v", err)
 					return false
 				}
-				return doc.Doc[dl.FieldUpgradeDetails] == nil && doc.Doc[dl.FieldUpgradeStartedAt] == nil && doc.Doc[dl.FieldUpgradeStatus] == nil && doc.Doc[dl.FieldUpgradedAt] != ""
+				upgradedAt, ok := doc.Doc[dl.FieldUpgradedAt]
+				upgradedAtStr, isStr := upgradedAt.(string)
+				return doc.Doc[dl.FieldUpgradeDetails] == nil && doc.Doc[dl.FieldUpgradeStartedAt] == nil && doc.Doc[dl.FieldUpgradeStatus] == nil && ok && isStr && upgradedAtStr != ""
 			}), mock.Anything, mock.Anything).Return(nil)
 			return mBulk
 		},
@@ -733,7 +823,7 @@ func TestProcessUpgradeDetails(t *testing.T) {
 				bulker: mBulk,
 			}
 
-			err := ct.processUpgradeDetails(context.Background(), tc.agent, tc.details)
+			err := ct.processUpgradeDetails(context.Background(), tc.agent, tc.details, tc.ver)
 			if tc.err == nil {
 				assert.NoError(t, err)
 			} else {
