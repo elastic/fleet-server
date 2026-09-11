@@ -1311,7 +1311,7 @@ func TestProcessPolicySecretPathsConcurrentDispatch(t *testing.T) {
 			agent := &model.Agent{
 				ESDocument: model.ESDocument{Id: fmt.Sprintf("agent%d", a)},
 			}
-			action, err := processPolicy(t.Context(), logger, bulker, agent, pp.Clone())
+			action, err := processPolicy(t.Context(), logger, bulker, agent, pp)
 			if err != nil {
 				errs[a] = err
 				return
