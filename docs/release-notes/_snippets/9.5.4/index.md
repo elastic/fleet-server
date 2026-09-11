@@ -11,5 +11,5 @@
 ### Fixes [fleet-server-9.5.4-fixes]
 
 
-* Fix secret keys corruption in policy processing. [#7759](https://github.com/elastic/fleet-server/pull/7759) [#7790](https://github.com/elastic/fleet-server/pull/7790) 
+* Fix secret keys corruption in policy processing. [#7759](https://github.com/elastic/fleet-server/pull/7759) 
 
