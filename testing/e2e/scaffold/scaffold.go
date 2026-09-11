@@ -821,3 +821,109 @@ func (s *Scaffold) GetPolicy(ctx context.Context, id string) []byte {
 	s.Require().NoError(err)
 	return p
 }
+
+// CreateServiceToken creates an Elasticsearch service token for the fleet-server service.
+// Returns the token value.
+func (s *Scaffold) CreateServiceToken(ctx context.Context) string {
+	tokenName := fmt.Sprintf("fleet-server-e2e-%d", time.Now().UnixNano())
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
+		fmt.Sprintf("http://localhost:9200/_security/service/elastic/fleet-server/credential/token/%s", tokenName), nil)
+	s.Require().NoError(err)
+	req.SetBasicAuth(s.ElasticUser, s.ElasticPass)
+
+	resp, err := s.Client.Do(req)
+	s.Require().NoError(err)
+	defer resp.Body.Close()
+	p, err := io.ReadAll(resp.Body)
+	s.Require().NoError(err)
+	s.Require().Equalf(http.StatusOK, resp.StatusCode, "create service token failed: %s", p)
+
+	var obj struct {
+		Token struct {
+			Value string `json:"value"`
+		} `json:"token"`
+	}
+	err = json.Unmarshal(p, &obj)
+	s.Require().NoError(err)
+	s.Require().NotEmpty(obj.Token.Value, "service token value must not be empty")
+	return obj.Token.Value
+}
+
+// CreateFleetOutput creates a Fleet output via Kibana's Fleet API.
+// Returns the output ID.
+func (s *Scaffold) CreateFleetOutput(ctx context.Context, body map[string]any) string {
+	p, err := json.Marshal(body)
+	s.Require().NoError(err)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://localhost:5601/api/fleet/outputs", bytes.NewReader(p))
+	s.Require().NoError(err)
+	req.SetBasicAuth(s.ElasticUser, s.ElasticPass)
+	req.Header.Set("kbn-xsrf", "e2e-test")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := s.Client.Do(req)
+	s.Require().NoError(err)
+	defer resp.Body.Close()
+	p, err = io.ReadAll(resp.Body)
+	s.Require().NoError(err)
+	s.Require().Equalf(http.StatusOK, resp.StatusCode, "create Fleet output failed: %s", p)
+
+	var obj struct {
+		Item struct {
+			ID string `json:"id"`
+		} `json:"item"`
+	}
+	err = json.Unmarshal(p, &obj)
+	s.Require().NoError(err)
+	s.Require().NotEmpty(obj.Item.ID)
+	return obj.Item.ID
+}
+
+// CreateAgentPolicy creates a Fleet agent policy via Kibana's Fleet API.
+// Returns the policy ID and initial revision.
+func (s *Scaffold) CreateAgentPolicy(ctx context.Context, name, namespace, dataOutputID string) (string, int) {
+	body := map[string]any{
+		"name":           name,
+		"namespace":      namespace,
+		"data_output_id": dataOutputID,
+	}
+	p, err := json.Marshal(body)
+	s.Require().NoError(err)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://localhost:5601/api/fleet/agent_policies", bytes.NewReader(p))
+	s.Require().NoError(err)
+	req.SetBasicAuth(s.ElasticUser, s.ElasticPass)
+	req.Header.Set("kbn-xsrf", "e2e-test")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := s.Client.Do(req)
+	s.Require().NoError(err)
+	defer resp.Body.Close()
+	p, err = io.ReadAll(resp.Body)
+	s.Require().NoError(err)
+	s.Require().Equalf(http.StatusOK, resp.StatusCode, "create agent policy failed: %s", p)
+
+	var obj struct {
+		Item struct {
+			ID       string `json:"id"`
+			Revision int    `json:"revision"`
+		} `json:"item"`
+	}
+	err = json.Unmarshal(p, &obj)
+	s.Require().NoError(err)
+	s.Require().NotEmpty(obj.Item.ID)
+	return obj.Item.ID, obj.Item.Revision
+}
+
+// GetAgentPolicyRevision returns the current revision of the given policy from Kibana.
+func (s *Scaffold) GetAgentPolicyRevision(ctx context.Context, policyID string) int {
+	p := s.GetPolicy(ctx, policyID)
+	var obj struct {
+		Item struct {
+			Revision int `json:"revision"`
+		} `json:"item"`
+	}
+	err := json.Unmarshal(p, &obj)
+	s.Require().NoError(err)
+	return obj.Item.Revision
+}
