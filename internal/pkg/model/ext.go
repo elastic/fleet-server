@@ -5,7 +5,9 @@
 package model
 
 import (
+	"bytes"
 	"maps"
+	"slices"
 	"time"
 )
 
@@ -85,19 +87,21 @@ func ClonePolicyData(d *PolicyData) *PolicyData {
 		return nil
 	}
 	res := &PolicyData{
-		Agent:             d.Agent,
-		Fleet:             d.Fleet,
+		Agent:             bytes.Clone(d.Agent),
+		Fleet:             bytes.Clone(d.Fleet),
 		ID:                d.ID,
-		Inputs:            make([]map[string]interface{}, 0, len(d.Inputs)),
-		OutputPermissions: d.OutputPermissions,
+		Inputs:            nil, // populated below; stays nil when d.Inputs is nil
+		OutputPermissions: bytes.Clone(d.OutputPermissions),
 		Outputs:           cloneMap(d.Outputs),
 		Revision:          d.Revision,
-		SecretReferences:  make([]SecretReferencesItems, 0, len(d.SecretReferences)),
+		SecretReferences:  slices.Clone(d.SecretReferences),
 	}
-	for _, m := range d.Inputs {
-		res.Inputs = append(res.Inputs, maps.Clone(m))
+	if len(d.Inputs) > 0 {
+		res.Inputs = make([]map[string]any, len(d.Inputs))
+		for i, m := range d.Inputs {
+			res.Inputs[i] = maps.Clone(m)
+		}
 	}
-	res.SecretReferences = append(res.SecretReferences, d.SecretReferences...)
 	if d.Signed != nil {
 		res.Signed = &Signed{
 			Data:      d.Signed.Data,
@@ -105,6 +109,43 @@ func ClonePolicyData(d *PolicyData) *PolicyData {
 		}
 	}
 	return res
+}
+
+// deepCloneMapAny recursively deep-clones a map[string]any.
+func deepCloneMapAny(m map[string]any) map[string]any {
+	if m == nil {
+		return nil
+	}
+	r := make(map[string]any, len(m))
+	for k, v := range m {
+		switch vt := v.(type) {
+		case map[string]any:
+			r[k] = deepCloneMapAny(vt)
+		case []any:
+			r[k] = deepCloneSliceAny(vt)
+		default:
+			r[k] = v
+		}
+	}
+	return r
+}
+
+func deepCloneSliceAny(s []any) []any {
+	if s == nil {
+		return nil
+	}
+	r := make([]any, len(s))
+	for i, v := range s {
+		switch vt := v.(type) {
+		case map[string]any:
+			r[i] = deepCloneMapAny(vt)
+		case []any:
+			r[i] = deepCloneSliceAny(vt)
+		default:
+			r[i] = v
+		}
+	}
+	return r
 }
 
 // cloneMap does a deep copy on a map of objects
@@ -115,7 +156,7 @@ func cloneMap(m map[string]map[string]interface{}) map[string]map[string]interfa
 	}
 	r := make(map[string]map[string]interface{})
 	for k, v := range m {
-		r[k] = maps.Clone(v)
+		r[k] = deepCloneMapAny(v)
 	}
 	return r
 }

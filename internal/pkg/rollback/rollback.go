@@ -41,7 +41,7 @@ func (r *Rollback) Register(name string, fn RollbackFunc) {
 func (r *Rollback) Rollback(ctx context.Context) (err error) {
 	for _, rb := range r.rbi {
 		log := r.log.With().Str("rollback_fn_name", rb.name).Logger()
-		log.Debug().Msg("rollback function called")
+		log.Info().Msg("rollback function called")
 		if rerr := rb.fn(ctx); rerr != nil {
 			log.Error().Err(rerr).Msgf("rollback function %q failed", rb.name)
 			if err == nil {

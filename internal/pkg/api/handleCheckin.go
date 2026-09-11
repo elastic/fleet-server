@@ -221,13 +221,7 @@ func (ct *CheckinT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, 
 	// sets timeout is set to max(1m, min(pDur-2m, max poll time))
 	// sets the response write timeout to max(2m, timeout+1m)
 	if pDur != time.Duration(0) {
-		pollDuration = pDur - (2 * time.Minute)
-		if pollDuration > ct.cfg.Timeouts.CheckinMaxPoll {
-			pollDuration = ct.cfg.Timeouts.CheckinMaxPoll
-		}
-		if pollDuration < time.Minute {
-			pollDuration = time.Minute
-		}
+		pollDuration = max(min(pDur-(2*time.Minute), ct.cfg.Timeouts.CheckinMaxPoll), config.CheckinMaxPollFloor)
 
 		wTime := pollDuration + time.Minute
 		rc := http.NewResponseController(w)
@@ -283,7 +277,7 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 
 	// Handle upgrade details for agents using the new 8.11 upgrade details field of the checkin.
 	// Older agents will communicate any issues with upgrades via the Ack endpoint.
-	if err := ct.processUpgradeDetails(r.Context(), agent, req.UpgradeDetails); err != nil {
+	if err := ct.processUpgradeDetails(r.Context(), agent, req.UpgradeDetails, ver); err != nil {
 		return fmt.Errorf("failed to update upgrade_details: %w", err)
 	}
 
@@ -430,12 +424,20 @@ func (ct *CheckinT) verifyActionExists(vCtx context.Context, vSpan *apm.Span, ag
 }
 
 // processUpgradeDetails will verify and set the upgrade_details section of an agent document based on checkin value.
-// if the agent doc and checkin details are both nil the method is a nop
-// if the checkin upgrade_details is nil but there was a previous value in the agent doc, fleet-server treats it as a successful upgrade
-// otherwise the details are validated; action_id is checked and upgrade_details.metadata is validated based on upgrade_details.state and the agent doc is updated.
-func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agent, details *UpgradeDetails) error {
+// When the checkin upgrade_details is nil, markUpgradeComplete is called, which handles three cases:
+//   - NOP if there is no upgrade in progress (upgrade_started_at empty and no stored upgrade_details).
+//   - NOP if an upgrade was dispatched (upgrade_started_at set) but the agent has not yet changed version
+//     or reported any upgrade_details — the upgrade action has not been received/completed yet. This guard
+//     is bypassed for stale upgrade_started_at values (older than upgradeStartedAtStalenessThreshold).
+//   - Mark complete if the agent had stored upgrade_details (normal upgrade path) or changed version
+//     without any intermediate details (fast upgrade race: upgrade completed in < 1 checkin interval).
+//
+// When the checkin upgrade_details is non-nil, the details are validated: action_id is checked and
+// upgrade_details.metadata is validated based on upgrade_details.state, then the agent doc is updated.
+// ver is the agent's new version string if it differs from the stored version, or empty if unchanged.
+func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agent, details *UpgradeDetails, ver string) error {
 	if details == nil {
-		err := ct.markUpgradeComplete(ctx, agent)
+		err := ct.markUpgradeComplete(ctx, agent, ver)
 		if err != nil {
 			return err
 		}
@@ -541,15 +543,48 @@ func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agen
 	return ct.bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3))
 }
 
-func (ct *CheckinT) markUpgradeComplete(ctx context.Context, agent *model.Agent) error {
-	// nop if there are no checkin details, and the agent has no details
-	if agent.UpgradeDetails == nil {
+func (ct *CheckinT) markUpgradeComplete(ctx context.Context, agent *model.Agent, ver string) error {
+	// NOP: no upgrade in progress and no stored upgrade state to clear.
+	if agent.UpgradeDetails == nil && agent.UpgradeStartedAt == "" {
 		return nil
+	}
+	// NOP: upgrade was dispatched (upgrade_started_at is set) but the agent has not yet changed
+	// version and has sent no upgrade_details — it has not yet received or completed the upgrade
+	// action. Do not prematurely clear upgrade_started_at on the first checkin after dispatch.
+	// ver is non-empty only when the agent's reported version differs from its stored version.
+	//
+	// Exception: if upgrade_started_at is clearly stale (older than 2× CheckinMaxPoll), clear it
+	// to self-heal agents stuck in the updating state after a rolling fleet-server upgrade where
+	// the version was already updated by an older instance. The threshold uses 2× CheckinMaxPoll
+	// so a legitimately long-running poll (up to CheckinMaxPoll) cannot be mistaken for staleness.
+	// In the stale case upgraded_at is NOT set because the upgrade outcome is unknown.
+	if agent.UpgradeDetails == nil && agent.UpgradeStartedAt != "" && ver == "" {
+		t, err := time.Parse(time.RFC3339, agent.UpgradeStartedAt)
+		if err != nil {
+			t, err = time.Parse(time.RFC3339Nano, agent.UpgradeStartedAt)
+		}
+		if err != nil || time.Since(t) < ct.stalenessThreshold() {
+			return nil
+		}
+		// Stale: clear upgrade_started_at without setting upgraded_at (outcome unknown).
+		span, ctx := apm.StartSpan(ctx, "Clear stale upgrade", "update")
+		span.Context.SetLabel("agent_id", agent.Agent.ID)
+		defer span.End()
+		doc := bulk.UpdateFields{
+			dl.FieldUpgradeDetails:   nil,
+			dl.FieldUpgradeStartedAt: nil,
+		}
+		body, err := doc.Marshal()
+		if err != nil {
+			return err
+		}
+		return ct.bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3))
 	}
 	span, ctx := apm.StartSpan(ctx, "Mark update complete", "update")
 	span.Context.SetLabel("agent_id", agent.Agent.ID)
 	defer span.End()
-	// if the checkin had no details, but agent has details treat like a successful upgrade
+	// Checkin had no upgrade_details but agent either had stored details (normal upgrade path) or
+	// changed version without intermediate details (fast upgrade race). Treat as successful upgrade.
 	doc := bulk.UpdateFields{
 		dl.FieldUpgradeDetails:   nil,
 		dl.FieldUpgradeStartedAt: nil,
@@ -561,6 +596,17 @@ func (ct *CheckinT) markUpgradeComplete(ctx context.Context, agent *model.Agent)
 		return err
 	}
 	return ct.bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3))
+}
+
+// stalenessThreshold returns the age beyond which an upgrade_started_at value with no associated
+// upgrade_details is treated as stale and cleared. It is set to 2× the effective CheckinMaxPoll
+// so that a legitimately long-running poll (up to CheckinMaxPoll) cannot be mistaken for a stuck
+// upgrade. The effective minimum of 1m matches the same floor used by the long-poll logic.
+func (ct *CheckinT) stalenessThreshold() time.Duration {
+	if ct.cfg == nil {
+		return 2 * config.DefaultCheckinMaxPoll
+	}
+	return 2 * max(ct.cfg.Timeouts.CheckinMaxPoll, config.CheckinMaxPollFloor)
 }
 
 func (ct *CheckinT) writeResponse(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, agent *model.Agent, resp CheckinResponse) error {
@@ -853,28 +899,44 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 		return nil, ErrNoPolicyOutput
 	}
 
-	data := model.ClonePolicyData(pp.Policy.Data)
-	for policyName, policyOutput := range data.Outputs {
+	for name, policyOutput := range pp.Policy.Data.Outputs {
 		// NOTE: Not sure if output secret keys collected here include new entries, but they are collected for completeness
 		ks, err := policy.ProcessOutputSecret(ctx, policyOutput, bulker) // makes a bulk request to get secret values
 		if err != nil {
-			return nil, fmt.Errorf("failed to process output secrets %q: %w",
-				policyName, err)
+			return nil, fmt.Errorf("failed to process output secret for output %q: %w", name, err)
 		}
-		pp.SecretKeys = append(pp.SecretKeys, ks...)
+		for _, key := range ks {
+			pp.SecretKeys = append(pp.SecretKeys, "outputs."+name+"."+key)
+		}
 	}
 	// Iterate through the policy outputs and prepare them
 	for _, policyOutput := range pp.Outputs {
-		if err := policyOutput.Prepare(ctx, zlog, bulker, agent, data.Outputs); err != nil {
+		if err := policyOutput.Prepare(ctx, zlog, bulker, agent, pp.Policy.Data.Outputs); err != nil {
 			return nil, fmt.Errorf("failed to prepare output %q: %w",
 				policyOutput.Name, err)
 		}
 	}
-	// Add replace inputs with agent prepared version.
-	data.Inputs = pp.Inputs
+
+	// Do not advertise remote ES service_token in secret_paths once Prepare(...) has
+	// deleted it from the policy sent to agents. Use pp.Outputs for type because
+	// Prepare rewrites pp.Policy.Data.Outputs type to elasticsearch.
+	for name, out := range pp.Outputs {
+		if out.Type != policy.OutputTypeRemoteElasticsearch {
+			continue
+		}
+		if _, ok := pp.Policy.Data.Outputs[name][policy.FieldOutputServiceToken]; !ok {
+			prefixed := "outputs." + name + "." + policy.FieldOutputServiceToken
+			pp.SecretKeys = slices.DeleteFunc(pp.SecretKeys, func(key string) bool {
+				return key == prefixed
+			})
+		}
+	}
+
+	// Replace raw inputs with the secret-substituted version built during policy parsing.
+	pp.Policy.Data.Inputs = pp.Inputs
 
 	// JSON transformations to turn a model.PolicyData into an Action.data
-	p, err := json.Marshal(data)
+	p, err := json.Marshal(pp.Policy.Data)
 	if err != nil {
 		return nil, err
 	}

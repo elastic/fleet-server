@@ -8,6 +8,15 @@ import (
 	"time"
 )
 
+const (
+	// DefaultCheckinMaxPoll is the default value for CheckinMaxPoll.
+	DefaultCheckinMaxPoll = time.Hour
+
+	// CheckinMaxPollFloor is the minimum effective value for CheckinMaxPoll;
+	// configured values below this floor are ignored.
+	CheckinMaxPollFloor = time.Minute
+)
+
 // ServerTimeouts is the configuration for the server timeouts
 type ServerTimeouts struct {
 	Read             time.Duration `config:"read"`
@@ -64,7 +73,7 @@ func (c *ServerTimeouts) InitDefaults() {
 	// MaxPoll is the maximum allowed value for a long poll when the client specified poll_timeout value is used.
 	// The long poll value is poll_timeout-2m, and the request's write timeout is set to poll_timeout-1m
 	// CheckinMaxPoll values of less then 1m are effectively ignored and a 1m limit is used.
-	c.CheckinMaxPoll = time.Hour
+	c.CheckinMaxPoll = DefaultCheckinMaxPoll
 
 	// Drain is the max duration that a server will keep connections open when a shutdown signal is received in order to gracefully handle in progress-requests.
 	// It is used as a context timeout value for server.ShutDown(ctx).
