@@ -704,3 +704,61 @@ func TestMonitor_StaleRevisionSkipsSecretResolution(t *testing.T) {
 	assert.NoError(t, err, "stale revision should be skipped without error, not trigger secret resolution")
 	assert.Equal(t, int64(8), pm.policies[policyID].pp.Policy.RevisionIdx, "cached revision must not change for stale input")
 }
+
+// BenchmarkPolicyDispatch measures fleet-server heap allocation per policy
+// dispatch cycle across varying subscriber counts.
+//
+// Run this benchmark on commits before and after #7794 to compare:
+//
+//   git stash  # or checkout the parent commit
+//   go test -run=^$ -bench=BenchmarkPolicyDispatch -benchmem ./internal/pkg/policy/
+//   git stash pop  # or checkout current commit
+//   go test -run=^$ -bench=BenchmarkPolicyDispatch -benchmem ./internal/pkg/policy/
+//
+// Before #7794: dispatchPending sends &policy.pp (0 clone allocs).
+// After  #7794: dispatchPending calls pp.Clone() per subscriber (N×clone allocs).
+// The bytes/op delta is the per-dispatch memory cost of the race-condition fix.
+func BenchmarkPolicyDispatch(b *testing.B) {
+	// benchDispatchPolicy has a remote_elasticsearch output with a secret
+	// service_token. This is the exact shape that triggered the incident
+	// (sdh-beats/issues/7585): processPolicy called slices.DeleteFunc on the
+	// shared SecretKeys for every remote ES output, causing concurrent
+	// processPolicy goroutines to race and corrupt the slice.
+	bulker := ftesting.NewMockBulk()
+	var d model.PolicyData
+	require.NoError(b, json.Unmarshal([]byte(benchDispatchPolicy), &d))
+	pp, err := NewParsedPolicy(context.Background(), bulker, model.Policy{
+		PolicyID:    "bench-policy",
+		RevisionIdx: 1,
+		Data:        &d,
+	})
+	require.NoError(b, err)
+
+	for _, subs := range []int{1, 10, 100, 1000} {
+		b.Run(fmt.Sprintf("subs=%d", subs), func(b *testing.B) {
+			m := &monitorT{
+				log:      zerolog.Nop(),
+				policies: map[string]policyT{"bench-policy": {pp: *pp}},
+				pendingQ: makeHead(),
+				limit:    rate.NewLimiter(rate.Inf, subs+1),
+			}
+			subscribers := make([]*subT, subs)
+			for i := range subs {
+				subscribers[i] = NewSub("bench-policy", fmt.Sprintf("agent-%d", i), 0)
+			}
+			ctx := context.Background()
+
+			b.ReportAllocs()
+			b.ResetTimer()
+			for range b.N {
+				for _, s := range subscribers {
+					m.pendingQ.pushBack(s)
+				}
+				m.dispatchPending(ctx)
+				for _, s := range subscribers {
+					<-s.ch
+				}
+			}
+		})
+	}
+}
