@@ -2017,7 +2017,7 @@ func TestProcessPolicySecretPathsConcurrentDispatch(t *testing.T) {
 			},
 		}
 		wg.Go(func() {
-			action, err := processPolicy(t.Context(), logger, bulker, agent, pp.Clone())
+			action, err := processPolicy(t.Context(), logger, bulker, agent, pp)
 			if err != nil {
 				errs[a] = err
 				return
