@@ -710,10 +710,10 @@ func TestMonitor_StaleRevisionSkipsSecretResolution(t *testing.T) {
 //
 // Run this benchmark on commits before and after #7794 to compare:
 //
-//   git stash  # or checkout the parent commit
-//   go test -run=^$ -bench=BenchmarkPolicyDispatch -benchmem ./internal/pkg/policy/
-//   git stash pop  # or checkout current commit
-//   go test -run=^$ -bench=BenchmarkPolicyDispatch -benchmem ./internal/pkg/policy/
+//	git stash  # or checkout the parent commit
+//	go test -run=^$ -bench=BenchmarkPolicyDispatch -benchmem ./internal/pkg/policy/
+//	git stash pop  # or checkout current commit
+//	go test -run=^$ -bench=BenchmarkPolicyDispatch -benchmem ./internal/pkg/policy/
 //
 // Before #7794: dispatchPending sends &policy.pp (0 clone allocs).
 // After  #7794: dispatchPending calls pp.Clone() per subscriber (N×clone allocs).
