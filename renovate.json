@@ -91,6 +91,16 @@
       "enabled": false
     },
     {
+      "description": "Keep go-json-schema-generate updates manual",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchPackageNames": [
+        "github.com/elastic/go-json-schema-generate"
+      ],
+      "enabled": false
+    },
+    {
       "description": "GitHub Actions: keep macOS runner updates manual",
       "matchManagers": [
         "github-actions"
