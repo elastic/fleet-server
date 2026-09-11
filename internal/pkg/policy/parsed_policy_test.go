@@ -37,6 +37,9 @@ var policyWithSecretsMixed string
 //go:embed testdata/policy_with_otel_secrets.json
 var policyWithOtelSecrets []byte
 
+//go:embed testdata/bench_dispatch_policy.json
+var benchDispatchPolicy string
+
 func TestNewParsedPolicy(t *testing.T) {
 	// Run two formatting of the same payload to validate that the sha2 remains the same
 	testcases := []struct {
