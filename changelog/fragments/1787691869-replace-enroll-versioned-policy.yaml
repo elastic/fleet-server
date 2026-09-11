@@ -1,0 +1,17 @@
+kind: bug-fix
+
+summary: Allow replace-enrollment of agents assigned to version-specific policy variants
+
+description: |
+  The enroll-with-replace path rejected any agent whose document had been
+  reassigned to a version-specific policy variant (e.g. "policy#9.6") by
+  Kibana's version-specific policy assignment task, because it compared the
+  raw stored policy ID against the enrollment key's policy ID, and enrollment
+  API keys are only ever bound to the base policy. Containerized (agentless)
+  agents hit this whenever their pod was recreated after such a reassignment:
+  every re-enrollment attempt failed with AgentNotReplaceable and the agent
+  stayed offline permanently. The check now compares base policy IDs, so a
+  version-suffixed assignment no longer blocks replacement while enrolling
+  into a genuinely different policy is still rejected.
+
+component: fleet-server

@@ -308,7 +308,10 @@ func (et *EnrollerT) _enroll(
 
 			// confirm that its on the same policy
 			// it is not supported to have it the same ID enroll into different policies
-			if agent.PolicyID != policyID {
+			// compare base policy IDs: the agent may have been reassigned to a
+			// version-specific policy variant (e.g. "policy#9.6") while enrollment
+			// API keys are only ever bound to the base policy
+			if policyBaseID(agent.PolicyID) != policyBaseID(policyID) {
 				zlog.Warn().
 					Str("AgentId", agent.Id).
 					Str("PolicyId", policyID).
@@ -361,6 +364,11 @@ func (et *EnrollerT) _enroll(
 
 	// Existing agent, only update a subset of the fields
 	if agent.Id != "" {
+		prevVer := ""
+		if agent.Agent != nil {
+			prevVer = agent.Agent.Version
+		}
+
 		agent.Active = true
 		agent.Namespaces = namespaces
 		agent.LocalMetadata = localMeta
@@ -390,6 +398,10 @@ func (et *EnrollerT) _enroll(
 			dl.FieldUnenrolledAt:          nil,
 			dl.FieldUnenrolledReason:      nil,
 			dl.FieldUpdatedAt:             now.UTC().Format(time.RFC3339),
+		}
+		// stamp upgraded_at so Kibana's version-specific policy assignment task will re-evaluate this agent
+		if req.ReplaceToken != nil && *req.ReplaceToken != "" && prevVer != "" && prevVer != ver {
+			doc[dl.FieldUpgradedAt] = now.UTC().Format(time.RFC3339)
 		}
 		err = updateFleetAgent(ctx, et.bulker, agentID, doc)
 		if err != nil {
@@ -672,17 +684,21 @@ func createFleetAgent(ctx context.Context, bulker bulk.Bulk, id string, agent mo
 			OpType:     "create",
 			Refresh:    "wait_for",
 		}
-		res, err := req.Do(ctx, bulker.Client())
-		if err != nil {
-			return err
+		zlog := zerolog.Ctx(ctx)
+		res, doErr := req.Do(ctx, bulker.Client())
+		if doErr != nil {
+			zlog.Warn().Str("agent_id", id).Err(doErr).Msg("enrollment write transport error")
+			return doErr
 		}
 		defer res.Body.Close()
 		if res.StatusCode == http.StatusConflict {
-			zerolog.Ctx(ctx).Debug().Str("agent_id", id).Msg("agent document already exists on enrollment create, treating as success")
+			zlog.Debug().Str("agent_id", id).Msg("agent document already exists on enrollment create, treating as success")
 			return nil
 		}
 		if res.IsError() {
-			return fmt.Errorf("createFleetAgent: %s", res.String())
+			esResp := res.String()
+			zlog.Warn().Str("agent_id", id).Int("status_code", res.StatusCode).Str("es_response", esResp).Msg("enrollment write ES error")
+			return fmt.Errorf("createFleetAgent: %s", esResp)
 		}
 		return nil
 	}

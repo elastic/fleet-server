@@ -18,7 +18,9 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -402,6 +404,7 @@ func TestProcessUpgradeDetails(t *testing.T) {
 		name    string
 		agent   *model.Agent
 		details *UpgradeDetails
+		ver     string
 		bulk    func() *ftesting.MockBulk
 		cache   func() *testcache.MockCache
 		err     error
@@ -411,6 +414,93 @@ func TestProcessUpgradeDetails(t *testing.T) {
 		details: nil,
 		bulk: func() *ftesting.MockBulk {
 			return ftesting.NewMockBulk()
+		},
+		cache: func() *testcache.MockCache {
+			return testcache.NewMockCache()
+		},
+		err: nil,
+	}, {
+		name:    "agent has upgrade_started_at but no upgrade_details, checkin details are nil (fast upgrade race)",
+		agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent", Version: "8.19.0"}, UpgradeStartedAt: "2024-01-01T00:00:00Z"},
+		details: nil,
+		ver:     "8.20.0", // agent restarted at new version
+		bulk: func() *ftesting.MockBulk {
+			mBulk := ftesting.NewMockBulk()
+			mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.MatchedBy(func(p []byte) bool {
+				doc := struct {
+					Doc map[string]any `json:"doc"`
+				}{}
+				if err := json.Unmarshal(p, &doc); err != nil {
+					t.Logf("bulk match unmarshal error: %v", err)
+					return false
+				}
+				upgradedAt, ok := doc.Doc[dl.FieldUpgradedAt]
+				upgradedAtStr, isStr := upgradedAt.(string)
+				return doc.Doc[dl.FieldUpgradeDetails] == nil && doc.Doc[dl.FieldUpgradeStartedAt] == nil && ok && isStr && upgradedAtStr != ""
+			}), mock.Anything, mock.Anything).Return(nil)
+			return mBulk
+		},
+		cache: func() *testcache.MockCache {
+			return testcache.NewMockCache()
+		},
+		err: nil,
+	}, {
+		name:    "agent has upgrade_started_at but no upgrade_details, first checkin after dispatch (same version, upgrade not yet received)",
+		agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent", Version: "8.19.0"}, UpgradeStartedAt: time.Now().UTC().Format(time.RFC3339)},
+		details: nil,
+		ver:     "", // version unchanged — upgrade action not yet received by agent; upgrade_started_at is fresh so staleness guard applies
+		bulk: func() *ftesting.MockBulk {
+			return ftesting.NewMockBulk() // no Update call expected
+		},
+		cache: func() *testcache.MockCache {
+			return testcache.NewMockCache()
+		},
+		err: nil,
+	}, {
+		name: "agent has stale upgrade_started_at but no upgrade_details, same version (self-heal after rolling fleet-server upgrade)",
+		// upgrade_started_at older than 2× default CheckinMaxPoll (2h); cfg is nil in tests so fallback = 2h
+		agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent", Version: "8.19.0"}, UpgradeStartedAt: time.Now().Add(-3 * time.Hour).UTC().Format(time.RFC3339)},
+		details: nil,
+		ver:     "", // version matches stored — upgrade_started_at is stale so we clear it; upgraded_at NOT set (outcome unknown)
+		bulk: func() *ftesting.MockBulk {
+			mBulk := ftesting.NewMockBulk()
+			mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.MatchedBy(func(p []byte) bool {
+				doc := struct {
+					Doc map[string]any `json:"doc"`
+				}{}
+				if err := json.Unmarshal(p, &doc); err != nil {
+					t.Logf("bulk match unmarshal error: %v", err)
+					return false
+				}
+				_, hasUpgradedAt := doc.Doc[dl.FieldUpgradedAt]
+				return doc.Doc[dl.FieldUpgradeDetails] == nil && doc.Doc[dl.FieldUpgradeStartedAt] == nil && !hasUpgradedAt
+			}), mock.Anything, mock.Anything).Return(nil)
+			return mBulk
+		},
+		cache: func() *testcache.MockCache {
+			return testcache.NewMockCache()
+		},
+		err: nil,
+	}, {
+		name: "agent has stale upgrade_started_at with fractional seconds (RFC3339Nano), same version (self-heal)",
+		// upgrade_started_at uses fractional seconds as Kibana may produce; must still parse and self-heal
+		agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent", Version: "8.19.0"}, UpgradeStartedAt: time.Now().Add(-3 * time.Hour).UTC().Format(time.RFC3339Nano)},
+		details: nil,
+		ver:     "",
+		bulk: func() *ftesting.MockBulk {
+			mBulk := ftesting.NewMockBulk()
+			mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.MatchedBy(func(p []byte) bool {
+				doc := struct {
+					Doc map[string]any `json:"doc"`
+				}{}
+				if err := json.Unmarshal(p, &doc); err != nil {
+					t.Logf("bulk match unmarshal error: %v", err)
+					return false
+				}
+				_, hasUpgradedAt := doc.Doc[dl.FieldUpgradedAt]
+				return doc.Doc[dl.FieldUpgradeDetails] == nil && doc.Doc[dl.FieldUpgradeStartedAt] == nil && !hasUpgradedAt
+			}), mock.Anything, mock.Anything).Return(nil)
+			return mBulk
 		},
 		cache: func() *testcache.MockCache {
 			return testcache.NewMockCache()
@@ -430,7 +520,9 @@ func TestProcessUpgradeDetails(t *testing.T) {
 					t.Logf("bulk match unmarshal error: %v", err)
 					return false
 				}
-				return doc.Doc[dl.FieldUpgradeDetails] == nil && doc.Doc[dl.FieldUpgradeStartedAt] == nil && doc.Doc[dl.FieldUpgradedAt] != ""
+				upgradedAt, ok := doc.Doc[dl.FieldUpgradedAt]
+				upgradedAtStr, isStr := upgradedAt.(string)
+				return doc.Doc[dl.FieldUpgradeDetails] == nil && doc.Doc[dl.FieldUpgradeStartedAt] == nil && ok && isStr && upgradedAtStr != ""
 			}), mock.Anything, mock.Anything).Return(nil)
 			return mBulk
 		},
@@ -792,7 +884,7 @@ func TestProcessUpgradeDetails(t *testing.T) {
 				bulker: mBulk,
 			}
 
-			err := ct.processUpgradeDetails(context.Background(), tc.agent, tc.details)
+			err := ct.processUpgradeDetails(context.Background(), tc.agent, tc.details, tc.ver)
 			if tc.err == nil {
 				assert.NoError(t, err)
 			} else {
@@ -1859,4 +1951,91 @@ func TestProcessPolicyRemoteESServiceTokenSecretPaths(t *testing.T) {
 	_, hasServiceToken := remotePolicy["service_token"]
 	assert.False(t, hasServiceToken, "service_token should be deleted by Prepare before delivery to agents")
 	assert.Equal(t, policy.OutputTypeElasticsearch, remotePolicy["type"])
+}
+
+// TestProcessPolicySecretPathsConcurrentDispatch ensures processPolicy does not
+// mutate the shared ParsedPolicy.SecretKeys when concurrent checkin goroutines
+// process the same policy fan-out.
+// Regression test for https://github.com/elastic/fleet-server/issues/7739
+func TestProcessPolicySecretPathsConcurrentDispatch(t *testing.T) {
+	logger := testlog.SetLogger(t)
+
+	const payload = `{
+		"outputs": {
+			"remote": {
+				"type": "remote_elasticsearch",
+				"secrets": {
+					"service_token": {"id": "ST_ID"},
+					"ssl": {"key": {"id": "SSL_KEY_ID"}}
+				}
+			}
+		},
+		"output_permissions": {
+			"remote": {
+				"_fallback": {
+					"indices": [{"names": ["logs-*"], "privileges": ["auto_configure", "create_doc"]}]
+				}
+			}
+		}
+	}`
+
+	const agents = 2
+
+	var d model.PolicyData
+	err := json.Unmarshal([]byte(payload), &d)
+	require.NoError(t, err)
+
+	bulker := ftesting.NewMockBulk()
+	pp, err := policy.NewParsedPolicy(t.Context(), bulker, model.Policy{
+		PolicyID:    "policy1",
+		RevisionIdx: 1,
+		Data:        &d,
+	})
+	require.NoError(t, err)
+
+	remoteOut := pp.Outputs["remote"]
+	require.NotNil(t, remoteOut.Role)
+
+	bulker.On("CreateAndGetBulker", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(ftesting.NewMockBulk(), false, nil)
+
+	baseline := slices.Clone(pp.SecretKeys)
+	remoteKey := bulk.APIKey{ID: "remote-id", Key: "remote-key"}
+
+	var wg sync.WaitGroup
+	secretPaths := make([][]string, agents)
+	errs := make([]error, agents)
+	for a := range agents {
+		agent := &model.Agent{
+			ESDocument: model.ESDocument{Id: fmt.Sprintf("agent%d", a)},
+			Outputs: map[string]*model.PolicyOutput{
+				"remote": {
+					APIKey:          remoteKey.Agent(),
+					APIKeyID:        remoteKey.ID,
+					PermissionsHash: remoteOut.Role.Sha2,
+					Type:            policy.OutputTypeRemoteElasticsearch,
+				},
+			},
+		}
+		wg.Go(func() {
+			action, err := processPolicy(t.Context(), logger, bulker, agent, pp)
+			if err != nil {
+				errs[a] = err
+				return
+			}
+			pc, err := action.Data.AsActionPolicyChange()
+			if err != nil {
+				errs[a] = err
+				return
+			}
+			secretPaths[a] = pc.Policy.SecretPaths
+		})
+	}
+	wg.Wait()
+
+	for a := range agents {
+		require.NoError(t, errs[a])
+		assert.Equal(t, []string{"outputs.remote.ssl.key"}, secretPaths[a], "agent %d received incorrect secret paths", a)
+	}
+	assert.Equal(t, baseline, pp.SecretKeys, "shared ParsedPolicy.SecretKeys was mutated")
 }
