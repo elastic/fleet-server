@@ -18,15 +18,15 @@ func newCache(_ config.Cache) (Cacher, error) {
 
 type NoCache struct{}
 
-func (c *NoCache) Get(_ any) (any, bool) {
+func (c *NoCache) Get(_ string) (any, bool) {
 	return nil, false
 }
 
-func (c *NoCache) Set(_ any, _ any, _ int64) bool {
+func (c *NoCache) Set(_ string, _ any, _ int64) bool {
 	return true
 }
 
-func (c *NoCache) SetWithTTL(_, _ any, _ int64, _ time.Duration) bool {
+func (c *NoCache) SetWithTTL(_ string, _ any, _ int64, _ time.Duration) bool {
 	return true
 }
 
