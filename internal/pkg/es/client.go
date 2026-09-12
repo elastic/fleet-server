@@ -22,7 +22,7 @@ import (
 	"github.com/rs/zerolog"
 
 	backoff "github.com/cenkalti/backoff/v4"
-	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v9"
 )
 
 const (

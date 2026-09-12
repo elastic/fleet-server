@@ -14,7 +14,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 	"github.com/rs/zerolog"
 
-	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v9"
 	"golang.org/x/sync/errgroup"
 )
 
