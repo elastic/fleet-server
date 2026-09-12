@@ -131,6 +131,19 @@ download_mbp_packages_from_gcp_bucket() {
     gcloud storage cp --recursive --quiet ${bucketUri}/* ${WORKSPACE}/${pattern}
 }
 
+resolve_dra_version() {
+    local version=${1}
+    local type=${2}
+    # mage getVersion only appends "-SNAPSHOT" when the SNAPSHOT env var is
+    # set, which happens in the separate package.sh job -- apply it here too
+    # so it matches the packaged snapshot artifacts.
+    if [[ ${type} == "snapshot" ]]; then
+        echo "${version}-SNAPSHOT"
+    else
+        echo "${version}"
+    fi
+}
+
 with_mage() {
     create_workspace
     go install github.com/magefile/mage # uses go.mod implicitly
