@@ -356,6 +356,9 @@ type Test mg.Namespace
 // Docker is the namespace for docker related tasks.
 type Docker mg.Namespace
 
+// Release is the namespace for release automation.
+type Release mg.Namespace
+
 // envToBool reads the env var string s and parses it as a bool.
 func envToBool(s string) bool {
 	v, ok := os.LookupEnv(s)
@@ -2293,4 +2296,45 @@ func (Test) CloudE2ERun() error {
 	err = cmd.Run()
 	err = errors.Join(err, os.WriteFile(filepath.Join("build", "test-cloude2e.out"), b.Bytes(), 0o644))
 	return err
+}
+
+const releaseToolDir = "dev-tools/mage/release"
+
+// runReleaseTool invokes the nested-module CLI with the Fleet Server repo as cwd.
+func runReleaseTool(args ...string) error {
+	root, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	env := map[string]string{"FLEET_SERVER_REPO_ROOT": root}
+	cmdArgs := append([]string{"run", "-C", releaseToolDir, "./cmd/fleet-release"}, args...)
+	return sh.RunWithV(env, "go", cmdArgs...)
+}
+
+// UpdateVersion updates the version in version/version.go.
+func (Release) UpdateVersion(version string) error {
+	return runReleaseTool("update-version", version)
+}
+
+// UpdateMergify adds a new backport rule to .mergify.yml.
+func (Release) UpdateMergify(version string) error {
+	return runReleaseTool("update-mergify", version)
+}
+
+// RunMajorMinor orchestrates the major/minor release workflow after feature freeze.
+// Set DRY_RUN=true to preview changes without pushing.
+func (Release) RunMajorMinor() error {
+	return runReleaseTool("run-major-minor")
+}
+
+// RunPatch orchestrates the complete patch release workflow.
+// Set DRY_RUN=true to preview changes without pushing.
+func (Release) RunPatch() error {
+	return runReleaseTool("run-patch")
+}
+
+// EnsureIssueTracker creates or updates the Fleet Server release checklist issue for
+// CURRENT_RELEASE, linking related PRs labeled "release".
+func (Release) EnsureIssueTracker() error {
+	return runReleaseTool("ensure-issue-tracker")
 }
