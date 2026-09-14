@@ -132,7 +132,6 @@ func (suite *AgentContainerSuite) TestRemoteESOutputWithSecrets() {
 		agentReq := testcontainers.ContainerRequest{
 			Image: suite.dockerImg,
 			Env: map[string]string{
-				"GOCOVERDIR":             "/cover",
 				"FLEET_ENROLL":           "1",
 				"FLEET_URL":              "https://fleet-server:8220",
 				"FLEET_CA":               "/tmp/e2e-test-ca.crt",
@@ -144,12 +143,6 @@ func (suite *AgentContainerSuite) TestRemoteESOutputWithSecrets() {
 				ContainerFilePath: "/tmp/e2e-test-ca.crt",
 				FileMode:          0644,
 			}},
-			Mounts: testcontainers.ContainerMounts{
-				testcontainers.ContainerMount{
-					Source: &testcontainers.GenericBindMountSource{suite.CoverPath},
-					Target: "/cover",
-				},
-			},
 		}
 		agentC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 			ContainerRequest: agentReq,
