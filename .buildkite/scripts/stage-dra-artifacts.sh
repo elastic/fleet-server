@@ -36,12 +36,13 @@ chmod -R a+r "${BASE_DIR}"/*
 chmod -R a+w "${BASE_DIR}"
 mkdir -p artifacts
 find "${BASE_DIR}" -maxdepth 1 -type f -exec cp {} artifacts/ \;
-find "${BASE_DIR}/reports" -maxdepth 1 -type f -exec cp {} artifacts/ \;
 
 if ! ls artifacts/* >/dev/null 2>&1; then
-  echo "ERROR: no ${WORKFLOW} artifacts found in artifacts/" >&2
+  echo "ERROR: no ${WORKFLOW} packages found in ${BASE_DIR}" >&2
   exit 1
 fi
+
+find "${BASE_DIR}/reports" -maxdepth 1 -type f -exec cp {} artifacts/ \;
 
 echo "Staged artifacts:"
 ls -1 artifacts/

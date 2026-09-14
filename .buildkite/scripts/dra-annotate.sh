@@ -8,7 +8,7 @@
 ##  publishes it to the final location.
 ##
 ##  Invoked from the generated DRA sub-pipeline. Kept as a standalone script
-##  because Buildkite interpolates inline command:'s ${VAR} references at
+##  because Buildkite interpolates inline commands' ${VAR} references at
 ##  job pickup, which would eat local variables set inside the command block.
 ##
 
@@ -17,7 +17,7 @@ set -euo pipefail
 WORKFLOW="${1:?workflow required}"
 
 buildkite-agent artifact download "artifacts/dra/fleet-server/*/manifest-*.json" . --step "dra-prep-${WORKFLOW}"
-manifest=$(find artifacts/dra/fleet-server -name "manifest-*.json" | head -1)
+manifest=$(find artifacts/dra/fleet-server -name "manifest-*.json" 2>/dev/null | head -1 || true)
 if [[ -z "${manifest}" ]]; then
   echo "ERROR: no DRA manifest found for workflow ${WORKFLOW}" >&2
   exit 1
