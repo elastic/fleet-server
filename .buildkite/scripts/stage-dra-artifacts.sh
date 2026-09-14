@@ -32,10 +32,8 @@ mkdir -p "${BASE_DIR}/reports"
 (cd "${BASE_DIR}/reports" && shasum -a 512 "dependencies-${VERSION}.csv" > "dependencies-${VERSION}.csv.sha512")
 
 echo "--- Staging ${WORKFLOW} artifacts"
-if ls "${BASE_DIR}"/* >/dev/null 2>&1; then
-  chmod -R a+r "${BASE_DIR}"/*
-  chmod -R a+w "${BASE_DIR}"
-fi
+chmod -R a+r "${BASE_DIR}"/*
+chmod -R a+w "${BASE_DIR}"
 mkdir -p artifacts
 find "${BASE_DIR}" -maxdepth 1 -type f -exec cp {} artifacts/ \;
 
