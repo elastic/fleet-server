@@ -27,7 +27,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/file/cbor"
 	"github.com/elastic/fleet-server/v7/internal/pkg/file/uploader"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
-	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v9"
 )
 
 const (
