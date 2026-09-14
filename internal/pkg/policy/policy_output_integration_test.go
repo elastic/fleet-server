@@ -20,6 +20,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
+	"github.com/elastic/fleet-server/v7/internal/pkg/secret"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 )
@@ -195,6 +196,77 @@ func TestPolicyOutputESPrepareRealES(t *testing.T) {
 	assert.Equal(t, gotOutput.PermissionsHash, output.Role.Sha2)
 	assert.NotEmpty(t, gotOutput.APIKey)
 	assert.NotEmpty(t, gotOutput.APIKeyID)
+}
+
+// mOTLPRole is the output_permissions role descriptor Kibana emits for a managed OTLP output.
+var mOTLPRole = []byte(`{"_managed_otlp_apm":{"applications":[{"application":"apm","privileges":["event:write"],"resources":["*"]}]}}`)
+
+func TestPolicyOutputOTLPPrepareRealES(t *testing.T) {
+	const outputName = "test otlp"
+
+	t.Run("mOTLP — mints scoped API key and writes secret ref to agent doc", func(t *testing.T) {
+		ctx := testlog.SetLogger(t).WithContext(t.Context())
+		index, bulker := ftesting.SetupCleanIndex(ctx, t, dl.FleetAgents)
+
+		agentID := createAgent(ctx, t, index, bulker, map[string]*model.PolicyOutput{})
+		agent, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+		require.NoError(t, err)
+
+		output := Output{
+			Type: OutputTypeOTLP,
+			Name: outputName,
+			Role: &RoleT{Sha2: "new-hash", Raw: mOTLPRole},
+		}
+		policyMap := map[string]map[string]any{outputName: {}}
+
+		require.NoError(t, output.prepareOTLP(ctx, zerolog.Nop(), bulker, &agent, policyMap, nil))
+
+		resolvedAPIKey, _ := policyMap[outputName]["api_key"].(string)
+		assert.NotEmpty(t, resolvedAPIKey, "resolved api_key must be written to outputMap")
+
+		ftesting.Retry(t, ctx, func(ctx context.Context) error {
+			got, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+			if err != nil {
+				return err
+			}
+
+			gotOutput, ok := got.Outputs[outputName]
+			require.True(t, ok, "output %q not found on agent document", outputName)
+
+			assert.Equal(t, OutputTypeOTLP, gotOutput.Type)
+			assert.Equal(t, output.Role.Sha2, gotOutput.PermissionsHash)
+			assert.NotEmpty(t, gotOutput.APIKeyID)
+
+			_, isRef := secret.ParseSecretReference(gotOutput.APIKey)
+			assert.True(t, isRef, "api_key on agent doc must be a secret reference, got %q", gotOutput.APIKey)
+
+			return nil
+		}, ftesting.RetrySleep(time.Second))
+	})
+
+	t.Run("external OTLP — no output_permissions, no API key minted", func(t *testing.T) {
+		ctx := testlog.SetLogger(t).WithContext(t.Context())
+		index, bulker := ftesting.SetupCleanIndex(ctx, t, dl.FleetAgents)
+
+		agentID := createAgent(ctx, t, index, bulker, map[string]*model.PolicyOutput{})
+		agent, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+		require.NoError(t, err)
+
+		output := Output{
+			Type: OutputTypeOTLP,
+			Name: outputName,
+			Role: nil,
+		}
+		policyMap := map[string]map[string]any{outputName: {}}
+
+		require.NoError(t, output.prepareOTLP(ctx, zerolog.Nop(), bulker, &agent, policyMap, nil))
+
+		assert.Empty(t, policyMap[outputName]["api_key"], "external OTLP must not inject an api_key")
+
+		got, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+		require.NoError(t, err)
+		assert.Empty(t, got.Outputs, "agent doc must not be updated for external OTLP")
+	})
 }
 
 func createAgent(ctx context.Context, t *testing.T, index string, bulker bulk.Bulk, outputs map[string]*model.PolicyOutput) string {

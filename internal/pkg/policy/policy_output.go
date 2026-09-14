@@ -606,6 +606,9 @@ func (p *Output) prepareOTLP(
 			dl.FieldPolicyOutputPermissionsHash: p.Role.Sha2,
 		}
 
+		if !foundOutput {
+			fields[dl.FiledType] = OutputTypeOTLP
+		}
 		if output.APIKeyID != "" {
 			retiring := model.ToRetireAPIKeyIdsItems{
 				ID:        output.APIKeyID,
@@ -639,6 +642,7 @@ func (p *Output) prepareOTLP(
 			return fmt.Errorf("fail update agent record: %w", err)
 		}
 
+		output.Type = OutputTypeOTLP
 		output.APIKey = apiKeyRef
 		output.APIKeyID = outputAPIKey.ID
 		output.PermissionsHash = p.Role.Sha2
