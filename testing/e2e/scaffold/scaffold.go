@@ -881,11 +881,20 @@ func (s *Scaffold) CreateFleetOutput(ctx context.Context, body map[string]any) s
 
 // CreateAgentPolicy creates a Fleet agent policy via Kibana's Fleet API.
 // Returns the policy ID and initial revision.
-func (s *Scaffold) CreateAgentPolicy(ctx context.Context, name, namespace, dataOutputID string) (string, int) {
+// CreateAgentPolicy creates a Fleet agent policy via Kibana's Fleet API.
+// extra is merged into the request body, allowing callers to set optional fields
+// such as monitoring_output_id and monitoring_enabled.
+// Returns the policy ID and initial revision.
+func (s *Scaffold) CreateAgentPolicy(ctx context.Context, name, namespace, dataOutputID string, extra ...map[string]any) (string, int) {
 	body := map[string]any{
 		"name":           name,
 		"namespace":      namespace,
 		"data_output_id": dataOutputID,
+	}
+	for _, m := range extra {
+		for k, v := range m {
+			body[k] = v
+		}
 	}
 	p, err := json.Marshal(body)
 	s.Require().NoError(err)
@@ -1011,4 +1020,40 @@ func (s *Scaffold) GetAgentPolicyRevision(ctx context.Context, policyID string) 
 	err := json.Unmarshal(p, &obj)
 	s.Require().NoError(err)
 	return obj.Item.Revision
+}
+
+// WaitForAgentDocsInIndex polls indexPattern until at least one document whose
+// agent.id matches agentID appears. Use this to verify that an agent has
+// written data to a particular output (e.g. metrics-elastic_agent.* for
+// monitoring data routed through a remote_elasticsearch output).
+func (s *Scaffold) WaitForAgentDocsInIndex(ctx context.Context, agentID, indexPattern string) {
+	s.Require().Eventually(func() bool {
+		query := fmt.Sprintf(`{"query":{"term":{"agent.id":"%s"}},"size":1}`, agentID)
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost,
+			fmt.Sprintf("http://localhost:9200/%s/_search", indexPattern), strings.NewReader(query))
+		if err != nil {
+			return false
+		}
+		req.SetBasicAuth(s.ElasticUser, s.ElasticPass)
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := s.Client.Do(req)
+		if err != nil {
+			return false
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return false
+		}
+		var result struct {
+			Hits struct {
+				Total struct {
+					Value int `json:"value"`
+				} `json:"total"`
+			} `json:"hits"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+			return false
+		}
+		return result.Hits.Total.Value > 0
+	}, 2*time.Minute, time.Second, "agent %s never wrote documents to %s within timeout", agentID, indexPattern)
 }

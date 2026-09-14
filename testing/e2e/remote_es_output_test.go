@@ -113,11 +113,19 @@ func (suite *AgentContainerSuite) TestRemoteESOutputWithSecrets() {
 		},
 	})
 
-	// Create an agent policy using the remote ES output as its data output.
+	// Create an agent policy using the remote ES output as both the data output
+	// and the monitoring output. Setting monitoring_output_id to the remote ES
+	// output causes the agents to write their self-monitoring metrics there,
+	// giving us concrete data to query as end-to-end proof that documents flow
+	// through the remote_elasticsearch connection.
 	policyID, _ := suite.CreateAgentPolicy(ctx,
 		"remote-es-race-"+uuid.Must(uuid.NewV4()).String(),
 		"default",
 		outputID,
+		map[string]any{
+			"monitoring_output_id": outputID,
+			"monitoring_enabled":   []string{"logs", "metrics"},
+		},
 	)
 
 	// Verify the generated .fleet-policies document has a non-empty
@@ -208,4 +216,12 @@ func (suite *AgentContainerSuite) TestRemoteESOutputWithSecrets() {
 		policyRevision := suite.GetAgentPolicyRevision(ctx, policyID)
 		return agentDoc.Revision >= policyRevision
 	}, 2*time.Minute, 5*time.Second, "agent policy revision did not match Fleet's within timeout")
+
+	// Verify that data collected by the agent was actually indexed into the
+	// remote ES over the remote_elasticsearch output connection. Because
+	// monitoring_output_id is set to the remote ES output, the agent writes its
+	// self-monitoring metrics there. Waiting for metrics-elastic_agent.* documents
+	// confirms the full path: secret-reference resolved → API key created in
+	// remote ES → agent authenticated → data indexed.
+	suite.WaitForAgentDocsInIndex(ctx, firstEnrolledAgentID, "metrics-elastic_agent.*")
 }
