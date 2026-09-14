@@ -11,6 +11,7 @@ import (
 	"io"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gofrs/uuid/v5"
@@ -26,7 +27,7 @@ import (
 // (non-empty secret_references) without crashing, and that enrolled agents
 // successfully apply the policy.
 //
-// Two agents enroll concurrently so fleet-server dispatches the same policy to
+// Five agents enroll concurrently so fleet-server dispatches the same policy to
 // multiple subscribers simultaneously — the scenario that exercises the shared-
 // ParsedPolicy race fixed in #7794.
 //
@@ -139,31 +140,46 @@ func (suite *AgentContainerSuite) TestRemoteESOutputWithSecrets() {
 	// available, so we create one explicitly.
 	enrollKey := suite.CreateEnrollmentAPIKey(ctx, policyID)
 
-	// Enroll two agents concurrently under the same policy so that fleet-server
-	// dispatches the policy to multiple subscribers simultaneously — the scenario
-	// that exercises the shared-ParsedPolicy race fixed in #7794.
-	for i := range 2 {
-		agentReq := testcontainers.ContainerRequest{
-			Image: suite.dockerImg,
-			Env: map[string]string{
-				"FLEET_ENROLL":           "1",
-				"FLEET_URL":              "https://fleet-server:8220",
-				"FLEET_CA":               "/tmp/e2e-test-ca.crt",
-				"FLEET_ENROLLMENT_TOKEN": enrollKey,
-			},
-			Networks: []string{"integration_default"},
-			Files: []testcontainers.ContainerFile{{
-				HostFilePath:      filepath.Join(suite.CertPath, "e2e-test-ca.crt"),
-				ContainerFilePath: "/tmp/e2e-test-ca.crt",
-				FileMode:          0644,
-			}},
-		}
-		agentC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
-			ContainerRequest: agentReq,
-			Started:          true,
-			Logger:           &logger{suite.T()},
-		})
+	// Enroll agents concurrently under the same policy. Launching all containers
+	// in parallel maximises the chance that multiple agents connect to fleet-server
+	// and trigger processPolicy at the same time — the scenario that exercises the
+	// shared-ParsedPolicy race fixed in #7794.
+	const numAgents = 5
+	agentContainers := make([]testcontainers.Container, numAgents)
+	agentErrs := make([]error, numAgents)
+	var wg sync.WaitGroup
+	for i := range numAgents {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			agentReq := testcontainers.ContainerRequest{
+				Image: suite.dockerImg,
+				Env: map[string]string{
+					"FLEET_ENROLL":           "1",
+					"FLEET_URL":              "https://fleet-server:8220",
+					"FLEET_CA":               "/tmp/e2e-test-ca.crt",
+					"FLEET_ENROLLMENT_TOKEN": enrollKey,
+				},
+				Networks: []string{"integration_default"},
+				Files: []testcontainers.ContainerFile{{
+					HostFilePath:      filepath.Join(suite.CertPath, "e2e-test-ca.crt"),
+					ContainerFilePath: "/tmp/e2e-test-ca.crt",
+					FileMode:          0644,
+				}},
+			}
+			c, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+				ContainerRequest: agentReq,
+				Started:          true,
+				Logger:           &logger{suite.T()},
+			})
+			agentContainers[i] = c
+			agentErrs[i] = err
+		}(i)
+	}
+	wg.Wait()
+	for i, err := range agentErrs {
 		suite.Require().NoError(err, "agent %d container start failed", i)
+		agentC := agentContainers[i]
 		idx := i
 		suite.T().Cleanup(func() {
 			cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), time.Minute)
@@ -184,8 +200,8 @@ func (suite *AgentContainerSuite) TestRemoteESOutputWithSecrets() {
 		})
 	}
 
-	// Wait for both enrolled agents (any agent that is not the fleet-server agent)
-	// to appear in Fleet and reach the online state.
+	// Wait for all enrolled agents (excluding the fleet-server agent) to appear
+	// in Fleet and reach the online state.
 	var firstEnrolledAgentID string
 	suite.Require().Eventually(func() bool {
 		_, agents := suite.GetAgents(ctx)
@@ -201,8 +217,8 @@ func (suite *AgentContainerSuite) TestRemoteESOutputWithSecrets() {
 				online++
 			}
 		}
-		return online >= 2
-	}, 3*time.Minute, time.Second, "fewer than 2 enrolled agents reached online status")
+		return online >= numAgents
+	}, 3*time.Minute, time.Second, "fewer than %d enrolled agents reached online status", numAgents)
 
 	// Fleet-server must still be healthy after dispatching the policy with
 	// secret_references populated to multiple concurrent subscribers — a panic
