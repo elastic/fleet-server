@@ -947,6 +947,59 @@ func (s *Scaffold) CreateEnrollmentAPIKey(ctx context.Context, policyID string) 
 	return obj.Item.APIKey
 }
 
+// WaitForPolicySecretReferences polls the .fleet-policies index until the most
+// recent revision for policyID has a non-empty secret_references array. Call
+// this after creating a policy with a Fleet output that uses the "secrets"
+// wrapper to confirm the secret reference was actually persisted before
+// enrolling agents that depend on it.
+func (s *Scaffold) WaitForPolicySecretReferences(ctx context.Context, policyID string) {
+	timer := time.NewTimer(time.Second)
+	for {
+		query := fmt.Sprintf(`{"query":{"term":{"policy_id":"%s"}},"sort":[{"revision_idx":{"order":"desc"}}],"size":1}`, policyID)
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://localhost:9200/.fleet-policies/_search", strings.NewReader(query))
+		s.Require().NoError(err)
+		req.SetBasicAuth(s.ElasticUser, s.ElasticPass)
+		req.Header.Set("Content-Type", "application/json")
+		select {
+		case <-ctx.Done():
+			s.Require().NoError(ctx.Err(), "context expired before policy secret_references was populated")
+			return
+		case <-timer.C:
+			resp, err := s.Client.Do(req)
+			if err != nil {
+				timer.Reset(time.Second)
+				continue
+			}
+			if resp.StatusCode != http.StatusOK {
+				resp.Body.Close()
+				timer.Reset(time.Second)
+				continue
+			}
+			var result struct {
+				Hits struct {
+					Total struct {
+						Value int `json:"value"`
+					} `json:"total"`
+					Hits []struct {
+						Source struct {
+							Data struct {
+								SecretReferences []any `json:"secret_references"`
+							} `json:"data"`
+						} `json:"_source"`
+					} `json:"hits"`
+				} `json:"hits"`
+			}
+			err = json.NewDecoder(resp.Body).Decode(&result)
+			resp.Body.Close()
+			s.Require().NoError(err)
+			if result.Hits.Total.Value > 0 && len(result.Hits.Hits[0].Source.Data.SecretReferences) > 0 {
+				return
+			}
+			timer.Reset(time.Second)
+		}
+	}
+}
+
 // GetAgentPolicyRevision returns the current revision of the given policy from Kibana.
 func (s *Scaffold) GetAgentPolicyRevision(ctx context.Context, policyID string) int {
 	p := s.GetPolicy(ctx, policyID)

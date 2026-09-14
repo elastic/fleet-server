@@ -120,6 +120,12 @@ func (suite *AgentContainerSuite) TestRemoteESOutputWithSecrets() {
 		outputID,
 	)
 
+	// Verify the generated .fleet-policies document has a non-empty
+	// secret_references before enrolling agents. If Kibana silently dropped the
+	// "secrets" wrapper, the policy would have no secret_references and the test
+	// would not exercise the #7794 race at all.
+	suite.WaitForPolicySecretReferences(ctx, policyID)
+
 	// Explicitly create an enrollment API key for the new policy.
 	// CreateAgentPolicy does not guarantee an auto-generated key is immediately
 	// available, so we create one explicitly.
