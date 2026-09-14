@@ -1193,6 +1193,16 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 		return nil, fmt.Errorf("failed to prepare OTel exporters: %w", err)
 	}
 
+	// Remove otlp outputs from the delivered policy. Elastic Agent has no OTLP output
+	// implementation — OTLP delivery is configured entirely through the otelcol exporters
+	// block, which prepareOTelExporters has already populated from these outputs.
+	for name, out := range pp.Outputs {
+		if out.Type != policy.OutputTypeOTLP {
+			continue
+		}
+		delete(pp.Policy.Data.Outputs, name)
+	}
+
 	// Replace raw inputs with the secret-substituted version built during policy parsing.
 	pp.Policy.Data.Inputs = pp.Inputs
 

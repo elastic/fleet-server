@@ -2091,84 +2091,114 @@ func TestProcessPolicySecretPathsConcurrentDispatch(t *testing.T) {
 	assert.Equal(t, baseline, pp.SecretKeys, "shared ParsedPolicy.SecretKeys was mutated")
 }
 
-func TestPrepareOTelExportersOTLP(t *testing.T) {
-	const (
-		outputName = "my-otlp-output"
-		rawAPIKey  = "key-id:key-secret"
-	)
-	wantHeader := "ApiKey " + base64.StdEncoding.EncodeToString([]byte(rawAPIKey))
+func TestProcessPolicyOTLPOutput(t *testing.T) {
+	logger := testlog.SetLogger(t)
+
+	const outputName = "my-otlp"
+
+	// secretDocID is returned by MockBulk.WriteSecret; MockBulk.ReadSecrets returns id+"_value".
+	const secretDocID = "otlp-secret-doc-id"
+	wantHeader := "ApiKey " + base64.StdEncoding.EncodeToString([]byte(secretDocID+"_value"))
 
 	tests := []struct {
-		name        string
-		exporterID  string
-		outputType  string
-		apiKey      string
-		wantErr     bool
-		wantHeader  string
-		wantNoWrite bool // exporter config must be unchanged (no headers injected)
+		name       string
+		exporterID string // e.g. "otlp/my-otlp" or "otlphttp/my-otlp"
+		managed    bool   // true = include output_permissions, triggering key minting
+		wantHeader string // expected Authorization header; empty = no injection
 	}{
 		{
-			name:       "otlp exporter with mOTLP api_key — injects Authorization header",
+			name:       "external OTLP, grpc — exporter unchanged, output dropped",
 			exporterID: "otlp/" + outputName,
-			outputType: policy.OutputTypeOTLP,
-			apiKey:     rawAPIKey,
-			wantHeader: wantHeader,
 		},
 		{
-			name:       "otlphttp exporter with mOTLP api_key — injects Authorization header",
+			name:       "external OTLP, http — exporter unchanged, output dropped",
 			exporterID: "otlphttp/" + outputName,
-			outputType: policy.OutputTypeOTLP,
-			apiKey:     rawAPIKey,
+		},
+		{
+			name:       "managed OTLP, grpc — Authorization header injected, output dropped",
+			exporterID: "otlp/" + outputName,
+			managed:    true,
 			wantHeader: wantHeader,
 		},
 		{
-			name:        "otlp exporter with no api_key — external OTLP, config unchanged",
-			exporterID:  "otlp/" + outputName,
-			outputType:  policy.OutputTypeOTLP,
-			apiKey:      "",
-			wantNoWrite: true,
-		},
-		{
-			name:        "otlphttp exporter with no api_key — external OTLP, config unchanged",
-			exporterID:  "otlphttp/" + outputName,
-			outputType:  policy.OutputTypeOTLP,
-			apiKey:      "",
-			wantNoWrite: true,
-		},
-		{
-			name:       "otlp exporter with wrong output type — returns error",
-			exporterID: "otlp/" + outputName,
-			outputType: policy.OutputTypeElasticsearch,
-			apiKey:     rawAPIKey,
-			wantErr:    true,
+			name:       "managed OTLP, http — Authorization header injected, output dropped",
+			exporterID: "otlphttp/" + outputName,
+			managed:    true,
+			wantHeader: wantHeader,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			outputs := map[string]map[string]any{
-				outputName: {"type": tc.outputType},
-			}
-			if tc.apiKey != "" {
-				outputs[outputName]["api_key"] = tc.apiKey
-			}
-			exporters := map[string]any{
-				tc.exporterID: map[string]any{},
+			outputPermissions := ""
+			if tc.managed {
+				outputPermissions = fmt.Sprintf(`,
+				"output_permissions": {
+					%q: {
+						"_managed_otlp_apm": {
+							"applications": [{"application": "apm", "privileges": ["event:write"], "resources": ["*"]}]
+						}
+					}
+				}`, outputName)
 			}
 
-			err := prepareOTelExporters(outputs, exporters)
+			policyPayload := fmt.Sprintf(`{
+				"id": "test-policy",
+				"revision": 1,
+				"outputs": {%q: {"type": "otlp"}},
+				"exporters": {%q: {"endpoint": "https://otlp.example:4317"}}
+				%s,
+				"inputs": []
+			}`, outputName, tc.exporterID, outputPermissions)
 
-			if tc.wantErr {
-				require.Error(t, err)
-				return
+			var d model.PolicyData
+			require.NoError(t, json.Unmarshal([]byte(policyPayload), &d))
+
+			bulker := ftesting.NewMockBulk()
+			if tc.managed {
+				bulker.On("APIKeyCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(&bulk.APIKey{ID: "otlp-key-id", Key: "otlp-key-secret"}, nil)
+				bulker.On("WriteSecret", mock.Anything, mock.Anything).
+					Return(secretDocID, nil)
+				bulker.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(nil)
 			}
+
+			pp, err := policy.NewParsedPolicy(t.Context(), bulker, model.Policy{
+				PolicyID:    "policy1",
+				RevisionIdx: 1,
+				Data:        &d,
+			})
 			require.NoError(t, err)
 
-			cfg := exporters[tc.exporterID].(map[string]any)
-			if tc.wantNoWrite {
-				assert.Empty(t, cfg["headers"], "headers must not be injected for external OTLP output")
+			agent := &model.Agent{ESDocument: model.ESDocument{Id: "agent1"}}
+
+			action, err := processPolicy(t.Context(), logger, bulker, agent, pp, nil)
+			require.NoError(t, err)
+
+			pc, err := action.Data.AsActionPolicyChange()
+			require.NoError(t, err)
+
+			// The OTLP output must not appear in the delivered policy.
+			_, hasOTLP := pc.Policy.Outputs[outputName]
+			assert.False(t, hasOTLP, "otlp output must not be delivered to the agent")
+
+			// With only an OTLP output the "outputs" key must be absent from the JSON
+			// (api.PolicyData.Outputs is omitempty) — an empty map is a fatal agent error.
+			raw, err := json.Marshal(pc.Policy)
+			require.NoError(t, err)
+			assert.NotContains(t, string(raw), `"outputs":`, "outputs key must be omitted when all outputs are otlp")
+
+			// The otelcol exporter must still be delivered.
+			exporterRaw, ok := pc.Policy.Exporters[tc.exporterID]
+			require.True(t, ok, "exporter %q must be present in delivered policy", tc.exporterID)
+			exporterCfg, ok := exporterRaw.(map[string]any)
+			require.True(t, ok, "exporter config must be a map")
+
+			if tc.wantHeader == "" {
+				assert.Empty(t, exporterCfg["headers"], "no Authorization header for external OTLP output")
 			} else {
-				headers, ok := cfg["headers"].(map[string]any)
+				headers, ok := exporterCfg["headers"].(map[string]any)
 				require.True(t, ok, "headers must be a map")
 				assert.Equal(t, tc.wantHeader, headers["Authorization"])
 			}
