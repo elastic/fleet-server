@@ -915,6 +915,38 @@ func (s *Scaffold) CreateAgentPolicy(ctx context.Context, name, namespace, dataO
 	return obj.Item.ID, obj.Item.Revision
 }
 
+// CreateEnrollmentAPIKey creates a Fleet enrollment API key for the given policy
+// and returns the key token. Use this instead of GetEnrollmentTokenForPolicyID
+// when the policy was just created and the auto-generated key may not yet exist.
+func (s *Scaffold) CreateEnrollmentAPIKey(ctx context.Context, policyID string) string {
+	body := map[string]any{"policy_id": policyID}
+	p, err := json.Marshal(body)
+	s.Require().NoError(err)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://localhost:5601/api/fleet/enrollment_api_keys", bytes.NewReader(p))
+	s.Require().NoError(err)
+	req.SetBasicAuth(s.ElasticUser, s.ElasticPass)
+	req.Header.Set("kbn-xsrf", "e2e-test")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := s.Client.Do(req)
+	s.Require().NoError(err)
+	defer resp.Body.Close()
+	p, err = io.ReadAll(resp.Body)
+	s.Require().NoError(err)
+	s.Require().Equalf(http.StatusOK, resp.StatusCode, "create enrollment API key failed: %s", p)
+
+	var obj struct {
+		Item struct {
+			APIKey string `json:"api_key"`
+		} `json:"item"`
+	}
+	err = json.Unmarshal(p, &obj)
+	s.Require().NoError(err)
+	s.Require().NotEmpty(obj.Item.APIKey)
+	return obj.Item.APIKey
+}
+
 // GetAgentPolicyRevision returns the current revision of the given policy from Kibana.
 func (s *Scaffold) GetAgentPolicyRevision(ctx context.Context, policyID string) int {
 	p := s.GetPolicy(ctx, policyID)

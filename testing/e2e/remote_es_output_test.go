@@ -23,13 +23,16 @@ import (
 //
 // It verifies that fleet-server correctly serves a policy with a
 // remote_elasticsearch output whose service_token is stored as a Fleet secret
-// (non-empty secret_references) without crashing, and that an enrolled agent
-// successfully applies the policy.
+// (non-empty secret_references) without crashing, and that enrolled agents
+// successfully apply the policy.
+//
+// Two agents enroll concurrently so fleet-server dispatches the same policy to
+// multiple subscribers simultaneously — the scenario that exercises the shared-
+// ParsedPolicy race fixed in #7794.
 //
 // The service_token is wrapped in {"secrets": {"service_token": "..."}} when
 // creating the Fleet output so that Fleet stores it as a secret and populates
-// secret_references in the generated policy — the trigger condition for the
-// race fixed in #7794.
+// secret_references in the generated policy — the trigger condition for the race.
 func (suite *AgentContainerSuite) TestRemoteESOutputWithSecrets() {
 	ctx, cancel := context.WithTimeout(suite.T().Context(), 5*time.Minute)
 	defer cancel()
@@ -117,80 +120,92 @@ func (suite *AgentContainerSuite) TestRemoteESOutputWithSecrets() {
 		outputID,
 	)
 
-	// Enroll a second agent with the remote ES policy.
-	enrollKey := suite.GetEnrollmentTokenForPolicyID(ctx, policyID)
-	agentReq := testcontainers.ContainerRequest{
-		Image: suite.dockerImg,
-		Env: map[string]string{
-			"GOCOVERDIR":             "/cover",
-			"FLEET_ENROLL":           "1",
-			"FLEET_URL":              "https://fleet-server:8220",
-			"FLEET_CA":               "/tmp/e2e-test-ca.crt",
-			"FLEET_ENROLLMENT_TOKEN": enrollKey,
-		},
-		Networks: []string{"integration_default"},
-		Files: []testcontainers.ContainerFile{{
-			HostFilePath:      filepath.Join(suite.CertPath, "e2e-test-ca.crt"),
-			ContainerFilePath: "/tmp/e2e-test-ca.crt",
-			FileMode:          0644,
-		}},
-		Mounts: testcontainers.ContainerMounts{
-			testcontainers.ContainerMount{
-				Source: &testcontainers.GenericBindMountSource{suite.CoverPath},
-				Target: "/cover",
-			},
-		},
-	}
-	agentC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
-		ContainerRequest: agentReq,
-		Started:          true,
-		Logger:           &logger{suite.T()},
-	})
-	suite.Require().NoError(err)
-	suite.T().Cleanup(func() {
-		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), time.Minute)
-		defer cleanupCancel()
-		if suite.T().Failed() {
-			rc, err := agentC.Logs(cleanupCtx)
-			if err != nil {
-				suite.T().Logf("unable to get agent container logs: %v", err)
-			} else {
-				p, err := io.ReadAll(rc)
-				suite.T().Logf("agent container logs (read err: %v):\n%s", err, string(p))
-				rc.Close()
-			}
-		}
-		if err := agentC.Terminate(cleanupCtx); err != nil {
-			suite.T().Logf("warning: failed to terminate agent container: %v", err)
-		}
-	})
+	// Explicitly create an enrollment API key for the new policy.
+	// CreateAgentPolicy does not guarantee an auto-generated key is immediately
+	// available, so we create one explicitly.
+	enrollKey := suite.CreateEnrollmentAPIKey(ctx, policyID)
 
-	// Wait for the enrolled agent to appear in Fleet.
-	// suite.agentID is the fleet-server agent registered by FleetIsHealthy; the
-	// newly enrolled agent is any other agent on the list.
-	var agentID string
+	// Enroll two agents concurrently under the same policy so that fleet-server
+	// dispatches the policy to multiple subscribers simultaneously — the scenario
+	// that exercises the shared-ParsedPolicy race fixed in #7794.
+	for i := range 2 {
+		agentReq := testcontainers.ContainerRequest{
+			Image: suite.dockerImg,
+			Env: map[string]string{
+				"GOCOVERDIR":             "/cover",
+				"FLEET_ENROLL":           "1",
+				"FLEET_URL":              "https://fleet-server:8220",
+				"FLEET_CA":               "/tmp/e2e-test-ca.crt",
+				"FLEET_ENROLLMENT_TOKEN": enrollKey,
+			},
+			Networks: []string{"integration_default"},
+			Files: []testcontainers.ContainerFile{{
+				HostFilePath:      filepath.Join(suite.CertPath, "e2e-test-ca.crt"),
+				ContainerFilePath: "/tmp/e2e-test-ca.crt",
+				FileMode:          0644,
+			}},
+			Mounts: testcontainers.ContainerMounts{
+				testcontainers.ContainerMount{
+					Source: &testcontainers.GenericBindMountSource{suite.CoverPath},
+					Target: "/cover",
+				},
+			},
+		}
+		agentC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+			ContainerRequest: agentReq,
+			Started:          true,
+			Logger:           &logger{suite.T()},
+		})
+		suite.Require().NoError(err, "agent %d container start failed", i)
+		idx := i
+		suite.T().Cleanup(func() {
+			cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), time.Minute)
+			defer cleanupCancel()
+			if suite.T().Failed() {
+				rc, err := agentC.Logs(cleanupCtx)
+				if err != nil {
+					suite.T().Logf("unable to get agent %d container logs: %v", idx, err)
+				} else {
+					p, err := io.ReadAll(rc)
+					suite.T().Logf("agent %d container logs (read err: %v):\n%s", idx, err, string(p))
+					rc.Close()
+				}
+			}
+			if err := agentC.Terminate(cleanupCtx); err != nil {
+				suite.T().Logf("warning: failed to terminate agent %d container: %v", idx, err)
+			}
+		})
+	}
+
+	// Wait for both enrolled agents (any agent that is not the fleet-server agent)
+	// to appear in Fleet and reach the online state.
+	var firstEnrolledAgentID string
 	suite.Require().Eventually(func() bool {
 		_, agents := suite.GetAgents(ctx)
+		online := 0
 		for _, a := range agents {
-			if a.ID != suite.agentID {
-				agentID = a.ID
-				return true
+			if a.ID == suite.agentID {
+				continue
+			}
+			if a.Status == "online" {
+				if firstEnrolledAgentID == "" {
+					firstEnrolledAgentID = a.ID
+				}
+				online++
 			}
 		}
-		return false
-	}, 2*time.Minute, time.Second, "enrolled agent did not appear in Fleet")
+		return online >= 2
+	}, 3*time.Minute, time.Second, "fewer than 2 enrolled agents reached online status")
 
-	suite.AgentIsOnline(ctx, agentID)
-
-	// Fleet-server must still be healthy after serving the policy with
-	// secret_references populated — a panic from the race condition would cause
-	// the status endpoint to fail or return a non-OK status.
+	// Fleet-server must still be healthy after dispatching the policy with
+	// secret_references populated to multiple concurrent subscribers — a panic
+	// from the race condition would cause the status endpoint to fail.
 	suite.FleetServerStatusOK(ctx, endpoint)
 
-	// Verify the agent's applied policy revision matches Fleet's, confirming
-	// fleet-server dispatched the policy without crashing mid-stream.
+	// Verify one enrolled agent's applied policy revision matches Fleet's,
+	// confirming fleet-server dispatched the policy without crashing mid-stream.
 	suite.Require().Eventually(func() bool {
-		agentDoc := suite.GetAgent(ctx, agentID)
+		agentDoc := suite.GetAgent(ctx, firstEnrolledAgentID)
 		policyRevision := suite.GetAgentPolicyRevision(ctx, policyID)
 		return agentDoc.Revision >= policyRevision
 	}, 2*time.Minute, 5*time.Second, "agent policy revision did not match Fleet's within timeout")
