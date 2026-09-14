@@ -48,21 +48,10 @@ echo "DRA_UPLOAD=${DRA_UPLOAD}"
 annotate_step=""
 trigger_step=""
 if [[ "${DRA_UPLOAD}" == "true" ]]; then
-  annotate_step=$(cat <<ANN
-
-  - label: ":memo: Annotate DRA summary (${TYPE})"
-    key: "dra-annotate-${TYPE}"
-    depends_on: "dra-prep-${TYPE}"
-    command: ".buildkite/scripts/dra-annotate.sh ${TYPE}"
-    agents:
-      provider: "gcp"
-      image: "${IMAGE_UBUNTU_X86_64}"
-    timeout_in_minutes: 5
-ANN
-)
   trigger_step=$(cat <<TRIG
 
   - label: ":pipeline: DRA processing for fleet-server (${TYPE})"
+    key: "dra-trigger-${TYPE}"
     trigger: "unified-release-dra-processing"
     depends_on: "dra-prep-${TYPE}"
     build:
@@ -71,6 +60,18 @@ ANN
         DRA_STACK_VERSION: "${VERSION}"
         DRA_WORKFLOW: "${TYPE}"
 TRIG
+)
+  annotate_step=$(cat <<ANN
+
+  - label: ":memo: Annotate DRA summary (${TYPE})"
+    key: "dra-annotate-${TYPE}"
+    depends_on: "dra-trigger-${TYPE}"
+    command: ".buildkite/scripts/dra-annotate.sh ${TYPE}"
+    agents:
+      provider: "gcp"
+      image: "${IMAGE_UBUNTU_X86_64}"
+    timeout_in_minutes: 5
+ANN
 )
 fi
 
