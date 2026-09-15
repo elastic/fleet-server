@@ -114,11 +114,18 @@ func (suite *AgentContainerSuite) TestRemoteESOutputWithSecrets() {
 		},
 	})
 
-	// Create an agent policy using the remote ES output as the data output.
+	// Create an agent policy using the remote ES output as both the data output
+	// and the monitoring output. Routing monitoring through the remote ES output
+	// lets us confirm end-to-end that the secret-reference is resolved, the API
+	// key is created in the remote ES, and agents can authenticate and write there.
 	policyID, _ := suite.CreateAgentPolicy(ctx,
 		"remote-es-race-"+uuid.Must(uuid.NewV4()).String(),
 		"default",
 		outputID,
+		map[string]any{
+			"monitoring_output_id": outputID,
+			"monitoring_enabled":   []string{"logs", "metrics"},
+		},
 	)
 
 	// Verify the generated .fleet-policies document has a non-empty
@@ -229,7 +236,13 @@ func (suite *AgentContainerSuite) TestRemoteESOutputWithSecrets() {
 	suite.Require().Eventually(func() bool {
 		agentDoc := suite.GetAgent(ctx, firstEnrolledAgentID)
 		policyRevision := suite.GetAgentPolicyRevision(ctx, policyID)
-		return agentDoc.Revision >= policyRevision
+		return agentDoc.Revision == policyRevision
 	}, 2*time.Minute, 5*time.Second, "agent policy revision did not match Fleet's within timeout")
 
+	// Verify that agent self-monitoring data was indexed into the remote ES.
+	// Agents route monitoring through the remote_elasticsearch output, so
+	// documents appearing under metrics-elastic_agent.* confirm the full path:
+	// secret_references resolved → API key created in remote ES → agent
+	// authenticated → data indexed.
+	suite.WaitForAgentDocsInIndex(ctx, firstEnrolledAgentID, "metrics-elastic_agent.*")
 }

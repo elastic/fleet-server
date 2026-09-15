@@ -881,8 +881,6 @@ func (s *Scaffold) CreateFleetOutput(ctx context.Context, body map[string]any) s
 }
 
 // CreateAgentPolicy creates a Fleet agent policy via Kibana's Fleet API.
-// Returns the policy ID and initial revision.
-// CreateAgentPolicy creates a Fleet agent policy via Kibana's Fleet API.
 // extra is merged into the request body, allowing callers to set optional fields
 // such as monitoring_output_id and monitoring_enabled.
 // Returns the policy ID and initial revision.
@@ -1054,5 +1052,5 @@ func (s *Scaffold) WaitForAgentDocsInIndex(ctx context.Context, agentID, indexPa
 			return false
 		}
 		return result.Hits.Total.Value > 0
-	}, 2*time.Minute, time.Second, "agent %s never wrote documents to %s within timeout", agentID, indexPattern)
+	}, 4*time.Minute, time.Second, "agent %s never wrote documents to %s within timeout", agentID, indexPattern)
 }
