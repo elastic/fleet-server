@@ -563,6 +563,43 @@ func TestPolicyOTLPOutputPrepare(t *testing.T) {
 	}
 }
 
+func TestPolicyOTLPOutputPrepareManagedToExternal(t *testing.T) {
+	const (
+		secretID = "prev-secret-id"
+		oldKeyID = "prev-key-id"
+	)
+	secretRef := "$co.elastic.secret{" + secretID + "}"
+
+	logger := testlog.SetLogger(t)
+	bulker := ftesting.NewMockBulk()
+
+	// Two Update calls: one to append the retirement record, one to remove the output entry.
+	bulker.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Twice()
+
+	agent := &model.Agent{
+		ESDocument: model.ESDocument{Id: "agent-id"},
+		Outputs: map[string]*model.PolicyOutput{
+			"test output": {
+				Type:            OutputTypeOTLP,
+				APIKey:          secretRef,
+				APIKeyID:        oldKeyID,
+				PermissionsHash: "old-hash",
+			},
+		},
+	}
+	output := Output{
+		Type: OutputTypeOTLP,
+		Name: "test output",
+		Role: nil, // no output_permissions → external OTLP
+	}
+	policyMap := map[string]map[string]any{"test output": {"type": OutputTypeOTLP}}
+
+	err := output.Prepare(context.Background(), logger, bulker, agent, policyMap)
+	require.NoError(t, err)
+	assert.Empty(t, policyMap["test output"]["api_key"], "external OTLP must not inject an api_key")
+	bulker.AssertExpectations(t)
+}
+
 func TestPolicyRemoteESOutputPrepareNoRole(t *testing.T) {
 	logger := testlog.SetLogger(t)
 	bulker := ftesting.NewMockBulk()

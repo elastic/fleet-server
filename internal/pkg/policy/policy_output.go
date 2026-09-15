@@ -458,6 +458,37 @@ func (p *Output) prepareOTLP(
 	// Only mOTLP outputs carry an output_permissions block and need API key management.
 	if p.Role == nil {
 		zlog.Debug().Msg("no output permissions for OTLP output; skipping API key management")
+		// If this output previously had a managed API key (mOTLP → external transition),
+		// retire it now. Without this the old key stays valid indefinitely and its
+		// .fleet-secrets doc is pinned alive by outputSecretIsReferenced.
+		if prev, ok := agent.Outputs[p.Name]; ok && prev.APIKeyID != "" {
+			retiring := model.ToRetireAPIKeyIdsItems{
+				ID:        prev.APIKeyID,
+				RetiredAt: time.Now().UTC().Format(time.RFC3339),
+			}
+			if secretID, ok := secret.ParseSecretReference(prev.APIKey); ok {
+				retiring.SecretID = secretID
+			}
+			retireFields := map[string]any{
+				dl.FieldPolicyOutputToRetireAPIKeyIDs: retiring,
+			}
+			body, err := renderUpdatePainlessScript(p.Name, retireFields)
+			if err != nil {
+				return fmt.Errorf("could not render retirement script for mOTLP→external transition: %w", err)
+			}
+			if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
+				zlog.Error().Err(err).Msg("fail update agent record for mOTLP→external transition")
+				return fmt.Errorf("fail update agent record: %w", err)
+			}
+			body, err = renderRemoveOutputPainlessScript(p.Name)
+			if err != nil {
+				return fmt.Errorf("could not render remove-output script for mOTLP→external transition: %w", err)
+			}
+			if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
+				zlog.Error().Err(err).Msg("fail remove output entry for mOTLP→external transition")
+				return fmt.Errorf("fail update agent record: %w", err)
+			}
+		}
 		return nil
 	}
 
@@ -610,10 +641,12 @@ func (p *Output) prepareOTLP(
 			fields[dl.FiledType] = OutputTypeOTLP
 		}
 		if output.APIKeyID != "" {
+			// Leave Output empty: OTLP keys are minted against the primary cluster.
+			// invalidateAPIKeys treats a non-empty Output as a remote-cluster key and routes
+			// invalidation through an output bulker that cannot exist for OTLP.
 			retiring := model.ToRetireAPIKeyIdsItems{
 				ID:        output.APIKeyID,
 				RetiredAt: time.Now().UTC().Format(time.RFC3339),
-				Output:    p.Name,
 			}
 			if secretID, ok := secret.ParseSecretReference(output.APIKey); ok {
 				retiring.SecretID = secretID

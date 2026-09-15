@@ -418,7 +418,7 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 	}
 
 	for outputName, output := range agent.Outputs {
-		if output.Type != policy.OutputTypeElasticsearch {
+		if output.Type != policy.OutputTypeElasticsearch && output.Type != policy.OutputTypeOTLP {
 			continue
 		}
 
