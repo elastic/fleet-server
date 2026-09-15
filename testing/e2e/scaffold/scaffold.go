@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"net"
 	"net/http"
 	"os"
@@ -892,9 +893,7 @@ func (s *Scaffold) CreateAgentPolicy(ctx context.Context, name, namespace, dataO
 		"data_output_id": dataOutputID,
 	}
 	for _, m := range extra {
-		for k, v := range m {
-			body[k] = v
-		}
+		maps.Copy(body, m)
 	}
 	p, err := json.Marshal(body)
 	s.Require().NoError(err)
