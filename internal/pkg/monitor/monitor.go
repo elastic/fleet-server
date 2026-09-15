@@ -230,7 +230,11 @@ func (m *simpleMonitorT) Run(ctx context.Context) (err error) {
 		checkpoint, err := gcheckpt.Query(sCtx, m.monCli, m.index)
 		span.End()
 		if err != nil {
-			m.log.Warn().Err(err).Msg("failed to initialize the global checkpoints, will retry")
+			if errors.Is(err, es.ErrShardRestoring) {
+				m.log.Warn().Msgf("index shard is being restored, poll again in %v", retryDelay)
+			} else {
+				m.log.Warn().Err(err).Msg("failed to initialize the global checkpoints, will retry")
+			}
 			err = sleep.WithContext(ctx, retryDelay)
 			if err != nil {
 				if m.tracer != nil {
@@ -276,6 +280,10 @@ func (m *simpleMonitorT) Run(ctx context.Context) (err error) {
 			if errors.Is(err, es.ErrIndexNotFound) {
 				// Wait until created
 				m.log.Debug().Msgf("index not found, poll again in %v", retryDelay)
+			} else if errors.Is(err, es.ErrShardRestoring) {
+				// Index shard is being restored from a snapshot; this is expected
+				// and self-resolving. Poll again after the retry delay.
+				m.log.Warn().Msgf("index shard is being restored, poll again in %v", retryDelay)
 			} else if errors.Is(err, es.ErrTimeout) {
 				// Timed out, wait again
 				m.log.Debug().Msg("timeout on global checkpoints advance, poll again")
