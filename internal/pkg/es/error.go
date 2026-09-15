@@ -16,6 +16,7 @@ const (
 	timeoutErrorType         = "timeout_exception"
 	indexNotFoundErrorType   = "index_not_found_exception"
 	versionConflictErrorType = "version_conflict_engine_exception"
+	shardRestoringErrorType  = "shard_restoring_exception"
 )
 
 // TODO: Why do we have both ErrElastic and ErrorT?  Very strange.
@@ -35,6 +36,8 @@ func (e *ErrElastic) Unwrap() error {
 		return ErrIndexNotFound
 	} else if e.Type == timeoutErrorType {
 		return ErrTimeout
+	} else if e.Type == shardRestoringErrorType {
+		return ErrShardRestoring
 	}
 
 	return nil
@@ -74,11 +77,13 @@ var (
 	ErrIndexNotFound          = errors.New("index not found")
 	ErrTimeout                = errors.New("timeout")
 	ErrNotFound               = errors.New("not found")
+	ErrShardRestoring         = errors.New("shard restoring")
 
-	knownErrorTypes = [3]string{
+	knownErrorTypes = [4]string{
 		timeoutErrorType,
 		indexNotFoundErrorType,
 		versionConflictErrorType,
+		shardRestoringErrorType,
 	}
 
 	// helps with native translation of native java exceptions

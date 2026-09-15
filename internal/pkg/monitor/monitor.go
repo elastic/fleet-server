@@ -276,6 +276,10 @@ func (m *simpleMonitorT) Run(ctx context.Context) (err error) {
 			if errors.Is(err, es.ErrIndexNotFound) {
 				// Wait until created
 				m.log.Debug().Msgf("index not found, poll again in %v", retryDelay)
+			} else if errors.Is(err, es.ErrShardRestoring) {
+				// Index shard is being restored from a snapshot; this is expected
+				// and self-resolving. Poll again after the retry delay.
+				m.log.Warn().Msgf("index shard is being restored, poll again in %v", retryDelay)
 			} else if errors.Is(err, es.ErrTimeout) {
 				// Timed out, wait again
 				m.log.Debug().Msg("timeout on global checkpoints advance, poll again")
