@@ -425,6 +425,181 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 	})
 }
 
+func TestPolicyOTLPOutputPrepareNoRole(t *testing.T) {
+	logger := testlog.SetLogger(t)
+	bulker := ftesting.NewMockBulk()
+	po := Output{
+		Type: OutputTypeOTLP,
+		Name: "test output",
+		Role: nil,
+	}
+
+	policyMap := map[string]map[string]any{
+		"test output": {},
+	}
+
+	err := po.Prepare(context.Background(), logger, bulker, &model.Agent{}, policyMap)
+	require.NoError(t, err, "external OTLP output with no role must not error")
+	assert.Empty(t, policyMap["test output"]["api_key"], "outputMap must not be mutated")
+	bulker.AssertExpectations(t)
+}
+
+func TestPolicyOTLPOutputPrepare(t *testing.T) {
+	const (
+		secretID = "test-secret-id"
+		oldKeyID = "old-key-id"
+	)
+	secretRef := "$co.elastic.secret{" + secretID + "}"
+	mintedKey := bulk.APIKey{ID: "new-key-id", Key: "new-key-secret"}
+
+	tests := []struct {
+		name           string
+		roleHash       string
+		existingOutput *model.PolicyOutput
+		setupMocks     func(*ftesting.MockBulk)
+		wantErr        bool
+		wantAPIKey     string
+		wantPermHash   string
+		wantCandidates []OutputSecretCandidate
+	}{
+		{
+			name:     "hash matches — resolves existing secret without minting",
+			roleHash: "abc123",
+			existingOutput: &model.PolicyOutput{
+				APIKey:          secretRef,
+				APIKeyID:        oldKeyID,
+				PermissionsHash: "abc123",
+			},
+			setupMocks:   func(_ *ftesting.MockBulk) {},
+			wantAPIKey:   secretID + "_value",
+			wantPermHash: "abc123",
+		},
+		{
+			name:     "hash changed — updates key permissions",
+			roleHash: "new-hash",
+			existingOutput: &model.PolicyOutput{
+				APIKey:          secretRef,
+				APIKeyID:        oldKeyID,
+				PermissionsHash: "old-hash",
+			},
+			setupMocks: func(b *ftesting.MockBulk) {
+				b.On("APIKeyRead", mock.Anything, oldKeyID, mock.Anything).
+					Return(&bulk.APIKeyMetadata{ID: oldKeyID, RoleDescriptors: TestPayload}, nil).Once()
+				b.On("APIKeyUpdate", mock.Anything, oldKeyID, mock.Anything, mock.Anything).Return(nil).Once()
+				b.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+			},
+			wantAPIKey:   secretID + "_value",
+			wantPermHash: "new-hash",
+		},
+		{
+			name:           "new agent — mints key and writes secret",
+			roleHash:       "new-hash",
+			existingOutput: nil,
+			setupMocks: func(b *ftesting.MockBulk) {
+				b.On("APIKeyCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(&mintedKey, nil).Once()
+				b.On("WriteSecret", mock.Anything, mintedKey.Agent()).Return(secretID, nil).Once()
+				b.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+			},
+			wantAPIKey:   secretID + "_value",
+			wantPermHash: "new-hash",
+		},
+		{
+			name:           "agent doc update fails — secret candidate recorded",
+			roleHash:       "new-hash",
+			existingOutput: nil,
+			setupMocks: func(b *ftesting.MockBulk) {
+				b.On("APIKeyCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(&mintedKey, nil).Once()
+				b.On("WriteSecret", mock.Anything, mintedKey.Agent()).Return(secretID, nil).Once()
+				b.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(errors.New("ES update failed")).Once()
+			},
+			wantErr: true,
+			wantCandidates: []OutputSecretCandidate{{
+				AgentID:    "agent-id",
+				OutputName: "test output",
+				SecretID:   secretID,
+				SecretRef:  secretRef,
+			}},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			logger := testlog.SetLogger(t)
+			bulker := ftesting.NewMockBulk()
+			tc.setupMocks(bulker)
+
+			outputs := map[string]*model.PolicyOutput{}
+			if tc.existingOutput != nil {
+				outputs["test output"] = tc.existingOutput
+			}
+			testAgent := &model.Agent{
+				ESDocument: model.ESDocument{Id: "agent-id"},
+				Outputs:    outputs,
+			}
+			output := Output{
+				Type: OutputTypeOTLP,
+				Name: "test output",
+				Role: &RoleT{Sha2: tc.roleHash, Raw: TestPayload},
+			}
+			policyMap := map[string]map[string]any{"test output": {"type": OutputTypeOTLP}}
+			collector := &recordingOutputSecretCandidateCollector{}
+
+			err := output.Prepare(context.Background(), logger, bulker, testAgent, policyMap,
+				WithOutputSecretCandidateCollector(collector))
+
+			if tc.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tc.wantAPIKey, policyMap[output.Name]["api_key"])
+				assert.Equal(t, tc.wantPermHash, testAgent.Outputs[output.Name].PermissionsHash)
+			}
+			assert.Equal(t, tc.wantCandidates, collector.candidates)
+			bulker.AssertExpectations(t)
+		})
+	}
+}
+
+func TestPolicyOTLPOutputPrepareManagedToExternal(t *testing.T) {
+	const (
+		secretID = "prev-secret-id"
+		oldKeyID = "prev-key-id"
+	)
+	secretRef := "$co.elastic.secret{" + secretID + "}"
+
+	logger := testlog.SetLogger(t)
+	bulker := ftesting.NewMockBulk()
+
+	// Two Update calls: one to append the retirement record, one to remove the output entry.
+	bulker.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Twice()
+
+	agent := &model.Agent{
+		ESDocument: model.ESDocument{Id: "agent-id"},
+		Outputs: map[string]*model.PolicyOutput{
+			"test output": {
+				Type:            OutputTypeOTLP,
+				APIKey:          secretRef,
+				APIKeyID:        oldKeyID,
+				PermissionsHash: "old-hash",
+			},
+		},
+	}
+	output := Output{
+		Type: OutputTypeOTLP,
+		Name: "test output",
+		Role: nil, // no output_permissions → external OTLP
+	}
+	policyMap := map[string]map[string]any{"test output": {"type": OutputTypeOTLP}}
+
+	err := output.Prepare(context.Background(), logger, bulker, agent, policyMap)
+	require.NoError(t, err)
+	assert.Empty(t, policyMap["test output"]["api_key"], "external OTLP must not inject an api_key")
+	bulker.AssertExpectations(t)
+}
+
 func TestPolicyRemoteESOutputPrepareNoRole(t *testing.T) {
 	logger := testlog.SetLogger(t)
 	bulker := ftesting.NewMockBulk()
