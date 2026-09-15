@@ -169,9 +169,15 @@ func (suite *AgentContainerSuite) TestRemoteESOutputWithSecrets() {
 		}(i)
 	}
 	wg.Wait()
-	for i, err := range agentErrs {
-		suite.Require().NoError(err, "agent %d container start failed", i)
-		agentC := agentContainers[i]
+	// Register cleanup for every container that was created before checking
+	// for errors. If we checked errors first, a Require failure on agent N
+	// would skip registering cleanup for agents N+1…numAgents-1, leaking
+	// those containers and interfering with subsequent E2E runs.
+	for i, c := range agentContainers {
+		if c == nil {
+			continue
+		}
+		agentC := c
 		idx := i
 		suite.T().Cleanup(func() {
 			cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), time.Minute)
@@ -190,6 +196,9 @@ func (suite *AgentContainerSuite) TestRemoteESOutputWithSecrets() {
 				suite.T().Logf("warning: failed to terminate agent %d container: %v", idx, err)
 			}
 		})
+	}
+	for i, err := range agentErrs {
+		suite.Require().NoError(err, "agent %d container start failed", i)
 	}
 
 	// Wait for all enrolled agents (excluding the fleet-server agent) to appear
