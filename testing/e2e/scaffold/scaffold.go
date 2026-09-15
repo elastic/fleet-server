@@ -927,7 +927,7 @@ func (s *Scaffold) CreateAgentPolicy(ctx context.Context, name, namespace, dataO
 // and returns the key token. Use this instead of GetEnrollmentTokenForPolicyID
 // when the policy was just created and the auto-generated key may not yet exist.
 func (s *Scaffold) CreateEnrollmentAPIKey(ctx context.Context, policyID string) string {
-	body := map[string]any{"policy_id": policyID}
+	body := map[string]any{"policy_id": policyID, "name": "e2e-test-" + policyID}
 	p, err := json.Marshal(body)
 	s.Require().NoError(err)
 
