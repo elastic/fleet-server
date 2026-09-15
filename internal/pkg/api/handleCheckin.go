@@ -1286,6 +1286,14 @@ func prepareOTelExporters(outputs map[string]map[string]any, exporters map[strin
 			if headers == nil {
 				headers = make(map[string]any)
 			}
+			// Remove any existing authorization header regardless of case. HTTP headers are
+			// case-insensitive; a user-supplied `authorization` entry would otherwise sit
+			// alongside `Authorization` with no defined winner. The mOTLP key takes precedence.
+			for k := range headers {
+				if strings.EqualFold(k, "Authorization") {
+					delete(headers, k)
+				}
+			}
 			headers["Authorization"] = "ApiKey " + base64.StdEncoding.EncodeToString([]byte(apiKey))
 			config["headers"] = headers
 		default:
@@ -1593,7 +1601,7 @@ func (ct *CheckinT) processPolicyDetails(ctx context.Context, zlog zerolog.Logge
 	// Update API keys if the policy has changed, or if the revision differs.
 	if policyID != agent.AgentPolicyID || revisionIDX != agent.PolicyRevisionIdx {
 		for outputName, output := range agent.Outputs {
-			if output.Type != policy.OutputTypeElasticsearch {
+			if output.Type != policy.OutputTypeElasticsearch && output.Type != policy.OutputTypeOTLP {
 				continue
 			}
 			if err := updateAPIKey(ctx, zlog, ct.bulker, agent.Id, output.APIKeyID, output.PermissionsHash, output.ToRetireAPIKeyIds, outputName); err != nil {
