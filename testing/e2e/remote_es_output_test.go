@@ -141,9 +141,7 @@ func (suite *AgentContainerSuite) TestRemoteESOutputWithSecrets() {
 	agentErrs := make([]error, numAgents)
 	var wg sync.WaitGroup
 	for i := range numAgents {
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
+		wg.Go(func() {
 			agentReq := testcontainers.ContainerRequest{
 				Image: suite.dockerImg,
 				Env: map[string]string{
@@ -166,7 +164,7 @@ func (suite *AgentContainerSuite) TestRemoteESOutputWithSecrets() {
 			})
 			agentContainers[i] = c
 			agentErrs[i] = err
-		}(i)
+		})
 	}
 	wg.Wait()
 	// Register cleanup for every container that was created before checking
