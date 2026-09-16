@@ -570,34 +570,54 @@ func TestPolicyOTLPOutputPrepareManagedToExternal(t *testing.T) {
 	)
 	secretRef := "$co.elastic.secret{" + secretID + "}"
 
-	logger := testlog.SetLogger(t)
-	bulker := ftesting.NewMockBulk()
-
-	// Two Update calls: one to append the retirement record, one to remove the output entry.
-	bulker.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Twice()
-
-	agent := &model.Agent{
-		ESDocument: model.ESDocument{Id: "agent-id"},
-		Outputs: map[string]*model.PolicyOutput{
-			"test output": {
-				Type:            OutputTypeOTLP,
-				APIKey:          secretRef,
-				APIKeyID:        oldKeyID,
-				PermissionsHash: "old-hash",
+	newAgent := func() *model.Agent {
+		return &model.Agent{
+			ESDocument: model.ESDocument{Id: "agent-id"},
+			Outputs: map[string]*model.PolicyOutput{
+				"test output": {
+					Type:            OutputTypeOTLP,
+					APIKey:          secretRef,
+					APIKeyID:        oldKeyID,
+					PermissionsHash: "old-hash",
+				},
 			},
-		},
+		}
 	}
-	output := Output{
+	policyOutput := Output{
 		Type: OutputTypeOTLP,
 		Name: "test output",
 		Role: nil, // no output_permissions → external OTLP
 	}
 	policyMap := map[string]map[string]any{"test output": {"type": OutputTypeOTLP}}
 
-	err := output.Prepare(context.Background(), logger, bulker, agent, policyMap)
-	require.NoError(t, err)
-	assert.Empty(t, policyMap["test output"]["api_key"], "external OTLP must not inject an api_key")
-	bulker.AssertExpectations(t)
+	t.Run("happy path: key invalidated and output entry removed", func(t *testing.T) {
+		logger := testlog.SetLogger(t)
+		bulker := ftesting.NewMockBulk()
+		bulker.On("APIKeyInvalidate", mock.Anything, []string{oldKeyID}).Return(nil).Once()
+		bulker.On("DeleteSecret", mock.Anything, secretID).Return(nil).Once()
+		bulker.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+
+		agent := newAgent()
+		err := policyOutput.Prepare(context.Background(), logger, bulker, agent, policyMap)
+		require.NoError(t, err)
+		assert.Empty(t, policyMap["test output"]["api_key"], "external OTLP must not inject an api_key")
+		assert.NotContains(t, agent.Outputs, "test output", "output entry must be removed from in-memory agent")
+		bulker.AssertExpectations(t)
+	})
+
+	t.Run("invalidation error: cleanup continues, Prepare returns nil", func(t *testing.T) {
+		logger := testlog.SetLogger(t)
+		bulker := ftesting.NewMockBulk()
+		bulker.On("APIKeyInvalidate", mock.Anything, []string{oldKeyID}).Return(errors.New("es unavailable")).Once()
+		bulker.On("DeleteSecret", mock.Anything, secretID).Return(nil).Once()
+		bulker.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+
+		agent := newAgent()
+		err := policyOutput.Prepare(context.Background(), logger, bulker, agent, policyMap)
+		require.NoError(t, err, "invalidation failure must not fail Prepare")
+		assert.NotContains(t, agent.Outputs, "test output", "output entry is still removed even when invalidation fails")
+		bulker.AssertExpectations(t)
+	})
 }
 
 func TestPolicyRemoteESOutputPrepareNoRole(t *testing.T) {
