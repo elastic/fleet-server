@@ -126,6 +126,70 @@ func (p *Output) Prepare(ctx context.Context, zlog zerolog.Logger, bulker bulk.B
 	return nil
 }
 
+// retireRemovedOutput scans agent.Outputs for the first entry absent from outputMap,
+// writes a retirement record for its key onto survivingOutputName, and removes the stale
+// agent-doc entry. At most one removal is processed per call, following the established
+// convention in prepareElasticsearch and prepareOTLP.
+func retireRemovedOutput(
+	ctx context.Context,
+	zlog zerolog.Logger,
+	bulker bulk.Bulk,
+	agent *model.Agent,
+	survivingOutputName string,
+	outputMap map[string]map[string]any,
+) error {
+	var toRetire *model.ToRetireAPIKeyIdsItems
+	var removedOutputName string
+	for agentOutputName, agentOutput := range agent.Outputs {
+		found := false
+		for outputMapKey := range outputMap {
+			if agentOutputName == outputMapKey {
+				found = true
+				break
+			}
+		}
+		if !found {
+			zlog.Info().Str(ecs.APIKeyID, agentOutput.APIKeyID).Str(ecs.PolicyOutputName, agentOutputName).Msg("Output removed, will retire API key")
+			retiring := model.ToRetireAPIKeyIdsItems{
+				ID:        agentOutput.APIKeyID,
+				RetiredAt: time.Now().UTC().Format(time.RFC3339),
+				Output:    agentOutputName,
+			}
+			if secretID, ok := secret.ParseSecretReference(agentOutput.APIKey); ok {
+				retiring.SecretID = secretID
+			}
+			toRetire = &retiring
+			removedOutputName = agentOutputName
+			break
+		}
+	}
+
+	if toRetire == nil {
+		return nil
+	}
+
+	fields := map[string]any{
+		dl.FieldPolicyOutputToRetireAPIKeyIDs: *toRetire,
+	}
+	body, err := renderUpdatePainlessScript(survivingOutputName, fields)
+	if err != nil {
+		return fmt.Errorf("could not update painless script: %w", err)
+	}
+	if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
+		zlog.Error().Err(err).Msg("fail update agent record")
+		return fmt.Errorf("fail update agent record: %w", err)
+	}
+	body, err = renderRemoveOutputPainlessScript(removedOutputName)
+	if err != nil {
+		return fmt.Errorf("could not create request body to update agent: %w", err)
+	}
+	if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
+		zlog.Error().Err(err).Msg("fail update agent record")
+		return fmt.Errorf("fail update agent record: %w", err)
+	}
+	return nil
+}
+
 func (p *Output) prepareElasticsearch(
 	ctx context.Context,
 	zlog zerolog.Logger,
@@ -157,62 +221,8 @@ func (p *Output) prepareElasticsearch(
 		agent.Outputs[p.Name] = output
 	}
 
-	// retire api key of removed remote output
-	var toRetireAPIKeys *model.ToRetireAPIKeyIdsItems
-	var removedOutputName string
-	// find the first output that is removed - supposing one output can be removed at a time
-	for agentOutputName, agentOutput := range agent.Outputs {
-		found := false
-		for outputMapKey := range outputMap {
-			if agentOutputName == outputMapKey {
-				found = true
-				break
-			}
-		}
-		if !found {
-			zlog.Info().Str(ecs.APIKeyID, agentOutput.APIKeyID).Str(ecs.PolicyOutputName, agentOutputName).Msg("Output removed, will retire API key")
-			retiring := model.ToRetireAPIKeyIdsItems{
-				ID:        agentOutput.APIKeyID,
-				RetiredAt: time.Now().UTC().Format(time.RFC3339),
-				Output:    agentOutputName,
-			}
-			if secretID, ok := secret.ParseSecretReference(agentOutput.APIKey); ok {
-				retiring.SecretID = secretID
-			}
-			toRetireAPIKeys = &retiring
-			removedOutputName = agentOutputName
-			break
-		}
-	}
-
-	if toRetireAPIKeys != nil {
-
-		// adding remote API key to new output toRetireAPIKeys
-		fields := map[string]any{
-			dl.FieldPolicyOutputToRetireAPIKeyIDs: *toRetireAPIKeys,
-		}
-
-		// Using painless script to append the old keys to the history
-		body, err := renderUpdatePainlessScript(p.Name, fields)
-		if err != nil {
-			return fmt.Errorf("could not update painless script: %w", err)
-		}
-
-		if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
-			zlog.Error().Err(err).Msg("fail update agent record")
-			return fmt.Errorf("fail update agent record: %w", err)
-		}
-
-		// remove output from agent doc
-		body, err = renderRemoveOutputPainlessScript(removedOutputName)
-		if err != nil {
-			return fmt.Errorf("could not create request body to update agent: %w", err)
-		}
-
-		if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
-			zlog.Error().Err(err).Msg("fail update agent record")
-			return fmt.Errorf("fail update agent record: %w", err)
-		}
+	if err := retireRemovedOutput(ctx, zlog, bulker, agent, p.Name, outputMap); err != nil {
+		return err
 	}
 
 	// Determine whether we need to generate an output ApiKey.
@@ -459,28 +469,21 @@ func (p *Output) prepareOTLP(
 	if p.Role == nil {
 		zlog.Debug().Msg("no output permissions for OTLP output; skipping API key management")
 		// If this output previously had a managed API key (mOTLP → external transition),
-		// retire it now. Without this the old key stays valid indefinitely and its
-		// .fleet-secrets doc is pinned alive by outputSecretIsReferenced.
+		// invalidate it directly. A retirement record cannot be used here: there is no surviving
+		// output entry to park it on, so any record written would be deleted by
+		// renderRemoveOutputPainlessScript in the same check-in, leaving the key active.
 		if prev, ok := agent.Outputs[p.Name]; ok && prev.APIKeyID != "" {
-			retiring := model.ToRetireAPIKeyIdsItems{
-				ID:        prev.APIKeyID,
-				RetiredAt: time.Now().UTC().Format(time.RFC3339),
+			if err := bulker.APIKeyInvalidate(ctx, prev.APIKeyID); err != nil {
+				zlog.Warn().Err(err).Str(ecs.APIKeyID, prev.APIKeyID).Str(ecs.PolicyOutputName, p.Name).
+					Msg("failed to invalidate mOTLP API key during transition to external OTLP")
 			}
 			if secretID, ok := secret.ParseSecretReference(prev.APIKey); ok {
-				retiring.SecretID = secretID
+				if err := bulker.DeleteSecret(ctx, secretID); err != nil {
+					zlog.Warn().Err(err).Str("secret.id", secretID).Str(ecs.PolicyOutputName, p.Name).
+						Msg("failed to delete mOTLP API key secret during transition to external OTLP")
+				}
 			}
-			retireFields := map[string]any{
-				dl.FieldPolicyOutputToRetireAPIKeyIDs: retiring,
-			}
-			body, err := renderUpdatePainlessScript(p.Name, retireFields)
-			if err != nil {
-				return fmt.Errorf("could not render retirement script for mOTLP→external transition: %w", err)
-			}
-			if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
-				zlog.Error().Err(err).Msg("fail update agent record for mOTLP→external transition")
-				return fmt.Errorf("fail update agent record: %w", err)
-			}
-			body, err = renderRemoveOutputPainlessScript(p.Name)
+			body, err := renderRemoveOutputPainlessScript(p.Name)
 			if err != nil {
 				return fmt.Errorf("could not render remove-output script for mOTLP→external transition: %w", err)
 			}
@@ -488,6 +491,7 @@ func (p *Output) prepareOTLP(
 				zlog.Error().Err(err).Msg("fail remove output entry for mOTLP→external transition")
 				return fmt.Errorf("fail update agent record: %w", err)
 			}
+			delete(agent.Outputs, p.Name)
 		}
 		return nil
 	}
@@ -507,53 +511,8 @@ func (p *Output) prepareOTLP(
 		agent.Outputs[p.Name] = output
 	}
 
-	// Retire API key of any removed output (one at a time by convention).
-	var toRetireAPIKeys *model.ToRetireAPIKeyIdsItems
-	var removedOutputName string
-	for agentOutputName, agentOutput := range agent.Outputs {
-		found := false
-		for outputMapKey := range outputMap {
-			if agentOutputName == outputMapKey {
-				found = true
-				break
-			}
-		}
-		if !found {
-			zlog.Info().Str(ecs.APIKeyID, agentOutput.APIKeyID).Str(ecs.PolicyOutputName, agentOutputName).Msg("Output removed, will retire API key")
-			retiring := model.ToRetireAPIKeyIdsItems{
-				ID:        agentOutput.APIKeyID,
-				RetiredAt: time.Now().UTC().Format(time.RFC3339),
-				Output:    agentOutputName,
-			}
-			if secretID, ok := secret.ParseSecretReference(agentOutput.APIKey); ok {
-				retiring.SecretID = secretID
-			}
-			toRetireAPIKeys = &retiring
-			removedOutputName = agentOutputName
-			break
-		}
-	}
-
-	if toRetireAPIKeys != nil {
-		fields := map[string]any{
-			dl.FieldPolicyOutputToRetireAPIKeyIDs: *toRetireAPIKeys,
-		}
-		body, err := renderUpdatePainlessScript(p.Name, fields)
-		if err != nil {
-			return fmt.Errorf("could not update painless script: %w", err)
-		}
-		if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
-			zlog.Error().Err(err).Msg("fail update agent record")
-			return fmt.Errorf("fail update agent record: %w", err)
-		}
-		body, err = renderRemoveOutputPainlessScript(removedOutputName)
-		if err != nil {
-			return fmt.Errorf("could not create request body to update agent: %w", err)
-		}
-		if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
-			zlog.Error().Err(err).Msg("fail update agent record")
-			return fmt.Errorf("fail update agent record: %w", err)
-		}
+	if err := retireRemovedOutput(ctx, zlog, bulker, agent, p.Name, outputMap); err != nil {
+		return err
 	}
 
 	needNewKey := false
@@ -641,12 +600,10 @@ func (p *Output) prepareOTLP(
 			fields[dl.FiledType] = OutputTypeOTLP
 		}
 		if output.APIKeyID != "" {
-			// Leave Output empty: OTLP keys are minted against the primary cluster.
-			// invalidateAPIKeys treats a non-empty Output as a remote-cluster key and routes
-			// invalidation through an output bulker that cannot exist for OTLP.
 			retiring := model.ToRetireAPIKeyIdsItems{
 				ID:        output.APIKeyID,
 				RetiredAt: time.Now().UTC().Format(time.RFC3339),
+				Output:    p.Name,
 			}
 			if secretID, ok := secret.ParseSecretReference(output.APIKey); ok {
 				retiring.SecretID = secretID
