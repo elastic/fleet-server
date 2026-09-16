@@ -14,7 +14,7 @@ require (
 	github.com/elastic/fleet-server/pkg/api v0.0.0-00010101000000-000000000000
 	github.com/elastic/fleet-server/v7 v7.17.29
 	github.com/gofrs/uuid/v5 v5.5.0
-	github.com/moby/moby/api v1.55.0
+	github.com/moby/moby/api v1.56.0
 	github.com/stretchr/testify v1.12.1
 	github.com/testcontainers/testcontainers-go v0.44.0
 	github.com/testcontainers/testcontainers-go/modules/toxiproxy v0.44.0
@@ -38,7 +38,7 @@ require (
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/ebitengine/purego v0.10.1 // indirect
 	github.com/elastic/go-sysinfo v1.15.1 // indirect
-	github.com/elastic/go-ucfg v0.9.1 // indirect
+	github.com/elastic/go-ucfg v0.9.2 // indirect
 	github.com/elastic/go-windows v1.0.2 // indirect
 	github.com/fatih/color v1.15.0 // indirect
 	github.com/felixge/httpsnoop v1.1.0 // indirect

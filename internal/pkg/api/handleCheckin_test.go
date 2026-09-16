@@ -127,9 +127,51 @@ func TestConvertActionData(t *testing.T) {
 	}, {
 		name:   "upgrade action",
 		aType:  UPGRADE,
-		raw:    json.RawMessage(`{"source_uri":"https://localhost:8080","version":"1.2.3"}`),
-		expect: Action_Data{json.RawMessage(`{"source_uri":"https://localhost:8080","version":"1.2.3"}`)},
+		raw:    json.RawMessage(`{"sources":["https://localhost:8080"],"version":"1.2.3"}`),
+		expect: Action_Data{json.RawMessage(`{"source_uri":"https://localhost:8080","sources":["https://localhost:8080"],"version":"1.2.3"}`)},
 		hasErr: false,
+	}, {
+		name:   "upgrade action populates source uri from sources",
+		aType:  UPGRADE,
+		raw:    json.RawMessage(`{"sources":["https://first.example.com","https://second.example.com"],"version":"1.2.3"}`),
+		expect: Action_Data{json.RawMessage(`{"source_uri":"https://first.example.com","sources":["https://first.example.com","https://second.example.com"],"version":"1.2.3"}`)},
+		hasErr: false,
+	}, {
+		name:   "upgrade action populates sources from source uri",
+		aType:  UPGRADE,
+		raw:    json.RawMessage(`{"source_uri":"https://legacy.example.com","version":"1.2.3"}`),
+		expect: Action_Data{json.RawMessage(`{"source_uri":"https://legacy.example.com","sources":["https://legacy.example.com"],"version":"1.2.3"}`)},
+		hasErr: false,
+	}, {
+		name:   "upgrade action uses sources over source uri",
+		aType:  UPGRADE,
+		raw:    json.RawMessage(`{"source_uri":"https://legacy.example.com","sources":["https://new.example.com"],"version":"1.2.3"}`),
+		expect: Action_Data{json.RawMessage(`{"source_uri":"https://new.example.com","sources":["https://new.example.com"],"version":"1.2.3"}`)},
+		hasErr: false,
+	}, {
+		name:   "upgrade action uses empty sources over source uri",
+		aType:  UPGRADE,
+		raw:    json.RawMessage(`{"source_uri":"https://legacy.example.com","sources":[],"version":"1.2.3"}`),
+		expect: Action_Data{json.RawMessage(`{"sources":[],"version":"1.2.3"}`)},
+		hasErr: false,
+	}, {
+		name:   "upgrade action does not populate sources from empty source uri",
+		aType:  UPGRADE,
+		raw:    json.RawMessage(`{"source_uri":"","version":"1.2.3"}`),
+		expect: Action_Data{json.RawMessage(`{"source_uri":"","sources":[],"version":"1.2.3"}`)},
+		hasErr: false,
+	}, {
+		name:   "upgrade action handles empty source_uri and sources",
+		aType:  UPGRADE,
+		raw:    json.RawMessage(`{"version":"1.2.3"}`),
+		expect: Action_Data{json.RawMessage(`{"version":"1.2.3"}`)},
+		hasErr: false,
+	}, {
+		name:   "upgrade action fails with too many sources",
+		aType:  UPGRADE,
+		raw:    json.RawMessage(`{"sources":["https://s1","https://s2","https://s3","https://s4","https://s5","https://s6","https://s7","https://s8","https://s9","https://s10","https://s11","https://s12","https://s13","https://s14","https://s15","https://s16","https://s17","https://s18","https://s19","https://s20","https://s21"],"version":"1.2.3"}`),
+		expect: Action_Data{},
+		hasErr: true,
 	}, {
 		name:   "request diagnostics action",
 		aType:  REQUESTDIAGNOSTICS,
@@ -231,6 +273,16 @@ func TestConvertActions(t *testing.T) {
 			Type:    REQUESTDIAGNOSTICS,
 			Signed:  &ActionSignature{Data: "eyJAdGltZXN0YW==", Signature: "U6NOg4ssxpFV="},
 			Data:    Action_Data{json.RawMessage(`{}`)},
+		}},
+		token: "",
+	}, {
+		name:    "upgrade action",
+		actions: []model.Action{{ActionID: "1234", Type: "UPGRADE", Data: json.RawMessage(`{"sources":["https://first.example.com","https://second.example.com"],"version":"9.6.0"}`)}},
+		resp: []Action{{
+			AgentId: "agent-id",
+			Id:      "1234",
+			Type:    UPGRADE,
+			Data:    Action_Data{json.RawMessage(`{"source_uri":"https://first.example.com","sources":["https://first.example.com","https://second.example.com"],"version":"9.6.0"}`)},
 		}},
 		token: "",
 	}, {name: "multiple actions",
@@ -403,6 +455,7 @@ func TestProcessUpgradeDetails(t *testing.T) {
 		name    string
 		agent   *model.Agent
 		details *UpgradeDetails
+		ver     string
 		bulk    func() *ftesting.MockBulk
 		cache   func() *testcache.MockCache
 		err     error
@@ -412,6 +465,93 @@ func TestProcessUpgradeDetails(t *testing.T) {
 		details: nil,
 		bulk: func() *ftesting.MockBulk {
 			return ftesting.NewMockBulk()
+		},
+		cache: func() *testcache.MockCache {
+			return testcache.NewMockCache()
+		},
+		err: nil,
+	}, {
+		name:    "agent has upgrade_started_at but no upgrade_details, checkin details are nil (fast upgrade race)",
+		agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent", Version: "8.19.0"}, UpgradeStartedAt: "2024-01-01T00:00:00Z"},
+		details: nil,
+		ver:     "8.20.0", // agent restarted at new version
+		bulk: func() *ftesting.MockBulk {
+			mBulk := ftesting.NewMockBulk()
+			mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.MatchedBy(func(p []byte) bool {
+				doc := struct {
+					Doc map[string]any `json:"doc"`
+				}{}
+				if err := json.Unmarshal(p, &doc); err != nil {
+					t.Logf("bulk match unmarshal error: %v", err)
+					return false
+				}
+				upgradedAt, ok := doc.Doc[dl.FieldUpgradedAt]
+				upgradedAtStr, isStr := upgradedAt.(string)
+				return doc.Doc[dl.FieldUpgradeDetails] == nil && doc.Doc[dl.FieldUpgradeStartedAt] == nil && ok && isStr && upgradedAtStr != ""
+			}), mock.Anything, mock.Anything).Return(nil)
+			return mBulk
+		},
+		cache: func() *testcache.MockCache {
+			return testcache.NewMockCache()
+		},
+		err: nil,
+	}, {
+		name:    "agent has upgrade_started_at but no upgrade_details, first checkin after dispatch (same version, upgrade not yet received)",
+		agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent", Version: "8.19.0"}, UpgradeStartedAt: time.Now().UTC().Format(time.RFC3339)},
+		details: nil,
+		ver:     "", // version unchanged — upgrade action not yet received by agent; upgrade_started_at is fresh so staleness guard applies
+		bulk: func() *ftesting.MockBulk {
+			return ftesting.NewMockBulk() // no Update call expected
+		},
+		cache: func() *testcache.MockCache {
+			return testcache.NewMockCache()
+		},
+		err: nil,
+	}, {
+		name: "agent has stale upgrade_started_at but no upgrade_details, same version (self-heal after rolling fleet-server upgrade)",
+		// upgrade_started_at older than 2× default CheckinMaxPoll (2h); cfg is nil in tests so fallback = 2h
+		agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent", Version: "8.19.0"}, UpgradeStartedAt: time.Now().Add(-3 * time.Hour).UTC().Format(time.RFC3339)},
+		details: nil,
+		ver:     "", // version matches stored — upgrade_started_at is stale so we clear it; upgraded_at NOT set (outcome unknown)
+		bulk: func() *ftesting.MockBulk {
+			mBulk := ftesting.NewMockBulk()
+			mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.MatchedBy(func(p []byte) bool {
+				doc := struct {
+					Doc map[string]any `json:"doc"`
+				}{}
+				if err := json.Unmarshal(p, &doc); err != nil {
+					t.Logf("bulk match unmarshal error: %v", err)
+					return false
+				}
+				_, hasUpgradedAt := doc.Doc[dl.FieldUpgradedAt]
+				return doc.Doc[dl.FieldUpgradeDetails] == nil && doc.Doc[dl.FieldUpgradeStartedAt] == nil && !hasUpgradedAt
+			}), mock.Anything, mock.Anything).Return(nil)
+			return mBulk
+		},
+		cache: func() *testcache.MockCache {
+			return testcache.NewMockCache()
+		},
+		err: nil,
+	}, {
+		name: "agent has stale upgrade_started_at with fractional seconds (RFC3339Nano), same version (self-heal)",
+		// upgrade_started_at uses fractional seconds as Kibana may produce; must still parse and self-heal
+		agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent", Version: "8.19.0"}, UpgradeStartedAt: time.Now().Add(-3 * time.Hour).UTC().Format(time.RFC3339Nano)},
+		details: nil,
+		ver:     "",
+		bulk: func() *ftesting.MockBulk {
+			mBulk := ftesting.NewMockBulk()
+			mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.MatchedBy(func(p []byte) bool {
+				doc := struct {
+					Doc map[string]any `json:"doc"`
+				}{}
+				if err := json.Unmarshal(p, &doc); err != nil {
+					t.Logf("bulk match unmarshal error: %v", err)
+					return false
+				}
+				_, hasUpgradedAt := doc.Doc[dl.FieldUpgradedAt]
+				return doc.Doc[dl.FieldUpgradeDetails] == nil && doc.Doc[dl.FieldUpgradeStartedAt] == nil && !hasUpgradedAt
+			}), mock.Anything, mock.Anything).Return(nil)
+			return mBulk
 		},
 		cache: func() *testcache.MockCache {
 			return testcache.NewMockCache()
@@ -431,7 +571,9 @@ func TestProcessUpgradeDetails(t *testing.T) {
 					t.Logf("bulk match unmarshal error: %v", err)
 					return false
 				}
-				return doc.Doc[dl.FieldUpgradeDetails] == nil && doc.Doc[dl.FieldUpgradeStartedAt] == nil && doc.Doc[dl.FieldUpgradedAt] != ""
+				upgradedAt, ok := doc.Doc[dl.FieldUpgradedAt]
+				upgradedAtStr, isStr := upgradedAt.(string)
+				return doc.Doc[dl.FieldUpgradeDetails] == nil && doc.Doc[dl.FieldUpgradeStartedAt] == nil && ok && isStr && upgradedAtStr != ""
 			}), mock.Anything, mock.Anything).Return(nil)
 			return mBulk
 		},
@@ -793,7 +935,7 @@ func TestProcessUpgradeDetails(t *testing.T) {
 				bulker: mBulk,
 			}
 
-			err := ct.processUpgradeDetails(context.Background(), tc.agent, tc.details)
+			err := ct.processUpgradeDetails(context.Background(), tc.agent, tc.details, tc.ver)
 			if tc.err == nil {
 				assert.NoError(t, err)
 			} else {
@@ -1927,7 +2069,7 @@ func TestProcessPolicySecretPathsConcurrentDispatch(t *testing.T) {
 			},
 		}
 		wg.Go(func() {
-			action, err := processPolicy(t.Context(), logger, bulker, agent, pp, nil)
+			action, err := processPolicy(t.Context(), logger, bulker, agent, pp.Clone(), nil)
 			if err != nil {
 				errs[a] = err
 				return
