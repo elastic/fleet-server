@@ -150,8 +150,9 @@ func createILMPolicy(ctx context.Context, cli *elasticsearch.Client, name string
 	// in that case let's just create the ILM policy
 	zerolog.Ctx(ctx).Debug().Str("policy", policy).Str("body", body).Msg("Creating ILM policy")
 
-	res, err := cli.ILM.PutLifecycle(policy,
-		cli.ILM.PutLifecycle.WithBody(strings.NewReader(body)),
+	res, err := cli.ILM.PutLifecycle(
+		strings.NewReader(body),
+		policy,
 		cli.ILM.PutLifecycle.WithContext(ctx),
 	)
 	if err != nil {

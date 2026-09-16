@@ -152,6 +152,13 @@ linters:
       - common-false-positives
       - legacy
       - std-error-handling
+    rules:
+      # go-elasticsearch v9 keeps the legacy Config/NewClient API fully
+      # functional. Fleet Server still relies on that API while the option-based
+      # client configuration is migrated separately.
+      - linters:
+          - staticcheck
+        text: "SA1019: elasticsearch\\.(Config|NewClient) is deprecated"
       # Which file paths to exclude: they will be analyzed, but issues from them won't be reported.
       # "/" will be replaced by the current OS file path separator to properly work on Windows.
       # Default: []

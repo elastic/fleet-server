@@ -418,8 +418,8 @@ func (m *simpleMonitorT) search(ctx context.Context, tmpl *dsl.Tmpl, params map[
 
 	res, err := m.esCli.FleetSearch(
 		m.index,
+		bytes.NewBuffer(query),
 		m.esCli.FleetSearch.WithContext(ctx),
-		m.esCli.FleetSearch.WithBody(bytes.NewBuffer(query)),
 		m.esCli.FleetSearch.WithWaitForCheckpoints(seqNos.String()),
 	)
 	if err != nil {
