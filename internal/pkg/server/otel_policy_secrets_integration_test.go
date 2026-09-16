@@ -20,7 +20,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v9"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/api"
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"

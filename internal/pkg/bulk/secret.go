@@ -13,7 +13,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v9"
 	"go.elastic.co/apm/v2"
 )
 

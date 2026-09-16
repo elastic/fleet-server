@@ -14,7 +14,7 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v9"
 )
 
 // Can be cleaner but it's temporary bootstrap until it's moved to the elasticseach system index plugin
