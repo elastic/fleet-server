@@ -1,0 +1,41 @@
+// begin 8.19.22 relnotes
+
+[[release-notes-8.19.22]]
+==  8.19.22
+
+Review important information about the  8.19.22 release.
+
+
+
+
+
+
+
+
+
+
+
+
+[discrete]
+[[enhancements-8.19.22]]
+=== Enhancements
+
+
+
+
+* Update Go to 1.26.8. https://github.com/elastic/fleet-server/pull/7757[#7757] 
+
+
+
+
+[discrete]
+[[bug-fixes-8.19.22]]
+=== Bug fixes
+
+
+
+
+* Fix secret keys corruption in policy processing. https://github.com/elastic/fleet-server/pull/7833[#7833] https://github.com/elastic/fleet-server/pull/7815[#7815] 
+* Fix agent permanently stuck in &#34;updating&#34; state after fast upgrade. https://github.com/elastic/fleet-server/pull/7833[#7833] https://github.com/elastic/fleet-server/pull/7815[#7815] 
+
+// end 8.19.22 relnotes
