@@ -162,4 +162,3 @@ func cloneMap(m map[string]map[string]interface{}) map[string]map[string]interfa
 	}
 	return r
 }
-
