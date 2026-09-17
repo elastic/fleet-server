@@ -440,15 +440,29 @@ func TestPolicyOutputESPrepareESRetireRemoteAPIKeys(t *testing.T) {
 		ctx, zerolog.Nop(), bulker, bulker, &agent, policyMap, false, nil)
 	require.NoError(t, err)
 
-	// need to wait a bit before querying the agent again
-	// TODO: find a better way to query the updated agent
-	time.Sleep(time.Second)
+	// Stale entry must be removed from the in-memory map immediately so that a second
+	// surviving output's retireRemovedOutputs call does not re-park a duplicate record.
+	assert.NotContains(t, agent.Outputs, "remote output", "stale entry must be removed from in-memory agent.Outputs")
+
+	ftesting.Retry(t, ctx, func(ctx context.Context) error {
+		got, err := dl.FindAgent(
+			ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+		if err != nil {
+			return err
+		}
+		gotOutput, ok := got.Outputs[output.Name]
+		if !ok {
+			return fmt.Errorf("output %q not yet on agent doc", output.Name)
+		}
+		if len(gotOutput.ToRetireAPIKeyIds) == 0 {
+			return fmt.Errorf("ToRetireAPIKeyIds not yet populated on %q", output.Name)
+		}
+		return nil
+	}, ftesting.RetrySleep(time.Second))
 
 	got, err := dl.FindAgent(
 		ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
-	if err != nil {
-		require.NoError(t, err, "failed to find agent ID %q", agentID)
-	}
+	require.NoError(t, err)
 
 	gotOutput, ok := got.Outputs[output.Name]
 	require.True(t, ok, "no '%s' output found on agent document", output.Name)
@@ -503,6 +517,9 @@ func TestPolicyOutputOTLPPrepareRetireRemovedOutput(t *testing.T) {
 	outputMap := map[string]map[string]any{survivingOutput: {}}
 	require.NoError(t, survivingOutputObj.prepareOTLP(ctx, zerolog.Nop(), bulker, &agent, outputMap, nil))
 
+	// Stale entry must be removed from the in-memory map immediately.
+	assert.NotContains(t, agent.Outputs, oldOutputName, "stale entry must be removed from in-memory agent.Outputs")
+
 	// Wait for both painless updates (retire record + remove stale entry) to be visible.
 	ftesting.Retry(t, ctx, func(ctx context.Context) error {
 		got, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
@@ -539,4 +556,114 @@ func TestPolicyOutputOTLPPrepareRetireRemovedOutput(t *testing.T) {
 	// The stale "old otlp" entry must be gone — this is the half TestPolicyOutputESPrepareESRetireRemoteAPIKeys
 	// leaves unverified.
 	assert.NotContains(t, got.Outputs, oldOutputName, "stale output entry must be removed from agent doc")
+}
+
+// TestPolicyOutputRetireMultipleRemovedOutputs verifies that retireRemovedOutputs processes
+// all removed outputs in a single call. This matters when multiple integration-specific outputs
+// are removed from a policy in one revision but only one surviving output calls Prepare.
+func TestPolicyOutputRetireMultipleRemovedOutputs(t *testing.T) {
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
+	index, bulker := ftesting.SetupCleanIndex(ctx, t, dl.FleetAgents)
+
+	// Seed agent with two stale outputs (both absent from the new policy).
+	agentID := createAgent(ctx, t, index, bulker, map[string]*model.PolicyOutput{
+		"removed-a": {APIKey: "key-a:val", APIKeyID: "key-a"},
+		"removed-b": {APIKey: "key-b:val", APIKeyID: "key-b"},
+	})
+	agent, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+	require.NoError(t, err)
+
+	survivor := Output{
+		Type: OutputTypeElasticsearch,
+		Name: "survivor",
+		Role: &RoleT{Sha2: "hash-v1", Raw: TestPayload},
+	}
+	outputMap := map[string]map[string]any{"survivor": {}}
+
+	require.NoError(t, survivor.prepareElasticsearch(ctx, zerolog.Nop(), bulker, bulker, &agent, outputMap, false, nil))
+
+	// Both stale entries must be gone from the in-memory map immediately.
+	assert.NotContains(t, agent.Outputs, "removed-a", "removed-a must be removed from in-memory agent.Outputs")
+	assert.NotContains(t, agent.Outputs, "removed-b", "removed-b must be removed from in-memory agent.Outputs")
+
+	// Both retirement records must appear on the survivor in the persisted doc.
+	ftesting.Retry(t, ctx, func(ctx context.Context) error {
+		got, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+		if err != nil {
+			return err
+		}
+		sv, ok := got.Outputs["survivor"]
+		if !ok {
+			return fmt.Errorf("survivor output not yet on agent doc")
+		}
+		if len(sv.ToRetireAPIKeyIds) < 2 {
+			return fmt.Errorf("expected 2 retirement records, got %d", len(sv.ToRetireAPIKeyIds))
+		}
+		return nil
+	}, ftesting.RetrySleep(time.Second))
+
+	got, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+	require.NoError(t, err)
+
+	sv, ok := got.Outputs["survivor"]
+	require.True(t, ok)
+	require.Len(t, sv.ToRetireAPIKeyIds, 2)
+
+	retiredIDs := []string{sv.ToRetireAPIKeyIds[0].ID, sv.ToRetireAPIKeyIds[1].ID}
+	assert.ElementsMatch(t, []string{"key-a", "key-b"}, retiredIDs)
+
+	assert.NotContains(t, got.Outputs, "removed-a", "removed-a must be absent from persisted doc")
+	assert.NotContains(t, got.Outputs, "removed-b", "removed-b must be absent from persisted doc")
+}
+
+// TestPolicyOutputRetireNoDuplicateAcrossSurvivors verifies that when two outputs survive a
+// policy revision and each calls retireRemovedOutputs, the single removed output produces exactly
+// one retirement record — not one per surviving output. The in-memory delete in retireRemovedOutputs
+// is what prevents the duplicate.
+func TestPolicyOutputRetireNoDuplicateAcrossSurvivors(t *testing.T) {
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
+	index, bulker := ftesting.SetupCleanIndex(ctx, t, dl.FleetAgents)
+
+	// Seed agent with one stale output.
+	agentID := createAgent(ctx, t, index, bulker, map[string]*model.PolicyOutput{
+		"removed": {APIKey: "key-r:val", APIKeyID: "key-r"},
+	})
+	agent, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+	require.NoError(t, err)
+
+	// Two surviving outputs: one ES, one OTLP. Both call retireRemovedOutputs.
+	outputMap := map[string]map[string]any{
+		"es-out":   {},
+		"otlp-out": {},
+	}
+
+	esOut := Output{Type: OutputTypeElasticsearch, Name: "es-out", Role: &RoleT{Sha2: "hash-v1", Raw: TestPayload}}
+	require.NoError(t, esOut.prepareElasticsearch(ctx, zerolog.Nop(), bulker, bulker, &agent, outputMap, false, nil))
+
+	otlpOut := Output{Type: OutputTypeOTLP, Name: "otlp-out", Role: &RoleT{Sha2: "hash-v1", Raw: mOTLPRole}}
+	require.NoError(t, otlpOut.prepareOTLP(ctx, zerolog.Nop(), bulker, &agent, outputMap, nil))
+
+	// Wait for all updates to be visible.
+	ftesting.Retry(t, ctx, func(ctx context.Context) error {
+		got, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+		if err != nil {
+			return err
+		}
+		if _, stillPresent := got.Outputs["removed"]; stillPresent {
+			return fmt.Errorf("stale output still present on agent doc")
+		}
+		return nil
+	}, ftesting.RetrySleep(time.Second))
+
+	got, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+	require.NoError(t, err)
+
+	// Count total retirement records across all surviving outputs. Must be exactly 1.
+	var totalRetirements int
+	for _, out := range got.Outputs {
+		totalRetirements += len(out.ToRetireAPIKeyIds)
+	}
+	assert.Equal(t, 1, totalRetirements, "exactly one retirement record expected across all surviving outputs; got %d (duplicate records indicate the in-memory delete is not working)", totalRetirements)
+
+	assert.NotContains(t, got.Outputs, "removed")
 }
