@@ -157,7 +157,7 @@ func (p *Output) prepareElasticsearch(
 		agent.Outputs[p.Name] = output
 	}
 
-	if err := retireRemovedOutput(ctx, zlog, bulker, agent, p.Name, outputMap); err != nil {
+	if err := retireRemovedOutputs(ctx, zlog, bulker, agent, p.Name, outputMap); err != nil {
 		return err
 	}
 
@@ -336,7 +336,7 @@ func (p *Output) prepareOTLP(
 		agent.Outputs[p.Name] = output
 	}
 
-	if err := retireRemovedOutput(ctx, zlog, bulker, agent, p.Name, outputMap); err != nil {
+	if err := retireRemovedOutputs(ctx, zlog, bulker, agent, p.Name, outputMap); err != nil {
 		return err
 	}
 
@@ -576,11 +576,18 @@ func generateOutputAPIKey(
 	)
 }
 
-// retireRemovedOutput scans agent.Outputs for the first entry absent from outputMap,
-// writes a retirement record for its key onto survivingOutputName, and removes the stale
-// agent-doc entry. At most one removal is processed per call, following the established
-// convention in prepareElasticsearch and prepareOTLP.
-func retireRemovedOutput(
+// retireRemovedOutputs retires all outputs present in agent.Outputs but absent from outputMap.
+// For each, it parks a retirement record on survivingOutputName and removes the stale doc entry.
+//
+// This is called once per surviving output, so the in-memory delete is essential: without it
+// every surviving output's Prepare call would find the same stale entry and park a duplicate
+// retirement record. Individual integrations can each specify a different output_id, so a single
+// policy revision can remove more than one output — the full loop handles all of them.
+//
+// Park before remove: if the remove Update fails the record is already committed, so the key
+// is still invalidated at ack and the stale entry is reprocessed next check-in. The reverse
+// order would destroy the only record of the key on failure.
+func retireRemovedOutputs(
 	ctx context.Context,
 	zlog zerolog.Logger,
 	bulker bulk.Bulk,
@@ -588,54 +595,43 @@ func retireRemovedOutput(
 	survivingOutputName string,
 	outputMap map[string]map[string]any,
 ) error {
-	var toRetire *model.ToRetireAPIKeyIdsItems
-	var removedOutputName string
 	for agentOutputName, agentOutput := range agent.Outputs {
-		found := false
-		for outputMapKey := range outputMap {
-			if agentOutputName == outputMapKey {
-				found = true
-				break
-			}
+		if _, stillInPolicy := outputMap[agentOutputName]; stillInPolicy {
+			continue
 		}
-		if !found {
-			zlog.Info().Str(ecs.APIKeyID, agentOutput.APIKeyID).Str(ecs.PolicyOutputName, agentOutputName).Msg("Output removed, will retire API key")
-			retiring := model.ToRetireAPIKeyIdsItems{
-				ID:        agentOutput.APIKeyID,
-				RetiredAt: time.Now().UTC().Format(time.RFC3339),
-				Output:    agentOutputName,
-			}
-			if secretID, ok := secret.ParseSecretReference(agentOutput.APIKey); ok {
-				retiring.SecretID = secretID
-			}
-			toRetire = &retiring
-			removedOutputName = agentOutputName
-			break
+
+		zlog.Info().Str(ecs.APIKeyID, agentOutput.APIKeyID).Str(ecs.PolicyOutputName, agentOutputName).Msg("Output removed, will retire API key")
+		retiring := model.ToRetireAPIKeyIdsItems{
+			ID:        agentOutput.APIKeyID,
+			RetiredAt: time.Now().UTC().Format(time.RFC3339),
+			Output:    agentOutputName,
 		}
-	}
+		if secretID, ok := secret.ParseSecretReference(agentOutput.APIKey); ok {
+			retiring.SecretID = secretID
+		}
 
-	if toRetire == nil {
-		return nil
-	}
-
-	fields := map[string]any{
-		dl.FieldPolicyOutputToRetireAPIKeyIDs: *toRetire,
-	}
-	body, err := renderUpdatePainlessScript(survivingOutputName, fields)
-	if err != nil {
-		return fmt.Errorf("could not update painless script: %w", err)
-	}
-	if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
-		zlog.Error().Err(err).Msg("fail update agent record")
-		return fmt.Errorf("fail update agent record: %w", err)
-	}
-	body, err = renderRemoveOutputPainlessScript(removedOutputName)
-	if err != nil {
-		return fmt.Errorf("could not create request body to update agent: %w", err)
-	}
-	if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
-		zlog.Error().Err(err).Msg("fail update agent record")
-		return fmt.Errorf("fail update agent record: %w", err)
+		fields := map[string]any{
+			dl.FieldPolicyOutputToRetireAPIKeyIDs: retiring,
+		}
+		body, err := renderUpdatePainlessScript(survivingOutputName, fields)
+		if err != nil {
+			return fmt.Errorf("could not update painless script: %w", err)
+		}
+		if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
+			zlog.Error().Err(err).Msg("fail update agent record")
+			return fmt.Errorf("fail update agent record: %w", err)
+		}
+		body, err = renderRemoveOutputPainlessScript(agentOutputName)
+		if err != nil {
+			return fmt.Errorf("could not create request body to update agent: %w", err)
+		}
+		if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
+			zlog.Error().Err(err).Msg("fail update agent record")
+			return fmt.Errorf("fail update agent record: %w", err)
+		}
+		// Remove from the in-memory map so that the next surviving output's retireRemovedOutputs
+		// call does not re-park the same entry. Safe to delete during range per Go spec.
+		delete(agent.Outputs, agentOutputName)
 	}
 	return nil
 }
