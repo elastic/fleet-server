@@ -20,9 +20,7 @@
             "^catalog-info.yaml$",
             "^changelog/",
             "^docs/",
-            "\\.md$",
-            "^CONTRIBUTING.md$",
-            "^README.md$"
+            "\\.md$"
         ],
         "fail_on_not_mergeable": true
       },
