@@ -35,7 +35,7 @@ Review important information about the  8.19.22 release.
 
 
 
-* Fix secret keys corruption in policy processing. https://github.com/elastic/fleet-server/pull/7833[#7833] https://github.com/elastic/fleet-server/pull/7815[#7815] 
-* Fix agent permanently stuck in &#34;updating&#34; state after fast upgrade. https://github.com/elastic/fleet-server/pull/7833[#7833] https://github.com/elastic/fleet-server/pull/7815[#7815] 
+* Fix secret keys corruption in policy processing. https://github.com/elastic/fleet-server/pull/7781[#7781] 
+* Fix agent permanently stuck in &#34;updating&#34; state after fast upgrade. https://github.com/elastic/fleet-server/pull/7784[#7784] 
 
 // end 8.19.22 relnotes

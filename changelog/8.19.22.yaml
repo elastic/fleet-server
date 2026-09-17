@@ -5,8 +5,7 @@ entries:
       description: ""
       component: fleet-server
       pr:
-        - https://github.com/elastic/fleet-server/pull/7833
-        - https://github.com/elastic/fleet-server/pull/7815
+        - https://github.com/elastic/fleet-server/pull/7781
       issue: []
       impact: ""
       action: ""
@@ -35,8 +34,7 @@ entries:
         detects the completed upgrade and clears the stuck state on the next checkin.
       component: fleet-server
       pr:
-        - https://github.com/elastic/fleet-server/pull/7833
-        - https://github.com/elastic/fleet-server/pull/7815
+        - https://github.com/elastic/fleet-server/pull/7784
       issue: []
       impact: ""
       action: ""
