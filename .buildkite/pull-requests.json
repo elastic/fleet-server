@@ -11,8 +11,8 @@
         "trigger_comment_regex": "^(?:(?:buildkite\\W+)?(?:build|test)\\W+(?:this|it))|^/test$",
         "always_trigger_comment_regex": "^(?:(?:buildkite\\W+)?(?:build|test)\\W+(?:this|it))|^/test$",
         "skip_ci_on_only_changed": [
-            "^.buildkite/pull-requests.json$",
-            "^.ci/",
+            "^\\.buildkite/pull-requests.json$",
+            "^\\.ci/",
             "^\\.github/",
             "^.gitignore",
             "^.mergify.yml$",
