@@ -20,7 +20,7 @@
             "^catalog-info.yaml$",
             "^changelog/",
             "^docs/",
-            "^\\.md$",
+            "\\.md$",
             "^CONTRIBUTING.md$",
             "^README.md$"
         ],
