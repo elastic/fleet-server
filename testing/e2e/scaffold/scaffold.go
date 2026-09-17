@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"net"
 	"net/http"
 	"os"
@@ -820,4 +821,236 @@ func (s *Scaffold) GetPolicy(ctx context.Context, id string) []byte {
 	p, err := io.ReadAll(resp.Body)
 	s.Require().NoError(err)
 	return p
+}
+
+// CreateServiceToken creates an Elasticsearch service token for the fleet-server service.
+// Returns the token value.
+func (s *Scaffold) CreateServiceToken(ctx context.Context) string {
+	tokenName := fmt.Sprintf("fleet-server-e2e-%d", time.Now().UnixNano())
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
+		fmt.Sprintf("http://localhost:9200/_security/service/elastic/fleet-server/credential/token/%s", tokenName), nil)
+	s.Require().NoError(err)
+	req.SetBasicAuth(s.ElasticUser, s.ElasticPass)
+
+	resp, err := s.Client.Do(req)
+	s.Require().NoError(err)
+	defer resp.Body.Close()
+	p, err := io.ReadAll(resp.Body)
+	s.Require().NoError(err)
+	s.Require().Equalf(http.StatusOK, resp.StatusCode, "create service token failed: %s", p)
+
+	var obj struct {
+		Token struct {
+			Value string `json:"value"`
+		} `json:"token"`
+	}
+	err = json.Unmarshal(p, &obj)
+	s.Require().NoError(err)
+	s.Require().NotEmpty(obj.Token.Value, "service token value must not be empty")
+	return obj.Token.Value
+}
+
+// CreateFleetOutput creates a Fleet output via Kibana's Fleet API.
+// Returns the output ID.
+func (s *Scaffold) CreateFleetOutput(ctx context.Context, body map[string]any) string {
+	p, err := json.Marshal(body)
+	s.Require().NoError(err)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://localhost:5601/api/fleet/outputs", bytes.NewReader(p))
+	s.Require().NoError(err)
+	req.SetBasicAuth(s.ElasticUser, s.ElasticPass)
+	req.Header.Set("kbn-xsrf", "e2e-test")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := s.Client.Do(req)
+	s.Require().NoError(err)
+	defer resp.Body.Close()
+	p, err = io.ReadAll(resp.Body)
+	s.Require().NoError(err)
+	s.Require().Equalf(http.StatusOK, resp.StatusCode, "create Fleet output failed: %s", p)
+
+	var obj struct {
+		Item struct {
+			ID string `json:"id"`
+		} `json:"item"`
+	}
+	err = json.Unmarshal(p, &obj)
+	s.Require().NoError(err)
+	s.Require().NotEmpty(obj.Item.ID)
+	return obj.Item.ID
+}
+
+// CreateAgentPolicy creates a Fleet agent policy via Kibana's Fleet API.
+// extra is merged into the request body, allowing callers to set optional fields
+// such as monitoring_output_id and monitoring_enabled.
+// Returns the policy ID and initial revision.
+func (s *Scaffold) CreateAgentPolicy(ctx context.Context, name, namespace, dataOutputID string, extra ...map[string]any) (string, int) {
+	body := map[string]any{
+		"name":           name,
+		"namespace":      namespace,
+		"data_output_id": dataOutputID,
+	}
+	for _, m := range extra {
+		maps.Copy(body, m)
+	}
+	p, err := json.Marshal(body)
+	s.Require().NoError(err)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://localhost:5601/api/fleet/agent_policies", bytes.NewReader(p))
+	s.Require().NoError(err)
+	req.SetBasicAuth(s.ElasticUser, s.ElasticPass)
+	req.Header.Set("kbn-xsrf", "e2e-test")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := s.Client.Do(req)
+	s.Require().NoError(err)
+	defer resp.Body.Close()
+	p, err = io.ReadAll(resp.Body)
+	s.Require().NoError(err)
+	s.Require().Equalf(http.StatusOK, resp.StatusCode, "create agent policy failed: %s", p)
+
+	var obj struct {
+		Item struct {
+			ID       string `json:"id"`
+			Revision int    `json:"revision"`
+		} `json:"item"`
+	}
+	err = json.Unmarshal(p, &obj)
+	s.Require().NoError(err)
+	s.Require().NotEmpty(obj.Item.ID)
+	return obj.Item.ID, obj.Item.Revision
+}
+
+// CreateEnrollmentAPIKey creates a Fleet enrollment API key for the given policy
+// and returns the key token. Use this instead of GetEnrollmentTokenForPolicyID
+// when the policy was just created and the auto-generated key may not yet exist.
+func (s *Scaffold) CreateEnrollmentAPIKey(ctx context.Context, policyID string) string {
+	body := map[string]any{"policy_id": policyID, "name": "e2e-test-" + policyID}
+	p, err := json.Marshal(body)
+	s.Require().NoError(err)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://localhost:5601/api/fleet/enrollment_api_keys", bytes.NewReader(p))
+	s.Require().NoError(err)
+	req.SetBasicAuth(s.ElasticUser, s.ElasticPass)
+	req.Header.Set("kbn-xsrf", "e2e-test")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := s.Client.Do(req)
+	s.Require().NoError(err)
+	defer resp.Body.Close()
+	p, err = io.ReadAll(resp.Body)
+	s.Require().NoError(err)
+	s.Require().Equalf(http.StatusOK, resp.StatusCode, "create enrollment API key failed: %s", p)
+
+	var obj struct {
+		Item struct {
+			APIKey string `json:"api_key"`
+		} `json:"item"`
+	}
+	err = json.Unmarshal(p, &obj)
+	s.Require().NoError(err)
+	s.Require().NotEmpty(obj.Item.APIKey)
+	return obj.Item.APIKey
+}
+
+// WaitForPolicySecretReferences polls the .fleet-policies index until the most
+// recent revision for policyID has a non-empty secret_references array. Call
+// this after creating a policy with a Fleet output that uses the "secrets"
+// wrapper to confirm the secret reference was actually persisted before
+// enrolling agents that depend on it.
+func (s *Scaffold) WaitForPolicySecretReferences(ctx context.Context, policyID string) {
+	timer := time.NewTimer(time.Second)
+	for {
+		query := fmt.Sprintf(`{"query":{"term":{"policy_id":"%s"}},"sort":[{"revision_idx":{"order":"desc"}}],"size":1}`, policyID)
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://localhost:9200/.fleet-policies/_search", strings.NewReader(query))
+		s.Require().NoError(err)
+		req.SetBasicAuth(s.ElasticUser, s.ElasticPass)
+		req.Header.Set("Content-Type", "application/json")
+		select {
+		case <-ctx.Done():
+			s.Require().NoError(ctx.Err(), "context expired before policy secret_references was populated")
+			return
+		case <-timer.C:
+			resp, err := s.Client.Do(req)
+			if err != nil {
+				timer.Reset(time.Second)
+				continue
+			}
+			if resp.StatusCode != http.StatusOK {
+				resp.Body.Close()
+				timer.Reset(time.Second)
+				continue
+			}
+			var result struct {
+				Hits struct {
+					Total struct {
+						Value int `json:"value"`
+					} `json:"total"`
+					Hits []struct {
+						Source struct {
+							Data struct {
+								SecretReferences []any `json:"secret_references"`
+							} `json:"data"`
+						} `json:"_source"`
+					} `json:"hits"`
+				} `json:"hits"`
+			}
+			err = json.NewDecoder(resp.Body).Decode(&result)
+			resp.Body.Close()
+			s.Require().NoError(err)
+			if result.Hits.Total.Value > 0 && len(result.Hits.Hits[0].Source.Data.SecretReferences) > 0 {
+				return
+			}
+			timer.Reset(time.Second)
+		}
+	}
+}
+
+// GetAgentPolicyRevision returns the current revision of the given policy from Kibana.
+func (s *Scaffold) GetAgentPolicyRevision(ctx context.Context, policyID string) int {
+	p := s.GetPolicy(ctx, policyID)
+	var obj struct {
+		Item struct {
+			Revision int `json:"revision"`
+		} `json:"item"`
+	}
+	err := json.Unmarshal(p, &obj)
+	s.Require().NoError(err)
+	return obj.Item.Revision
+}
+
+// WaitForAgentDocsInIndex polls indexPattern until at least one document whose
+// agent.id matches agentID appears. Use this to verify that an agent has
+// written data to a particular output (e.g. metrics-elastic_agent.* for
+// monitoring data routed through a remote_elasticsearch output).
+func (s *Scaffold) WaitForAgentDocsInIndex(ctx context.Context, agentID, indexPattern string) {
+	s.Require().Eventually(func() bool {
+		query := fmt.Sprintf(`{"query":{"term":{"agent.id":"%s"}},"size":1}`, agentID)
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost,
+			fmt.Sprintf("http://localhost:9200/%s/_search", indexPattern), strings.NewReader(query))
+		if err != nil {
+			return false
+		}
+		req.SetBasicAuth(s.ElasticUser, s.ElasticPass)
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := s.Client.Do(req)
+		if err != nil {
+			return false
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return false
+		}
+		var result struct {
+			Hits struct {
+				Total struct {
+					Value int `json:"value"`
+				} `json:"total"`
+			} `json:"hits"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+			return false
+		}
+		return result.Hits.Total.Value > 0
+	}, 4*time.Minute, time.Second, "agent %s never wrote documents to %s within timeout", agentID, indexPattern)
 }
