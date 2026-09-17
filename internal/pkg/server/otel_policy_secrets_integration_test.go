@@ -40,6 +40,7 @@ func createAgentPolicyWithOtelSecrets(t *testing.T, ctx context.Context, bulker 
 	inlineSecretID := createSecret(t, ctx, bulker, "inline_secret_value")
 	inlineSecretRef := fmt.Sprintf("$co.elastic.secret{%s}", inlineSecretID)
 	pathSecretID := createSecret(t, ctx, bulker, "path_secret_value")
+	certSecretID := createSecret(t, ctx, bulker, "cert_pem_value")
 
 	policyID := uuid.Must(uuid.NewV4()).String()
 	var otelPolicyData = model.PolicyData{
@@ -60,6 +61,18 @@ func createAgentPolicyWithOtelSecrets(t *testing.T, ctx context.Context, bulker 
 				"secrets": map[string]any{
 					"headers": map[string]any{
 						"authorization": map[string]any{"id": pathSecretID},
+					},
+				},
+			},
+			// Kibana PR #290981 adds TLS credentials for OTLP exporters using the
+			// path-based secret format (secrets.tls.*).  Both path-based and inline
+			// formats must resolve correctly inside the tls block.
+			"otlp/my-otlp": map[string]any{
+				"endpoint": "otel.example.com:4317",
+				"secrets": map[string]any{
+					"tls": map[string]any{
+						"cert_pem": map[string]any{"id": certSecretID},
+						"key_pem":  inlineSecretRef,
 					},
 				},
 			},
@@ -84,6 +97,7 @@ func createAgentPolicyWithOtelSecrets(t *testing.T, ctx context.Context, bulker 
 		SecretReferences: []model.SecretReferencesItems{
 			{ID: inlineSecretID},
 			{ID: pathSecretID},
+			{ID: certSecretID},
 		},
 	}
 
@@ -220,6 +234,18 @@ func Test_Agent_OtelPolicy_Secrets(t *testing.T) {
 	require.True(t, ok, "expected exporters.elasticsearch/default.headers to be a map")
 	assert.Equal(t, "path_secret_value", headersMap["authorization"])
 
+	// Assert exporters.otlp/my-otlp TLS secrets resolved: 'secrets' wrapper removed,
+	// values promoted to tls.*.  Covers the path added by Kibana PR #290981.
+	require.Contains(t, actionData.Policy.Exporters, "otlp/my-otlp")
+	otlpExporterMap, ok := actionData.Policy.Exporters["otlp/my-otlp"].(map[string]any)
+	require.True(t, ok, "expected exporters.otlp/my-otlp to be a map")
+	assert.NotContains(t, otlpExporterMap, "secrets", "expected 'secrets' key to be removed from exporters.otlp/my-otlp")
+	require.Contains(t, otlpExporterMap, "tls")
+	tlsMap, ok := otlpExporterMap["tls"].(map[string]any)
+	require.True(t, ok, "expected exporters.otlp/my-otlp.tls to be a map")
+	assert.Equal(t, "cert_pem_value", tlsMap["cert_pem"], "path-based TLS cert_pem must be resolved")
+	assert.Equal(t, "inline_secret_value", tlsMap["key_pem"], "inline TLS key_pem must be resolved")
+
 	// Assert processors.batch.api_key was replaced with inline secret value
 	require.Contains(t, actionData.Policy.Processors, "batch")
 	batchMap, ok := actionData.Policy.Processors["batch"].(map[string]any)
@@ -244,6 +270,8 @@ func Test_Agent_OtelPolicy_Secrets(t *testing.T) {
 		[]string{
 			"receivers.otlp.auth",
 			"exporters.elasticsearch/default.headers.authorization",
+			"exporters.otlp/my-otlp.tls.cert_pem",
+			"exporters.otlp/my-otlp.tls.key_pem",
 			"processors.batch.api_key",
 			"extensions.basicauth.password",
 			"connectors.spanmetrics.token",

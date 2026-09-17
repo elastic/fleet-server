@@ -9,6 +9,9 @@ package policy
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -24,6 +27,17 @@ import (
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 )
+
+// localPolicyESURL returns the local Elasticsearch URL with embedded credentials, suitable for
+// ftesting.VerifyAPIKeyInvalidated. Reads ELASTICSEARCH_HOSTS or defaults to localhost:9200.
+func localPolicyESURL() string {
+	hosts := os.Getenv("ELASTICSEARCH_HOSTS")
+	if hosts == "" {
+		return "http://elastic:changeme@localhost:9200"
+	}
+	host := strings.SplitN(hosts, ",", 2)[0]
+	return "http://elastic:changeme@" + host
+}
 
 var TestPayload []byte
 
@@ -267,6 +281,55 @@ func TestPolicyOutputOTLPPrepareRealES(t *testing.T) {
 		require.NoError(t, err)
 		assert.Empty(t, got.Outputs, "agent doc must not be updated for external OTLP")
 	})
+
+	t.Run("mOTLP→external transition — key invalidated, secret deleted, output entry removed", func(t *testing.T) {
+		ctx := testlog.SetLogger(t).WithContext(t.Context())
+		index, bulker := ftesting.SetupCleanIndex(ctx, t, dl.FleetAgents)
+
+		agentID := createAgent(ctx, t, index, bulker, map[string]*model.PolicyOutput{})
+		agent, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+		require.NoError(t, err)
+
+		// First: establish a managed OTLP output with a real API key and secret.
+		mOTLPMap := map[string]map[string]any{outputName: {}}
+		mOTLP := Output{Type: OutputTypeOTLP, Name: outputName, Role: &RoleT{Sha2: "hash-v1", Raw: mOTLPRole}}
+		require.NoError(t, mOTLP.prepareOTLP(ctx, zerolog.Nop(), bulker, &agent, mOTLPMap, nil))
+
+		oldKeyID := agent.Outputs[outputName].APIKeyID
+		require.NotEmpty(t, oldKeyID, "expected an API key ID after mOTLP prepare")
+
+		oldSecretRef := agent.Outputs[outputName].APIKey
+		oldSecretID, ok := secret.ParseSecretReference(oldSecretRef)
+		require.True(t, ok, "expected a secret reference after mOTLP prepare")
+
+		// Transition: policy removes output_permissions → external OTLP.
+		external := Output{Type: OutputTypeOTLP, Name: outputName, Role: nil}
+		require.NoError(t, external.prepareOTLP(ctx, zerolog.Nop(), bulker, &agent, map[string]map[string]any{outputName: {}}, nil))
+
+		assert.NotContains(t, agent.Outputs, outputName, "output entry must be removed from in-memory agent")
+
+		// Agent doc must no longer carry the output entry.
+		ftesting.Retry(t, ctx, func(ctx context.Context) error {
+			got, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+			if err != nil {
+				return err
+			}
+			if _, found := got.Outputs[outputName]; found {
+				return fmt.Errorf("output entry %q still present on agent doc", outputName)
+			}
+			return nil
+		}, ftesting.RetrySleep(time.Second))
+
+		// Secret must be deleted.
+		resolved, err := bulker.ReadSecrets(ctx, []string{oldSecretID})
+		require.NoError(t, err)
+		assert.Empty(t, resolved[oldSecretID], "secret must be deleted after mOTLP→external transition")
+
+		// The ES API key itself must be invalidated — this is what earns the subtest name.
+		// An invalidation regression would not fail the assertions above because APIKeyInvalidate
+		// errors are logged and swallowed by design (fire-and-forget).
+		ftesting.VerifyAPIKeyInvalidated(t, ctx, localPolicyESURL(), oldKeyID, true)
+	})
 }
 
 func createAgent(ctx context.Context, t *testing.T, index string, bulker bulk.Bulk, outputs map[string]*model.PolicyOutput) string {
@@ -397,4 +460,83 @@ func TestPolicyOutputESPrepareESRetireRemoteAPIKeys(t *testing.T) {
 	assert.Equal(t, gotOutput.PermissionsHash, output.Role.Sha2)
 	assert.NotEmpty(t, gotOutput.APIKey)
 	assert.NotEmpty(t, gotOutput.APIKeyID)
+}
+
+// TestPolicyOutputOTLPPrepareRetireRemovedOutput mirrors TestPolicyOutputESPrepareESRetireRemoteAPIKeys
+// for the OTLP code path.  It seeds the agent with a real minted key (secret ref) on an "old otlp"
+// output, then calls prepareOTLP for a different surviving output.  retireRemovedOutput must:
+//   - write a retirement record onto the surviving output's ToRetireAPIKeyIds with the correct
+//     ID, Output name, and SecretID (covers the secret.ParseSecretReference branch in retireRemovedOutput);
+//   - remove the stale "old otlp" entry from the agent doc (the renderRemoveOutputPainlessScript
+//     half, which TestPolicyOutputESPrepareESRetireRemoteAPIKeys leaves unverified).
+func TestPolicyOutputOTLPPrepareRetireRemovedOutput(t *testing.T) {
+	const (
+		oldOutputName   = "old otlp"
+		survivingOutput = "surviving otlp"
+	)
+
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
+	index, bulker := ftesting.SetupCleanIndex(ctx, t, dl.FleetAgents)
+
+	// Phase 1: mint a real OTLP key and secret for "old otlp" by running prepareOTLP.
+	agentID := createAgent(ctx, t, index, bulker, map[string]*model.PolicyOutput{})
+	agent, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+	require.NoError(t, err)
+
+	setupOutput := Output{Type: OutputTypeOTLP, Name: oldOutputName, Role: &RoleT{Sha2: "hash-v1", Raw: mOTLPRole}}
+	require.NoError(t, setupOutput.prepareOTLP(ctx, zerolog.Nop(), bulker, &agent, map[string]map[string]any{oldOutputName: {}}, nil))
+
+	oldKeyID := agent.Outputs[oldOutputName].APIKeyID
+	require.NotEmpty(t, oldKeyID, "setup: expected APIKeyID after mOTLP prepare")
+
+	oldSecretID, ok := secret.ParseSecretReference(agent.Outputs[oldOutputName].APIKey)
+	require.True(t, ok, "setup: expected secret reference after mOTLP prepare")
+
+	// Phase 2: prepareOTLP for the surviving output; outputMap no longer contains "old otlp".
+	// retireRemovedOutput scans agent.Outputs, finds "old otlp" absent from outputMap, and writes
+	// a retirement record onto "surviving otlp", then removes the stale entry.
+	survivingOutputObj := Output{
+		Type: OutputTypeOTLP,
+		Name: survivingOutput,
+		Role: &RoleT{Sha2: "hash-v1", Raw: mOTLPRole},
+	}
+	outputMap := map[string]map[string]any{survivingOutput: {}}
+	require.NoError(t, survivingOutputObj.prepareOTLP(ctx, zerolog.Nop(), bulker, &agent, outputMap, nil))
+
+	// Wait for both painless updates (retire record + remove stale entry) to be visible.
+	ftesting.Retry(t, ctx, func(ctx context.Context) error {
+		got, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+		if err != nil {
+			return err
+		}
+		sv, ok := got.Outputs[survivingOutput]
+		if !ok {
+			return fmt.Errorf("output %q not yet on agent doc", survivingOutput)
+		}
+		if len(sv.ToRetireAPIKeyIds) == 0 {
+			return fmt.Errorf("ToRetireAPIKeyIds not yet populated on %q", survivingOutput)
+		}
+		if _, stillPresent := got.Outputs[oldOutputName]; stillPresent {
+			return fmt.Errorf("stale output %q still on agent doc", oldOutputName)
+		}
+		return nil
+	}, ftesting.RetrySleep(time.Second))
+
+	got, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+	require.NoError(t, err)
+
+	// Surviving output must carry the retirement record for "old otlp".
+	sv, ok := got.Outputs[survivingOutput]
+	require.True(t, ok, "surviving output %q must be present", survivingOutput)
+	require.Len(t, sv.ToRetireAPIKeyIds, 1, "exactly one retirement record expected")
+	assert.Equal(t, oldKeyID, sv.ToRetireAPIKeyIds[0].ID, "retired key ID")
+	assert.Equal(t, oldOutputName, sv.ToRetireAPIKeyIds[0].Output, "retired key output name")
+	assert.Equal(t, oldSecretID, sv.ToRetireAPIKeyIds[0].SecretID, "retired key secret ID")
+	assert.NotEmpty(t, sv.ToRetireAPIKeyIds[0].RetiredAt, "RetiredAt must be set")
+	assert.Equal(t, OutputTypeOTLP, sv.Type, "surviving output type")
+	assert.NotEmpty(t, sv.APIKeyID, "surviving output must have a fresh key")
+
+	// The stale "old otlp" entry must be gone — this is the half TestPolicyOutputESPrepareESRetireRemoteAPIKeys
+	// leaves unverified.
+	assert.NotContains(t, got.Outputs, oldOutputName, "stale output entry must be removed from agent doc")
 }
