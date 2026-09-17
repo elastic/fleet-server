@@ -700,8 +700,6 @@ func (s *Scaffold) AddPolicyOverrides(ctx context.Context, id string, overrides 
 	defer resp.Body.Close()
 	s.Require().Equal(http.StatusOK, resp.StatusCode)
 }
-<<<<<<< HEAD
-=======
 
 func (s *Scaffold) GetPolicy(ctx context.Context, id string) []byte {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("http://localhost:5601/api/fleet/agent_policies/%s", id), nil)
@@ -948,4 +946,3 @@ func (s *Scaffold) WaitForAgentDocsInIndex(ctx context.Context, agentID, indexPa
 		return result.Hits.Total.Value > 0
 	}, 4*time.Minute, time.Second, "agent %s never wrote documents to %s within timeout", agentID, indexPattern)
 }
->>>>>>> 552fb78 (test: E2E regression test for fleet-server parsed policy race condition (#7794) (#7815))
