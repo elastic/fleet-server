@@ -13,7 +13,7 @@
         "skip_ci_on_only_changed": [
             "^.buildkite/pull-requests.json$",
             "^.ci/",
-            "^.github/",
+            "^\\.github/",
             "^.gitignore",
             "^.mergify.yml$",
             "^.pre-commit-config.yaml$",
