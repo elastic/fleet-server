@@ -2518,6 +2518,13 @@ type GetFileResponse200Headers struct {
 	XRequestId        *string
 }
 
+// GetFileResponse206Headers the declared response headers of an HTTP 206 response for GetFile
+type GetFileResponse206Headers struct {
+	ContentRange      *string
+	ElasticApiVersion *string
+	XRequestId        *string
+}
+
 // GetFileResponse400Headers the declared response headers of an HTTP 400 response for GetFile
 type GetFileResponse400Headers struct {
 	ElasticApiVersion *string
@@ -2538,6 +2545,12 @@ type GetFileResponse403Headers struct {
 
 // GetFileResponse404Headers the declared response headers of an HTTP 404 response for GetFile
 type GetFileResponse404Headers struct {
+	ElasticApiVersion *string
+	XRequestId        *string
+}
+
+// GetFileResponse416Headers the declared response headers of an HTTP 416 response for GetFile
+type GetFileResponse416Headers struct {
 	ElasticApiVersion *string
 	XRequestId        *string
 }
@@ -2576,6 +2589,8 @@ type GetFileResponse struct {
 	JSON503 *Unavailable
 	// Headers200 the parsed response headers for an HTTP 200 response
 	Headers200 *GetFileResponse200Headers
+	// Headers206 the parsed response headers for an HTTP 206 response
+	Headers206 *GetFileResponse206Headers
 	// Headers400 the parsed response headers for an HTTP 400 response
 	Headers400 *GetFileResponse400Headers
 	// Headers401 the parsed response headers for an HTTP 401 response
@@ -2584,6 +2599,8 @@ type GetFileResponse struct {
 	Headers403 *GetFileResponse403Headers
 	// Headers404 the parsed response headers for an HTTP 404 response
 	Headers404 *GetFileResponse404Headers
+	// Headers416 the parsed response headers for an HTTP 416 response
+	Headers416 *GetFileResponse416Headers
 	// Headers429 the parsed response headers for an HTTP 429 response
 	Headers429 *GetFileResponse429Headers
 	// Headers500 the parsed response headers for an HTTP 500 response
@@ -4786,6 +4803,9 @@ func ParseGetFileResponse(rsp *http.Response) (*GetFileResponse, error) {
 	}
 
 	switch {
+	case rsp.StatusCode == 206:
+		break // No content-type
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
 		var dest BadRequest
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -4808,6 +4828,9 @@ func ParseGetFileResponse(rsp *http.Response) (*GetFileResponse, error) {
 		response.JSON403 = &dest
 
 	case rsp.StatusCode == 404:
+		break // No content-type
+
+	case rsp.StatusCode == 416:
 		break // No content-type
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
@@ -4858,6 +4881,30 @@ func ParseGetFileResponse(rsp *http.Response) (*GetFileResponse, error) {
 			headers.XRequestId = &value
 		}
 		response.Headers200 = &headers
+	case rsp.StatusCode == 206:
+		var headers GetFileResponse206Headers
+		if values := rsp.Header.Values("Content-Range"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Range", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentRange = &value
+		}
+		if values := rsp.Header.Values("Elastic-Api-Version"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Elastic-Api-Version", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ElasticApiVersion = &value
+		}
+		if values := rsp.Header.Values("X-Request-Id"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Request-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XRequestId = &value
+		}
+		response.Headers206 = &headers
 	case rsp.StatusCode == 400:
 		var headers GetFileResponse400Headers
 		if values := rsp.Header.Values("Elastic-Api-Version"); len(values) > 0 {
@@ -4926,6 +4973,23 @@ func ParseGetFileResponse(rsp *http.Response) (*GetFileResponse, error) {
 			headers.XRequestId = &value
 		}
 		response.Headers404 = &headers
+	case rsp.StatusCode == 416:
+		var headers GetFileResponse416Headers
+		if values := rsp.Header.Values("Elastic-Api-Version"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Elastic-Api-Version", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ElasticApiVersion = &value
+		}
+		if values := rsp.Header.Values("X-Request-Id"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Request-Id", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XRequestId = &value
+		}
+		response.Headers416 = &headers
 	case rsp.StatusCode == 429:
 		var headers GetFileResponse429Headers
 		if values := rsp.Header.Values("X-Request-Id"); len(values) > 0 {
