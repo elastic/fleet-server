@@ -447,7 +447,6 @@ components:
             The value, if specified is expected to be a string that is parsable by [time.ParseDuration](https://pkg.go.dev/time#ParseDuration).
             If specified fleet-server will set its poll timeout to `max(1m, poll_timeout-2m)` and its write timeout to `max(2m, poll_timout-1m)`.
           type: string
-          format: duration
         upgrade_details:
           $ref: "#/components/schemas/upgrade_details"
         agent_policy_id:
@@ -1984,6 +1983,19 @@ paths:
               schema:
                 type: string
                 format: binary
+        "206":
+          description: Partial File Contents
+          headers:
+            Content-Range:
+              description: Byte range of returned file section
+              schema:
+                type: string
+                examples:
+                  - "500-4096/250000"
+            Elastic-Api-Version:
+              $ref: "#/components/headers/apiVersion"
+            X-Request-Id:
+              $ref: "#/components/headers/requestID"
         "400":
           $ref: "#/components/responses/badRequest"
         "401":
@@ -2008,6 +2020,13 @@ paths:
                     message: Client is not authorized
         "404":
           description: bad path, file not found
+          headers:
+            Elastic-Api-Version:
+              $ref: "#/components/headers/apiVersion"
+            X-Request-Id:
+              $ref: "#/components/headers/requestID"
+        "416":
+          description: Range Not Satisfiable
           headers:
             Elastic-Api-Version:
               $ref: "#/components/headers/apiVersion"
