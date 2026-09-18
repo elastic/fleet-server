@@ -176,6 +176,9 @@ func (p *Output) prepareElasticsearch(
 	case hasConfigChanged:
 		zlog.Debug().Msg("must generate api key as remote output config changed")
 		needNewKey = true
+	case output.Type != "" && agentDocOutputType(output.Type) != OutputTypeElasticsearch:
+		zlog.Debug().Str("persistedType", output.Type).Msg("must generate api key as output type changed")
+		needNewKey = true
 	case p.Role.Sha2 != output.PermissionsHash:
 		// the is actually the OutputPermissionsHash for the default hash. The Agent
 		// document on ES does not have OutputPermissionsHash for any other output
@@ -348,11 +351,20 @@ func (p *Output) prepareOTLP(
 		return err
 	}
 
+	_, isSecretRef := secret.ParseSecretReference(output.APIKey)
 	needNewKey := false
 	needUpdateKey := false
 	switch {
 	case output.APIKey == "":
 		zlog.Debug().Msg("must generate OTLP API key as it is not present")
+		needNewKey = true
+	case output.Type != "" && output.Type != OutputTypeOTLP:
+		zlog.Debug().Str("persistedType", output.Type).Msg("must generate OTLP API key as output type changed")
+		needNewKey = true
+	case !isSecretRef:
+		// Managed OTLP always stores keys via fleet-secrets. A plain id:key means the entry
+		// was written by a different output type under the same name (e.g., elasticsearch).
+		zlog.Debug().Msg("must generate OTLP API key as existing key is not a secret reference")
 		needNewKey = true
 	case p.Role.Sha2 != output.PermissionsHash:
 		zlog.Debug().Msg("must update OTLP API key as policy output permissions changed")
@@ -582,6 +594,17 @@ func generateOutputAPIKey(
 		roles,
 		apikey.NewMetadata(agentID, outputName, apikey.TypeOutput),
 	)
+}
+
+// agentDocOutputType normalizes the type stored in the agent doc. remote_elasticsearch is
+// written as elasticsearch in the agent doc (prepareElasticsearch always passes
+// OutputTypeElasticsearch), so comparisons against persisted type must normalize both sides.
+// The ack and checkin gates that drive cleanup depend on this mapping.
+func agentDocOutputType(t string) string {
+	if t == OutputTypeRemoteElasticsearch {
+		return OutputTypeElasticsearch
+	}
+	return t
 }
 
 // retireRemovedOutputs retires all outputs present in agent.Outputs but absent from outputMap.
