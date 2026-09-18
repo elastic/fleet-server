@@ -31,6 +31,7 @@ const (
 	OutputTypeRemoteElasticsearch = "remote_elasticsearch"
 	OutputTypeLogstash            = "logstash"
 	OutputTypeKafka               = "kafka"
+	OutputTypeOTLP                = "otlp"
 
 	OTelExporterTypeElasticsearch = "elasticsearch"
 )
@@ -113,6 +114,11 @@ func (p *Output) Prepare(ctx context.Context, zlog zerolog.Logger, bulker bulk.B
 	case OutputTypeKafka:
 		zlog.Debug().Msg("preparing kafka output")
 		zlog.Info().Msg("no actions required for kafka output preparation")
+	case OutputTypeOTLP:
+		zlog.Debug().Msg("preparing OTLP output")
+		if err := p.prepareOTLP(ctx, zlog, bulker, agent, outputMap, cfg.secretCandidateCollector); err != nil {
+			return fmt.Errorf("failed to prepare OTLP output %q: %w", p.Name, err)
+		}
 	default:
 		zlog.Error().Msgf("unknown output type: %s; skipping preparation", p.Type)
 		return fmt.Errorf("encountered unexpected output type while preparing outputs: %s", p.Type)
@@ -151,62 +157,8 @@ func (p *Output) prepareElasticsearch(
 		agent.Outputs[p.Name] = output
 	}
 
-	// retire api key of removed remote output
-	var toRetireAPIKeys *model.ToRetireAPIKeyIdsItems
-	var removedOutputName string
-	// find the first output that is removed - supposing one output can be removed at a time
-	for agentOutputName, agentOutput := range agent.Outputs {
-		found := false
-		for outputMapKey := range outputMap {
-			if agentOutputName == outputMapKey {
-				found = true
-				break
-			}
-		}
-		if !found {
-			zlog.Info().Str(ecs.APIKeyID, agentOutput.APIKeyID).Str(ecs.PolicyOutputName, agentOutputName).Msg("Output removed, will retire API key")
-			retiring := model.ToRetireAPIKeyIdsItems{
-				ID:        agentOutput.APIKeyID,
-				RetiredAt: time.Now().UTC().Format(time.RFC3339),
-				Output:    agentOutputName,
-			}
-			if secretID, ok := secret.ParseSecretReference(agentOutput.APIKey); ok {
-				retiring.SecretID = secretID
-			}
-			toRetireAPIKeys = &retiring
-			removedOutputName = agentOutputName
-			break
-		}
-	}
-
-	if toRetireAPIKeys != nil {
-
-		// adding remote API key to new output toRetireAPIKeys
-		fields := map[string]any{
-			dl.FieldPolicyOutputToRetireAPIKeyIDs: *toRetireAPIKeys,
-		}
-
-		// Using painless script to append the old keys to the history
-		body, err := renderUpdatePainlessScript(p.Name, fields)
-		if err != nil {
-			return fmt.Errorf("could not update painless script: %w", err)
-		}
-
-		if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
-			zlog.Error().Err(err).Msg("fail update agent record")
-			return fmt.Errorf("fail update agent record: %w", err)
-		}
-
-		// remove output from agent doc
-		body, err = renderRemoveOutputPainlessScript(removedOutputName)
-		if err != nil {
-			return fmt.Errorf("could not create request body to update agent: %w", err)
-		}
-
-		if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
-			zlog.Error().Err(err).Msg("fail update agent record")
-			return fmt.Errorf("fail update agent record: %w", err)
-		}
+	if err := retireRemovedOutputs(ctx, zlog, bulker, agent, p.Name, outputMap); err != nil {
+		return err
 	}
 
 	// Determine whether we need to generate an output ApiKey.
@@ -224,6 +176,9 @@ func (p *Output) prepareElasticsearch(
 	case hasConfigChanged:
 		zlog.Debug().Msg("must generate api key as remote output config changed")
 		needNewKey = true
+	case output.Type != "" && agentDocOutputType(output.Type) != OutputTypeElasticsearch:
+		zlog.Debug().Str("persistedType", output.Type).Msg("must generate api key as output type changed")
+		needNewKey = true
 	case p.Role.Sha2 != output.PermissionsHash:
 		// the is actually the OutputPermissionsHash for the default hash. The Agent
 		// document on ES does not have OutputPermissionsHash for any other output
@@ -236,59 +191,9 @@ func (p *Output) prepareElasticsearch(
 	}
 
 	if needUpdateKey {
-		zlog.Debug().
-			RawJSON("roles", p.Role.Raw).
-			Str("oldHash", output.PermissionsHash).
-			Str("newHash", p.Role.Sha2).
-			Msg("Generating a new API key")
-
-		// query current api key for roles so we don't lose permissions in the meantime
-		currentRoles, err := fetchAPIKeyRoles(ctx, outputBulker, output.APIKeyID)
-		if err != nil {
-			zlog.Error().
-				Str("apiKeyID", output.APIKeyID).
-				Err(err).Msg("fail fetching roles for key")
+		if err := updateOutputAPIKeyRoles(ctx, zlog, bulker, outputBulker, agent, p.Name, OutputTypeElasticsearch, output, p.Role); err != nil {
 			return err
 		}
-
-		// merge roles with p.Role
-		newRoles, err := mergeRoles(zlog, currentRoles, p.Role)
-		if err != nil {
-			zlog.Error().
-				Str("apiKeyID", output.APIKeyID).
-				Err(err).Msg("fail merging roles for key")
-			return err
-		}
-
-		// hash provided is only for merging request together and not persisted
-		err = outputBulker.APIKeyUpdate(ctx, output.APIKeyID, newRoles.Sha2, newRoles.Raw)
-		if err != nil {
-			zlog.Error().Err(err).Msg("fail generate output key")
-			zlog.Debug().RawJSON("roles", newRoles.Raw).Str("sha", newRoles.Sha2).Err(err).Msg("roles not updated")
-			return err
-		}
-
-		output.PermissionsHash = p.Role.Sha2 // for the sake of consistency
-		zlog.Debug().
-			Str("hash.sha256", p.Role.Sha2).
-			Str("roles", string(p.Role.Raw)).
-			Msg("Updating agent record to pick up most recent roles.")
-
-		fields := map[string]any{
-			dl.FieldPolicyOutputPermissionsHash: p.Role.Sha2,
-		}
-
-		// Using painless script to update permission hash for updated key
-		body, err := renderUpdatePainlessScript(p.Name, fields)
-		if err != nil {
-			return err
-		}
-
-		if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
-			zlog.Error().Err(err).Msg("fail update agent record")
-			return err
-		}
-
 	} else if needNewKey {
 		zlog.Debug().
 			RawJSON("fleet.policy.roles", p.Role.Raw).
@@ -342,67 +247,9 @@ func (p *Output) prepareElasticsearch(
 			Str(ecs.DefaultOutputAPIKeyID, outputAPIKey.ID).
 			Msg("Updating agent record to pick up default output key.")
 
-		secretID, err := bulker.WriteSecret(ctx, outputAPIKey.Agent())
-		if err != nil {
-			return fmt.Errorf("failed writing output API key secret: %w", err)
+		if err := persistNewOutputAPIKey(ctx, zlog, bulker, agent, p.Name, OutputTypeElasticsearch, output, p.Role, outputAPIKey, secretCandidateCollector); err != nil {
+			return err
 		}
-		apiKeyRef := secret.MakeSecretReference(secretID)
-
-		fields := map[string]any{
-			dl.FieldPolicyOutputAPIKey:          apiKeyRef,
-			dl.FieldPolicyOutputAPIKeyID:        outputAPIKey.ID,
-			dl.FieldPolicyOutputPermissionsHash: p.Role.Sha2,
-		}
-
-		if !foundOutput {
-			fields[dl.FiledType] = OutputTypeElasticsearch
-		}
-		if output.APIKeyID != "" {
-			retiring := model.ToRetireAPIKeyIdsItems{
-				ID:        output.APIKeyID,
-				RetiredAt: time.Now().UTC().Format(time.RFC3339),
-				Output:    p.Name,
-			}
-			if secretID, ok := secret.ParseSecretReference(output.APIKey); ok {
-				retiring.SecretID = secretID
-			}
-			fields[dl.FieldPolicyOutputToRetireAPIKeyIDs] = retiring
-		}
-
-		// Using painless script to append the old keys to the history
-		body, err := renderUpdatePainlessScript(p.Name, fields)
-		if err != nil {
-			return fmt.Errorf("could not update painless script: %w", err)
-		}
-
-		if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
-			zlog.Error().Err(err).Msg("fail update agent record")
-			// The update may have been committed by Elasticsearch even when the client
-			// returns an error, for example when the request context expires while
-			// waiting for the response. Deleting the secret here can therefore leave
-			// the agent document pointing at a missing secret.
-			if secretCandidateCollector != nil {
-				candidate := OutputSecretCandidate{
-					AgentID:    agent.Id,
-					OutputName: p.Name,
-					SecretID:   secretID,
-					SecretRef:  apiKeyRef,
-				}
-				if !secretCandidateCollector.Add(candidate) {
-					zlog.Warn().Str("secret.id", secretID).Msg("failed to enqueue output secret reconciliation candidate")
-				}
-			}
-			return fmt.Errorf("fail update agent record: %w", err)
-		}
-
-		// Now that all is done, we can update the output on the agent variable
-		// Right not it's more for consistency and to ensure the in-memory agent
-		// data is correct and in sync with ES, so it can be safely used after
-		// this method returns.
-		output.Type = OutputTypeElasticsearch
-		output.APIKey = apiKeyRef
-		output.APIKeyID = outputAPIKey.ID
-		output.PermissionsHash = p.Role.Sha2 // for the sake of consistency
 	}
 
 	if p.Type == OutputTypeRemoteElasticsearch {
@@ -435,6 +282,140 @@ func (p *Output) prepareElasticsearch(
 		apiKey = val
 	}
 	outputMap[p.Name]["api_key"] = apiKey
+	return nil
+}
+
+func (p *Output) prepareOTLP(
+	ctx context.Context,
+	zlog zerolog.Logger,
+	bulker bulk.Bulk,
+	agent *model.Agent,
+	outputMap map[string]map[string]any,
+	secretCandidateCollector OutputSecretCandidateCollector) error {
+	// External OTLP output — Kibana embeds auth credentials directly in the exporter config.
+	// Only mOTLP outputs carry an output_permissions block and need API key management.
+	if p.Role == nil {
+		zlog.Debug().Msg("no output permissions for OTLP output; skipping API key management")
+		prev, ok := agent.Outputs[p.Name]
+		if !ok || (prev.APIKeyID == "" && prev.APIKey == "") {
+			return nil
+		}
+		// mOTLP → external transition: park a retirement record on this entry and clear the
+		// active key fields. The entry persists so the ack/checkin gate can retire the key —
+		// the same deferred pattern used by retireRemovedOutputs for surviving outputs.
+		retiring := model.ToRetireAPIKeyIdsItems{
+			ID:        prev.APIKeyID,
+			RetiredAt: time.Now().UTC().Format(time.RFC3339),
+			Output:    p.Name,
+		}
+		if secretID, ok := secret.ParseSecretReference(prev.APIKey); ok {
+			retiring.SecretID = secretID
+		}
+		fields := map[string]any{
+			dl.FieldPolicyOutputToRetireAPIKeyIDs: retiring,
+			dl.FieldPolicyOutputAPIKeyID:          "",
+			dl.FieldPolicyOutputAPIKey:            "",
+			dl.FieldPolicyOutputPermissionsHash:   "",
+		}
+		body, err := renderUpdatePainlessScript(p.Name, fields)
+		if err != nil {
+			return fmt.Errorf("could not render update script for mOTLP→external transition: %w", err)
+		}
+		if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
+			zlog.Error().Err(err).Msg("fail to park retirement record for mOTLP→external transition")
+			return fmt.Errorf("fail update agent record: %w", err)
+		}
+		prev.ToRetireAPIKeyIds = append(prev.ToRetireAPIKeyIds, retiring)
+		prev.APIKeyID = ""
+		prev.APIKey = ""
+		prev.PermissionsHash = ""
+		return nil
+	}
+
+	if _, ok := outputMap[p.Name]; !ok {
+		zlog.Error().Err(ErrFailInjectAPIKey).Msg("unable to find output in map")
+		return ErrFailInjectAPIKey
+	}
+
+	output, foundOutput := agent.Outputs[p.Name]
+	if !foundOutput {
+		if agent.Outputs == nil {
+			agent.Outputs = map[string]*model.PolicyOutput{}
+		}
+		zlog.Debug().Msgf("creating agent.Outputs[%s]", p.Name)
+		output = &model.PolicyOutput{}
+		agent.Outputs[p.Name] = output
+	}
+
+	if err := retireRemovedOutputs(ctx, zlog, bulker, agent, p.Name, outputMap); err != nil {
+		return err
+	}
+
+	_, isSecretRef := secret.ParseSecretReference(output.APIKey)
+	needNewKey := false
+	needUpdateKey := false
+	switch {
+	case output.APIKey == "":
+		zlog.Debug().Msg("must generate OTLP API key as it is not present")
+		needNewKey = true
+	case output.Type != "" && output.Type != OutputTypeOTLP:
+		zlog.Debug().Str("persistedType", output.Type).Msg("must generate OTLP API key as output type changed")
+		needNewKey = true
+	case !isSecretRef:
+		// Managed OTLP always stores keys via fleet-secrets. A plain id:key means the entry
+		// was written by a different output type under the same name (e.g., elasticsearch).
+		zlog.Debug().Msg("must generate OTLP API key as existing key is not a secret reference")
+		needNewKey = true
+	case p.Role.Sha2 != output.PermissionsHash:
+		zlog.Debug().Msg("must update OTLP API key as policy output permissions changed")
+		needUpdateKey = true
+	default:
+		zlog.Debug().Msg("OTLP policy output permissions are the same")
+	}
+
+	if needUpdateKey {
+		if err := updateOutputAPIKeyRoles(ctx, zlog, bulker, bulker, agent, p.Name, OutputTypeOTLP, output, p.Role); err != nil {
+			return err
+		}
+	} else if needNewKey {
+		zlog.Debug().
+			RawJSON("fleet.policy.roles", p.Role.Raw).
+			Str("fleet.policy.otlp.oldHash", output.PermissionsHash).
+			Str("fleet.policy.otlp.newHash", p.Role.Sha2).
+			Msg("Generating a new OTLP API key")
+
+		ctx := zlog.WithContext(ctx)
+		outputAPIKey, err := generateOutputAPIKey(ctx, bulker, agent.Id, p.Name, p.Role.Raw)
+		if err != nil {
+			return fmt.Errorf("failed to generate OTLP output API key: %w", err)
+		}
+
+		zlog.Info().
+			Str("fleet.policy.role.hash.sha256", p.Role.Sha2).
+			Str(ecs.DefaultOutputAPIKeyID, outputAPIKey.ID).
+			Msg("Updating agent record to pick up OTLP output key.")
+
+		if err := persistNewOutputAPIKey(ctx, zlog, bulker, agent, p.Name, OutputTypeOTLP, output, p.Role, outputAPIKey, secretCandidateCollector); err != nil {
+			return err
+		}
+	}
+
+	// Resolve the secret reference and write the raw id:secret to the output map.
+	// OTLP always uses fleet-secrets storage — output.APIKey is always a $co.elastic.secret{} reference.
+	// prepareOTelExporters reads this resolved value to inject the Authorization header.
+	secretID, ok := secret.ParseSecretReference(output.APIKey)
+	if !ok {
+		return fmt.Errorf("unexpected non-reference OTLP api_key for output %q", p.Name)
+	}
+	resolved, err := bulker.ReadSecrets(ctx, []string{secretID})
+	if err != nil {
+		return fmt.Errorf("failed resolving OTLP output API key secret: %w", err)
+	}
+	val, ok := resolved[secretID]
+	if !ok || val == "" {
+		return fmt.Errorf("OTLP output API key secret %q not found", secretID)
+	}
+	outputMap[p.Name]["api_key"] = val
 	return nil
 }
 
@@ -613,4 +594,225 @@ func generateOutputAPIKey(
 		roles,
 		apikey.NewMetadata(agentID, outputName, apikey.TypeOutput),
 	)
+}
+
+// agentDocOutputType normalizes the type stored in the agent doc. remote_elasticsearch is
+// written as elasticsearch in the agent doc (prepareElasticsearch always passes
+// OutputTypeElasticsearch), so comparisons against persisted type must normalize both sides.
+// The ack and checkin gates that drive cleanup depend on this mapping.
+func agentDocOutputType(t string) string {
+	if t == OutputTypeRemoteElasticsearch {
+		return OutputTypeElasticsearch
+	}
+	return t
+}
+
+// retireRemovedOutputs retires all outputs present in agent.Outputs but absent from outputMap.
+// For each, it parks a retirement record on survivingOutputName and removes the stale doc entry.
+//
+// This is called once per surviving output, so the in-memory delete is essential: without it
+// every surviving output's Prepare call would find the same stale entry and park a duplicate
+// retirement record. Individual integrations can each specify a different output_id, so a single
+// policy revision can remove more than one output — the full loop handles all of them.
+//
+// Park before remove: if the remove Update fails the record is already committed, so the key
+// is still invalidated at ack and the stale entry is reprocessed next check-in. The reverse
+// order would destroy the only record of the key on failure.
+func retireRemovedOutputs(
+	ctx context.Context,
+	zlog zerolog.Logger,
+	bulker bulk.Bulk,
+	agent *model.Agent,
+	survivingOutputName string,
+	outputMap map[string]map[string]any,
+) error {
+	for agentOutputName, agentOutput := range agent.Outputs {
+		if _, stillInPolicy := outputMap[agentOutputName]; stillInPolicy {
+			continue
+		}
+
+		zlog.Info().Str(ecs.APIKeyID, agentOutput.APIKeyID).Str(ecs.PolicyOutputName, agentOutputName).Msg("Output removed, will retire API key")
+		retiring := model.ToRetireAPIKeyIdsItems{
+			ID:        agentOutput.APIKeyID,
+			RetiredAt: time.Now().UTC().Format(time.RFC3339),
+			Output:    agentOutputName,
+		}
+		if secretID, ok := secret.ParseSecretReference(agentOutput.APIKey); ok {
+			retiring.SecretID = secretID
+		}
+
+		fields := map[string]any{
+			dl.FieldPolicyOutputToRetireAPIKeyIDs: retiring,
+		}
+		body, err := renderUpdatePainlessScript(survivingOutputName, fields)
+		if err != nil {
+			return fmt.Errorf("could not update painless script: %w", err)
+		}
+		if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
+			zlog.Error().Err(err).Msg("fail update agent record")
+			return fmt.Errorf("fail update agent record: %w", err)
+		}
+		body, err = renderRemoveOutputPainlessScript(agentOutputName)
+		if err != nil {
+			return fmt.Errorf("could not create request body to update agent: %w", err)
+		}
+		if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
+			zlog.Error().Err(err).Msg("fail update agent record")
+			return fmt.Errorf("fail update agent record: %w", err)
+		}
+		// Remove from the in-memory map so that the next surviving output's retireRemovedOutputs
+		// call does not re-park the same entry. Safe to delete during range per Go spec.
+		delete(agent.Outputs, agentOutputName)
+	}
+	return nil
+}
+
+// updateOutputAPIKeyRoles merges new role permissions onto an existing API key and persists
+// the updated hash and type to the agent doc. outputBulker is used for the API key read/update
+// operations (differs from bulker for remote-elasticsearch outputs); bulker is always used
+// for the agent-doc update.
+func updateOutputAPIKeyRoles(
+	ctx context.Context,
+	zlog zerolog.Logger,
+	bulker bulk.Bulk,
+	outputBulker bulk.Bulk,
+	agent *model.Agent,
+	outputName string,
+	agentDocType string,
+	output *model.PolicyOutput,
+	role *RoleT,
+) error {
+	zlog.Debug().
+		RawJSON("roles", role.Raw).
+		Str("oldHash", output.PermissionsHash).
+		Str("newHash", role.Sha2).
+		Msg("Generating a new API key")
+
+	// query current api key for roles so we don't lose permissions in the meantime
+	currentRoles, err := fetchAPIKeyRoles(ctx, outputBulker, output.APIKeyID)
+	if err != nil {
+		zlog.Error().
+			Str("apiKeyID", output.APIKeyID).
+			Err(err).Msg("fail fetching roles for key")
+		return err
+	}
+
+	// merge roles with role
+	newRoles, err := mergeRoles(zlog, currentRoles, role)
+	if err != nil {
+		zlog.Error().
+			Str("apiKeyID", output.APIKeyID).
+			Err(err).Msg("fail merging roles for key")
+		return err
+	}
+
+	// hash provided is only for merging request together and not persisted
+	err = outputBulker.APIKeyUpdate(ctx, output.APIKeyID, newRoles.Sha2, newRoles.Raw)
+	if err != nil {
+		zlog.Error().Err(err).Msg("fail generate output key")
+		zlog.Debug().RawJSON("roles", newRoles.Raw).Str("sha", newRoles.Sha2).Err(err).Msg("roles not updated")
+		return err
+	}
+
+	output.Type = agentDocType
+	output.PermissionsHash = role.Sha2
+	zlog.Debug().
+		Str("hash.sha256", role.Sha2).
+		Str("roles", string(role.Raw)).
+		Msg("Updating agent record to pick up most recent roles.")
+
+	fields := map[string]any{
+		dl.FieldPolicyOutputPermissionsHash: role.Sha2,
+		dl.FiledType:                        agentDocType,
+	}
+
+	// Using painless script to update permission hash for updated key
+	body, err := renderUpdatePainlessScript(outputName, fields)
+	if err != nil {
+		return err
+	}
+
+	if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
+		zlog.Error().Err(err).Msg("fail update agent record")
+		return err
+	}
+	return nil
+}
+
+// persistNewOutputAPIKey writes a new API key secret to .fleet-secrets, updates the agent
+// doc with the new key reference (and a retirement record for the previous key if one exists),
+// and syncs the in-memory output. agentDocType is part of key state: it determines ack-time
+// routing and whether a type transition requires rotation, so it is written unconditionally
+// alongside every new key.
+func persistNewOutputAPIKey(
+	ctx context.Context,
+	zlog zerolog.Logger,
+	bulker bulk.Bulk,
+	agent *model.Agent,
+	outputName string,
+	agentDocType string,
+	output *model.PolicyOutput,
+	role *RoleT,
+	outputAPIKey *apikey.APIKey,
+	secretCandidateCollector OutputSecretCandidateCollector,
+) error {
+	secretID, err := bulker.WriteSecret(ctx, outputAPIKey.Agent())
+	if err != nil {
+		return fmt.Errorf("failed writing output API key secret: %w", err)
+	}
+	apiKeyRef := secret.MakeSecretReference(secretID)
+
+	fields := map[string]any{
+		dl.FieldPolicyOutputAPIKey:          apiKeyRef,
+		dl.FieldPolicyOutputAPIKeyID:        outputAPIKey.ID,
+		dl.FieldPolicyOutputPermissionsHash: role.Sha2,
+		dl.FiledType:                        agentDocType,
+	}
+	if output.APIKeyID != "" {
+		retiring := model.ToRetireAPIKeyIdsItems{
+			ID:        output.APIKeyID,
+			RetiredAt: time.Now().UTC().Format(time.RFC3339),
+			Output:    outputName,
+		}
+		if secretID, ok := secret.ParseSecretReference(output.APIKey); ok {
+			retiring.SecretID = secretID
+		}
+		fields[dl.FieldPolicyOutputToRetireAPIKeyIDs] = retiring
+	}
+
+	// Using painless script to append the old keys to the history
+	body, err := renderUpdatePainlessScript(outputName, fields)
+	if err != nil {
+		return fmt.Errorf("could not update painless script: %w", err)
+	}
+
+	if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
+		zlog.Error().Err(err).Msg("fail update agent record")
+		// The update may have been committed by Elasticsearch even when the client
+		// returns an error, for example when the request context expires while
+		// waiting for the response. Deleting the secret here can therefore leave
+		// the agent document pointing at a missing secret.
+		if secretCandidateCollector != nil {
+			candidate := OutputSecretCandidate{
+				AgentID:    agent.Id,
+				OutputName: outputName,
+				SecretID:   secretID,
+				SecretRef:  apiKeyRef,
+			}
+			if !secretCandidateCollector.Add(candidate) {
+				zlog.Warn().Str("secret.id", secretID).Msg("failed to enqueue output secret reconciliation candidate")
+			}
+		}
+		return fmt.Errorf("fail update agent record: %w", err)
+	}
+
+	// Now that all is done, we can update the output on the agent variable
+	// Right not it's more for consistency and to ensure the in-memory agent
+	// data is correct and in sync with ES, so it can be safely used after
+	// this method returns.
+	output.Type = agentDocType
+	output.APIKey = apiKeyRef
+	output.APIKeyID = outputAPIKey.ID
+	output.PermissionsHash = role.Sha2 // for the sake of consistency
+	return nil
 }

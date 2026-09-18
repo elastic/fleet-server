@@ -712,8 +712,9 @@ func TestInvalidateAPIKeysRemoteOutputReadFromPoliciesNotFound(t *testing.T) {
 		m.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{HitsT: es.HitsT{
 			Hits: []es.HitT{},
 		}}, nil).Once()
-
 		m.On("GetBulker", "remote1").Return(nil)
+		// When the remote bulker cannot be resolved, the primary cluster is used as a fallback.
+		m.On("APIKeyInvalidate", mock.Anything, []string{"toRetire1"}).Return(nil).Once()
 		return m
 	}
 

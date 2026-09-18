@@ -9,6 +9,7 @@ package policy
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
@@ -20,6 +21,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
+	"github.com/elastic/fleet-server/v7/internal/pkg/secret"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 )
@@ -197,6 +199,206 @@ func TestPolicyOutputESPrepareRealES(t *testing.T) {
 	assert.NotEmpty(t, gotOutput.APIKeyID)
 }
 
+// mOTLPRole is the output_permissions role descriptor Kibana emits for a managed OTLP output.
+var mOTLPRole = []byte(`{"_managed_otlp_apm":{"applications":[{"application":"apm","privileges":["event:write"],"resources":["*"]}]}}`)
+
+func TestPolicyOutputOTLPPrepareRealES(t *testing.T) {
+	const outputName = "test otlp"
+
+	t.Run("mOTLP — mints scoped API key and writes secret ref to agent doc", func(t *testing.T) {
+		ctx := testlog.SetLogger(t).WithContext(t.Context())
+		index, bulker := ftesting.SetupCleanIndex(ctx, t, dl.FleetAgents)
+
+		agentID := createAgent(ctx, t, index, bulker, map[string]*model.PolicyOutput{})
+		agent, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+		require.NoError(t, err)
+
+		output := Output{
+			Type: OutputTypeOTLP,
+			Name: outputName,
+			Role: &RoleT{Sha2: "new-hash", Raw: mOTLPRole},
+		}
+		policyMap := map[string]map[string]any{outputName: {}}
+
+		require.NoError(t, output.prepareOTLP(ctx, zerolog.Nop(), bulker, &agent, policyMap, nil))
+
+		resolvedAPIKey, _ := policyMap[outputName]["api_key"].(string)
+		assert.NotEmpty(t, resolvedAPIKey, "resolved api_key must be written to outputMap")
+
+		ftesting.Retry(t, ctx, func(ctx context.Context) error {
+			got, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+			if err != nil {
+				return err
+			}
+
+			gotOutput, ok := got.Outputs[outputName]
+			require.True(t, ok, "output %q not found on agent document", outputName)
+
+			assert.Equal(t, OutputTypeOTLP, gotOutput.Type)
+			assert.Equal(t, output.Role.Sha2, gotOutput.PermissionsHash)
+			assert.NotEmpty(t, gotOutput.APIKeyID)
+
+			_, isRef := secret.ParseSecretReference(gotOutput.APIKey)
+			assert.True(t, isRef, "api_key on agent doc must be a secret reference, got %q", gotOutput.APIKey)
+
+			return nil
+		}, ftesting.RetrySleep(time.Second))
+	})
+
+	t.Run("output type change from elasticsearch to otlp updates persisted type", func(t *testing.T) {
+		ctx := testlog.SetLogger(t).WithContext(t.Context())
+		index, bulker := ftesting.SetupCleanIndex(ctx, t, dl.FleetAgents)
+
+		// Establish an elasticsearch output so the agent doc has Type:"elasticsearch",
+		// a real APIKeyID, and hash "hash-v1".
+		agentID := createAgent(ctx, t, index, bulker, map[string]*model.PolicyOutput{})
+		agent, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+		require.NoError(t, err)
+
+		esOut := Output{
+			Type: OutputTypeElasticsearch,
+			Name: outputName,
+			Role: &RoleT{Sha2: "hash-v1", Raw: TestPayload},
+		}
+		require.NoError(t, esOut.prepareElasticsearch(ctx, zerolog.Nop(), bulker, bulker, &agent,
+			map[string]map[string]any{outputName: {}}, false, nil))
+
+		// Reload to capture the persisted elasticsearch key ID before the transition.
+		var esKeyID string
+		ftesting.Retry(t, ctx, func(ctx context.Context) error {
+			got, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+			if err != nil {
+				return err
+			}
+			out, ok := got.Outputs[outputName]
+			if !ok || out.APIKeyID == "" {
+				return fmt.Errorf("elasticsearch output not yet persisted")
+			}
+			esKeyID = out.APIKeyID
+			agent = got
+			return nil
+		}, ftesting.RetrySleep(time.Second))
+
+		// Wait for the security index to refresh so the key is visible before the transition.
+		ftesting.VerifyAPIKeyInvalidated(t, ctx, ftesting.LocalESURL(), esKeyID, false)
+
+		// Policy changes the output to OTLP. The type change (elasticsearch → otlp) fires
+		// before the hash check and forces a new key via persistNewOutputAPIKey. The old ES
+		// plain key is parked in to_retire_api_key_ids; the new OTLP key is a secret reference.
+		otlpOut := Output{
+			Type: OutputTypeOTLP,
+			Name: outputName,
+			Role: &RoleT{Sha2: "hash-v2", Raw: mOTLPRole},
+		}
+		require.NoError(t, otlpOut.prepareOTLP(ctx, zerolog.Nop(), bulker, &agent,
+			map[string]map[string]any{outputName: {}}, nil))
+
+		ftesting.Retry(t, ctx, func(ctx context.Context) error {
+			got, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+			if err != nil {
+				return err
+			}
+			out, ok := got.Outputs[outputName]
+			if !ok {
+				return fmt.Errorf("output %q not found", outputName)
+			}
+			if out.Type != OutputTypeOTLP {
+				return fmt.Errorf("type not yet updated: got %q, want %q", out.Type, OutputTypeOTLP)
+			}
+			return nil
+		}, ftesting.RetrySleep(time.Second))
+
+		got, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+		require.NoError(t, err)
+		out := got.Outputs[outputName]
+		require.NotNil(t, out)
+
+		assert.Equal(t, OutputTypeOTLP, out.Type)
+		assert.Equal(t, "hash-v2", out.PermissionsHash)
+		assert.NotEqual(t, esKeyID, out.APIKeyID, "type change must rotate the key")
+		assert.NotEmpty(t, out.APIKeyID, "new OTLP key must be minted")
+		_, isRef := secret.ParseSecretReference(out.APIKey)
+		assert.True(t, isRef, "new OTLP key must be stored as a secret reference")
+		require.Len(t, out.ToRetireAPIKeyIds, 1, "old ES key must be parked for retirement")
+		assert.Equal(t, esKeyID, out.ToRetireAPIKeyIds[0].ID, "retired key must be the old ES key")
+	})
+
+	t.Run("external OTLP — no output_permissions, no API key minted", func(t *testing.T) {
+		ctx := testlog.SetLogger(t).WithContext(t.Context())
+		index, bulker := ftesting.SetupCleanIndex(ctx, t, dl.FleetAgents)
+
+		agentID := createAgent(ctx, t, index, bulker, map[string]*model.PolicyOutput{})
+		agent, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+		require.NoError(t, err)
+
+		output := Output{
+			Type: OutputTypeOTLP,
+			Name: outputName,
+			Role: nil,
+		}
+		policyMap := map[string]map[string]any{outputName: {}}
+
+		require.NoError(t, output.prepareOTLP(ctx, zerolog.Nop(), bulker, &agent, policyMap, nil))
+
+		assert.Empty(t, policyMap[outputName]["api_key"], "external OTLP must not inject an api_key")
+
+		got, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+		require.NoError(t, err)
+		assert.Empty(t, got.Outputs, "agent doc must not be updated for external OTLP")
+	})
+
+	t.Run("mOTLP→external transition — retirement record parked, active key fields cleared", func(t *testing.T) {
+		ctx := testlog.SetLogger(t).WithContext(t.Context())
+		index, bulker := ftesting.SetupCleanIndex(ctx, t, dl.FleetAgents)
+
+		agentID := createAgent(ctx, t, index, bulker, map[string]*model.PolicyOutput{})
+		agent, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+		require.NoError(t, err)
+
+		// First: establish a managed OTLP output with a real API key and secret.
+		mOTLPMap := map[string]map[string]any{outputName: {}}
+		mOTLP := Output{Type: OutputTypeOTLP, Name: outputName, Role: &RoleT{Sha2: "hash-v1", Raw: mOTLPRole}}
+		require.NoError(t, mOTLP.prepareOTLP(ctx, zerolog.Nop(), bulker, &agent, mOTLPMap, nil))
+
+		oldKeyID := agent.Outputs[outputName].APIKeyID
+		require.NotEmpty(t, oldKeyID, "expected an API key ID after mOTLP prepare")
+
+		oldSecretRef := agent.Outputs[outputName].APIKey
+		oldSecretID, ok := secret.ParseSecretReference(oldSecretRef)
+		require.True(t, ok, "expected a secret reference after mOTLP prepare")
+
+		// Wait for the security index to refresh so the key is visible before the transition.
+		ftesting.VerifyAPIKeyInvalidated(t, ctx, ftesting.LocalESURL(), oldKeyID, false)
+
+		// Transition: policy removes output_permissions → external OTLP.
+		// The retirement record is parked on the entry itself; invalidation is deferred to
+		// the ack/checkin gate (updateAPIKey), consistent with how retireRemovedOutputs works.
+		external := Output{Type: OutputTypeOTLP, Name: outputName, Role: nil}
+		require.NoError(t, external.prepareOTLP(ctx, zerolog.Nop(), bulker, &agent, map[string]map[string]any{outputName: {}}, nil))
+
+		// In-memory: entry retained with cleared active fields and retirement record parked.
+		require.Contains(t, agent.Outputs, outputName, "entry must be retained for deferred retirement")
+		out := agent.Outputs[outputName]
+		assert.Empty(t, out.APIKeyID, "active key id must be cleared")
+		assert.Empty(t, out.APIKey, "active key secret must be cleared")
+		assert.Empty(t, out.PermissionsHash, "permissions hash must be cleared")
+		require.Len(t, out.ToRetireAPIKeyIds, 1, "one retirement record must be parked")
+		assert.Equal(t, oldKeyID, out.ToRetireAPIKeyIds[0].ID)
+		assert.Equal(t, oldSecretID, out.ToRetireAPIKeyIds[0].SecretID)
+
+		// Agent doc: entry persists with the retirement record and cleared active fields.
+		got, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+		require.NoError(t, err)
+		require.Contains(t, got.Outputs, outputName, "agent doc must still carry the entry")
+		docOut := got.Outputs[outputName]
+		assert.Empty(t, docOut.APIKeyID, "api_key_id must be cleared in agent doc")
+		assert.Empty(t, docOut.APIKey, "api_key must be cleared in agent doc")
+		assert.Equal(t, OutputTypeOTLP, docOut.Type, "type must be retained so ack/checkin gate routes to entry")
+		require.Len(t, docOut.ToRetireAPIKeyIds, 1, "retirement record must be in agent doc")
+		assert.Equal(t, oldKeyID, docOut.ToRetireAPIKeyIds[0].ID)
+	})
+}
+
 func createAgent(ctx context.Context, t *testing.T, index string, bulker bulk.Bulk, outputs map[string]*model.PolicyOutput) string {
 	const nowStr = "2022-08-12T16:50:05Z"
 
@@ -305,15 +507,29 @@ func TestPolicyOutputESPrepareESRetireRemoteAPIKeys(t *testing.T) {
 		ctx, zerolog.Nop(), bulker, bulker, &agent, policyMap, false, nil)
 	require.NoError(t, err)
 
-	// need to wait a bit before querying the agent again
-	// TODO: find a better way to query the updated agent
-	time.Sleep(time.Second)
+	// Stale entry must be removed from the in-memory map immediately so that a second
+	// surviving output's retireRemovedOutputs call does not re-park a duplicate record.
+	assert.NotContains(t, agent.Outputs, "remote output", "stale entry must be removed from in-memory agent.Outputs")
+
+	ftesting.Retry(t, ctx, func(ctx context.Context) error {
+		got, err := dl.FindAgent(
+			ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+		if err != nil {
+			return err
+		}
+		gotOutput, ok := got.Outputs[output.Name]
+		if !ok {
+			return fmt.Errorf("output %q not yet on agent doc", output.Name)
+		}
+		if len(gotOutput.ToRetireAPIKeyIds) == 0 {
+			return fmt.Errorf("ToRetireAPIKeyIds not yet populated on %q", output.Name)
+		}
+		return nil
+	}, ftesting.RetrySleep(time.Second))
 
 	got, err := dl.FindAgent(
 		ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
-	if err != nil {
-		require.NoError(t, err, "failed to find agent ID %q", agentID)
-	}
+	require.NoError(t, err)
 
 	gotOutput, ok := got.Outputs[output.Name]
 	require.True(t, ok, "no '%s' output found on agent document", output.Name)
@@ -325,4 +541,196 @@ func TestPolicyOutputESPrepareESRetireRemoteAPIKeys(t *testing.T) {
 	assert.Equal(t, gotOutput.PermissionsHash, output.Role.Sha2)
 	assert.NotEmpty(t, gotOutput.APIKey)
 	assert.NotEmpty(t, gotOutput.APIKeyID)
+}
+
+// TestPolicyOutputOTLPPrepareRetireRemovedOutput mirrors TestPolicyOutputESPrepareESRetireRemoteAPIKeys
+// for the OTLP code path.  It seeds the agent with a real minted key (secret ref) on an "old otlp"
+// output, then calls prepareOTLP for a different surviving output.  retireRemovedOutput must:
+//   - write a retirement record onto the surviving output's ToRetireAPIKeyIds with the correct
+//     ID, Output name, and SecretID (covers the secret.ParseSecretReference branch in retireRemovedOutput);
+//   - remove the stale "old otlp" entry from the agent doc (the renderRemoveOutputPainlessScript
+//     half, which TestPolicyOutputESPrepareESRetireRemoteAPIKeys leaves unverified).
+func TestPolicyOutputOTLPPrepareRetireRemovedOutput(t *testing.T) {
+	const (
+		oldOutputName   = "old otlp"
+		survivingOutput = "surviving otlp"
+	)
+
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
+	index, bulker := ftesting.SetupCleanIndex(ctx, t, dl.FleetAgents)
+
+	// Phase 1: mint a real OTLP key and secret for "old otlp" by running prepareOTLP.
+	agentID := createAgent(ctx, t, index, bulker, map[string]*model.PolicyOutput{})
+	agent, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+	require.NoError(t, err)
+
+	setupOutput := Output{Type: OutputTypeOTLP, Name: oldOutputName, Role: &RoleT{Sha2: "hash-v1", Raw: mOTLPRole}}
+	require.NoError(t, setupOutput.prepareOTLP(ctx, zerolog.Nop(), bulker, &agent, map[string]map[string]any{oldOutputName: {}}, nil))
+
+	oldKeyID := agent.Outputs[oldOutputName].APIKeyID
+	require.NotEmpty(t, oldKeyID, "setup: expected APIKeyID after mOTLP prepare")
+
+	oldSecretID, ok := secret.ParseSecretReference(agent.Outputs[oldOutputName].APIKey)
+	require.True(t, ok, "setup: expected secret reference after mOTLP prepare")
+
+	// Phase 2: prepareOTLP for the surviving output; outputMap no longer contains "old otlp".
+	// retireRemovedOutput scans agent.Outputs, finds "old otlp" absent from outputMap, and writes
+	// a retirement record onto "surviving otlp", then removes the stale entry.
+	survivingOutputObj := Output{
+		Type: OutputTypeOTLP,
+		Name: survivingOutput,
+		Role: &RoleT{Sha2: "hash-v1", Raw: mOTLPRole},
+	}
+	outputMap := map[string]map[string]any{survivingOutput: {}}
+	require.NoError(t, survivingOutputObj.prepareOTLP(ctx, zerolog.Nop(), bulker, &agent, outputMap, nil))
+
+	// Stale entry must be removed from the in-memory map immediately.
+	assert.NotContains(t, agent.Outputs, oldOutputName, "stale entry must be removed from in-memory agent.Outputs")
+
+	// Wait for both painless updates (retire record + remove stale entry) to be visible.
+	ftesting.Retry(t, ctx, func(ctx context.Context) error {
+		got, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+		if err != nil {
+			return err
+		}
+		sv, ok := got.Outputs[survivingOutput]
+		if !ok {
+			return fmt.Errorf("output %q not yet on agent doc", survivingOutput)
+		}
+		if len(sv.ToRetireAPIKeyIds) == 0 {
+			return fmt.Errorf("ToRetireAPIKeyIds not yet populated on %q", survivingOutput)
+		}
+		if _, stillPresent := got.Outputs[oldOutputName]; stillPresent {
+			return fmt.Errorf("stale output %q still on agent doc", oldOutputName)
+		}
+		return nil
+	}, ftesting.RetrySleep(time.Second))
+
+	got, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+	require.NoError(t, err)
+
+	// Surviving output must carry the retirement record for "old otlp".
+	sv, ok := got.Outputs[survivingOutput]
+	require.True(t, ok, "surviving output %q must be present", survivingOutput)
+	require.Len(t, sv.ToRetireAPIKeyIds, 1, "exactly one retirement record expected")
+	assert.Equal(t, oldKeyID, sv.ToRetireAPIKeyIds[0].ID, "retired key ID")
+	assert.Equal(t, oldOutputName, sv.ToRetireAPIKeyIds[0].Output, "retired key output name")
+	assert.Equal(t, oldSecretID, sv.ToRetireAPIKeyIds[0].SecretID, "retired key secret ID")
+	assert.NotEmpty(t, sv.ToRetireAPIKeyIds[0].RetiredAt, "RetiredAt must be set")
+	assert.Equal(t, OutputTypeOTLP, sv.Type, "surviving output type")
+	assert.NotEmpty(t, sv.APIKeyID, "surviving output must have a fresh key")
+
+	// The stale "old otlp" entry must be gone — this is the half TestPolicyOutputESPrepareESRetireRemoteAPIKeys
+	// leaves unverified.
+	assert.NotContains(t, got.Outputs, oldOutputName, "stale output entry must be removed from agent doc")
+}
+
+// TestPolicyOutputRetireMultipleRemovedOutputs verifies that retireRemovedOutputs processes
+// all removed outputs in a single call. This matters when multiple integration-specific outputs
+// are removed from a policy in one revision but only one surviving output calls Prepare.
+func TestPolicyOutputRetireMultipleRemovedOutputs(t *testing.T) {
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
+	index, bulker := ftesting.SetupCleanIndex(ctx, t, dl.FleetAgents)
+
+	// Seed agent with two stale outputs (both absent from the new policy).
+	agentID := createAgent(ctx, t, index, bulker, map[string]*model.PolicyOutput{
+		"removed-a": {APIKey: "key-a:val", APIKeyID: "key-a"},
+		"removed-b": {APIKey: "key-b:val", APIKeyID: "key-b"},
+	})
+	agent, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+	require.NoError(t, err)
+
+	survivor := Output{
+		Type: OutputTypeElasticsearch,
+		Name: "survivor",
+		Role: &RoleT{Sha2: "hash-v1", Raw: TestPayload},
+	}
+	outputMap := map[string]map[string]any{"survivor": {}}
+
+	require.NoError(t, survivor.prepareElasticsearch(ctx, zerolog.Nop(), bulker, bulker, &agent, outputMap, false, nil))
+
+	// Both stale entries must be gone from the in-memory map immediately.
+	assert.NotContains(t, agent.Outputs, "removed-a", "removed-a must be removed from in-memory agent.Outputs")
+	assert.NotContains(t, agent.Outputs, "removed-b", "removed-b must be removed from in-memory agent.Outputs")
+
+	// Both retirement records must appear on the survivor in the persisted doc.
+	ftesting.Retry(t, ctx, func(ctx context.Context) error {
+		got, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+		if err != nil {
+			return err
+		}
+		sv, ok := got.Outputs["survivor"]
+		if !ok {
+			return fmt.Errorf("survivor output not yet on agent doc")
+		}
+		if len(sv.ToRetireAPIKeyIds) < 2 {
+			return fmt.Errorf("expected 2 retirement records, got %d", len(sv.ToRetireAPIKeyIds))
+		}
+		return nil
+	}, ftesting.RetrySleep(time.Second))
+
+	got, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+	require.NoError(t, err)
+
+	sv, ok := got.Outputs["survivor"]
+	require.True(t, ok)
+	require.Len(t, sv.ToRetireAPIKeyIds, 2)
+
+	retiredIDs := []string{sv.ToRetireAPIKeyIds[0].ID, sv.ToRetireAPIKeyIds[1].ID}
+	assert.ElementsMatch(t, []string{"key-a", "key-b"}, retiredIDs)
+
+	assert.NotContains(t, got.Outputs, "removed-a", "removed-a must be absent from persisted doc")
+	assert.NotContains(t, got.Outputs, "removed-b", "removed-b must be absent from persisted doc")
+}
+
+// TestPolicyOutputRetireNoDuplicateAcrossSurvivors verifies that when two outputs survive a
+// policy revision and each calls retireRemovedOutputs, the single removed output produces exactly
+// one retirement record — not one per surviving output. The in-memory delete in retireRemovedOutputs
+// is what prevents the duplicate.
+func TestPolicyOutputRetireNoDuplicateAcrossSurvivors(t *testing.T) {
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
+	index, bulker := ftesting.SetupCleanIndex(ctx, t, dl.FleetAgents)
+
+	// Seed agent with one stale output.
+	agentID := createAgent(ctx, t, index, bulker, map[string]*model.PolicyOutput{
+		"removed": {APIKey: "key-r:val", APIKeyID: "key-r"},
+	})
+	agent, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+	require.NoError(t, err)
+
+	// Two surviving outputs: one ES, one OTLP. Both call retireRemovedOutputs.
+	outputMap := map[string]map[string]any{
+		"es-out":   {},
+		"otlp-out": {},
+	}
+
+	esOut := Output{Type: OutputTypeElasticsearch, Name: "es-out", Role: &RoleT{Sha2: "hash-v1", Raw: TestPayload}}
+	require.NoError(t, esOut.prepareElasticsearch(ctx, zerolog.Nop(), bulker, bulker, &agent, outputMap, false, nil))
+
+	otlpOut := Output{Type: OutputTypeOTLP, Name: "otlp-out", Role: &RoleT{Sha2: "hash-v1", Raw: mOTLPRole}}
+	require.NoError(t, otlpOut.prepareOTLP(ctx, zerolog.Nop(), bulker, &agent, outputMap, nil))
+
+	// Wait for all updates to be visible.
+	ftesting.Retry(t, ctx, func(ctx context.Context) error {
+		got, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+		if err != nil {
+			return err
+		}
+		if _, stillPresent := got.Outputs["removed"]; stillPresent {
+			return fmt.Errorf("stale output still present on agent doc")
+		}
+		return nil
+	}, ftesting.RetrySleep(time.Second))
+
+	got, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+	require.NoError(t, err)
+
+	// Count total retirement records across all surviving outputs. Must be exactly 1.
+	var totalRetirements int
+	for _, out := range got.Outputs {
+		totalRetirements += len(out.ToRetireAPIKeyIds)
+	}
+	assert.Equal(t, 1, totalRetirements, "exactly one retirement record expected across all surviving outputs; got %d (duplicate records indicate the in-memory delete is not working)", totalRetirements)
+
+	assert.NotContains(t, got.Outputs, "removed")
 }

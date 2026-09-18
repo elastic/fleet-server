@@ -1,0 +1,9 @@
+kind: feature
+
+summary: Add support for OTLP output
+
+description: |
+  Adds support for OTLP typed outputs which are delivered to agents as pure otel exporter configuration.
+  This includes API key lifecycle when output_permissions is provided for the managed endpoint, and secrets injection into the exporter config.
+
+component: fleet-server

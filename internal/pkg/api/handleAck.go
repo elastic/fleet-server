@@ -418,7 +418,7 @@ func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, ag
 	}
 
 	for outputName, output := range agent.Outputs {
-		if output.Type != policy.OutputTypeElasticsearch {
+		if output.Type != policy.OutputTypeElasticsearch && output.Type != policy.OutputTypeOTLP {
 			continue
 		}
 
@@ -507,9 +507,12 @@ func updateAPIKey(ctx context.Context,
 				}
 			}
 		}
-		invalidateAPIKeys(ctx, zlog, bulk, toRetireAPIKeyIDs, apiKeyID)
-		deleteRetiredSecrets(ctx, zlog, bulk, toRetireAPIKeyIDs)
 	}
+	// Process retirement records regardless of whether an active key is present.
+	// This handles entries that park records without a live replacement key — e.g.,
+	// an mOTLP→external OTLP transition where the output survives but the key is retired.
+	invalidateAPIKeys(ctx, zlog, bulk, toRetireAPIKeyIDs, apiKeyID)
+	deleteRetiredSecrets(ctx, zlog, bulk, toRetireAPIKeyIDs)
 
 	return nil
 }
@@ -712,6 +715,18 @@ func makeUpdatePolicyBody(policyID string, newRev int64) []byte {
 	return buf.Bytes()
 }
 
+// invalidateAPIKeys retires the given API keys against the correct cluster.
+//
+// Each item's Output field names the output the key belongs to.
+// An empty Output routes directly to the primary cluster (bulk).
+// A non-empty Output triggers a remote-bulker lookup: GetBulker is tried first (hot path),
+// then CreateAndGetBulker via QueryOutputFromPolicy (cold/restart path). If neither resolves
+// a bulker, the primary cluster is used as a fallback — correct for local outputs (elasticsearch,
+// otlp) and benign for unreachable remote outputs (primary returns "not found" rather than
+// silently dropping the request).
+//
+// This mirrors the fail-safe pattern in updateAPIKey, which starts with the primary bulker
+// and only upgrades to a remote one when available.
 func invalidateAPIKeys(ctx context.Context, zlog zerolog.Logger, bulk bulk.Bulk, toRetireAPIKeyIDs []model.ToRetireAPIKeyIdsItems, skip string) {
 	ids := make([]string, 0, len(toRetireAPIKeyIDs))
 	remoteIds := make(map[string][]string)
@@ -738,22 +753,34 @@ func invalidateAPIKeys(ctx context.Context, zlog zerolog.Logger, bulk bulk.Bulk,
 	for outputName, outputIds := range remoteIds {
 		outputBulk := bulk.GetBulker(outputName)
 
+		var outputPolicy *model.Policy
 		if outputBulk == nil {
 			// read output config from .fleet-policies, not filtering by policy id as agent could be reassigned
-			policy, err := dl.QueryOutputFromPolicy(ctx, bulk, outputName)
-			if err != nil || policy == nil {
-				zlog.Warn().Str(ecs.PolicyOutputName, outputName).Any("ids", outputIds).Msg("Output policy not found, API keys will be orphaned")
+			var err error
+			outputPolicy, err = dl.QueryOutputFromPolicy(ctx, bulk, outputName)
+			if err != nil || outputPolicy == nil {
+				zlog.Warn().Str(ecs.PolicyOutputName, outputName).Any("ids", outputIds).Msg("Output policy not found, falling back to primary cluster for key invalidation")
 			} else {
-				outputBulk, _, err = bulk.CreateAndGetBulker(ctx, zlog, outputName, policy.Data.Outputs)
+				outputBulk, _, err = bulk.CreateAndGetBulker(ctx, zlog, outputName, outputPolicy.Data.Outputs)
 				if err != nil {
-					zlog.Warn().Str(ecs.PolicyOutputName, outputName).Any("ids", outputIds).Msg("Failed to recreate output bulker, API keys will be orphaned")
+					zlog.Warn().Str(ecs.PolicyOutputName, outputName).Any("ids", outputIds).Msg("Failed to recreate output bulker, falling back to primary cluster for key invalidation")
 				}
 			}
 		}
-		if outputBulk != nil {
-			if err := outputBulk.APIKeyInvalidate(ctx, outputIds...); err != nil {
-				zlog.Info().Err(err).Strs("ids", outputIds).Str(ecs.PolicyOutputName, outputName).Msg("Failed to invalidate API keys")
+		// Fall back to the primary cluster when no remote bulker is available.
+		// For local outputs (elasticsearch, otlp) this is correct — the key lives on the primary.
+		// For remote_elasticsearch with an unreachable bulker, skip rather than falling back:
+		// the primary cluster does not hold the key and would silently return "not found".
+		if outputBulk == nil {
+			if outputPolicy != nil && outputPolicy.Data.Outputs[outputName]["type"] == policy.OutputTypeRemoteElasticsearch {
+				zlog.Warn().Str(ecs.PolicyOutputName, outputName).Any("ids", outputIds).
+					Msg("Cannot invalidate remote ES API keys: remote cluster unreachable, keys may leak")
+				continue
 			}
+			outputBulk = bulk
+		}
+		if err := outputBulk.APIKeyInvalidate(ctx, outputIds...); err != nil {
+			zlog.Info().Err(err).Strs("ids", outputIds).Str(ecs.PolicyOutputName, outputName).Msg("Failed to invalidate API keys")
 		}
 	}
 }
