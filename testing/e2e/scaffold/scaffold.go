@@ -288,6 +288,39 @@ type KibanaAgent struct {
 	Status string `json:"status"`
 }
 
+// ESAgentDoc is the structure of an agent document stored in .fleet-agents.
+type ESAgentDoc struct {
+	Revision      int      `json:"policy_revision_idx"`
+	PolicyID      string   `json:"policy_id"`
+	AgentPolicyID string   `json:"agent_policy_id"`
+	Type          string   `json:"type"`
+	Status        string   `json:"status"`
+	Tags          []string `json:"tags"`
+	Agent         struct {
+		ID      string `json:"id"`
+		Version string `json:"version"`
+		Type    string `json:"type"`
+	} `json:"agent"`
+}
+
+// GetAgent fetches a single agent document from .fleet-agents by agent ID.
+func (s *Scaffold) GetAgent(ctx context.Context, id string) ESAgentDoc {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://localhost:9200/.fleet-agents/_doc/"+id, nil)
+	s.Require().NoError(err)
+	req.SetBasicAuth(s.ElasticUser, s.ElasticPass)
+
+	resp, err := s.Client.Do(req)
+	s.Require().NoError(err)
+	defer resp.Body.Close()
+	s.Require().Equal(http.StatusOK, resp.StatusCode)
+	var obj struct {
+		Source ESAgentDoc `json:"_source"`
+	}
+	err = json.NewDecoder(resp.Body).Decode(&obj)
+	s.Require().NoError(err)
+	return obj.Source
+}
+
 func (s *Scaffold) GetAgents(ctx context.Context) (int, []KibanaAgent) {
 	// TODO handle pagination if needed in the future
 	req, err := http.NewRequestWithContext(ctx, "GET", "http://localhost:5601/api/fleet/agents", nil)
