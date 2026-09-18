@@ -258,6 +258,80 @@ func TestPolicyOutputOTLPPrepareRealES(t *testing.T) {
 		}, ftesting.RetrySleep(time.Second))
 	})
 
+	t.Run("output type change from elasticsearch to otlp updates persisted type", func(t *testing.T) {
+		ctx := testlog.SetLogger(t).WithContext(t.Context())
+		index, bulker := ftesting.SetupCleanIndex(ctx, t, dl.FleetAgents)
+
+		// Establish an elasticsearch output so the agent doc has Type:"elasticsearch",
+		// a real APIKeyID, and hash "hash-v1".
+		agentID := createAgent(ctx, t, index, bulker, map[string]*model.PolicyOutput{})
+		agent, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+		require.NoError(t, err)
+
+		esOut := Output{
+			Type: OutputTypeElasticsearch,
+			Name: outputName,
+			Role: &RoleT{Sha2: "hash-v1", Raw: TestPayload},
+		}
+		require.NoError(t, esOut.prepareElasticsearch(ctx, zerolog.Nop(), bulker, bulker, &agent,
+			map[string]map[string]any{outputName: {}}, false, nil))
+
+		// Reload to capture the persisted elasticsearch key ID before the transition.
+		var esKeyID string
+		ftesting.Retry(t, ctx, func(ctx context.Context) error {
+			got, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+			if err != nil {
+				return err
+			}
+			out, ok := got.Outputs[outputName]
+			if !ok || out.APIKeyID == "" {
+				return fmt.Errorf("elasticsearch output not yet persisted")
+			}
+			esKeyID = out.APIKeyID
+			agent = got
+			return nil
+		}, ftesting.RetrySleep(time.Second))
+
+		// Wait for the security index to refresh so the key is visible before the transition.
+		ftesting.VerifyAPIKeyInvalidated(t, ctx, localPolicyESURL(), esKeyID, false)
+
+		// Policy changes the output to OTLP with new permissions (hash "hash-v2").
+		// The hash change triggers needUpdateKey → updateOutputAPIKeyRoles: same key,
+		// updated roles, and persisted type updated to "otlp".
+		otlpOut := Output{
+			Type: OutputTypeOTLP,
+			Name: outputName,
+			Role: &RoleT{Sha2: "hash-v2", Raw: mOTLPRole},
+		}
+		require.NoError(t, otlpOut.prepareOTLP(ctx, zerolog.Nop(), bulker, &agent,
+			map[string]map[string]any{outputName: {}}, nil))
+
+		ftesting.Retry(t, ctx, func(ctx context.Context) error {
+			got, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+			if err != nil {
+				return err
+			}
+			out, ok := got.Outputs[outputName]
+			if !ok {
+				return fmt.Errorf("output %q not found", outputName)
+			}
+			if out.Type != OutputTypeOTLP {
+				return fmt.Errorf("type not yet updated: got %q, want %q", out.Type, OutputTypeOTLP)
+			}
+			return nil
+		}, ftesting.RetrySleep(time.Second))
+
+		got, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+		require.NoError(t, err)
+		out := got.Outputs[outputName]
+		require.NotNil(t, out)
+
+		assert.Equal(t, OutputTypeOTLP, out.Type)
+		assert.Equal(t, "hash-v2", out.PermissionsHash)
+		assert.Equal(t, esKeyID, out.APIKeyID, "key must not rotate — only roles were updated")
+		assert.Empty(t, out.ToRetireAPIKeyIds, "no key was retired — updateOutputAPIKeyRoles was called, not persistNewOutputAPIKey")
+	})
+
 	t.Run("external OTLP — no output_permissions, no API key minted", func(t *testing.T) {
 		ctx := testlog.SetLogger(t).WithContext(t.Context())
 		index, bulker := ftesting.SetupCleanIndex(ctx, t, dl.FleetAgents)
@@ -301,6 +375,9 @@ func TestPolicyOutputOTLPPrepareRealES(t *testing.T) {
 		oldSecretRef := agent.Outputs[outputName].APIKey
 		oldSecretID, ok := secret.ParseSecretReference(oldSecretRef)
 		require.True(t, ok, "expected a secret reference after mOTLP prepare")
+
+		// Wait for the security index to refresh so the key is visible before the transition.
+		ftesting.VerifyAPIKeyInvalidated(t, ctx, localPolicyESURL(), oldKeyID, false)
 
 		// Transition: policy removes output_permissions → external OTLP.
 		external := Output{Type: OutputTypeOTLP, Name: outputName, Role: nil}
