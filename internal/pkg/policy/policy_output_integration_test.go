@@ -10,8 +10,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
-	"strings"
 	"testing"
 	"time"
 
@@ -28,16 +26,6 @@ import (
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 )
 
-// localPolicyESURL returns the local Elasticsearch URL with embedded credentials, suitable for
-// ftesting.VerifyAPIKeyInvalidated. Reads ELASTICSEARCH_HOSTS or defaults to localhost:9200.
-func localPolicyESURL() string {
-	hosts := os.Getenv("ELASTICSEARCH_HOSTS")
-	if hosts == "" {
-		return "http://elastic:changeme@localhost:9200"
-	}
-	host := strings.SplitN(hosts, ",", 2)[0]
-	return "http://elastic:changeme@" + host
-}
 
 var TestPayload []byte
 
@@ -293,7 +281,7 @@ func TestPolicyOutputOTLPPrepareRealES(t *testing.T) {
 		}, ftesting.RetrySleep(time.Second))
 
 		// Wait for the security index to refresh so the key is visible before the transition.
-		ftesting.VerifyAPIKeyInvalidated(t, ctx, localPolicyESURL(), esKeyID, false)
+		ftesting.VerifyAPIKeyInvalidated(t, ctx, ftesting.LocalESURL(), esKeyID, false)
 
 		// Policy changes the output to OTLP. The type change (elasticsearch → otlp) fires
 		// before the hash check and forces a new key via persistNewOutputAPIKey. The old ES
@@ -381,7 +369,7 @@ func TestPolicyOutputOTLPPrepareRealES(t *testing.T) {
 		require.True(t, ok, "expected a secret reference after mOTLP prepare")
 
 		// Wait for the security index to refresh so the key is visible before the transition.
-		ftesting.VerifyAPIKeyInvalidated(t, ctx, localPolicyESURL(), oldKeyID, false)
+		ftesting.VerifyAPIKeyInvalidated(t, ctx, ftesting.LocalESURL(), oldKeyID, false)
 
 		// Transition: policy removes output_permissions → external OTLP.
 		// The retirement record is parked on the entry itself; invalidation is deferred to

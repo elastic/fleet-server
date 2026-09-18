@@ -483,9 +483,9 @@ func TestPolicyOTLPOutputPrepare(t *testing.T) {
 				PermissionsHash: "old-hash",
 			},
 			setupMocks: func(b *ftesting.MockBulk) {
-				b.On("APIKeyRead", mock.Anything, oldKeyID, mock.Anything).
+				b.On("APIKeyRead", mock.Anything, oldKeyID).
 					Return(&bulk.APIKeyMetadata{ID: oldKeyID, RoleDescriptors: TestPayload}, nil).Once()
-				b.On("APIKeyUpdate", mock.Anything, oldKeyID, mock.Anything, mock.Anything).Return(nil).Once()
+				b.On("APIKeyUpdate", mock.Anything, oldKeyID).Return(nil).Once()
 				b.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 			},
 			wantAPIKey:   secretID + "_value",

@@ -2205,3 +2205,115 @@ func TestProcessPolicyOTLPOutput(t *testing.T) {
 		})
 	}
 }
+
+func TestPrepareOTelExporters(t *testing.T) {
+	esAPIKey := "keyid:secret"
+	esAPIKeyB64 := base64.StdEncoding.EncodeToString([]byte(esAPIKey))
+	otlpAPIKey := "otlpid:otlpsecret"
+	otlpAPIKeyB64 := base64.StdEncoding.EncodeToString([]byte(otlpAPIKey))
+
+	esOutput := map[string]any{"type": policy.OutputTypeElasticsearch, "api_key": esAPIKey}
+	otlpOutput := map[string]any{"type": policy.OutputTypeOTLP, "api_key": otlpAPIKey}
+	otlpExternalOutput := map[string]any{"type": policy.OutputTypeOTLP}
+
+	tests := []struct {
+		name        string
+		outputs     map[string]map[string]any
+		exporters   map[string]any
+		wantErr     string
+		wantAPIKey  string
+		wantHeader  string
+	}{
+		{
+			name:      "non-map exporter config",
+			outputs:   map[string]map[string]any{"default": esOutput},
+			exporters: map[string]any{"elasticsearch/default": "not-a-map"},
+			wantErr:   "unexpected config type",
+		},
+		{
+			name:      "exporter id missing slash",
+			outputs:   map[string]map[string]any{"default": esOutput},
+			exporters: map[string]any{"elasticsearch": nil},
+			wantErr:   "unexpected exporter id format",
+		},
+		{
+			name:      "output not found for exporter",
+			outputs:   map[string]map[string]any{},
+			exporters: map[string]any{"elasticsearch/missing": nil},
+			wantErr:   "output \"missing\" not found",
+		},
+		{
+			name:      "elasticsearch exporter with wrong output type uses type value in error (not output name)",
+			outputs:   map[string]map[string]any{"myout": {"type": "logstash"}},
+			exporters: map[string]any{"elasticsearch/myout": nil},
+			wantErr:   "\"logstash\"",
+		},
+		{
+			name:      "elasticsearch exporter with missing api_key",
+			outputs:   map[string]map[string]any{"default": {"type": policy.OutputTypeElasticsearch}},
+			exporters: map[string]any{"elasticsearch/default": nil},
+			wantErr:   "api key not found",
+		},
+		{
+			name:      "otlp exporter with wrong output type",
+			outputs:   map[string]map[string]any{"default": esOutput},
+			exporters: map[string]any{"otlp/default": nil},
+			wantErr:   "unexpected output type",
+		},
+		{
+			name:      "unknown exporter type",
+			outputs:   map[string]map[string]any{"default": esOutput},
+			exporters: map[string]any{"kafka/default": nil},
+			wantErr:   "not supported",
+		},
+		{
+			name:       "elasticsearch exporter injects base64 api_key",
+			outputs:    map[string]map[string]any{"default": esOutput},
+			exporters:  map[string]any{"elasticsearch/default": nil},
+			wantAPIKey: esAPIKeyB64,
+		},
+		{
+			name:      "otlp exporter with external output — no header injected",
+			outputs:   map[string]map[string]any{"myotlp": otlpExternalOutput},
+			exporters: map[string]any{"otlp/myotlp": nil},
+		},
+		{
+			name:       "managed otlp exporter injects Authorization header",
+			outputs:    map[string]map[string]any{"myotlp": otlpOutput},
+			exporters:  map[string]any{"otlp/myotlp": nil},
+			wantHeader: "ApiKey " + otlpAPIKeyB64,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			exporters := make(map[string]any, len(tc.exporters))
+			for k, v := range tc.exporters {
+				exporters[k] = v
+			}
+			err := prepareOTelExporters(tc.outputs, exporters)
+			if tc.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			if tc.wantAPIKey != "" {
+				for _, v := range exporters {
+					cfg, ok := v.(map[string]any)
+					require.True(t, ok)
+					assert.Equal(t, tc.wantAPIKey, cfg["api_key"])
+				}
+			}
+			if tc.wantHeader != "" {
+				for _, v := range exporters {
+					cfg, ok := v.(map[string]any)
+					require.True(t, ok)
+					headers, ok := cfg["headers"].(map[string]any)
+					require.True(t, ok, "headers must be present")
+					assert.Equal(t, tc.wantHeader, headers["Authorization"])
+				}
+			}
+		})
+	}
+}
