@@ -10,8 +10,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
-	"strings"
 	"testing"
 	"time"
 
@@ -29,17 +27,6 @@ import (
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 )
 
-// localElasticsearchURL returns the local Elasticsearch base URL with embedded credentials,
-// suitable for passing to ftesting.VerifyAPIKeyInvalidated.
-func localElasticsearchURL() string {
-	hosts := os.Getenv("ELASTICSEARCH_HOSTS")
-	if hosts == "" {
-		return "http://elastic:changeme@localhost:9200"
-	}
-	// ELASTICSEARCH_HOSTS may be a comma-separated list; take the first entry.
-	host := strings.SplitN(hosts, ",", 2)[0]
-	return "http://elastic:changeme@" + host
-}
 
 // Test_Agent_OTLP_Output verifies the full API-key lifecycle for a managed OTLP output:
 //
@@ -159,7 +146,7 @@ func Test_Agent_OTLP_Output(t *testing.T) {
 	}, ftesting.RetrySleep(time.Second))
 
 	// The key must be live before the output is removed.
-	localESURL := localElasticsearchURL()
+	localESURL := ftesting.LocalESURL()
 	ftesting.VerifyAPIKeyInvalidated(t, ctx, localESURL, otlpKeyID, false)
 
 	// Ack the first policy-change action.

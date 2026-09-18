@@ -753,9 +753,11 @@ func invalidateAPIKeys(ctx context.Context, zlog zerolog.Logger, bulk bulk.Bulk,
 	for outputName, outputIds := range remoteIds {
 		outputBulk := bulk.GetBulker(outputName)
 
+		var outputPolicy *model.Policy
 		if outputBulk == nil {
 			// read output config from .fleet-policies, not filtering by policy id as agent could be reassigned
-			outputPolicy, err := dl.QueryOutputFromPolicy(ctx, bulk, outputName)
+			var err error
+			outputPolicy, err = dl.QueryOutputFromPolicy(ctx, bulk, outputName)
 			if err != nil || outputPolicy == nil {
 				zlog.Warn().Str(ecs.PolicyOutputName, outputName).Any("ids", outputIds).Msg("Output policy not found, falling back to primary cluster for key invalidation")
 			} else {
@@ -767,9 +769,14 @@ func invalidateAPIKeys(ctx context.Context, zlog zerolog.Logger, bulk bulk.Bulk,
 		}
 		// Fall back to the primary cluster when no remote bulker is available.
 		// For local outputs (elasticsearch, otlp) this is correct — the key lives on the primary.
-		// For genuinely remote outputs with an unreachable bulker, the primary cluster returns
-		// "not found" rather than silently dropping the invalidation request.
+		// For remote_elasticsearch with an unreachable bulker, skip rather than falling back:
+		// the primary cluster does not hold the key and would silently return "not found".
 		if outputBulk == nil {
+			if outputPolicy != nil && outputPolicy.Data.Outputs[outputName]["type"] == policy.OutputTypeRemoteElasticsearch {
+				zlog.Warn().Str(ecs.PolicyOutputName, outputName).Any("ids", outputIds).
+					Msg("Cannot invalidate remote ES API keys: remote cluster unreachable, keys may leak")
+				continue
+			}
 			outputBulk = bulk
 		}
 		if err := outputBulk.APIKeyInvalidate(ctx, outputIds...); err != nil {

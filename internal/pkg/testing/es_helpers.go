@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -53,4 +55,23 @@ func VerifyAPIKeyInvalidated(t *testing.T, ctx context.Context, esURL, apiKeyID 
 		}
 		return nil
 	}, RetrySleep(2*time.Second), RetryCount(10))
+}
+
+// LocalESURL returns the local Elasticsearch base URL with embedded credentials.
+// It reads ELASTICSEARCH_HOSTS (comma-separated), takes the first entry, strips any
+// existing scheme, and prepends "http://elastic:changeme@". Defaults to localhost:9200.
+func LocalESURL() string {
+	hosts := os.Getenv("ELASTICSEARCH_HOSTS")
+	if hosts == "" {
+		return "http://elastic:changeme@localhost:9200"
+	}
+	raw := strings.SplitN(hosts, ",", 2)[0]
+	u, err := url.Parse(raw)
+	if err != nil || u.Host == "" {
+		// bare host:port with no scheme
+		u = &url.URL{Host: raw}
+	}
+	u.Scheme = "http"
+	u.User = url.UserPassword("elastic", "changeme")
+	return u.String()
 }
