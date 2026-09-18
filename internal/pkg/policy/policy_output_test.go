@@ -590,33 +590,43 @@ func TestPolicyOTLPOutputPrepareManagedToExternal(t *testing.T) {
 	}
 	policyMap := map[string]map[string]any{"test output": {"type": OutputTypeOTLP}}
 
-	t.Run("happy path: key invalidated and output entry removed", func(t *testing.T) {
+	t.Run("parks retirement record and clears active key fields", func(t *testing.T) {
 		logger := testlog.SetLogger(t)
 		bulker := ftesting.NewMockBulk()
-		bulker.On("APIKeyInvalidate", mock.Anything, []string{oldKeyID}).Return(nil).Once()
-		bulker.On("DeleteSecret", mock.Anything, secretID).Return(nil).Once()
 		bulker.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 		agent := newAgent()
 		err := policyOutput.Prepare(context.Background(), logger, bulker, agent, policyMap)
 		require.NoError(t, err)
 		assert.Empty(t, policyMap["test output"]["api_key"], "external OTLP must not inject an api_key")
-		assert.NotContains(t, agent.Outputs, "test output", "output entry must be removed from in-memory agent")
+		// Entry persists so the ack/checkin gate can retire the key.
+		require.Contains(t, agent.Outputs, "test output", "output entry must be retained for deferred retirement")
+		out := agent.Outputs["test output"]
+		assert.Empty(t, out.APIKeyID, "active key id must be cleared")
+		assert.Empty(t, out.APIKey, "active key secret must be cleared")
+		assert.Empty(t, out.PermissionsHash, "permissions hash must be cleared")
+		require.Len(t, out.ToRetireAPIKeyIds, 1, "one retirement record must be parked")
+		assert.Equal(t, oldKeyID, out.ToRetireAPIKeyIds[0].ID)
+		assert.Equal(t, secretID, out.ToRetireAPIKeyIds[0].SecretID)
 		bulker.AssertExpectations(t)
 	})
 
-	t.Run("invalidation error: cleanup continues, Prepare returns nil", func(t *testing.T) {
+	t.Run("no-op when no active key present", func(t *testing.T) {
 		logger := testlog.SetLogger(t)
 		bulker := ftesting.NewMockBulk()
-		bulker.On("APIKeyInvalidate", mock.Anything, []string{oldKeyID}).Return(errors.New("es unavailable")).Once()
-		bulker.On("DeleteSecret", mock.Anything, secretID).Return(nil).Once()
-		bulker.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
-		agent := newAgent()
+		agent := &model.Agent{
+			ESDocument: model.ESDocument{Id: "agent-id"},
+			Outputs: map[string]*model.PolicyOutput{
+				"test output": {
+					Type:            OutputTypeOTLP,
+					ToRetireAPIKeyIds: []model.ToRetireAPIKeyIdsItems{{ID: oldKeyID}},
+				},
+			},
+		}
 		err := policyOutput.Prepare(context.Background(), logger, bulker, agent, policyMap)
-		require.NoError(t, err, "invalidation failure must not fail Prepare")
-		assert.NotContains(t, agent.Outputs, "test output", "output entry is still removed even when invalidation fails")
-		bulker.AssertExpectations(t)
+		require.NoError(t, err, "second call with cleared key must be a no-op")
+		bulker.AssertNotCalled(t, "Update")
 	})
 }
 

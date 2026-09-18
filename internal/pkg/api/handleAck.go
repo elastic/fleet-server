@@ -507,9 +507,12 @@ func updateAPIKey(ctx context.Context,
 				}
 			}
 		}
-		invalidateAPIKeys(ctx, zlog, bulk, toRetireAPIKeyIDs, apiKeyID)
-		deleteRetiredSecrets(ctx, zlog, bulk, toRetireAPIKeyIDs)
 	}
+	// Process retirement records regardless of whether an active key is present.
+	// This handles entries that park records without a live replacement key — e.g.,
+	// an mOTLP→external OTLP transition where the output survives but the key is retired.
+	invalidateAPIKeys(ctx, zlog, bulk, toRetireAPIKeyIDs, apiKeyID)
+	deleteRetiredSecrets(ctx, zlog, bulk, toRetireAPIKeyIDs)
 
 	return nil
 }

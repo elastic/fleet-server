@@ -293,31 +293,39 @@ func (p *Output) prepareOTLP(
 	// Only mOTLP outputs carry an output_permissions block and need API key management.
 	if p.Role == nil {
 		zlog.Debug().Msg("no output permissions for OTLP output; skipping API key management")
-		// If this output previously had a managed API key (mOTLP → external transition),
-		// invalidate it directly. A retirement record cannot be used here: there is no surviving
-		// output entry to park it on, so any record written would be deleted by
-		// renderRemoveOutputPainlessScript in the same check-in, leaving the key active.
-		if prev, ok := agent.Outputs[p.Name]; ok && prev.APIKeyID != "" {
-			if err := bulker.APIKeyInvalidate(ctx, prev.APIKeyID); err != nil {
-				zlog.Warn().Err(err).Str(ecs.APIKeyID, prev.APIKeyID).Str(ecs.PolicyOutputName, p.Name).
-					Msg("failed to invalidate mOTLP API key during transition to external OTLP")
-			}
-			if secretID, ok := secret.ParseSecretReference(prev.APIKey); ok {
-				if err := bulker.DeleteSecret(ctx, secretID); err != nil {
-					zlog.Warn().Err(err).Str("secret.id", secretID).Str(ecs.PolicyOutputName, p.Name).
-						Msg("failed to delete mOTLP API key secret during transition to external OTLP")
-				}
-			}
-			body, err := renderRemoveOutputPainlessScript(p.Name)
-			if err != nil {
-				return fmt.Errorf("could not render remove-output script for mOTLP→external transition: %w", err)
-			}
-			if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
-				zlog.Error().Err(err).Msg("fail remove output entry for mOTLP→external transition")
-				return fmt.Errorf("fail update agent record: %w", err)
-			}
-			delete(agent.Outputs, p.Name)
+		prev, ok := agent.Outputs[p.Name]
+		if !ok || (prev.APIKeyID == "" && prev.APIKey == "") {
+			return nil
 		}
+		// mOTLP → external transition: park a retirement record on this entry and clear the
+		// active key fields. The entry persists so the ack/checkin gate can retire the key —
+		// the same deferred pattern used by retireRemovedOutputs for surviving outputs.
+		retiring := model.ToRetireAPIKeyIdsItems{
+			ID:        prev.APIKeyID,
+			RetiredAt: time.Now().UTC().Format(time.RFC3339),
+			Output:    p.Name,
+		}
+		if secretID, ok := secret.ParseSecretReference(prev.APIKey); ok {
+			retiring.SecretID = secretID
+		}
+		fields := map[string]any{
+			dl.FieldPolicyOutputToRetireAPIKeyIDs: retiring,
+			dl.FieldPolicyOutputAPIKeyID:          "",
+			dl.FieldPolicyOutputAPIKey:            "",
+			dl.FieldPolicyOutputPermissionsHash:   "",
+		}
+		body, err := renderUpdatePainlessScript(p.Name, fields)
+		if err != nil {
+			return fmt.Errorf("could not render update script for mOTLP→external transition: %w", err)
+		}
+		if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
+			zlog.Error().Err(err).Msg("fail to park retirement record for mOTLP→external transition")
+			return fmt.Errorf("fail update agent record: %w", err)
+		}
+		prev.ToRetireAPIKeyIds = append(prev.ToRetireAPIKeyIds, retiring)
+		prev.APIKeyID = ""
+		prev.APIKey = ""
+		prev.PermissionsHash = ""
 		return nil
 	}
 
