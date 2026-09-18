@@ -2217,12 +2217,12 @@ func TestPrepareOTelExporters(t *testing.T) {
 	otlpExternalOutput := map[string]any{"type": policy.OutputTypeOTLP}
 
 	tests := []struct {
-		name        string
-		outputs     map[string]map[string]any
-		exporters   map[string]any
-		wantErr     string
-		wantAPIKey  string
-		wantHeader  string
+		name       string
+		outputs    map[string]map[string]any
+		exporters  map[string]any
+		wantErr    string
+		wantAPIKey string
+		wantHeader string
 	}{
 		{
 			name:      "non-map exporter config",

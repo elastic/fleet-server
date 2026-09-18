@@ -26,7 +26,6 @@ import (
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 )
 
-
 var TestPayload []byte
 
 func TestRenderUpdatePainlessScript(t *testing.T) {

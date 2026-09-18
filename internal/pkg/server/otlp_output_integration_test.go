@@ -27,7 +27,6 @@ import (
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 )
 
-
 // Test_Agent_OTLP_Output verifies the full API-key lifecycle for a managed OTLP output:
 //
 //  1. Agent enrolls under a policy with a managed OTLP output (output_permissions present).

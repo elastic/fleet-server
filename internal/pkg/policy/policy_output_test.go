@@ -619,7 +619,7 @@ func TestPolicyOTLPOutputPrepareManagedToExternal(t *testing.T) {
 			ESDocument: model.ESDocument{Id: "agent-id"},
 			Outputs: map[string]*model.PolicyOutput{
 				"test output": {
-					Type:            OutputTypeOTLP,
+					Type:              OutputTypeOTLP,
 					ToRetireAPIKeyIds: []model.ToRetireAPIKeyIdsItems{{ID: oldKeyID}},
 				},
 			},
