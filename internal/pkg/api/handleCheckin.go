@@ -1196,11 +1196,17 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 	// Remove otlp outputs from the delivered policy. Elastic Agent has no OTLP output
 	// implementation — OTLP delivery is configured entirely through the otelcol exporters
 	// block, which prepareOTelExporters has already populated from these outputs.
+	// Also prune the corresponding secret_paths entries collected above: the agent never
+	// receives the OTLP output block, so its secret paths must not appear in secret_paths.
 	for name, out := range pp.Outputs {
 		if out.Type != policy.OutputTypeOTLP {
 			continue
 		}
 		delete(pp.Policy.Data.Outputs, name)
+		prefix := "outputs." + name + "."
+		pp.SecretKeys = slices.DeleteFunc(pp.SecretKeys, func(key string) bool {
+			return strings.HasPrefix(key, prefix)
+		})
 	}
 
 	// Replace raw inputs with the secret-substituted version built during policy parsing.
