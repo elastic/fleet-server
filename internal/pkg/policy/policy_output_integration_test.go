@@ -356,7 +356,7 @@ func TestPolicyOutputOTLPPrepareRealES(t *testing.T) {
 		assert.Empty(t, got.Outputs, "agent doc must not be updated for external OTLP")
 	})
 
-	t.Run("mOTLP→external transition — key invalidated, secret deleted, output entry removed", func(t *testing.T) {
+	t.Run("mOTLP→external transition — retirement record parked, active key fields cleared", func(t *testing.T) {
 		ctx := testlog.SetLogger(t).WithContext(t.Context())
 		index, bulker := ftesting.SetupCleanIndex(ctx, t, dl.FleetAgents)
 
@@ -380,32 +380,31 @@ func TestPolicyOutputOTLPPrepareRealES(t *testing.T) {
 		ftesting.VerifyAPIKeyInvalidated(t, ctx, localPolicyESURL(), oldKeyID, false)
 
 		// Transition: policy removes output_permissions → external OTLP.
+		// The retirement record is parked on the entry itself; invalidation is deferred to
+		// the ack/checkin gate (updateAPIKey), consistent with how retireRemovedOutputs works.
 		external := Output{Type: OutputTypeOTLP, Name: outputName, Role: nil}
 		require.NoError(t, external.prepareOTLP(ctx, zerolog.Nop(), bulker, &agent, map[string]map[string]any{outputName: {}}, nil))
 
-		assert.NotContains(t, agent.Outputs, outputName, "output entry must be removed from in-memory agent")
+		// In-memory: entry retained with cleared active fields and retirement record parked.
+		require.Contains(t, agent.Outputs, outputName, "entry must be retained for deferred retirement")
+		out := agent.Outputs[outputName]
+		assert.Empty(t, out.APIKeyID, "active key id must be cleared")
+		assert.Empty(t, out.APIKey, "active key secret must be cleared")
+		assert.Empty(t, out.PermissionsHash, "permissions hash must be cleared")
+		require.Len(t, out.ToRetireAPIKeyIds, 1, "one retirement record must be parked")
+		assert.Equal(t, oldKeyID, out.ToRetireAPIKeyIds[0].ID)
+		assert.Equal(t, oldSecretID, out.ToRetireAPIKeyIds[0].SecretID)
 
-		// Agent doc must no longer carry the output entry.
-		ftesting.Retry(t, ctx, func(ctx context.Context) error {
-			got, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
-			if err != nil {
-				return err
-			}
-			if _, found := got.Outputs[outputName]; found {
-				return fmt.Errorf("output entry %q still present on agent doc", outputName)
-			}
-			return nil
-		}, ftesting.RetrySleep(time.Second))
-
-		// Secret must be deleted.
-		resolved, err := bulker.ReadSecrets(ctx, []string{oldSecretID})
+		// Agent doc: entry persists with the retirement record and cleared active fields.
+		got, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
 		require.NoError(t, err)
-		assert.Empty(t, resolved[oldSecretID], "secret must be deleted after mOTLP→external transition")
-
-		// The ES API key itself must be invalidated — this is what earns the subtest name.
-		// An invalidation regression would not fail the assertions above because APIKeyInvalidate
-		// errors are logged and swallowed by design (fire-and-forget).
-		ftesting.VerifyAPIKeyInvalidated(t, ctx, localPolicyESURL(), oldKeyID, true)
+		require.Contains(t, got.Outputs, outputName, "agent doc must still carry the entry")
+		docOut := got.Outputs[outputName]
+		assert.Empty(t, docOut.APIKeyID, "api_key_id must be cleared in agent doc")
+		assert.Empty(t, docOut.APIKey, "api_key must be cleared in agent doc")
+		assert.Equal(t, OutputTypeOTLP, docOut.Type, "type must be retained so ack/checkin gate routes to entry")
+		require.Len(t, docOut.ToRetireAPIKeyIds, 1, "retirement record must be in agent doc")
+		assert.Equal(t, oldKeyID, docOut.ToRetireAPIKeyIds[0].ID)
 	})
 }
 
