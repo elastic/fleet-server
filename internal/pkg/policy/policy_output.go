@@ -188,7 +188,7 @@ func (p *Output) prepareElasticsearch(
 	}
 
 	if needUpdateKey {
-		if err := updateOutputAPIKeyRoles(ctx, zlog, bulker, outputBulker, agent, p.Name, output, p.Role); err != nil {
+		if err := updateOutputAPIKeyRoles(ctx, zlog, bulker, outputBulker, agent, p.Name, OutputTypeElasticsearch, output, p.Role); err != nil {
 			return err
 		}
 	} else if needNewKey {
@@ -244,7 +244,7 @@ func (p *Output) prepareElasticsearch(
 			Str(ecs.DefaultOutputAPIKeyID, outputAPIKey.ID).
 			Msg("Updating agent record to pick up default output key.")
 
-		if err := persistNewOutputAPIKey(ctx, zlog, bulker, agent, p.Name, OutputTypeElasticsearch, foundOutput, output, p.Role, outputAPIKey, secretCandidateCollector); err != nil {
+		if err := persistNewOutputAPIKey(ctx, zlog, bulker, agent, p.Name, OutputTypeElasticsearch, output, p.Role, outputAPIKey, secretCandidateCollector); err != nil {
 			return err
 		}
 	}
@@ -354,7 +354,7 @@ func (p *Output) prepareOTLP(
 	}
 
 	if needUpdateKey {
-		if err := updateOutputAPIKeyRoles(ctx, zlog, bulker, bulker, agent, p.Name, output, p.Role); err != nil {
+		if err := updateOutputAPIKeyRoles(ctx, zlog, bulker, bulker, agent, p.Name, OutputTypeOTLP, output, p.Role); err != nil {
 			return err
 		}
 	} else if needNewKey {
@@ -375,7 +375,7 @@ func (p *Output) prepareOTLP(
 			Str(ecs.DefaultOutputAPIKeyID, outputAPIKey.ID).
 			Msg("Updating agent record to pick up OTLP output key.")
 
-		if err := persistNewOutputAPIKey(ctx, zlog, bulker, agent, p.Name, OutputTypeOTLP, foundOutput, output, p.Role, outputAPIKey, secretCandidateCollector); err != nil {
+		if err := persistNewOutputAPIKey(ctx, zlog, bulker, agent, p.Name, OutputTypeOTLP, output, p.Role, outputAPIKey, secretCandidateCollector); err != nil {
 			return err
 		}
 	}
@@ -637,7 +637,7 @@ func retireRemovedOutputs(
 }
 
 // updateOutputAPIKeyRoles merges new role permissions onto an existing API key and persists
-// the updated hash to the agent doc. outputBulker is used for the API key read/update
+// the updated hash and type to the agent doc. outputBulker is used for the API key read/update
 // operations (differs from bulker for remote-elasticsearch outputs); bulker is always used
 // for the agent-doc update.
 func updateOutputAPIKeyRoles(
@@ -647,6 +647,7 @@ func updateOutputAPIKeyRoles(
 	outputBulker bulk.Bulk,
 	agent *model.Agent,
 	outputName string,
+	agentDocType string,
 	output *model.PolicyOutput,
 	role *RoleT,
 ) error {
@@ -682,7 +683,8 @@ func updateOutputAPIKeyRoles(
 		return err
 	}
 
-	output.PermissionsHash = role.Sha2 // for the sake of consistency
+	output.Type = agentDocType
+	output.PermissionsHash = role.Sha2
 	zlog.Debug().
 		Str("hash.sha256", role.Sha2).
 		Str("roles", string(role.Raw)).
@@ -690,6 +692,7 @@ func updateOutputAPIKeyRoles(
 
 	fields := map[string]any{
 		dl.FieldPolicyOutputPermissionsHash: role.Sha2,
+		dl.FiledType:                        agentDocType,
 	}
 
 	// Using painless script to update permission hash for updated key
@@ -707,8 +710,9 @@ func updateOutputAPIKeyRoles(
 
 // persistNewOutputAPIKey writes a new API key secret to .fleet-secrets, updates the agent
 // doc with the new key reference (and a retirement record for the previous key if one exists),
-// and syncs the in-memory output. agentDocType is stamped into the agent doc when the output
-// entry is new (foundOutput == false).
+// and syncs the in-memory output. agentDocType is part of key state: it determines ack-time
+// routing and whether a type transition requires rotation, so it is written unconditionally
+// alongside every new key.
 func persistNewOutputAPIKey(
 	ctx context.Context,
 	zlog zerolog.Logger,
@@ -716,7 +720,6 @@ func persistNewOutputAPIKey(
 	agent *model.Agent,
 	outputName string,
 	agentDocType string,
-	foundOutput bool,
 	output *model.PolicyOutput,
 	role *RoleT,
 	outputAPIKey *apikey.APIKey,
@@ -732,10 +735,7 @@ func persistNewOutputAPIKey(
 		dl.FieldPolicyOutputAPIKey:          apiKeyRef,
 		dl.FieldPolicyOutputAPIKeyID:        outputAPIKey.ID,
 		dl.FieldPolicyOutputPermissionsHash: role.Sha2,
-	}
-
-	if !foundOutput {
-		fields[dl.FiledType] = agentDocType
+		dl.FiledType:                        agentDocType,
 	}
 	if output.APIKeyID != "" {
 		retiring := model.ToRetireAPIKeyIdsItems{

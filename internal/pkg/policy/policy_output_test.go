@@ -765,7 +765,7 @@ func TestPolicyRemoteESOutputPrepare(t *testing.T) {
 		assert.Equal(t, wantAPIKey.Agent(), gotOutput.APIKey)
 		assert.Equal(t, wantAPIKey.ID, gotOutput.APIKeyID)
 		assert.Equal(t, output.Role.Sha2, gotOutput.PermissionsHash)
-		assert.Equal(t, output.Type, gotOutput.Type)
+		assert.Equal(t, OutputTypeElasticsearch, gotOutput.Type) // remote_elasticsearch is normalized to elasticsearch on write
 
 		assert.Equal(t, OutputTypeElasticsearch, policyMap["test output"]["type"])
 		assert.Empty(t, policyMap["test output"]["service_token"])
