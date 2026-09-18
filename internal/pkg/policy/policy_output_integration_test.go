@@ -295,9 +295,9 @@ func TestPolicyOutputOTLPPrepareRealES(t *testing.T) {
 		// Wait for the security index to refresh so the key is visible before the transition.
 		ftesting.VerifyAPIKeyInvalidated(t, ctx, localPolicyESURL(), esKeyID, false)
 
-		// Policy changes the output to OTLP with new permissions (hash "hash-v2").
-		// The hash change triggers needUpdateKey → updateOutputAPIKeyRoles: same key,
-		// updated roles, and persisted type updated to "otlp".
+		// Policy changes the output to OTLP. The type change (elasticsearch → otlp) fires
+		// before the hash check and forces a new key via persistNewOutputAPIKey. The old ES
+		// plain key is parked in to_retire_api_key_ids; the new OTLP key is a secret reference.
 		otlpOut := Output{
 			Type: OutputTypeOTLP,
 			Name: outputName,
@@ -328,8 +328,12 @@ func TestPolicyOutputOTLPPrepareRealES(t *testing.T) {
 
 		assert.Equal(t, OutputTypeOTLP, out.Type)
 		assert.Equal(t, "hash-v2", out.PermissionsHash)
-		assert.Equal(t, esKeyID, out.APIKeyID, "key must not rotate — only roles were updated")
-		assert.Empty(t, out.ToRetireAPIKeyIds, "no key was retired — updateOutputAPIKeyRoles was called, not persistNewOutputAPIKey")
+		assert.NotEqual(t, esKeyID, out.APIKeyID, "type change must rotate the key")
+		assert.NotEmpty(t, out.APIKeyID, "new OTLP key must be minted")
+		_, isRef := secret.ParseSecretReference(out.APIKey)
+		assert.True(t, isRef, "new OTLP key must be stored as a secret reference")
+		require.Len(t, out.ToRetireAPIKeyIds, 1, "old ES key must be parked for retirement")
+		assert.Equal(t, esKeyID, out.ToRetireAPIKeyIds[0].ID, "retired key must be the old ES key")
 	})
 
 	t.Run("external OTLP — no output_permissions, no API key minted", func(t *testing.T) {
