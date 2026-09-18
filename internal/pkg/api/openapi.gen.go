@@ -16,7 +16,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/oapi-codegen/runtime"
-	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 // Defines values for ActionType.
@@ -592,7 +591,7 @@ type CheckinRequest struct {
 	// If not specified fleet-server will use the timeout values specified in the config (defaults to 5m polling and a 10m write timeout).
 	// The value, if specified is expected to be a string that is parsable by [time.ParseDuration](https://pkg.go.dev/time#ParseDuration).
 	// If specified fleet-server will set its poll timeout to `max(1m, poll_timeout-2m)` and its write timeout to `max(2m, poll_timout-1m)`.
-	PollTimeout *openapi_types.Duration `json:"poll_timeout,omitempty"`
+	PollTimeout *string `json:"poll_timeout,omitempty"`
 
 	// Status The agent state, inferred from agent control protocol states.
 	Status CheckinRequestStatus `json:"status"`

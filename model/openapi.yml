@@ -447,7 +447,6 @@ components:
             The value, if specified is expected to be a string that is parsable by [time.ParseDuration](https://pkg.go.dev/time#ParseDuration).
             If specified fleet-server will set its poll timeout to `max(1m, poll_timeout-2m)` and its write timeout to `max(2m, poll_timout-1m)`.
           type: string
-          format: duration
         upgrade_details:
           $ref: "#/components/schemas/upgrade_details"
         agent_policy_id:
