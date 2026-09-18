@@ -26,7 +26,7 @@ output "kibana_url" {
 }
 
 output "fleet_url" {
-  value       = ec_deployment.deployment.integrations_server.endpoints != null ? ec_deployment.deployment.integrations_server.endpoints.fleet : ""
+  value       = ec_deployment.deployment.integrations_server.https_endpoint
   description = "The secure Fleet URL"
 }
 
