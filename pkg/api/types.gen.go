@@ -13,19 +13,20 @@ import (
 	"time"
 
 	"github.com/oapi-codegen/runtime"
-	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 // Defines values for ActionType.
 const (
-	CANCEL             ActionType = "CANCEL"
-	INPUTACTION        ActionType = "INPUT_ACTION"
-	POLICYCHANGE       ActionType = "POLICY_CHANGE"
-	POLICYREASSIGN     ActionType = "POLICY_REASSIGN"
-	REQUESTDIAGNOSTICS ActionType = "REQUEST_DIAGNOSTICS"
-	SETTINGS           ActionType = "SETTINGS"
-	UNENROLL           ActionType = "UNENROLL"
-	UPGRADE            ActionType = "UPGRADE"
+	CANCEL               ActionType = "CANCEL"
+	INPUTACTION          ActionType = "INPUT_ACTION"
+	MIGRATE              ActionType = "MIGRATE"
+	POLICYCHANGE         ActionType = "POLICY_CHANGE"
+	POLICYREASSIGN       ActionType = "POLICY_REASSIGN"
+	PRIVILEGELEVELCHANGE ActionType = "PRIVILEGE_LEVEL_CHANGE"
+	REQUESTDIAGNOSTICS   ActionType = "REQUEST_DIAGNOSTICS"
+	SETTINGS             ActionType = "SETTINGS"
+	UNENROLL             ActionType = "UNENROLL"
+	UPGRADE              ActionType = "UPGRADE"
 )
 
 // Valid indicates whether the value is a known member of the ActionType enum.
@@ -35,9 +36,13 @@ func (e ActionType) Valid() bool {
 		return true
 	case INPUTACTION:
 		return true
+	case MIGRATE:
+		return true
 	case POLICYCHANGE:
 		return true
 	case POLICYREASSIGN:
+		return true
+	case PRIVILEGELEVELCHANGE:
 		return true
 	case REQUESTDIAGNOSTICS:
 		return true
@@ -100,6 +105,7 @@ func (e ActionSettingsLogLevel) Valid() bool {
 // Defines values for AuditUnenrollRequestReason.
 const (
 	KeyRevoked AuditUnenrollRequestReason = "key_revoked"
+	Migrated   AuditUnenrollRequestReason = "migrated"
 	Orphaned   AuditUnenrollRequestReason = "orphaned"
 	Uninstall  AuditUnenrollRequestReason = "uninstall"
 )
@@ -108,6 +114,8 @@ const (
 func (e AuditUnenrollRequestReason) Valid() bool {
 	switch e {
 	case KeyRevoked:
+		return true
+	case Migrated:
 		return true
 	case Orphaned:
 		return true
@@ -120,16 +128,19 @@ func (e AuditUnenrollRequestReason) Valid() bool {
 
 // Defines values for CheckinRequestStatus.
 const (
-	CheckinRequestStatusDegraded CheckinRequestStatus = "degraded"
-	CheckinRequestStatusError    CheckinRequestStatus = "error"
-	CheckinRequestStatusOnline   CheckinRequestStatus = "online"
-	CheckinRequestStatusStarting CheckinRequestStatus = "starting"
+	CheckinRequestStatusDegraded     CheckinRequestStatus = "degraded"
+	CheckinRequestStatusDisconnected CheckinRequestStatus = "disconnected"
+	CheckinRequestStatusError        CheckinRequestStatus = "error"
+	CheckinRequestStatusOnline       CheckinRequestStatus = "online"
+	CheckinRequestStatusStarting     CheckinRequestStatus = "starting"
 )
 
 // Valid indicates whether the value is a known member of the CheckinRequestStatus enum.
 func (e CheckinRequestStatus) Valid() bool {
 	switch e {
 	case CheckinRequestStatusDegraded:
+		return true
+	case CheckinRequestStatusDisconnected:
 		return true
 	case CheckinRequestStatusError:
 		return true
@@ -449,6 +460,19 @@ type ActionCancel struct {
 // ActionInputAction The INPUT_ACTION action data.
 type ActionInputAction = map[string]interface{}
 
+// ActionMigrate The MIGRATE action data.
+type ActionMigrate struct {
+	// EnrollmentToken Enrollment token used to enroll agent to a new cluster.
+	EnrollmentToken string `json:"enrollment_token"`
+
+	// Settings An embedded JSON object that holds user-provided settings like TLS.
+	// Defined in fleet-server as a `json.RawMessage`.
+	Settings json.RawMessage `json:"settings,omitempty"`
+
+	// TargetUri URI of Fleet Server in a target cluster.
+	TargetUri string `json:"target_uri"`
+}
+
 // ActionPolicyChange The POLICY_CHANGE action data.
 type ActionPolicyChange struct {
 	// Policy The full policy that an agent should run after combining with local configuration/env vars.
@@ -460,10 +484,22 @@ type ActionPolicyReassign struct {
 	PolicyId string `json:"policy_id"`
 }
 
+// ActionPrivilegeLevelChange The PRIVILEGE_LEVEL_CHANGE action.
+type ActionPrivilegeLevelChange struct {
+	// Unprivileged Flag indicating whether target level is unprivileged. If not provided unprivileged is assumed.
+	Unprivileged bool `json:"unprivileged"`
+
+	// UserInfo Optional user info data.
+	UserInfo *UserInfo `json:"user_info,omitempty"`
+}
+
 // ActionRequestDiagnostics The REQUEST_DIAGNOSTICS action data.
 type ActionRequestDiagnostics struct {
 	// AdditionalMetrics list optional additional metrics.
-	AdditionalMetrics *[]ActionRequestDiagnosticsAdditionalMetrics `json:"additional_metrics,omitempty"`
+	AdditionalMetrics []ActionRequestDiagnosticsAdditionalMetrics `json:"additional_metrics,omitempty"`
+
+	// ExcludeEventsLog Excludes the Events Log from the diagnostic collection.
+	ExcludeEventsLog bool `json:"exclude_events_log,omitempty"`
 }
 
 // ActionRequestDiagnosticsAdditionalMetrics defines model for ActionRequestDiagnostics.AdditionalMetrics.
@@ -491,6 +527,9 @@ type ActionUnenroll = interface{}
 
 // ActionUpgrade the UPGRADE action data.
 type ActionUpgrade struct {
+	// Rollback Indicates if this version change should be performed as a rollback to a previous version.
+	Rollback *bool `json:"rollback,omitempty"`
+
 	// SourceUri The source of the upgrade artifact.
 	SourceUri *string `json:"source_uri,omitempty"`
 
@@ -501,8 +540,6 @@ type ActionUpgrade struct {
 // AuditUnenrollRequest Request to add unenroll audit information to an agent document.
 type AuditUnenrollRequest struct {
 	// Reason The unenroll reason
-	//
-	// Examples: uninstall
 	Reason AuditUnenrollRequestReason `json:"reason"`
 
 	// Timestamp Agent timestamp of when the uninstall/unenroll action occured; may differ from fleet-server time due to retries.
@@ -510,9 +547,16 @@ type AuditUnenrollRequest struct {
 }
 
 // AuditUnenrollRequestReason The unenroll reason
-//
-// Examples: uninstall
 type AuditUnenrollRequestReason string
+
+// AvailableRollbacks Target versions available for a rollback
+type AvailableRollbacks = []struct {
+	// ValidUntil timestamp indicating when the rollback target will expire
+	ValidUntil time.Time `json:"valid_until"`
+
+	// Version version of the available rollback target, represented as string
+	Version string `json:"version"`
+}
 
 // CheckinRequest defines model for checkinRequest.
 type CheckinRequest struct {
@@ -520,28 +564,37 @@ type CheckinRequest struct {
 	// Translated to a sequence number in fleet-server in order to retrieve any new actions for the agent from the last checkin.
 	AckToken *string `json:"ack_token,omitempty"`
 
+	// AgentPolicyId The ID of the policy that the agent is currently running.
+	AgentPolicyId *string `json:"agent_policy_id,omitempty"`
+
 	// Components An embedded JSON object that holds component information that the agent is running.
 	// Defined in fleet-server as a `json.RawMessage`, defined as an object in the elastic-agent.
 	// fleet-server will update the components in an agent record if they differ from this object.
-	Components *json.RawMessage `json:"components,omitempty"`
+	Components json.RawMessage `json:"components,omitempty"`
 
 	// LocalMetadata An embedded JSON object that holds meta-data values.
 	// Defined in fleet-server as a `json.RawMessage`, defined as an object in the elastic-agent.
 	// elastic-agent will populate the object with information from the binary and host/system environment.
 	// fleet-server will update the agent record if a checkin response contains different data from the record.
-	LocalMetadata *json.RawMessage `json:"local_metadata,omitempty"`
+	LocalMetadata json.RawMessage `json:"local_metadata,omitempty"`
 
 	// Message State message, may be overridden or use the error message of a failing component.
 	Message string `json:"message"`
+
+	// PolicyRevisionIdx The revision of the policy that the agent is currently running.
+	PolicyRevisionIdx *int64 `json:"policy_revision_idx,omitempty"`
 
 	// PollTimeout An optional timeout value that informs fleet-server of when a client will time out on it's checkin request.
 	// If not specified fleet-server will use the timeout values specified in the config (defaults to 5m polling and a 10m write timeout).
 	// The value, if specified is expected to be a string that is parsable by [time.ParseDuration](https://pkg.go.dev/time#ParseDuration).
 	// If specified fleet-server will set its poll timeout to `max(1m, poll_timeout-2m)` and its write timeout to `max(2m, poll_timout-1m)`.
-	PollTimeout *openapi_types.Duration `json:"poll_timeout,omitempty"`
+	PollTimeout *string `json:"poll_timeout,omitempty"`
 
 	// Status The agent state, inferred from agent control protocol states.
 	Status CheckinRequestStatus `json:"status"`
+
+	// Upgrade Container for upgrade information coming from agent
+	Upgrade UpgradeInformation `json:"upgrade,omitempty"`
 
 	// UpgradeDetails Additional details describing the status of an UPGRADE action delivered by the client (agent) on checkin.
 	UpgradeDetails *UpgradeDetails `json:"upgrade_details,omitempty"`
@@ -559,7 +612,7 @@ type CheckinResponse struct {
 	Action string `json:"action"`
 
 	// Actions A list of actions that the agent must execute.
-	Actions *[]Action `json:"actions,omitempty"`
+	Actions []Action `json:"actions,omitempty"`
 }
 
 // DiagnosticsEvent The ack event for a request diagnostics action.
@@ -588,7 +641,7 @@ type DiagnosticsEvent struct {
 	// Not used by fleet-server.
 	// Actions that have errored should use the error attribute to communicate an error status.
 	// Additional action status information can be provided in the data attribute.
-	// Deprecated: this property has been marked as deprecated upstream, but no `x-deprecated-reason` was set
+	// Deprecated: Not used by fleet-server.
 	Subtype EventSubtype `json:"subtype"`
 
 	// Timestamp The timestamp of the acknowledgement event. Has the format of "2006-01-02T15:04:05.99999-07:00"
@@ -600,7 +653,7 @@ type DiagnosticsEvent struct {
 	// Not used by fleet-server.
 	// Actions that have errored should use the error attribute to communicate an error status.
 	// Additional action status information can be provided in the data attribute.
-	// Deprecated: this property has been marked as deprecated upstream, but no `x-deprecated-reason` was set
+	// Deprecated: Not used by fleet-server.
 	Type EventType `json:"type"`
 }
 
@@ -615,14 +668,14 @@ type EnrollMetadata struct {
 
 	// Tags User provided tags for the agent.
 	// fleet-server will pass the tags to the agent record on enrollment.
-	Tags []string `json:"tags"`
+	Tags []string `json:"tags,omitempty"`
 
 	// UserProvided An embedded JSON object that holds user-provided meta-data values.
 	// Defined in fleet-server as a `json.RawMessage`.
 	// fleet-server does not use these values on enrollment of an agent.
 	//
 	// Defined in the elastic-agent as a `map[string]interface{}` with no way to specify any values.
-	// Deprecated: this property has been marked as deprecated upstream, but no `x-deprecated-reason` was set
+	// Deprecated: Not used by elastic-agent.
 	UserProvided json.RawMessage `json:"user_provided"`
 }
 
@@ -652,7 +705,7 @@ type EnrollRequest struct {
 	// To support pre-existing installs.
 	//
 	// Never implemented.
-	// Deprecated: this property has been marked as deprecated upstream, but no `x-deprecated-reason` was set
+	// Deprecated: Never implemented.
 	SharedId *string `json:"shared_id,omitempty"`
 
 	// Type The enrollment type of the agent.
@@ -686,14 +739,14 @@ type EnrollResponseItem struct {
 	// Actions Defined in fleet-server and elastic-agent as `[]interface{}`.
 	//
 	// Never used by agent.
-	// Deprecated: this property has been marked as deprecated upstream, but no `x-deprecated-reason` was set
-	Actions []map[string]interface{} `json:"actions"`
+	// Deprecated: Not used by elastic-agent.
+	Actions []map[string]interface{} `json:"actions,omitempty"`
 
 	// Active If the agent is active in fleet.
 	// Set to true upon enrollment.
 	//
 	// Handling of other values never implemented.
-	// Deprecated: this property has been marked as deprecated upstream, but no `x-deprecated-reason` was set
+	// Deprecated: Handling of other values is undefined.
 	Active bool `json:"active"`
 
 	// EnrolledAt The RFC3339 timestamp that the agent was enrolled at.
@@ -705,7 +758,7 @@ type EnrollResponseItem struct {
 	// LocalMetadata A copy of the (updated) local metadata provided in the enrollment request.
 	//
 	// Never used by agent.
-	// Deprecated: this property has been marked as deprecated upstream, but no `x-deprecated-reason` was set
+	// Deprecated: Not used by elastic-agent.
 	LocalMetadata json.RawMessage `json:"local_metadata"`
 
 	// PolicyId The policy ID that the agent is enrolled with. Decoded from the API key used in the request.
@@ -715,7 +768,7 @@ type EnrollResponseItem struct {
 	// fleet-ui may differ.
 	//
 	// Never used by agent.
-	// Deprecated: this property has been marked as deprecated upstream, but no `x-deprecated-reason` was set
+	// Deprecated: Not used by elastic-agent.
 	Status string `json:"status"`
 
 	// Tags A copy of the tags that were sent with the enrollment request.
@@ -724,13 +777,13 @@ type EnrollResponseItem struct {
 	// Type The enrollment request type.
 	//
 	// Handling of other values never implemented.
-	// Deprecated: this property has been marked as deprecated upstream, but no `x-deprecated-reason` was set
+	// Deprecated: Handling of other values is undefined.
 	Type string `json:"type"`
 
 	// UserProvidedMetadata A copy of the user provided metadata from the enrollment request.
 	//
 	// Currently will be empty.
-	// Deprecated: this property has been marked as deprecated upstream, but no `x-deprecated-reason` was set
+	// Deprecated: Not used by elastic-agent.
 	UserProvidedMetadata json.RawMessage `json:"user_provided_metadata"`
 }
 
@@ -753,7 +806,7 @@ type Error struct {
 // Actions that have errored should use the error attribute to communicate an error status.
 // Additional action status information can be provided in the data attribute.
 //
-// Deprecated: this type has been marked as deprecated upstream, but no `x-deprecated-reason` was set
+// Deprecated: Not used by fleet-server.
 type EventSubtype string
 
 // EventType The event type of the ack.
@@ -763,7 +816,7 @@ type EventSubtype string
 // Actions that have errored should use the error attribute to communicate an error status.
 // Additional action status information can be provided in the data attribute.
 //
-// Deprecated: this type has been marked as deprecated upstream, but no `x-deprecated-reason` was set
+// Deprecated: Not used by fleet-server.
 type EventType string
 
 // GenericEvent A generic ack event for an action. Includes an optional error attribute.
@@ -788,7 +841,7 @@ type GenericEvent struct {
 	// Not used by fleet-server.
 	// Actions that have errored should use the error attribute to communicate an error status.
 	// Additional action status information can be provided in the data attribute.
-	// Deprecated: this property has been marked as deprecated upstream, but no `x-deprecated-reason` was set
+	// Deprecated: Not used by fleet-server.
 	Subtype EventSubtype `json:"subtype"`
 
 	// Timestamp The timestamp of the acknowledgement event. Has the format of "2006-01-02T15:04:05.99999-07:00"
@@ -800,7 +853,7 @@ type GenericEvent struct {
 	// Not used by fleet-server.
 	// Actions that have errored should use the error attribute to communicate an error status.
 	// Additional action status information can be provided in the data attribute.
-	// Deprecated: this property has been marked as deprecated upstream, but no `x-deprecated-reason` was set
+	// Deprecated: Not used by fleet-server.
 	Type EventType `json:"type"`
 }
 
@@ -841,7 +894,7 @@ type InputEvent struct {
 	// Not used by fleet-server.
 	// Actions that have errored should use the error attribute to communicate an error status.
 	// Additional action status information can be provided in the data attribute.
-	// Deprecated: this property has been marked as deprecated upstream, but no `x-deprecated-reason` was set
+	// Deprecated: Not used by fleet-server.
 	Subtype EventSubtype `json:"subtype"`
 
 	// Timestamp The timestamp of the acknowledgement event. Has the format of "2006-01-02T15:04:05.99999-07:00"
@@ -853,35 +906,69 @@ type InputEvent struct {
 	// Not used by fleet-server.
 	// Actions that have errored should use the error attribute to communicate an error status.
 	// Additional action status information can be provided in the data attribute.
-	// Deprecated: this property has been marked as deprecated upstream, but no `x-deprecated-reason` was set
+	// Deprecated: Not used by fleet-server.
 	Type EventType `json:"type"`
+}
+
+// OtelConfigService OTel collector pipelines setup.
+type OtelConfigService struct {
+	// Extensions List of enabled extensions.
+	Extensions []string `json:"extensions,omitempty"`
+	Pipelines  map[string]struct {
+		// Exporters list of enabled exporters for each pipeline.
+		Exporters []string `json:"exporters,omitempty"`
+
+		// Processors list of enabled processors for each pipeline.
+		Processors []string `json:"processors,omitempty"`
+
+		// Receivers list of enabled receivers for each pipeline.
+		Receivers []string `json:"receivers,omitempty"`
+	} `json:"pipelines,omitempty"`
 }
 
 // PolicyData The full policy that an agent should run after combining with local configuration/env vars.
 type PolicyData struct {
 	// Agent Agent configuration details associated with the policy. May include configuration toggling monitoring, uninstallation protection, etc.
-	Agent *map[string]interface{} `json:"agent,omitempty"`
+	Agent map[string]interface{} `json:"agent,omitempty"`
+
+	// Connectors OTel collector connectors.
+	Connectors map[string]interface{} `json:"connectors,omitempty"`
+
+	// Exporters OTel collector exporters.
+	Exporters map[string]interface{} `json:"exporters,omitempty"`
+
+	// Extensions OTel collector extensions.
+	Extensions map[string]interface{} `json:"extensions,omitempty"`
 
 	// Fleet Agent configuration to describe how to connect to fleet-server.
-	Fleet *map[string]interface{} `json:"fleet,omitempty"`
+	Fleet map[string]interface{} `json:"fleet,omitempty"`
 
 	// Id The policy's ID.
-	Id *string `json:"id,omitempty"`
+	Id string `json:"id,omitempty"`
 
 	// Inputs A list of all inputs that the agent should run.
-	Inputs *[]map[string]interface{} `json:"inputs,omitempty"`
+	Inputs []map[string]interface{} `json:"inputs,omitempty"`
 
 	// OutputPermissions Elasticsearch permissions that the agent requires in order to run the policy.
-	OutputPermissions *map[string]interface{} `json:"output_permissions,omitempty"`
+	OutputPermissions map[string]interface{} `json:"output_permissions,omitempty"`
 
 	// Outputs A map of all outputs that the agent running the policy can use to send data to.
-	Outputs *map[string]interface{} `json:"outputs,omitempty"`
+	Outputs map[string]interface{} `json:"outputs,omitempty"`
+
+	// Processors OTel collector processors.
+	Processors map[string]interface{} `json:"processors,omitempty"`
+
+	// Receivers OTel collector receivers.
+	Receivers map[string]interface{} `json:"receivers,omitempty"`
 
 	// Revision The revision number of the policy. Should match revision_idx.
-	Revision *int `json:"revision,omitempty"`
+	Revision int `json:"revision,omitempty"`
 
 	// SecretPaths A list of keys that reference secret values that have been injected into the policy.
-	SecretPaths *[]string `json:"secret_paths,omitempty"`
+	SecretPaths []string `json:"secret_paths,omitempty"`
+
+	// Service OTel collector pipelines setup.
+	Service *OtelConfigService `json:"service,omitempty"`
 
 	// Signed Optional action signing data.
 	Signed *ActionSignature `json:"signed,omitempty" yaml:"signed"`
@@ -934,7 +1021,7 @@ type UpgradeEvent struct {
 
 	// Payload If the payload is part of an upgrade event action ack it will include information about if the agent  will retry the upgrade.
 	// Payload is only used by upgrade acks and has been replaced in more recent versions by the checkin's upgrade_details attribute.
-	// Deprecated: this property has been marked as deprecated upstream, but no `x-deprecated-reason` was set
+	// Deprecated: Replaced in newer elastic-agent releases by the checkin request's upgrade_details attribute.
 	Payload *struct {
 		// Retry If the agent will retry the upgrade or not.
 		Retry bool `json:"retry"`
@@ -949,7 +1036,7 @@ type UpgradeEvent struct {
 	// Not used by fleet-server.
 	// Actions that have errored should use the error attribute to communicate an error status.
 	// Additional action status information can be provided in the data attribute.
-	// Deprecated: this property has been marked as deprecated upstream, but no `x-deprecated-reason` was set
+	// Deprecated: Not used by fleet-server.
 	Subtype EventSubtype `json:"subtype"`
 
 	// Timestamp The timestamp of the acknowledgement event. Has the format of "2006-01-02T15:04:05.99999-07:00"
@@ -961,7 +1048,7 @@ type UpgradeEvent struct {
 	// Not used by fleet-server.
 	// Actions that have errored should use the error attribute to communicate an error status.
 	// Additional action status information can be provided in the data attribute.
-	// Deprecated: this property has been marked as deprecated upstream, but no `x-deprecated-reason` was set
+	// Deprecated: Not used by fleet-server.
 	Type EventType `json:"type"`
 }
 
@@ -987,6 +1074,9 @@ type UpgradeDetails_Metadata struct {
 
 // UpgradeDetailsState The upgrade state.
 type UpgradeDetailsState string
+
+// UpgradeInformation Container for upgrade information coming from agent
+type UpgradeInformation = json.RawMessage
 
 // UpgradeMetadataDownloading Upgrade metadata for an upgrade that is downloading.
 type UpgradeMetadataDownloading struct {
@@ -1024,13 +1114,9 @@ type UpgradeMetadataScheduled struct {
 // UploadBeginRequest defines model for uploadBeginRequest.
 type UploadBeginRequest struct {
 	// ActionId ID of the action that requested this file
-	//
-	// Examples: 2f440d31-2ea4-42f8-b0f2-4b6e98e8dc5e
 	ActionId string `json:"action_id"`
 
 	// AgentId Identifier of the agent uploading. Matches the ID usually found in agent.id
-	//
-	// Examples: 9347e918-5e00-48b0-b302-a09f9258a46d
 	AgentId string                  `json:"agent_id"`
 	File    UploadBeginRequest_File `json:"file"`
 
@@ -1042,31 +1128,21 @@ type UploadBeginRequest struct {
 // UploadBeginRequest_File defines model for UploadBeginRequest.File.
 type UploadBeginRequest_File struct {
 	// Compression The algorithm used to compress the file. Valid values: br,gzip,deflate,none
-	//
-	// Examples: deflate
 	Compression *string `json:"Compression,omitempty"`
 
 	// Hash Checksums on the file contents
 	Hash *struct {
 		// Sha256 SHA256 of the contents
-		//
-		// Examples: 04f81394bababa0fb31e6ad2d703c875eb46dc254527e39ff316564c0dc339e2
 		Sha256 *string `json:"sha256,omitempty"`
 	} `json:"hash,omitempty"`
 
 	// MimeType MIME type of the file
-	//
-	// Examples: application/zip
 	MimeType string `json:"mime_type"`
 
 	// Name Name of the file including the extension, without the directory
-	//
-	// Examples: yankees-stats.zip
 	Name string `json:"name"`
 
 	// Size Size of the file contents, in bytes
-	//
-	// Examples: 8276748
 	Size                 int64                  `json:"size"`
 	AdditionalProperties map[string]interface{} `json:"-"`
 }
@@ -1077,13 +1153,9 @@ type UploadBeginRequestSrc string
 // UploadBeginAPIResponse Response to initiating a file upload
 type UploadBeginAPIResponse struct {
 	// ChunkSize The required size (in bytes) that the file must be segmented into for each chunk
-	//
-	// Examples: 4194304
 	ChunkSize int64 `json:"chunk_size"`
 
 	// UploadId A unique identifier for the ensuing upload operation
-	//
-	// Examples: fbc8e23c-055d-461e-87f7-b0d1b57f14b4
 	UploadId string `json:"upload_id"`
 }
 
@@ -1092,10 +1164,20 @@ type UploadCompleteRequest struct {
 	// Transithash the transithash (sha256 of the concatenation of each in-order chunk hash) of the entire file contents
 	Transithash struct {
 		// Sha256 SHA256 hash
-		//
-		// Examples: 83810fdc61c44290778c212d7829d0c3f0232e81bd551d3943998a920025d14f
 		Sha256 string `json:"sha256"`
 	} `json:"transithash"`
+}
+
+// UserInfo Optional user info data.
+type UserInfo struct {
+	// Groupname Custom group used to access Elastic Agent files.
+	Groupname *string `json:"groupname,omitempty"`
+
+	// Password Password for user specified by username.
+	Password *string `json:"password,omitempty"`
+
+	// Username Username of custom user used to run Elastic Agent.
+	Username *string `json:"username,omitempty"`
 }
 
 // ApiVersion defines model for apiVersion.
@@ -1213,6 +1295,9 @@ type ArtifactParams struct {
 
 // GetFileParams defines parameters for GetFile.
 type GetFileParams struct {
+	// Source Requests file from an alternate index pattern in elasticsearch. Requires specific integration support for creating the corresponding index and files. Supporting integration clients are allowlisted in fleet server.
+	Source *string `form:"source,omitempty" json:"source,omitempty"`
+
 	// ElasticApiVersion The API version to use, format should be "YYYY-MM-DD"
 	ElasticApiVersion *ApiVersion `json:"elastic-api-version,omitempty"`
 
@@ -1816,6 +1901,58 @@ func (t *Action_Data) FromActionInputAction(v ActionInputAction) error {
 
 // MergeActionInputAction performs a merge with any union data inside the Action_Data, using the provided ActionInputAction
 func (t *Action_Data) MergeActionInputAction(v ActionInputAction) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsActionMigrate returns the union data inside the Action_Data as a ActionMigrate
+func (t Action_Data) AsActionMigrate() (ActionMigrate, error) {
+	var body ActionMigrate
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromActionMigrate overwrites any union data inside the Action_Data as the provided ActionMigrate
+func (t *Action_Data) FromActionMigrate(v ActionMigrate) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeActionMigrate performs a merge with any union data inside the Action_Data, using the provided ActionMigrate
+func (t *Action_Data) MergeActionMigrate(v ActionMigrate) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsActionPrivilegeLevelChange returns the union data inside the Action_Data as a ActionPrivilegeLevelChange
+func (t Action_Data) AsActionPrivilegeLevelChange() (ActionPrivilegeLevelChange, error) {
+	var body ActionPrivilegeLevelChange
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromActionPrivilegeLevelChange overwrites any union data inside the Action_Data as the provided ActionPrivilegeLevelChange
+func (t *Action_Data) FromActionPrivilegeLevelChange(v ActionPrivilegeLevelChange) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeActionPrivilegeLevelChange performs a merge with any union data inside the Action_Data, using the provided ActionPrivilegeLevelChange
+func (t *Action_Data) MergeActionPrivilegeLevelChange(v ActionPrivilegeLevelChange) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
