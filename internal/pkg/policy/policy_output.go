@@ -591,6 +591,25 @@ func renderRemoveOutputPainlessScript(outputName string) ([]byte, error) {
 	})
 }
 
+// parkRetirementRecord appends a single retirement record to the named output's
+// to_retire_api_key_ids list on the agent document. The painless script uses a
+// contains() check, so re-parking an identical record after a partial failure is
+// safe.
+func parkRetirementRecord(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agentID, outputName string, record model.ToRetireAPIKeyIdsItems) error {
+	fields := map[string]any{
+		dl.FieldPolicyOutputToRetireAPIKeyIDs: record,
+	}
+	body, err := renderUpdatePainlessScript(outputName, fields)
+	if err != nil {
+		return fmt.Errorf("could not update painless script: %w", err)
+	}
+	if err = bulker.Update(ctx, dl.FleetAgents, agentID, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
+		zlog.Error().Err(err).Msg("fail update agent record")
+		return fmt.Errorf("fail update agent record: %w", err)
+	}
+	return nil
+}
+
 func generateOutputAPIKey(
 	ctx context.Context,
 	bulk bulk.Bulk,
@@ -645,27 +664,33 @@ func retireRemovedOutputs(
 		}
 
 		zlog.Info().Str(ecs.APIKeyID, agentOutput.APIKeyID).Str(ecs.PolicyOutputName, agentOutputName).Msg("Output removed, will retire API key")
-		retiring := model.ToRetireAPIKeyIdsItems{
-			ID:        agentOutput.APIKeyID,
-			RetiredAt: time.Now().UTC().Format(time.RFC3339),
-			Output:    agentOutputName,
-		}
-		if secretID, ok := secret.ParseSecretReference(agentOutput.APIKey); ok {
-			retiring.SecretID = secretID
+
+		// Transfer any pending retirement records from the removed entry to the survivor
+		// before deleting the entry. Without this, records parked by a prior key rotation
+		// or mOTLP→external transition would be lost.
+		for _, pending := range agentOutput.ToRetireAPIKeyIds {
+			if err := parkRetirementRecord(ctx, zlog, bulker, agent.Id, survivingOutputName, pending); err != nil {
+				return err
+			}
 		}
 
-		fields := map[string]any{
-			dl.FieldPolicyOutputToRetireAPIKeyIDs: retiring,
+		// Park the active key on the survivor. Skip when APIKeyID is empty to avoid writing
+		// a junk record with an empty ID that invalidateAPIKeys would silently discard.
+		if agentOutput.APIKeyID != "" {
+			retiring := model.ToRetireAPIKeyIdsItems{
+				ID:        agentOutput.APIKeyID,
+				RetiredAt: time.Now().UTC().Format(time.RFC3339),
+				Output:    agentOutputName,
+			}
+			if secretID, ok := secret.ParseSecretReference(agentOutput.APIKey); ok {
+				retiring.SecretID = secretID
+			}
+			if err := parkRetirementRecord(ctx, zlog, bulker, agent.Id, survivingOutputName, retiring); err != nil {
+				return err
+			}
 		}
-		body, err := renderUpdatePainlessScript(survivingOutputName, fields)
-		if err != nil {
-			return fmt.Errorf("could not update painless script: %w", err)
-		}
-		if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
-			zlog.Error().Err(err).Msg("fail update agent record")
-			return fmt.Errorf("fail update agent record: %w", err)
-		}
-		body, err = renderRemoveOutputPainlessScript(agentOutputName)
+
+		body, err := renderRemoveOutputPainlessScript(agentOutputName)
 		if err != nil {
 			return fmt.Errorf("could not create request body to update agent: %w", err)
 		}
