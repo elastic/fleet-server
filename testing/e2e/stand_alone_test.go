@@ -650,7 +650,20 @@ func (suite *StandAloneSuite) writeOpAMPCollectorConfig(configFilePath, instance
 func (suite *StandAloneSuite) TestOpAMPWithUpstreamCollector() {
 	dir := suite.T().TempDir()
 
-	ctx, cancel := context.WithTimeout(suite.T().Context(), 5*time.Minute)
+	const (
+		// buildTimeout covers the shallow clone of opentelemetry-collector-contrib and
+		// `make otelcontribcol`. Their duration is dominated by the CI agent rather than
+		// by anything fleet-server does; a slow agent should make this test slow instead
+		// of killing the build mid-compile (see elastic/fleet-server#6590).
+		buildTimeout = 15 * time.Minute
+		// opampTimeout covers the OpAMP assertions once the collector is built. Enrollment
+		// is a matter of seconds; the sibling EDOT test uses the same budget.
+		opampTimeout = 2 * time.Minute
+	)
+
+	// ctx bounds the whole test so the fleet-server and collector processes started with
+	// it are torn down no matter which phase fails.
+	ctx, cancel := context.WithTimeout(suite.T().Context(), buildTimeout+opampTimeout)
 	defer cancel()
 
 	apiKey := suite.startFleetServerForOpAMP(ctx, dir, "opamp-e2e-test-key")
@@ -666,10 +679,14 @@ func (suite *StandAloneSuite) TestOpAMPWithUpstreamCollector() {
 	resp.Body.Close()
 	suite.Require().Equal(http.StatusOK, resp.StatusCode)
 
+	// The clone and the build share their own budget, separate from the assertions.
+	buildCtx, buildCancel := context.WithTimeout(ctx, buildTimeout)
+	defer buildCancel()
+
 	// Clone OTel Collector contrib repository (shallow clone of main branch)
 	cloneDir := filepath.Join(dir, "opentelemetry-collector-contrib")
 	suite.T().Logf("Cloning opentelemetry-collector-contrib (main) to %s", cloneDir)
-	cloneCmd := exec.CommandContext(ctx,
+	cloneCmd := exec.CommandContext(buildCtx,
 		"git", "clone",
 		"--depth", "1",
 		"https://github.com/open-telemetry/opentelemetry-collector-contrib",
@@ -685,12 +702,13 @@ func (suite *StandAloneSuite) TestOpAMPWithUpstreamCollector() {
 	err = os.MkdirAll(filepath.Join(cloneDir, "bin"), 0755)
 	suite.Require().NoError(err)
 
-	makeCmd := exec.CommandContext(ctx, "make", "otelcontribcol")
+	makeCmd := exec.CommandContext(buildCtx, "make", "otelcontribcol")
 	makeCmd.Dir = cloneDir
 	makeCmd.Stdout = os.Stdout
 	makeCmd.Stderr = os.Stderr
 	err = makeCmd.Run()
 	suite.Require().NoError(err)
+	buildCancel()
 
 	// The make target places the binary under bin/; move it to the expected path.
 	builtBinary := filepath.Join(cloneDir, "bin", fmt.Sprintf("otelcontribcol_%s_%s", runtime.GOOS, runtime.GOARCH))
@@ -715,12 +733,32 @@ func (suite *StandAloneSuite) TestOpAMPWithUpstreamCollector() {
 	err = otelCmd.Start()
 	suite.Require().NoError(err)
 
-	defer otelCmd.Wait()
+	// The standard library forbids calling cmd.Wait() more than once (it races and
+	// returns "no child processes" on the second call). The goroutine below is the
+	// single Wait() call site; it forwards the exit status over a buffered channel so
+	// the deferred stop below can observe process exit without calling Wait() itself.
+	otelExited := make(chan error, 1)
+	go func() { otelExited <- otelCmd.Wait() }()
+
+	defer func() {
+		if err := otelCmd.Process.Signal(syscall.SIGTERM); err != nil {
+			suite.T().Logf("Unable to signal OTel Collector: %v", err)
+		}
+		select {
+		case <-otelExited:
+		case <-time.After(30 * time.Second):
+			// The 30s fallback guards against the collector not responding to SIGTERM.
+			_ = otelCmd.Process.Kill()
+			<-otelExited
+		}
+	}()
 
 	// Verify that the OTel Collector was enrolled in Fleet by fetching its document from
 	// .fleet-agents and asserting on its contents.
 	suite.T().Logf("Waiting for agent %s to appear in .fleet-agents", instanceUID)
-	agentDoc := suite.WaitForAgentDoc(ctx, instanceUID)
+	opampCtx, opampCancel := context.WithTimeout(ctx, opampTimeout)
+	defer opampCancel()
+	agentDoc := suite.WaitForAgentDoc(opampCtx, instanceUID)
 
 	suite.Equal(instanceUID, agentDoc.Agent.ID, "expected agent.id to match instanceUID")
 	versionOut, err := exec.Command(otelBinaryPath, "--version").Output()
