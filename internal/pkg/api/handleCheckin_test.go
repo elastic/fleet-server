@@ -16,6 +16,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -2288,9 +2289,7 @@ func TestPrepareOTelExporters(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			exporters := make(map[string]any, len(tc.exporters))
-			for k, v := range tc.exporters {
-				exporters[k] = v
-			}
+			maps.Copy(exporters, tc.exporters)
 			err := prepareOTelExporters(tc.outputs, exporters)
 			if tc.wantErr != "" {
 				require.Error(t, err)
