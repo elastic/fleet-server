@@ -18,8 +18,9 @@ import (
 )
 
 // Invalidate invalidates the provided API keys by ID.
-// It logs a warning for any key that ES did not actually invalidate (not found
-// or already invalidated), and returns an error if ES reported invalidation errors.
+// It logs a warning for any key that ES could not act on (not found); keys that
+// were already invalidated are silently accepted. Returns an error if ES reported
+// invalidation errors.
 func Invalidate(ctx context.Context, client *elasticsearch.Client, ids ...string) error {
 
 	payload := struct {
