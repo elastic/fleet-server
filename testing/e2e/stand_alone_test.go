@@ -963,6 +963,8 @@ func (suite *StandAloneSuite) agentAccessAPIKeyID(ctx context.Context, agentID s
 }
 
 // invalidateESAPIKey calls DELETE /_security/api_key to invalidate the given key ID.
+// It verifies the response body confirms the key was actually invalidated, not just that ES
+// returned 200 (which it does even when the key ID was not found).
 func (suite *StandAloneSuite) invalidateESAPIKey(ctx context.Context, keyID string) {
 	suite.T().Helper()
 	body, err := json.Marshal(map[string]any{"ids": []string{keyID}})
@@ -977,6 +979,13 @@ func (suite *StandAloneSuite) invalidateESAPIKey(ctx context.Context, keyID stri
 	suite.Require().NoError(err)
 	defer resp.Body.Close()
 	suite.Require().Equal(http.StatusOK, resp.StatusCode, "ES invalidate API key failed")
+	var result struct {
+		InvalidatedAPIKeys []string `json:"invalidated_api_keys"`
+		ErrorCount         int      `json:"error_count"`
+	}
+	suite.Require().NoError(json.NewDecoder(resp.Body).Decode(&result))
+	suite.Require().Contains(result.InvalidatedAPIKeys, keyID, "ES did not actually invalidate API key %s (may have already been deleted or not found)", keyID)
+	suite.Require().Zero(result.ErrorCount, "ES reported errors while invalidating API key %s", keyID)
 }
 
 // TestOpAMPWithEDOTCollector ensures that the EDOT Collector can connect to Fleet Server
