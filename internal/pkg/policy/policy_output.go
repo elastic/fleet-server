@@ -296,8 +296,21 @@ func (p *Output) prepareOTLP(
 	// Only mOTLP outputs carry an output_permissions block and need API key management.
 	if p.Role == nil {
 		zlog.Debug().Msg("no output permissions for OTLP output; skipping API key management")
-		prev, ok := agent.Outputs[p.Name]
-		if !ok || (prev.APIKeyID == "" && prev.APIKey == "") {
+
+		// Ensure an in-memory entry exists so retireRemovedOutputs can park records for
+		// any concurrently removed outputs onto this surviving output's agent doc entry.
+		if agent.Outputs == nil {
+			agent.Outputs = map[string]*model.PolicyOutput{}
+		}
+		if _, ok := agent.Outputs[p.Name]; !ok {
+			agent.Outputs[p.Name] = &model.PolicyOutput{}
+		}
+		if err := retireRemovedOutputs(ctx, zlog, bulker, agent, p.Name, outputMap); err != nil {
+			return err
+		}
+
+		prev := agent.Outputs[p.Name]
+		if prev.APIKeyID == "" && prev.APIKey == "" {
 			return nil
 		}
 		// mOTLP → external transition: park a retirement record on this entry and clear the
