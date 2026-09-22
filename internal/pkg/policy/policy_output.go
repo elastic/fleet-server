@@ -321,7 +321,7 @@ func (p *Output) prepareOTLP(
 			ID:         prev.APIKeyID,
 			RetiredAt:  time.Now().UTC().Format(time.RFC3339),
 			Output:     p.Name,
-			OutputType: OutputTypeOTLP,
+			OutputType: prev.Type,
 		}
 		if secretID, ok := secret.ParseSecretReference(prev.APIKey); ok {
 			retiring.SecretID = secretID

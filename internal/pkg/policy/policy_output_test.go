@@ -608,6 +608,32 @@ func TestPolicyOTLPOutputPrepareManagedToExternal(t *testing.T) {
 		require.Len(t, out.ToRetireAPIKeyIds, 1, "one retirement record must be parked")
 		assert.Equal(t, oldKeyID, out.ToRetireAPIKeyIds[0].ID)
 		assert.Equal(t, secretID, out.ToRetireAPIKeyIds[0].SecretID)
+		assert.Equal(t, OutputTypeOTLP, out.ToRetireAPIKeyIds[0].OutputType, "retirement record must carry the previous mOTLP type")
+		bulker.AssertExpectations(t)
+	})
+
+	t.Run("retirement record carries previous type when prior output was not mOTLP", func(t *testing.T) {
+		logger := testlog.SetLogger(t)
+		bulker := ftesting.NewMockBulk()
+		bulker.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+
+		agent := &model.Agent{
+			ESDocument: model.ESDocument{Id: "agent-id"},
+			Outputs: map[string]*model.PolicyOutput{
+				"test output": {
+					Type:            OutputTypeElasticsearch,
+					APIKey:          secretRef,
+					APIKeyID:        oldKeyID,
+					PermissionsHash: "old-hash",
+				},
+			},
+		}
+		err := policyOutput.Prepare(context.Background(), logger, bulker, agent, policyMap)
+		require.NoError(t, err)
+		out := agent.Outputs["test output"]
+		require.Len(t, out.ToRetireAPIKeyIds, 1)
+		assert.Equal(t, OutputTypeElasticsearch, out.ToRetireAPIKeyIds[0].OutputType,
+			"retirement record must carry the previous key type, not the new output type")
 		bulker.AssertExpectations(t)
 	})
 
