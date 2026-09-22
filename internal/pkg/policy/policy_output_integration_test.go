@@ -734,3 +734,57 @@ func TestPolicyOutputRetireNoDuplicateAcrossSurvivors(t *testing.T) {
 
 	assert.NotContains(t, got.Outputs, "removed")
 }
+
+// TestPolicyOutputRetireOntoNonManagedSurvivor verifies that retirement records from a removed
+// output are correctly parked on a surviving output that has no API key management of its own
+// (e.g. an external OTLP output). The surviving entry has no active key or type field, so the
+// retirement records are the only signal that the entry must not be skipped at ack time.
+func TestPolicyOutputRetireOntoNonManagedSurvivor(t *testing.T) {
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
+	index, bulker := ftesting.SetupCleanIndex(ctx, t, dl.FleetAgents)
+
+	// Seed agent with a stale ES output absent from the new policy.
+	agentID := createAgent(ctx, t, index, bulker, map[string]*model.PolicyOutput{
+		"old-es": {APIKey: "key-old:val", APIKeyID: "key-old-id", Type: OutputTypeElasticsearch},
+	})
+	agent, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+	require.NoError(t, err)
+
+	// External OTLP is the sole surviving output (no Role — no output_permissions).
+	extOTLP := Output{Type: OutputTypeOTLP, Name: "ext-otlp", Role: nil}
+	outputMap := map[string]map[string]any{"ext-otlp": {}}
+
+	require.NoError(t, extOTLP.prepareOTLP(ctx, zerolog.Nop(), bulker, &agent, outputMap, nil))
+
+	assert.NotContains(t, agent.Outputs, "old-es", "stale entry must be removed from in-memory agent.Outputs")
+
+	ftesting.Retry(t, ctx, func(ctx context.Context) error {
+		got, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+		if err != nil {
+			return err
+		}
+		sv, ok := got.Outputs["ext-otlp"]
+		if !ok {
+			return fmt.Errorf("ext-otlp entry not yet on agent doc")
+		}
+		if len(sv.ToRetireAPIKeyIds) == 0 {
+			return fmt.Errorf("ToRetireAPIKeyIds not yet populated on ext-otlp")
+		}
+		if _, stillPresent := got.Outputs["old-es"]; stillPresent {
+			return fmt.Errorf("old-es entry still present on agent doc")
+		}
+		return nil
+	}, ftesting.RetrySleep(time.Second))
+
+	got, err := dl.FindAgent(ctx, bulker, dl.QueryAgentByID, dl.FieldID, agentID, dl.WithIndexName(index))
+	require.NoError(t, err)
+
+	sv, ok := got.Outputs["ext-otlp"]
+	require.True(t, ok, "ext-otlp entry must be present on agent doc")
+	require.Len(t, sv.ToRetireAPIKeyIds, 1, "exactly one retirement record expected")
+	assert.Equal(t, "key-old-id", sv.ToRetireAPIKeyIds[0].ID)
+	assert.Equal(t, "old-es", sv.ToRetireAPIKeyIds[0].Output)
+	assert.Empty(t, sv.APIKeyID, "external OTLP must not have an active key")
+
+	assert.NotContains(t, got.Outputs, "old-es", "stale entry must be removed from agent doc")
+}

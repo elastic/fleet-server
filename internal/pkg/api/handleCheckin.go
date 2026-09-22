@@ -1611,7 +1611,7 @@ func (ct *CheckinT) processPolicyDetails(ctx context.Context, zlog zerolog.Logge
 	// Update API keys if the policy has changed, or if the revision differs.
 	if policyID != agent.AgentPolicyID || revisionIDX != agent.PolicyRevisionIdx {
 		for outputName, output := range agent.Outputs {
-			if output.Type != policy.OutputTypeElasticsearch && output.Type != policy.OutputTypeOTLP {
+			if output.APIKeyID == "" && len(output.ToRetireAPIKeyIds) == 0 {
 				continue
 			}
 			if err := updateAPIKey(ctx, zlog, ct.bulker, agent.Id, output.APIKeyID, output.PermissionsHash, output.ToRetireAPIKeyIds, outputName); err != nil {
