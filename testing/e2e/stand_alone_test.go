@@ -965,8 +965,34 @@ func (suite *StandAloneSuite) agentAccessAPIKeyID(ctx context.Context, agentID s
 // invalidateESAPIKey calls DELETE /_security/api_key to invalidate the given key ID.
 // It verifies the response body confirms the key was actually invalidated, not just that ES
 // returned 200 (which it does even when the key ID was not found).
+// Fleet-server creates API keys without refresh=true for performance, so the key may not be
+// immediately visible in the .security index. We poll GET /_security/api_key for up to 10 s
+// (matching fleet-server's own invalidateAPIKey logic) before issuing the DELETE.
 func (suite *StandAloneSuite) invalidateESAPIKey(ctx context.Context, keyID string) {
 	suite.T().Helper()
+
+	// Wait for the key to become visible in ES before attempting the DELETE.
+	suite.Require().Eventually(func() bool {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet,
+			"http://"+suite.ESHosts+"/_security/api_key?id="+keyID, nil)
+		if err != nil {
+			return false
+		}
+		req.SetBasicAuth(suite.ElasticUser, suite.ElasticPass)
+		resp, err := suite.Client.Do(req)
+		if err != nil || resp.StatusCode != http.StatusOK {
+			if resp != nil {
+				resp.Body.Close()
+			}
+			return false
+		}
+		defer resp.Body.Close()
+		var result struct {
+			APIKeys []json.RawMessage `json:"api_keys"`
+		}
+		return json.NewDecoder(resp.Body).Decode(&result) == nil && len(result.APIKeys) > 0
+	}, 10*time.Second, time.Second, "API key %s never became visible in ES .security index within 10 s", keyID)
+
 	body, err := json.Marshal(map[string]any{"ids": []string{keyID}})
 	suite.Require().NoError(err)
 	req, err := http.NewRequestWithContext(ctx, http.MethodDelete,
@@ -984,7 +1010,7 @@ func (suite *StandAloneSuite) invalidateESAPIKey(ctx context.Context, keyID stri
 		ErrorCount         int      `json:"error_count"`
 	}
 	suite.Require().NoError(json.NewDecoder(resp.Body).Decode(&result))
-	suite.Require().Contains(result.InvalidatedAPIKeys, keyID, "ES did not actually invalidate API key %s (may have already been deleted or not found)", keyID)
+	suite.Require().Contains(result.InvalidatedAPIKeys, keyID, "ES did not actually invalidate API key %s", keyID)
 	suite.Require().Zero(result.ErrorCount, "ES reported errors while invalidating API key %s", keyID)
 }
 
