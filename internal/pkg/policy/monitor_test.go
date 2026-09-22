@@ -342,103 +342,10 @@ func Test_Monitor_Limit_Delay(t *testing.T) {
 		mm.On("Unsubscribe", mock.Anything).Return().Once()
 		bulker := ftesting.NewMockBulk()
 
-<<<<<<< HEAD
-	var merr error
-	var mwg sync.WaitGroup
-	mwg.Add(1)
-	go func() {
-		defer mwg.Done()
-		merr = monitor.Run(ctx)
-	}()
-
-	err := monitor.(*monitorT).waitStart(ctx)
-	require.NoError(t, err)
-
-	agentId := uuid.Must(uuid.NewV4()).String()
-	policyID := uuid.Must(uuid.NewV4()).String()
-	s, err := monitor.Subscribe(agentId, policyID, 0)
-	defer monitor.Unsubscribe(s)
-	require.NoError(t, err)
-
-	agentId = uuid.Must(uuid.NewV4()).String()
-	policyID2 := uuid.Must(uuid.NewV4()).String()
-	s2, err := monitor.Subscribe(agentId, policyID, 0)
-	defer monitor.Unsubscribe(s2)
-	require.NoError(t, err)
-
-	rId := xid.New().String()
-	policy := model.Policy{
-		ESDocument: model.ESDocument{
-			Id:      rId,
-			Version: 1,
-			SeqNo:   1,
-		},
-		PolicyID:       policyID,
-		CoordinatorIdx: 1,
-		Data:           policyDataDefault,
-		RevisionIdx:    1,
-	}
-	policyData, err := json.Marshal(&policy)
-	require.NoError(t, err)
-
-	chHitT <- []es.HitT{{
-		ID:      rId,
-		SeqNo:   1,
-		Version: 1,
-		Source:  policyData,
-	}}
-
-	policy2 := model.Policy{
-		ESDocument: model.ESDocument{
-			Id:      rId,
-			Version: 1,
-			SeqNo:   1,
-		},
-		PolicyID:       policyID2,
-		CoordinatorIdx: 1,
-		Data:           policyDataDefault,
-		RevisionIdx:    1,
-	}
-	policyData, err = json.Marshal(&policy2)
-	require.NoError(t, err)
-	chHitT <- []es.HitT{{
-		ID:      rId,
-		SeqNo:   1,
-		Version: 1,
-		Source:  policyData,
-	}}
-
-	timedout := false
-	tm := time.NewTimer(2 * time.Second)
-	var ts1, ts2 time.Time
-LOOP:
-	for {
-		select {
-		case subPolicy := <-s.Output():
-			ts1 = time.Now().UTC()
-			if !ts2.IsZero() {
-				tm.Stop()
-				break LOOP
-			}
-			diff := cmp.Diff(policy, subPolicy.Policy)
-			require.Empty(t, diff)
-		case subPolicy := <-s2.Output():
-			ts2 = time.Now().UTC()
-			if !ts1.IsZero() {
-				tm.Stop()
-				break LOOP
-			}
-			diff := cmp.Diff(policy2, subPolicy.Policy)
-			require.Empty(t, diff)
-		case <-tm.C:
-			timedout = true
-			break LOOP
-=======
 		monitor := NewMonitor(bulker, mm, config.ServerLimits{PolicyLimit: config.Limit{Burst: 1, Interval: interval}})
 		pm := monitor.(*monitorT)
 		pm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
 			return []model.Policy{}, nil
->>>>>>> 3d842ac (Make Test_Monitor_Limit_Delay deterministic with synctest (#7859))
 		}
 
 		var merr error
