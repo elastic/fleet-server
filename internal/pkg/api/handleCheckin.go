@@ -511,9 +511,13 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	actCh := aSub.Ch()
 
 	for _, output := range agent.Outputs {
-		if output.APIKey == "" {
-			// use revision_idx=0 if the agent has a single output where no API key is defined
-			// This will force the policy monitor to emit a new policy to regerate API keys
+		if output.APIKey == "" && output.PermissionsHash != "" {
+			// A non-empty PermissionsHash means a key was previously minted for this
+			// output. If APIKey is now empty something cleared it — force revID=0 so the
+			// policy monitor re-emits the current policy and Prepare can recover the key.
+			// Entries with an empty hash have no expressed intent for a key (e.g. an
+			// external OTLP output after an mOTLP→external transition) and are skipped to
+			// avoid an indefinite re-emit loop.
 			revID = 0
 			break
 		}
