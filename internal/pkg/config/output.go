@@ -61,7 +61,7 @@ type Elasticsearch struct {
 func (c *Elasticsearch) InitDefaults() {
 	c.Protocol = schemeHTTP
 	c.Hosts = []string{"localhost:9200"}
-	c.Timeout = 90 * time.Second
+	c.Timeout = 3 * time.Minute
 	c.MaxRetries = 3
 	c.MaxConnPerHost = 128
 	c.MaxContentLength = 100 * 1024 * 1024
