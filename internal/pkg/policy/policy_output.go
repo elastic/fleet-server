@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"slices"
 	"strings"
 	"time"
 
@@ -676,7 +677,12 @@ func retireRemovedOutputs(
 
 		// Park the active key on the survivor. Skip when APIKeyID is empty to avoid writing
 		// a junk record with an empty ID that invalidateAPIKeys would silently discard.
-		if agentOutput.APIKeyID != "" {
+		// Also skip if a record for this key ID is already on the survivor exists and prior painless script failed.
+		survivor := agent.Outputs[survivingOutputName]
+		alreadyParked := survivor != nil && slices.ContainsFunc(survivor.ToRetireAPIKeyIds, func(r model.ToRetireAPIKeyIdsItems) bool {
+			return r.ID == agentOutput.APIKeyID
+		})
+		if agentOutput.APIKeyID != "" && !alreadyParked {
 			retiring := model.ToRetireAPIKeyIdsItems{
 				ID:        agentOutput.APIKeyID,
 				RetiredAt: time.Now().UTC().Format(time.RFC3339),
