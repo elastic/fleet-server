@@ -7,7 +7,7 @@
 package cache
 
 import (
-	"github.com/dgraph-io/ristretto"
+	"github.com/dgraph-io/ristretto/v2"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 )
