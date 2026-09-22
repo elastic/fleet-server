@@ -2215,6 +2215,11 @@ func (Test) CloudE2EUp() error {
 		imageTag = tag
 	}
 
+	stackImageTag, err := stackImageTagFromEnv()
+	if err != nil {
+		return fmt.Errorf("unable to derive stack image tag: %w", err)
+	}
+
 	initCmd := exec.Command("terraform", "init")
 	initCmd.Dir = filepath.Join("dev-tools", "cloud", "terraform")
 	initOut, err := initCmd.CombinedOutput()
@@ -2227,6 +2232,8 @@ func (Test) CloudE2EUp() error {
 		"-auto-approve",
 		"-var", "git_commit=" + getCommitID(),
 		"-var", "elastic_agent_docker_image=" + imageName + ":" + imageTag,
+		"-var", "kibana_docker_image=docker.elastic.co/cloud-release/kibana-cloud:" + stackImageTag,
+		"-var", "elasticsearch_docker_image=docker.elastic.co/cloud-release/elasticsearch-cloud-ess:" + stackImageTag,
 	}
 	log.Printf("Running terraform %s", strings.Join(args, " "))
 	applyCmd := exec.Command("terraform", args...)
@@ -2248,13 +2255,38 @@ func (Test) CloudE2EDown() error {
 		imageTag = tag
 	}
 
-	args := []string{"destroy", "-auto-approve", "-var", "elastic_agent_docker_image=" + imageName + ":" + imageTag}
+	stackImageTag, err := stackImageTagFromEnv()
+	if err != nil {
+		return fmt.Errorf("unable to derive stack image tag: %w", err)
+	}
+
+	args := []string{
+		"destroy",
+		"-auto-approve",
+		"-var", "elastic_agent_docker_image=" + imageName + ":" + imageTag,
+		"-var", "kibana_docker_image=docker.elastic.co/cloud-release/kibana-cloud:" + stackImageTag,
+		"-var", "elasticsearch_docker_image=docker.elastic.co/cloud-release/elasticsearch-cloud-ess:" + stackImageTag,
+	}
 	log.Printf("Running terraform %s", strings.Join(args, " "))
 	cmd := exec.Command("terraform", args...)
 	cmd.Dir = filepath.Join("dev-tools", "cloud", "terraform")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
+}
+
+// stackImageTagFromEnv returns the full ELASTICSEARCH_VERSION string from integration/.env
+// (e.g. "9.6.0-3d791774-SNAPSHOT"), which doubles as the image tag for cloud-release images.
+func stackImageTagFromEnv() (string, error) {
+	env, err := readEnvFile(filepath.Join("dev-tools", "integration", ".env"))
+	if err != nil {
+		return "", err
+	}
+	v, ok := env["ELASTICSEARCH_VERSION"]
+	if !ok || v == "" {
+		return "", fmt.Errorf("ELASTICSEARCH_VERSION not found in integration/.env")
+	}
+	return v, nil
 }
 
 // CloudE2ERun runs tests against the remote cloud deployment.
