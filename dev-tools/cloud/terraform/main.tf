@@ -94,7 +94,7 @@ resource "ec_deployment" "deployment" {
   }
 
   kibana = {
-    size       = "1g"
+    size       = "2g"
     zone_count = 1
     config = {
       docker_image = var.kibana_docker_image != "" ? local.docker_image_kb : null
