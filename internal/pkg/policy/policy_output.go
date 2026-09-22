@@ -318,9 +318,10 @@ func (p *Output) prepareOTLP(
 		// active key fields. The entry persists so the ack/checkin gate can retire the key —
 		// the same deferred pattern used by retireRemovedOutputs for surviving outputs.
 		retiring := model.ToRetireAPIKeyIdsItems{
-			ID:        prev.APIKeyID,
-			RetiredAt: time.Now().UTC().Format(time.RFC3339),
-			Output:    p.Name,
+			ID:         prev.APIKeyID,
+			RetiredAt:  time.Now().UTC().Format(time.RFC3339),
+			Output:     p.Name,
+			OutputType: OutputTypeOTLP,
 		}
 		if secretID, ok := secret.ParseSecretReference(prev.APIKey); ok {
 			retiring.SecretID = secretID
@@ -684,9 +685,10 @@ func retireRemovedOutputs(
 		})
 		if agentOutput.APIKeyID != "" && !alreadyParked {
 			retiring := model.ToRetireAPIKeyIdsItems{
-				ID:        agentOutput.APIKeyID,
-				RetiredAt: time.Now().UTC().Format(time.RFC3339),
-				Output:    agentOutputName,
+				ID:         agentOutput.APIKeyID,
+				RetiredAt:  time.Now().UTC().Format(time.RFC3339),
+				Output:     agentOutputName,
+				OutputType: agentOutput.Type,
 			}
 			if secretID, ok := secret.ParseSecretReference(agentOutput.APIKey); ok {
 				retiring.SecretID = secretID
@@ -814,9 +816,10 @@ func persistNewOutputAPIKey(
 	}
 	if output.APIKeyID != "" {
 		retiring := model.ToRetireAPIKeyIdsItems{
-			ID:        output.APIKeyID,
-			RetiredAt: time.Now().UTC().Format(time.RFC3339),
-			Output:    outputName,
+			ID:         output.APIKeyID,
+			RetiredAt:  time.Now().UTC().Format(time.RFC3339),
+			Output:     outputName,
+			OutputType: output.Type,
 		}
 		if secretID, ok := secret.ParseSecretReference(output.APIKey); ok {
 			retiring.SecretID = secretID

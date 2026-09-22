@@ -734,13 +734,22 @@ func invalidateAPIKeys(ctx context.Context, zlog zerolog.Logger, bulk bulk.Bulk,
 		if k.ID == skip || k.ID == "" {
 			continue
 		}
-		if k.Output != "" {
-			if remoteIds[k.Output] == nil {
-				remoteIds[k.Output] = make([]string, 0)
-			}
-			remoteIds[k.Output] = append(remoteIds[k.Output], k.ID)
-		} else {
+		// Route by output_type when available. Keys known to be on the primary cluster
+		// (otlp, elasticsearch) go directly into the primary bucket. Records that predate
+		// this field (empty output_type) with a named output fall into the name-based path
+		// so existing behaviour is preserved.
+		switch k.OutputType {
+		case policy.OutputTypeOTLP, policy.OutputTypeElasticsearch:
 			ids = append(ids, k.ID)
+		default:
+			if k.Output != "" {
+				if remoteIds[k.Output] == nil {
+					remoteIds[k.Output] = make([]string, 0)
+				}
+				remoteIds[k.Output] = append(remoteIds[k.Output], k.ID)
+			} else {
+				ids = append(ids, k.ID)
+			}
 		}
 	}
 	if len(ids) > 0 {
@@ -767,10 +776,6 @@ func invalidateAPIKeys(ctx context.Context, zlog zerolog.Logger, bulk bulk.Bulk,
 				}
 			}
 		}
-		// Fall back to the primary cluster when no remote bulker is available.
-		// For local outputs (elasticsearch, otlp) this is correct — the key lives on the primary.
-		// For remote_elasticsearch with an unreachable bulker, skip rather than falling back:
-		// the primary cluster does not hold the key and would silently return "not found".
 		if outputBulk == nil {
 			if outputPolicy != nil && outputPolicy.Data.Outputs[outputName]["type"] == policy.OutputTypeRemoteElasticsearch {
 				zlog.Warn().Str(ecs.PolicyOutputName, outputName).Any("ids", outputIds).

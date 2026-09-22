@@ -434,6 +434,10 @@
           "secret_id": {
             "description": "Fleet secret ID for the retired API key, if the key was stored in .fleet-secrets",
             "type": "string"
+          },
+          "output_type": {
+            "description": "Output type at the time this key was minted (e.g. elasticsearch, otlp). Used to route invalidation to the correct cluster without relying on current policy state. Empty for records that predate this field.",
+            "type": "string"
           }
         }
       }
