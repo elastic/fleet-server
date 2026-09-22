@@ -13,7 +13,20 @@ provider "ec" {}
 
 variable "elastic_agent_docker_image" {
   type        = string
-  description = "Elastic agent docker image with tag."
+  default     = ""
+  description = "Elastic agent docker image with tag. If empty, uses the ECH default for the stack version."
+}
+
+variable "kibana_docker_image" {
+  type        = string
+  default     = ""
+  description = "Kibana docker image with tag. If empty, uses the ECH default for the stack version."
+}
+
+variable "elasticsearch_docker_image" {
+  type        = string
+  default     = ""
+  description = "Elasticsearch docker image with tag. If empty, uses the ECH default for the stack version."
 }
 
 variable "git_commit" {
@@ -43,12 +56,14 @@ variable "deployment_template_id" {
 locals {
   // strip hash found in ELASTICSEARCH_VERSION in integration/.env to get stack_version
   dra_match       = regex("ELASTICSEARCH_VERSION=([0-9]+\\.[0-9]+\\.[0-9]+)(?:-[[:alpha:]]+-)?-?(SNAPSHOT)?", file("${path.module}/../../integration/.env"))
-  stack_version   = local.dra_match[1] == "SNAPSHOT" ? format("%s-SNAPSHOT", local.dra_match[0]) : local.dra_match[0]
+  dra_version     = local.dra_match[1] == "SNAPSHOT" ? format("%s-SNAPSHOT", local.dra_match[0]) : local.dra_match[0]
   docker_image_ea = var.elastic_agent_docker_image
+  docker_image_kb = var.kibana_docker_image
+  docker_image_es = var.elasticsearch_docker_image
 }
 
 data "ec_stack" "latest" {
-  version_regex = local.stack_version
+  version_regex = local.dra_version
   region        = var.ess_region
 }
 
@@ -73,18 +88,24 @@ resource "ec_deployment" "deployment" {
       size        = "8g"
       zone_count  = 2
     }
+    config = {
+      docker_image = var.elasticsearch_docker_image != "" ? local.docker_image_es : null
+    }
   }
 
   kibana = {
     size       = "1g"
     zone_count = 1
+    config = {
+      docker_image = var.kibana_docker_image != "" ? local.docker_image_kb : null
+    }
   }
 
   integrations_server = {
     size       = "1g"
     zone_count = 1
     config = {
-      docker_image = local.docker_image_ea
+      docker_image = var.elastic_agent_docker_image != "" ? local.docker_image_ea : null
     }
   }
 }
