@@ -263,10 +263,9 @@ func Test_Agent_OtelPolicy_OTLPExporterTLSSecrets(t *testing.T) {
 	const otlpOutputName = "my-otlp"
 	const exporterKey = "otlp/" + otlpOutputName
 
-	// Store a TLS cert as a secret (path-based format).
+	// Store both TLS credentials as secrets using the path-based format.
 	certSecretID := createSecret(t, ctx, srv.bulker, "cert_pem_value")
-	inlineSecretID := createSecret(t, ctx, srv.bulker, "key_pem_value")
-	inlineSecretRef := fmt.Sprintf("$co.elastic.secret{%s}", inlineSecretID)
+	keySecretID := createSecret(t, ctx, srv.bulker, "key_pem_value")
 
 	policyID := uuid.Must(uuid.NewV4()).String()
 	otlpPolicyData := model.PolicyData{
@@ -279,8 +278,8 @@ func Test_Agent_OtelPolicy_OTLPExporterTLSSecrets(t *testing.T) {
 				"endpoint": "otel.example.com:4317",
 				"secrets": map[string]any{
 					"tls": map[string]any{
-						"cert_pem": map[string]any{"id": certSecretID}, // path-based
-						"key_pem":  inlineSecretRef,                    // inline
+						"cert_pem": map[string]any{"id": certSecretID},
+						"key_pem":  map[string]any{"id": keySecretID},
 					},
 				},
 			},
@@ -291,7 +290,7 @@ func Test_Agent_OtelPolicy_OTLPExporterTLSSecrets(t *testing.T) {
 		Inputs: []map[string]any{},
 		SecretReferences: []model.SecretReferencesItems{
 			{ID: certSecretID},
-			{ID: inlineSecretID},
+			{ID: keySecretID},
 		},
 	}
 
@@ -375,11 +374,11 @@ func Test_Agent_OtelPolicy_OTLPExporterTLSSecrets(t *testing.T) {
 	assert.Equal(t, "cert_pem_value", tlsMap["cert_pem"], "path-based cert_pem must be resolved")
 	assert.Equal(t, "key_pem_value", tlsMap["key_pem"], "inline key_pem must be resolved")
 
-	// secret_paths must record both TLS credential paths.
+	// secret_paths must record both TLS credential paths (section prefix included).
 	assert.ElementsMatch(t,
 		[]string{
-			exporterKey + ".tls.cert_pem",
-			exporterKey + ".tls.key_pem",
+			"exporters." + exporterKey + ".tls.cert_pem",
+			"exporters." + exporterKey + ".tls.key_pem",
 		},
 		policyAction.Policy.SecretPaths,
 	)
