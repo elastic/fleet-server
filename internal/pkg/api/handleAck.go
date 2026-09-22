@@ -734,12 +734,13 @@ func invalidateAPIKeys(ctx context.Context, zlog zerolog.Logger, bulk bulk.Bulk,
 		if k.ID == skip || k.ID == "" {
 			continue
 		}
-		// Route by output_type when available. Keys known to be on the primary cluster
-		// (otlp, elasticsearch) go directly into the primary bucket. Records that predate
-		// this field (empty output_type) with a named output fall into the name-based path
-		// so existing behaviour is preserved.
+		// Route by output_type when available. OTLP keys are always on the primary cluster
+		// so they go directly into the primary bucket. All other types — including
+		// "elasticsearch", which the agent doc uses for both local and remote ES after
+		// normalization — stay on the name-based path so existing routing is preserved
+		// for records that predate this field or that cannot be distinguished from remote ES.
 		switch k.OutputType {
-		case policy.OutputTypeOTLP, policy.OutputTypeElasticsearch:
+		case policy.OutputTypeOTLP:
 			ids = append(ids, k.ID)
 		default:
 			if k.Output != "" {
