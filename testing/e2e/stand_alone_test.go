@@ -519,3 +519,534 @@ func (suite *StandAloneSuite) TestAPMInstrumentation() {
 	cancel()
 	cmd.Wait()
 }
+<<<<<<< HEAD
+=======
+
+// startFleetServerForOpAMP creates the fleet-server config from stand-alone-opamp.tpl,
+// starts the fleet-server binary, waits for it to be healthy, fetches an enrollment token
+// for "dummy-policy", and enrolls a dummy agent (to ensure .fleet-agents exists before any
+// OpAMP collector connects). It returns the enrollment API key. Fleet-server is stopped when
+// ctx is cancelled; the caller owns the context lifetime.
+func (suite *StandAloneSuite) startFleetServerForOpAMP(ctx context.Context, dir, staticTokenKey string) string {
+	suite.T().Helper()
+	tpl, err := template.ParseFiles(filepath.Join("testdata", "stand-alone-opamp.tpl"))
+	suite.Require().NoError(err)
+
+	f, err := os.Create(filepath.Join(dir, "config.yml"))
+	suite.Require().NoError(err)
+	err = tpl.Execute(f, map[string]any{
+		"Hosts":          suite.ESHosts,
+		"ServiceToken":   suite.ServiceToken,
+		"StaticTokenKey": staticTokenKey,
+	})
+	f.Close()
+	suite.Require().NoError(err)
+
+	// Run the fleet-server binary
+	cmd := exec.CommandContext(ctx, suite.binaryPath, "-c", filepath.Join(dir, "config.yml"))
+	cmd.Cancel = func() error { return cmd.Process.Signal(syscall.SIGTERM) }
+	cmd.Env = []string{"GOCOVERDIR=" + suite.CoverPath}
+	err = cmd.Start()
+	suite.Require().NoError(err)
+
+	suite.T().Cleanup(func() { cmd.Wait() })
+
+	suite.FleetServerStatusOK(ctx, "http://localhost:8220")
+
+	apiKey := suite.GetEnrollmentTokenForPolicyID(ctx, "dummy-policy")
+	// Enroll a dummy agent so the .fleet-agents index exists before any OpAMP collector connects.
+	tester := api_version.NewClientAPITesterCurrent(suite.Scaffold, "http://localhost:8220", apiKey)
+	tester.Enroll(ctx, apiKey)
+	return apiKey
+}
+
+// writeOpAMPCollectorConfig renders otelcol-opamp.tpl into configFilePath.
+func (suite *StandAloneSuite) writeOpAMPCollectorConfig(configFilePath, instanceUID, apiKey string) {
+	suite.T().Helper()
+	tpl, err := template.ParseFiles(filepath.Join("testdata", "otelcol-opamp.tpl"))
+	suite.Require().NoError(err)
+
+	f, err := os.Create(configFilePath)
+	suite.Require().NoError(err)
+
+	err = tpl.Execute(f, map[string]any{
+		"OpAMP": map[string]string{
+			"InstanceUID": instanceUID,
+			"APIKey":      apiKey,
+		},
+	})
+	f.Close()
+	suite.Require().NoError(err)
+}
+
+// TestOpAMPWithUpstreamCollector ensures that the upstream OTel Collector contrib can connect
+// to Fleet Server over OpAMP and enroll as an agent in the .fleet-agents index.
+func (suite *StandAloneSuite) TestOpAMPWithUpstreamCollector() {
+	dir := suite.T().TempDir()
+
+	ctx, cancel := context.WithTimeout(suite.T().Context(), 5*time.Minute)
+	defer cancel()
+
+	apiKey := suite.startFleetServerForOpAMP(ctx, dir, "opamp-e2e-test-key")
+
+	// Make sure the OpAMP endpoint works before proceeding to build the collector.
+	req, err := http.NewRequestWithContext(ctx, "POST", "http://localhost:8220/v1/opamp", nil)
+	suite.Require().NoError(err)
+
+	req.Header.Set("Authorization", "ApiKey "+apiKey)
+	req.Header.Set("Content-Type", "application/x-protobuf")
+	resp, err := suite.Client.Do(req)
+	suite.Require().NoError(err)
+	resp.Body.Close()
+	suite.Require().Equal(http.StatusOK, resp.StatusCode)
+
+	// Clone OTel Collector contrib repository (shallow clone of main branch)
+	cloneDir := filepath.Join(dir, "opentelemetry-collector-contrib")
+	suite.T().Logf("Cloning opentelemetry-collector-contrib (main) to %s", cloneDir)
+	cloneCmd := exec.CommandContext(ctx,
+		"git", "clone",
+		"--depth", "1",
+		"https://github.com/open-telemetry/opentelemetry-collector-contrib",
+		cloneDir,
+	)
+	cloneCmd.Stdout = os.Stdout
+	cloneCmd.Stderr = os.Stderr
+	err = cloneCmd.Run()
+	suite.Require().NoError(err)
+
+	// Build the OTel Collector binary
+	suite.T().Log("Building otelcol-contrib binary via make otelcontribcol")
+	err = os.MkdirAll(filepath.Join(cloneDir, "bin"), 0755)
+	suite.Require().NoError(err)
+
+	makeCmd := exec.CommandContext(ctx, "make", "otelcontribcol")
+	makeCmd.Dir = cloneDir
+	makeCmd.Stdout = os.Stdout
+	makeCmd.Stderr = os.Stderr
+	err = makeCmd.Run()
+	suite.Require().NoError(err)
+
+	// The make target places the binary under bin/; move it to the expected path.
+	builtBinary := filepath.Join(cloneDir, "bin", fmt.Sprintf("otelcontribcol_%s_%s", runtime.GOOS, runtime.GOARCH))
+	otelBinaryPath := filepath.Join(dir, "otelcol-contrib")
+	err = os.Rename(builtBinary, otelBinaryPath)
+	suite.Require().NoError(err)
+
+	// Configure it with the OpAMP extension
+	instanceUID := uuid.Must(uuid.NewV7()).String()
+	suite.T().Logf("Configuring OTel Collector with OpAMP extension (instanceUID=%s)", instanceUID)
+	collectorConfig := filepath.Join(dir, "otelcol.yml")
+	suite.writeOpAMPCollectorConfig(collectorConfig, instanceUID, apiKey)
+
+	// Start OTel Collector
+	suite.T().Log("Starting OTel Collector")
+	otelCmd := exec.CommandContext(ctx, otelBinaryPath, "--config", collectorConfig)
+	otelCmd.Cancel = func() error {
+		return otelCmd.Process.Signal(syscall.SIGTERM)
+	}
+	otelCmd.Stdout = os.Stdout
+	otelCmd.Stderr = os.Stderr
+	err = otelCmd.Start()
+	suite.Require().NoError(err)
+
+	defer otelCmd.Wait()
+
+	// Verify that the OTel Collector was enrolled in Fleet by fetching its document from
+	// .fleet-agents and asserting on its contents.
+	suite.T().Logf("Waiting for agent %s to appear in .fleet-agents", instanceUID)
+	agentDoc := suite.WaitForAgentDoc(ctx, instanceUID)
+
+	suite.Equal(instanceUID, agentDoc.Agent.ID, "expected agent.id to match instanceUID")
+	versionOut, err := exec.Command(otelBinaryPath, "--version").Output()
+	suite.Require().NoError(err)
+
+	otelVersion := strings.TrimPrefix(strings.TrimSpace(string(versionOut)), "otelcontribcol version ")
+	suite.Equal("OPAMP", agentDoc.Type, "expected type to be OPAMP")
+	suite.Equal("otelcontribcol", agentDoc.Agent.Type, "expected agent.type to be otelcontribcol")
+	suite.Equal(otelVersion, agentDoc.Agent.Version, "expected agent.version to match otelcol-contrib binary version")
+	suite.Equal(1, agentDoc.Revision, "expected policy_revision_idx to be 1")
+	suite.Contains(agentDoc.Tags, "otelcontribcol", "expected tags to contain otelcontribcol")
+}
+
+// TestAgentGracefulForceUnenroll exercises the full three-step escalation that fleet-server
+// applies when an agent checks in with an invalidated API key and the
+// graceful_force_unenroll.enabled feature flag is enabled:
+//
+//  1. 1st invalid checkin → fleet-server returns POLICY_CHANGE with empty policy.
+//     The agent stops all running components.
+//  2. 2nd invalid checkin → fleet-server returns UNENROLL.
+//     The agent disenrolls and exits.
+//
+// Fleet-server runs with:
+//   - graceful_force_unenroll.enabled: true
+//   - ttl_api_key: 2s  (cache expires quickly after key invalidation)
+//   - checkin_long_poll: 5s  (controls how fast the agent retries after step 1)
+func (suite *StandAloneSuite) TestAgentGracefulForceUnenroll() {
+	dlCtx, dlCancel := context.WithTimeout(suite.T().Context(), 10*time.Minute)
+	defer dlCancel()
+	rc := downloadElasticAgent(dlCtx, suite.T(), suite.Client)
+	agentExtractDir := suite.T().TempDir()
+	var paths extractedPaths
+	switch runtime.GOOS {
+	case "darwin", "linux":
+		paths = extractTar(suite.T(), rc, agentExtractDir)
+	case "windows":
+		paths = extractZip(suite.T(), rc, agentExtractDir)
+	default:
+		suite.Require().Failf("Unsupported OS", "OS %s is unsupported for this test", runtime.GOOS)
+	}
+	rc.Close()
+	suite.Require().NotEmpty(paths.agentBinary, "elastic-agent binary not found in archive")
+	agentDir := filepath.Dir(paths.agentBinary)
+
+	ctx, cancel := context.WithTimeout(suite.T().Context(), 10*time.Minute)
+	defer cancel()
+
+	// Start fleet-server with the feature flag, 2 s API key cache, and 5 s checkin poll.
+	dir := suite.T().TempDir()
+	tpl, err := template.ParseFiles(filepath.Join("testdata", "stand-alone-https-unenroll.tpl"))
+	suite.Require().NoError(err)
+	f, err := os.Create(filepath.Join(dir, "fs-config.yml"))
+	suite.Require().NoError(err)
+	err = tpl.Execute(f, map[string]string{
+		"Hosts":          suite.ESHosts,
+		"ServiceToken":   suite.ServiceToken,
+		"CertPath":       filepath.Join(suite.CertPath, "fleet-server.crt"),
+		"KeyPath":        filepath.Join(suite.CertPath, "fleet-server.key"),
+		"PassphrasePath": filepath.Join(suite.CertPath, "passphrase"),
+	})
+	f.Close()
+	suite.Require().NoError(err)
+
+	// Capture fleet-server stderr to a file so step 2 can scan it for the
+	// "Returning UNENROLL action" log message (fleet-server logs to stderr).
+	fsLogPath := filepath.Join(dir, "fleet-server.log")
+	fsLog, err := os.Create(fsLogPath)
+	suite.Require().NoError(err)
+
+	fsCmd := exec.CommandContext(ctx, suite.binaryPath, "-c", filepath.Join(dir, "fs-config.yml"))
+	fsCmd.Cancel = func() error { return fsCmd.Process.Signal(syscall.SIGTERM) }
+	fsCmd.Env = []string{"GOCOVERDIR=" + suite.CoverPath}
+	fsCmd.Stderr = fsLog
+	suite.Require().NoError(fsCmd.Start())
+	suite.T().Cleanup(func() {
+		fsCmd.Wait()
+		fsLog.Close()
+		if p, readErr := os.ReadFile(fsLogPath); readErr == nil {
+			suite.T().Logf("fleet-server output:\n%s", string(p))
+		}
+	})
+
+	suite.FleetServerStatusOK(ctx, "https://localhost:8220")
+
+	// Enroll the agent against the running fleet-server (blocking one-shot command).
+	enrollmentToken := suite.GetEnrollmentTokenForPolicyID(ctx, "dummy-policy")
+	enrollCmd := exec.CommandContext(ctx, paths.agentBinary, "enroll",
+		"--url=https://localhost:8220",
+		"--enrollment-token="+enrollmentToken,
+		"--certificate-authorities="+filepath.Join(suite.CertPath, "e2e-test-ca.crt"),
+		"--skip-daemon-reload",
+	)
+	enrollCmd.Dir = agentDir
+	enrollCmd.Env = append(os.Environ(), "GOCOVERDIR="+suite.CoverPath)
+	enrollOut, err := enrollCmd.CombinedOutput()
+	suite.Require().NoErrorf(err, "elastic-agent enroll failed:\n%s", string(enrollOut))
+	suite.T().Logf("enroll output:\n%s", string(enrollOut))
+
+	// Run the agent as a background process and stream output to a log file.
+	agentLogPath := filepath.Join(dir, "elastic-agent.log")
+	agentLog, err := os.Create(agentLogPath)
+	suite.Require().NoError(err)
+
+	agentCmd := exec.CommandContext(ctx, paths.agentBinary, "run")
+	agentCmd.Dir = agentDir
+	agentCmd.Cancel = func() error { return agentCmd.Process.Signal(syscall.SIGTERM) }
+	agentCmd.Stdout = agentLog
+	agentCmd.Stderr = agentLog
+	agentCmd.Env = append(os.Environ(), "GOCOVERDIR="+suite.CoverPath)
+	suite.Require().NoError(agentCmd.Start())
+
+	agentExited := make(chan error, 1)
+	// agentHasExited is closed once the agent process terminates; safe to check
+	// multiple times without consuming the value in agentExited.
+	agentHasExited := make(chan struct{})
+	go func() {
+		err := agentCmd.Wait()
+		close(agentHasExited)
+		agentExited <- err
+	}()
+
+	suite.T().Cleanup(func() {
+		agentLog.Close()
+		select {
+		case <-agentExited:
+		case <-time.After(15 * time.Second):
+			_ = agentCmd.Process.Kill()
+			<-agentExited
+		}
+		if p, readErr := os.ReadFile(agentLogPath); readErr == nil {
+			suite.T().Logf("elastic-agent output:\n%s", string(p))
+		}
+	})
+
+	// Wait for the enrolled agent to become online in Kibana.
+	// The standalone fleet-server registers itself as "e2e-test-id"; ignore it.
+	suite.T().Log("Waiting for enrolled agent to appear online in Kibana...")
+	agentID := ""
+	suite.Require().Eventually(func() bool {
+		// Fail fast if the agent process has already exited (crash).
+		select {
+		case <-agentHasExited:
+			if p, readErr := os.ReadFile(agentLogPath); readErr == nil {
+				suite.T().Logf("agent exited early; log:\n%s", string(p))
+			}
+			suite.Fail("elastic-agent process exited before becoming online")
+			return false
+		default:
+		}
+		_, agents := suite.GetAgents(ctx)
+		for _, a := range agents {
+			if a.ID != "e2e-test-id" {
+				suite.T().Logf("agent %s status=%s", a.ID, a.Status)
+			}
+			if a.ID != "e2e-test-id" && (a.Status == "online" || a.Status == "updating") {
+				agentID = a.ID
+				return true
+			}
+		}
+		return false
+	}, 3*time.Minute, 5*time.Second, "enrolled agent never reached online or updating status in Kibana")
+	suite.T().Logf("Agent %s is active and checking in", agentID)
+
+	// Retrieve the agent's ES API key ID so we can invalidate it.
+	apiKeyID := suite.agentAccessAPIKeyID(ctx, agentID)
+	suite.T().Logf("Invalidating agent API key %s", apiKeyID)
+	suite.invalidateESAPIKey(ctx, apiKeyID)
+
+	// After ttl_api_key (2 s) the cache entry expires. The agent's next checkin
+	// re-authenticates with ES, gets ErrUnauthorized, and fleet-server returns an empty
+	// POLICY_CHANGE (escalation step 1). The agent applies the empty policy and stops all
+	// components, but continues to check in with fleet-server.
+	//
+	// Note: the window between POLICY_CHANGE and the subsequent UNENROLL (step 2) can be
+	// very short (< 1 s). If the agent has already exited by the time we poll, that is
+	// also acceptable evidence that the full escalation sequence ran — treat it as step 1
+	// confirmed and proceed directly to the exit check.
+	suite.T().Log("Waiting for elastic-agent to have no running components (step 1: POLICY_CHANGE)...")
+	suite.Require().Eventually(func() bool {
+		// Fast-path: if the agent has already exited, POLICY_CHANGE + UNENROLL both ran.
+		select {
+		case <-agentHasExited:
+			suite.T().Log("Agent exited before step 1 was polled; POLICY_CHANGE implied by state machine")
+			return true
+		default:
+		}
+		cmd := exec.CommandContext(ctx, paths.agentBinary, "status", "--output", "json")
+		cmd.Dir = agentDir
+		out, err := cmd.Output()
+		if err != nil {
+			return false
+		}
+		var statusResp struct {
+			Components []json.RawMessage `json:"components"`
+		}
+		if err := json.Unmarshal(out, &statusResp); err != nil {
+			return false
+		}
+		return len(statusResp.Components) == 0
+	}, 2*time.Minute, 2*time.Second, "elastic-agent still has running components after empty policy was applied")
+	suite.T().Log("Agent has no running components — empty POLICY_CHANGE confirmed")
+
+	// The agent continues checking in. The 2nd invalid checkin returns UNENROLL (escalation
+	// step 2). On receiving UNENROLL the agent cancels its fleet gateway and goes dormant —
+	// the process stays running but stops sending checkins. The agent's Kibana status does not
+	// transition to "offline" until the policy's checkin interval expires (potentially several
+	// minutes), so instead we scan fleet-server's own log output for the unique message it
+	// emits when it sends the UNENROLL action.
+	suite.T().Log("Waiting for fleet-server to emit UNENROLL action log (step 2)...")
+	suite.Require().Eventually(func() bool {
+		data, readErr := os.ReadFile(fsLogPath)
+		if readErr != nil {
+			return false
+		}
+		return bytes.Contains(data, []byte("Returning UNENROLL action for agent with invalid API key")) &&
+			bytes.Contains(data, []byte(agentID))
+	}, 2*time.Minute, 2*time.Second, "fleet-server did not emit UNENROLL action for agent within timeout")
+	suite.T().Log("Fleet-server emitted UNENROLL action — UNENROLL confirmed")
+}
+
+// agentAccessAPIKeyID queries .fleet-agents to retrieve the access_api_key_id for the given agent.
+func (suite *StandAloneSuite) agentAccessAPIKeyID(ctx context.Context, agentID string) string {
+	suite.T().Helper()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
+		"http://"+suite.ESHosts+"/.fleet-agents/_doc/"+agentID, nil)
+	suite.Require().NoError(err)
+	req.SetBasicAuth(suite.ElasticUser, suite.ElasticPass)
+	resp, err := suite.Client.Do(req)
+	suite.Require().NoError(err)
+	defer resp.Body.Close()
+	suite.Require().Equal(http.StatusOK, resp.StatusCode)
+	var doc struct {
+		Source struct {
+			AccessAPIKeyID string `json:"access_api_key_id"`
+		} `json:"_source"`
+	}
+	suite.Require().NoError(json.NewDecoder(resp.Body).Decode(&doc))
+	suite.Require().NotEmpty(doc.Source.AccessAPIKeyID, "access_api_key_id not set in agent document")
+	return doc.Source.AccessAPIKeyID
+}
+
+// invalidateESAPIKey calls DELETE /_security/api_key to invalidate the given key ID.
+// It verifies the response body confirms the key was actually invalidated, not just that ES
+// returned 200 (which it does even when the key ID was not found).
+// Fleet-server creates API keys without refresh=true for performance, so the key may not be
+// immediately visible in the .security index. We poll GET /_security/api_key for up to 10 s
+// (matching fleet-server's own invalidateAPIKey logic) before issuing the DELETE.
+func (suite *StandAloneSuite) invalidateESAPIKey(ctx context.Context, keyID string) {
+	suite.T().Helper()
+
+	// Wait for the key to become visible in ES before attempting the DELETE.
+	suite.Require().Eventually(func() bool {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet,
+			"http://"+suite.ESHosts+"/_security/api_key?id="+keyID, nil)
+		if err != nil {
+			return false
+		}
+		req.SetBasicAuth(suite.ElasticUser, suite.ElasticPass)
+		resp, err := suite.Client.Do(req)
+		if err != nil || resp.StatusCode != http.StatusOK {
+			if resp != nil {
+				resp.Body.Close()
+			}
+			return false
+		}
+		defer resp.Body.Close()
+		var result struct {
+			APIKeys []json.RawMessage `json:"api_keys"`
+		}
+		return json.NewDecoder(resp.Body).Decode(&result) == nil && len(result.APIKeys) > 0
+	}, 10*time.Second, time.Second, "API key %s never became visible in ES .security index within 10 s", keyID)
+
+	body, err := json.Marshal(map[string]any{"ids": []string{keyID}})
+	suite.Require().NoError(err)
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete,
+		"http://"+suite.ESHosts+"/_security/api_key",
+		bytes.NewReader(body))
+	suite.Require().NoError(err)
+	req.SetBasicAuth(suite.ElasticUser, suite.ElasticPass)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := suite.Client.Do(req)
+	suite.Require().NoError(err)
+	defer resp.Body.Close()
+	suite.Require().Equal(http.StatusOK, resp.StatusCode, "ES invalidate API key failed")
+	var result struct {
+		InvalidatedAPIKeys []string `json:"invalidated_api_keys"`
+		ErrorCount         int      `json:"error_count"`
+	}
+	suite.Require().NoError(json.NewDecoder(resp.Body).Decode(&result))
+	suite.Require().Contains(result.InvalidatedAPIKeys, keyID, "ES did not actually invalidate API key %s", keyID)
+	suite.Require().Zero(result.ErrorCount, "ES reported errors while invalidating API key %s", keyID)
+}
+
+// TestOpAMPWithEDOTCollector ensures that the EDOT Collector can connect to Fleet Server
+// over OpAMP and enroll as an agent in the .fleet-agents index.
+func (suite *StandAloneSuite) TestOpAMPWithEDOTCollector() {
+	dir := suite.T().TempDir()
+
+	// Download and extract the full Elastic Agent package before starting the timed
+	// portion of the test. The archive is cached on disk after the first run so this
+	// is fast on subsequent runs; extracting everything ensures all components
+	// (e.g. elastic-otel-collector) needed by elastic-agent otel are present.
+	suite.T().Log("Downloading Elastic Agent package")
+	agentExtractDir := filepath.Join(dir, "elastic-agent-package")
+	suite.Require().NoError(os.MkdirAll(agentExtractDir, 0755))
+
+	downloadCtx, downloadCancel := context.WithTimeout(suite.T().Context(), 10*time.Minute)
+	defer downloadCancel()
+	rc := downloadElasticAgent(downloadCtx, suite.T(), suite.Client)
+	var paths extractedPaths
+	switch runtime.GOOS {
+	case "windows":
+		paths = extractZip(suite.T(), rc, agentExtractDir)
+	case "darwin", "linux":
+		paths = extractTar(suite.T(), rc, agentExtractDir)
+	default:
+		suite.Require().Failf("Unsupported OS", "OS %s is unsupported for tests", runtime.GOOS)
+	}
+	rc.Close()
+
+	agentBinaryPath := paths.agentBinary
+	suite.Require().NotEmpty(agentBinaryPath, "elastic-agent binary not found in archive")
+
+	suite.T().Logf("Found elastic-agent binary at %s", agentBinaryPath)
+
+	ctx, cancel := context.WithTimeout(suite.T().Context(), 2*time.Minute)
+	defer cancel()
+
+	apiKey := suite.startFleetServerForOpAMP(ctx, dir, "edot-opamp-e2e-test-key")
+
+	instanceUID := uuid.Must(uuid.NewV7()).String()
+	suite.T().Logf("Configuring EDOT Collector with OpAMP extension (instanceUID=%s)", instanceUID)
+	collectorConfig := filepath.Join(dir, "edot-otelcol.yml")
+	suite.writeOpAMPCollectorConfig(collectorConfig, instanceUID, apiKey)
+
+	// Start the EDOT Collector via `elastic-agent otel`
+	suite.T().Log("Starting EDOT Collector via elastic-agent otel")
+	edotOutputFile, err := os.CreateTemp(dir, "edot-output-*.log")
+	suite.Require().NoError(err)
+
+	edotCmd := exec.CommandContext(ctx, agentBinaryPath, "otel", "--config", collectorConfig)
+	edotCmd.Cancel = func() error {
+		return edotCmd.Process.Signal(syscall.SIGTERM)
+	}
+	edotCmd.Stdout = edotOutputFile
+	edotCmd.Stderr = edotOutputFile
+	err = edotCmd.Start()
+	suite.Require().NoError(err)
+
+	// edotCmd.Wait() must only be called once; the goroutine below is that
+	// single call site. Both the Cleanup handler and the early-exit select
+	// read from processExited instead of calling Wait() directly.
+	processExited := make(chan error, 1)
+	go func() { processExited <- edotCmd.Wait() }()
+
+	// Detect early exit — if the process dies within 5s it's a startup failure.
+	select {
+	case exitErr := <-processExited:
+		edotOutputFile.Close()
+		if out, readErr := os.ReadFile(edotOutputFile.Name()); readErr == nil {
+			suite.T().Logf("EDOT Collector output:\n%s", string(out))
+		}
+		suite.Require().NoError(exitErr, "EDOT Collector exited prematurely")
+		return
+	case <-time.After(5 * time.Second):
+		// Process is still running after 5s — proceed
+	}
+
+	suite.T().Cleanup(func() {
+		// Wait for the process to exit (context cancellation will have killed it)
+		// before closing the output file and reading it. The 30s fallback guards
+		// against the process not responding to SIGTERM.
+		select {
+		case <-processExited:
+		case <-time.After(30 * time.Second):
+		}
+		edotOutputFile.Close()
+		if out, readErr := os.ReadFile(edotOutputFile.Name()); readErr == nil {
+			suite.T().Logf("EDOT Collector output:\n%s", string(out))
+		}
+	})
+
+	// Verify that the EDOT Collector was enrolled in Fleet by fetching its document from
+	// .fleet-agents and asserting on its contents.
+	suite.T().Logf("Waiting for EDOT agent %s to appear in .fleet-agents", instanceUID)
+	agentDoc := suite.WaitForAgentDoc(ctx, instanceUID)
+
+	suite.Equal(instanceUID, agentDoc.Agent.ID, "expected agent.id to match instanceUID")
+	suite.Equal("OPAMP", agentDoc.Type, "expected type to be OPAMP")
+	suite.Equal("elastic-otel-collector", agentDoc.Agent.Type, "expected agent.type to be elastic-otel-collector")
+	suite.NotEmpty(agentDoc.Agent.Version, "expected agent.version to be set")
+	suite.Contains(agentDoc.Tags, "elastic-otel-collector", "expected tags to contain elastic-otel-collector")
+	suite.Equal(1, agentDoc.Revision, "expected policy_revision_idx to be 1")
+}
+>>>>>>> b5304b1 (fix(e2e): verify API key is actually invalidated in TestAgentGracefulForceUnenroll (#7865))
