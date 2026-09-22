@@ -17,10 +17,11 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 )
 
-// Invalidate invalidates the provided API keys by ID.
-// It logs a warning for any key that ES could not act on (not found); keys that
-// were already invalidated are silently accepted. Returns an error if ES reported
-// invalidation errors.
+// Invalidate invalidates the provided API keys by ID. Any key absent from both
+// invalidated_api_keys and previously_invalidated_api_keys in the ES response is
+// logged as a warning (key not found in ES). Previously-invalidated keys are
+// silently accepted — no warning is emitted for them. Returns an error if ES
+// reports a non-zero error_count.
 func Invalidate(ctx context.Context, client *elasticsearch.Client, ids ...string) error {
 
 	payload := struct {
