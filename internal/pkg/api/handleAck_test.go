@@ -752,14 +752,18 @@ func TestInvalidateAPIKeysOutputTypeRouting(t *testing.T) {
 			},
 		},
 		{
-			name: "elasticsearch type routes to primary without GetBulker",
+			name: "elasticsearch type with named output stays on name-based path",
 			record: model.ToRetireAPIKeyIdsItems{
 				ID:         "es-key",
 				Output:     "my-es",
 				OutputType: policy.OutputTypeElasticsearch,
 			},
 			setupBulker: func(m *ftesting.MockBulk) {
-				m.On("APIKeyInvalidate", mock.Anything, []string{"es-key"}).Return(nil).Once()
+				// elasticsearch normalizes both local and remote ES — keep on name-based
+				// path so remote keys are not incorrectly sent to the primary cluster.
+				remoteBulker := ftesting.NewMockBulk()
+				remoteBulker.On("APIKeyInvalidate", mock.Anything, []string{"es-key"}).Return(nil).Once()
+				m.On("GetBulker", "my-es").Return(remoteBulker)
 			},
 		},
 		{
