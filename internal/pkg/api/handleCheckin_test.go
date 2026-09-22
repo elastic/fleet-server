@@ -2298,7 +2298,7 @@ func TestProcessPolicyOTLPOutput(t *testing.T) {
 
 			agent := &model.Agent{ESDocument: model.ESDocument{Id: "agent1"}}
 
-			action, err := processPolicy(t.Context(), logger, bulker, agent, pp, nil)
+			action, _, err := processPolicy(t.Context(), logger, bulker, agent, pp, nil)
 			require.NoError(t, err)
 
 			pc, err := action.Data.AsActionPolicyChange()
