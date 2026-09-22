@@ -45,6 +45,16 @@
       "groupName": "go-dependencies"
     },
     {
+      "description": "codegen: oapi-codegen packages that require running 'mage generate' after update",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchPackageNames": [
+        "/^github\\.com/oapi-codegen//"
+      ],
+      "groupName": "codegen"
+    },
+    {
       "description": "elastic: all Elastic org packages",
       "matchManagers": [
         "gomod"
