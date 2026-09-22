@@ -42,7 +42,7 @@ func TestToESConfig(t *testing.T) {
 				ServiceToken:   "test-token",
 				MaxRetries:     3,
 				MaxConnPerHost: 128,
-				Timeout:        90 * time.Second,
+				Timeout:        3 * time.Minute,
 			},
 			result: elasticsearch.Config{
 				Addresses:    []string{"http://localhost:9200"},
@@ -55,7 +55,7 @@ func TestToESConfig(t *testing.T) {
 					MaxIdleConnsPerHost:   32,
 					MaxConnsPerHost:       128,
 					IdleConnTimeout:       60 * time.Second,
-					ResponseHeaderTimeout: 90 * time.Second,
+					ResponseHeaderTimeout: 3 * time.Minute,
 					ExpectContinueTimeout: 1 * time.Second,
 				},
 			},
@@ -68,7 +68,7 @@ func TestToESConfig(t *testing.T) {
 				ServiceTokenPath: "/path/is/ignored",
 				MaxRetries:       3,
 				MaxConnPerHost:   128,
-				Timeout:          90 * time.Second,
+				Timeout:          3 * time.Minute,
 			},
 			result: elasticsearch.Config{
 				Addresses:    []string{"http://localhost:9200"},
@@ -81,7 +81,7 @@ func TestToESConfig(t *testing.T) {
 					MaxIdleConnsPerHost:   32,
 					MaxConnsPerHost:       128,
 					IdleConnTimeout:       60 * time.Second,
-					ResponseHeaderTimeout: 90 * time.Second,
+					ResponseHeaderTimeout: 3 * time.Minute,
 					ExpectContinueTimeout: 1 * time.Second,
 				},
 			},
@@ -224,7 +224,7 @@ func TestToESConfig(t *testing.T) {
 			ServiceTokenPath: fileName,
 			MaxRetries:       3,
 			MaxConnPerHost:   128,
-			Timeout:          90 * time.Second,
+			Timeout:          3 * time.Minute,
 		}
 		es, err := cfg.ToESConfig(false)
 		require.NoError(t, err)
@@ -240,7 +240,7 @@ func TestToESConfig(t *testing.T) {
 				MaxIdleConnsPerHost:   32,
 				MaxConnsPerHost:       128,
 				IdleConnTimeout:       60 * time.Second,
-				ResponseHeaderTimeout: 90 * time.Second,
+				ResponseHeaderTimeout: 3 * time.Minute,
 				ExpectContinueTimeout: 1 * time.Second,
 			},
 		}
@@ -257,7 +257,7 @@ func TestToESConfig(t *testing.T) {
 			ServiceTokenPath: fileName,
 			MaxRetries:       3,
 			MaxConnPerHost:   128,
-			Timeout:          90 * time.Second,
+			Timeout:          3 * time.Minute,
 		}
 		es, err := cfg.ToESConfig(false)
 		require.NoError(t, err)
@@ -272,7 +272,7 @@ func TestToESConfig(t *testing.T) {
 				MaxIdleConnsPerHost:   32,
 				MaxConnsPerHost:       128,
 				IdleConnTimeout:       60 * time.Second,
-				ResponseHeaderTimeout: 90 * time.Second,
+				ResponseHeaderTimeout: 3 * time.Minute,
 				ExpectContinueTimeout: 1 * time.Second,
 			},
 		}
@@ -288,7 +288,7 @@ func TestToESConfig(t *testing.T) {
 			ServiceTokenPath: filepath.Join(t.TempDir(), "some-file"),
 			MaxRetries:       3,
 			MaxConnPerHost:   128,
-			Timeout:          90 * time.Second,
+			Timeout:          3 * time.Minute,
 		}
 		_, err := cfg.ToESConfig(false)
 		assert.ErrorAs(t, err, &os.ErrNotExist)

@@ -550,7 +550,7 @@ func defaultElastic() Elasticsearch {
 		MaxRetries:       3,
 		MaxConnPerHost:   128,
 		MaxContentLength: 104857600,
-		Timeout:          90 * time.Second,
+		Timeout:          3 * time.Minute,
 	}
 }
 

@@ -17,7 +17,7 @@ output:
     protocol: http
     hosts: ['localhost:9200']
     service_token: 'example-token'
-    timeout: 90s
+    timeout: 3m
     max_retries: 3
     max_conn_per_host: 128
     max_content_length: 1048576 # 10MiB
