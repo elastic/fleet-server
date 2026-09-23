@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"net"
 	"net/http"
 	"os"
@@ -285,6 +286,39 @@ func (s *Scaffold) NewFleetIsOnline(ctx context.Context) string {
 type KibanaAgent struct {
 	ID     string `json:"id"`
 	Status string `json:"status"`
+}
+
+// ESAgentDoc is the structure of an agent document stored in .fleet-agents.
+type ESAgentDoc struct {
+	Revision      int      `json:"policy_revision_idx"`
+	PolicyID      string   `json:"policy_id"`
+	AgentPolicyID string   `json:"agent_policy_id"`
+	Type          string   `json:"type"`
+	Status        string   `json:"status"`
+	Tags          []string `json:"tags"`
+	Agent         struct {
+		ID      string `json:"id"`
+		Version string `json:"version"`
+		Type    string `json:"type"`
+	} `json:"agent"`
+}
+
+// GetAgent fetches a single agent document from .fleet-agents by agent ID.
+func (s *Scaffold) GetAgent(ctx context.Context, id string) ESAgentDoc {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://localhost:9200/.fleet-agents/_doc/"+id, nil)
+	s.Require().NoError(err)
+	req.SetBasicAuth(s.ElasticUser, s.ElasticPass)
+
+	resp, err := s.Client.Do(req)
+	s.Require().NoError(err)
+	defer resp.Body.Close()
+	s.Require().Equal(http.StatusOK, resp.StatusCode)
+	var obj struct {
+		Source ESAgentDoc `json:"_source"`
+	}
+	err = json.NewDecoder(resp.Body).Decode(&obj)
+	s.Require().NoError(err)
+	return obj.Source
 }
 
 func (s *Scaffold) GetAgents(ctx context.Context) (int, []KibanaAgent) {
@@ -699,8 +733,6 @@ func (s *Scaffold) AddPolicyOverrides(ctx context.Context, id string, overrides 
 	defer resp.Body.Close()
 	s.Require().Equal(http.StatusOK, resp.StatusCode)
 }
-<<<<<<< HEAD
-=======
 
 func (s *Scaffold) GetPolicy(ctx context.Context, id string) []byte {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("http://localhost:5601/api/fleet/agent_policies/%s", id), nil)
@@ -996,4 +1028,4 @@ func (s *Scaffold) WaitForAgentDocsInIndex(ctx context.Context, agentID, indexPa
 		return result.Hits.Total.Value > 0
 	}, 4*time.Minute, time.Second, "agent %s never wrote documents to %s within timeout", agentID, indexPattern)
 }
->>>>>>> dbd62ab (test(e2e): wait for fleet-server agent ES doc before creating secrets-backed output (#7888))
+
