@@ -699,3 +699,49 @@ func (s *Scaffold) AddPolicyOverrides(ctx context.Context, id string, overrides 
 	defer resp.Body.Close()
 	s.Require().Equal(http.StatusOK, resp.StatusCode)
 }
+
+// WaitForFleetServerSecretsEnabled polls .fleet-agents until the fleet-server
+// agent document for agentID has local_metadata.elastic.agent.version indexed.
+// Kibana's isOutputSecretStorageEnabled() queries .fleet-agents directly, so
+// there is a window after FleetIsHealthy returns where zero agents are found
+// and secret storage is disabled. This closes that race.
+func (s *Scaffold) WaitForFleetServerSecretsEnabled(ctx context.Context, agentID string) {
+	query := fmt.Sprintf(`{"query":{"bool":{"must":[{"ids":{"values":[%q]}},{"exists":{"field":"local_metadata.elastic.agent.version"}}]}},"size":1}`, agentID)
+	timer := time.NewTimer(time.Second)
+	for {
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://localhost:9200/.fleet-agents/_search", strings.NewReader(query))
+		s.Require().NoError(err)
+		req.SetBasicAuth(s.ElasticUser, s.ElasticPass)
+		req.Header.Set("Content-Type", "application/json")
+		select {
+		case <-ctx.Done():
+			s.Require().NoError(ctx.Err(), "context expired before fleet-server agent version metadata appeared in .fleet-agents")
+			return
+		case <-timer.C:
+			resp, err := s.Client.Do(req)
+			if err != nil {
+				timer.Reset(time.Second)
+				continue
+			}
+			if resp.StatusCode != http.StatusOK {
+				resp.Body.Close()
+				timer.Reset(time.Second)
+				continue
+			}
+			var result struct {
+				Hits struct {
+					Total struct {
+						Value int `json:"value"`
+					} `json:"total"`
+				} `json:"hits"`
+			}
+			err = json.NewDecoder(resp.Body).Decode(&result)
+			resp.Body.Close()
+			s.Require().NoError(err)
+			if result.Hits.Total.Value > 0 {
+				return
+			}
+			timer.Reset(time.Second)
+		}
+	}
+}
