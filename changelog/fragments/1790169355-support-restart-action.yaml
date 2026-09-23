@@ -1,0 +1,13 @@
+kind: feature
+
+summary: Add support for the RESTART action.
+
+description: |
+  Fleet Server now recognizes the RESTART action type: it is accepted as a
+  valid action during checkin (with no action data, like UNENROLL) and its
+  acknowledgement is recorded as an action result. This allows Fleet to
+  remotely restart an Elastic Agent.
+
+component: fleet-server
+
+# issue: https://github.com/elastic/elastic-agent/issues/3367
