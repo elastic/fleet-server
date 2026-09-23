@@ -1,0 +1,44 @@
+version: 8.19.22
+entries:
+    - kind: bug-fix
+      summary: Fix secret keys corruption in policy processing
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/7781
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1788278234
+      file:
+        name: 1788278234-fix-secret-keys-corruption.yaml
+        checksum: 8fddfd49342e2d2721d820c5e3b333c61173899d
+    - kind: enhancement
+      summary: Update Go to 1.26.8
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/7757
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1788469748
+      file:
+        name: 1788469748-update-go-to-1.26.8.yaml
+        checksum: 144e69d3358b535f03ba3b6a41fa93b1e05626ad
+    - kind: bug-fix
+      summary: Fix agent permanently stuck in "updating" state after fast upgrade
+      description: |
+        Agents that completed an upgrade faster than one checkin interval (~60 s)
+        were permanently shown as "updating" in the Fleet UI. Fleet Server now
+        detects the completed upgrade and clears the stuck state on the next checkin.
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/7784
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1788912764
+      file:
+        name: 1788912764-fix-upgrade-started-at-stuck-fast-upgrade.yaml
+        checksum: 1e9f85bc348a11c95b0d1f88170a2681a08cf3a6
