@@ -144,7 +144,7 @@ func TestConfig(t *testing.T) {
 			err: "can only contain elasticsearch key",
 		},
 		"bad-bulk-flush-max-pending": {
-			err: "bulk.flush_max_pending must not be negative, got -1",
+			err: "bulk.flush_max_pending must be positive, got -1",
 		},
 		"bad-max-conn-per-host": {
 			err: "output.elasticsearch.max_conn_per_host must not be negative, got -1",
