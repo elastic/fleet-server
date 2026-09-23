@@ -147,7 +147,7 @@ func TestConfig(t *testing.T) {
 			err: "bulk.flush_max_pending must be positive, got -1",
 		},
 		"bad-max-conn-per-host": {
-			err: "output.elasticsearch.max_conn_per_host must not be negative, got -1",
+			err: "output.elasticsearch.max_conn_per_host must be positive, got -1",
 		},
 		"bad-limit-max": {
 			err: "limit max must not be negative, got -1",

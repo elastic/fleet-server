@@ -429,10 +429,15 @@ func TestElasticsearchValidate(t *testing.T) {
 		cfg.MaxConnPerHost = -1
 		require.Error(t, cfg.Validate())
 	})
-	t.Run("accepts zero MaxConnPerHost", func(t *testing.T) {
+	t.Run("rejects zero MaxConnPerHost", func(t *testing.T) {
 		cfg := Elasticsearch{}
 		cfg.InitDefaults()
 		cfg.MaxConnPerHost = 0
+		require.Error(t, cfg.Validate())
+	})
+	t.Run("accepts positive MaxConnPerHost", func(t *testing.T) {
+		cfg := Elasticsearch{}
+		cfg.InitDefaults()
 		require.NoError(t, cfg.Validate())
 	})
 }

@@ -69,8 +69,8 @@ func (c *Elasticsearch) InitDefaults() {
 
 // Validate ensures that the configuration is valid.
 func (c *Elasticsearch) Validate() error {
-	if c.MaxConnPerHost < 0 {
-		return fmt.Errorf("output.elasticsearch.max_conn_per_host must not be negative, got %d", c.MaxConnPerHost)
+	if c.MaxConnPerHost <= 0 {
+		return fmt.Errorf("output.elasticsearch.max_conn_per_host must be positive, got %d", c.MaxConnPerHost)
 	}
 	if c.ProxyURL != "" && !c.ProxyDisable {
 		if _, err := urlutil.ParseURL(c.ProxyURL); err != nil {
