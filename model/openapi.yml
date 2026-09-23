@@ -553,6 +553,7 @@ components:
             - $ref: "#/components/schemas/actionInputAction"
             - $ref: "#/components/schemas/actionMigrate"
             - $ref: "#/components/schemas/actionPrivilegeLevelChange"
+            - $ref: "#/components/schemas/actionUninstall"
         id:
           description: The action ID.
           type: string
@@ -579,6 +580,7 @@ components:
             - "REQUEST_DIAGNOSTICS"
             - "MIGRATE"
             - "PRIVILEGE_LEVEL_CHANGE"
+            - "UNINSTALL"
           x-go-custom-tag: yaml:"type" # openapi-generator
           x-oapi-codegen-extra-tags: # oapi-codegen tags
             yaml: "type"
@@ -698,6 +700,24 @@ components:
     actionUnenroll:
       description: The UNENROLL action data.
       # unenroll actions have no `data` attribute
+    actionUninstall:
+      description: The UNINSTALL action data.
+      type: object
+      properties:
+        delay:
+          description: |
+            Grace period before the uninstall executes on the agent, as a
+            duration string (e.g. "30m"). When empty the agent applies its
+            default (1h).
+          type: string
+          x-go-type-skip-optional-pointer: true
+        uninstall_token:
+          description: |
+            Uninstall token required to uninstall a tamper-protected (Elastic
+            Defend) agent. Passed through to the agent, which forwards it to the
+            uninstall command. Empty when the agent is not tamper-protected.
+          type: string
+          x-go-type-skip-optional-pointer: true
     actionRequestDiagnostics:
       description: The REQUEST_DIAGNOSTICS action data.
       properties:

@@ -33,9 +33,10 @@ import (
 )
 
 const (
-	TypeUnenroll = "UNENROLL"
-	TypeUpgrade  = "UPGRADE"
-	TypeMigrate  = "MIGRATE"
+	TypeUnenroll  = "UNENROLL"
+	TypeUpgrade   = "UPGRADE"
+	TypeMigrate   = "MIGRATE"
+	TypeUninstall = "UNINSTALL"
 )
 
 var (
@@ -309,10 +310,17 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 			setError(n, err)
 		} else {
 			setResult(n, http.StatusOK)
-		}
 
-		if event.Error == nil && (action.Type == TypeUnenroll || action.Type == TypeMigrate) {
-			unenrollIdxs = append(unenrollIdxs, n)
+			// UNINSTALL is acked after the agent is effectively removed; like UNENROLL
+			// and MIGRATE it must invalidate the agent's API keys. Only queue it once
+			// the action result has been recorded (this else branch) and the agent did
+			// not report an error, so a failure to record the result does not revoke
+			// keys or mark the agent inactive. It runs after the ack event has been
+			// authenticated, so the agent's ack always succeeds; only subsequent
+			// requests are rejected, which is correct for an uninstalled agent.
+			if event.Error == nil && (action.Type == TypeUnenroll || action.Type == TypeMigrate || action.Type == TypeUninstall) {
+				unenrollIdxs = append(unenrollIdxs, n)
+			}
 		}
 		span.End()
 	}
