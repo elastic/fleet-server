@@ -207,6 +207,16 @@ func parseBulkOpts(opts ...BulkOpt) bulkOptT {
 		f(&bopt)
 	}
 
+	// These two bound semaphores, and semaphore.NewWeighted panics on a negative
+	// size. A negative concurrency limit is meaningless, so treat it as unset
+	// rather than letting a bad config value crash the server on startup.
+	if bopt.maxPending < 0 {
+		bopt.maxPending = defaultMaxPending
+	}
+	if bopt.apikeyMaxParallel < 0 {
+		bopt.apikeyMaxParallel = defaultAPIKeyMaxParallel
+	}
+
 	return bopt
 }
 
