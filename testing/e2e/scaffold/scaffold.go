@@ -953,6 +953,55 @@ func (s *Scaffold) CreateEnrollmentAPIKey(ctx context.Context, policyID string) 
 	return obj.Item.APIKey
 }
 
+// WaitForFleetServerSecretsEnabled polls .fleet-agents until the fleet-server
+// agent document for agentID has local_metadata.elastic.agent.version indexed.
+// Kibana's isOutputSecretStorageEnabled() queries .fleet-agents directly (not
+// through its own cache), so there is a window after FleetIsHealthy returns
+// where the agent is visible via the Kibana API but its ES document has not
+// yet been indexed. Calling this before CreateFleetOutput ensures Kibana's
+// checkFleetServerVersionsForSecretsStorage will find the agent and enable
+// secret storage, so secret_references are populated in .fleet-policies.
+func (s *Scaffold) WaitForFleetServerSecretsEnabled(ctx context.Context, agentID string) {
+	query := fmt.Sprintf(`{"query":{"bool":{"must":[{"ids":{"values":[%q]}},{"exists":{"field":"local_metadata.elastic.agent.version"}}]}},"size":1}`, agentID)
+	timer := time.NewTimer(time.Second)
+	for {
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://localhost:9200/.fleet-agents/_search", strings.NewReader(query))
+		s.Require().NoError(err)
+		req.SetBasicAuth(s.ElasticUser, s.ElasticPass)
+		req.Header.Set("Content-Type", "application/json")
+		select {
+		case <-ctx.Done():
+			s.Require().NoError(ctx.Err(), "context expired before fleet-server agent version metadata appeared in .fleet-agents")
+			return
+		case <-timer.C:
+			resp, err := s.Client.Do(req)
+			if err != nil {
+				timer.Reset(time.Second)
+				continue
+			}
+			if resp.StatusCode != http.StatusOK {
+				resp.Body.Close()
+				timer.Reset(time.Second)
+				continue
+			}
+			var result struct {
+				Hits struct {
+					Total struct {
+						Value int `json:"value"`
+					} `json:"total"`
+				} `json:"hits"`
+			}
+			err = json.NewDecoder(resp.Body).Decode(&result)
+			resp.Body.Close()
+			s.Require().NoError(err)
+			if result.Hits.Total.Value > 0 {
+				return
+			}
+			timer.Reset(time.Second)
+		}
+	}
+}
+
 // WaitForPolicySecretReferences polls the .fleet-policies index until the most
 // recent revision for policyID has a non-empty secret_references array. Call
 // this after creating a policy with a Fleet output that uses the "secrets"
