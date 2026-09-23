@@ -5,6 +5,7 @@
 package config
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -14,6 +15,14 @@ type Limit struct {
 	Max                 int64         `config:"max"`
 	MaxBody             int64         `config:"max_body_byte_size"`
 	MaxBodyDecompressed int64         `config:"max_body_decompressed"`
+}
+
+// Validate ensures that the configuration is valid.
+func (c *Limit) Validate() error {
+	if c.Max < 0 {
+		return fmt.Errorf("limit max must not be negative, got %d", c.Max)
+	}
+	return nil
 }
 
 type ServerLimits struct {

@@ -421,3 +421,18 @@ func Test_Elasticsearch_DiagRequests(t *testing.T) {
 		require.Contains(t, string(p), "request 0 successful.")
 	})
 }
+
+func TestElasticsearchValidate(t *testing.T) {
+	t.Run("rejects negative MaxConnPerHost", func(t *testing.T) {
+		cfg := Elasticsearch{}
+		cfg.InitDefaults()
+		cfg.MaxConnPerHost = -1
+		require.Error(t, cfg.Validate())
+	})
+	t.Run("accepts zero MaxConnPerHost", func(t *testing.T) {
+		cfg := Elasticsearch{}
+		cfg.InitDefaults()
+		cfg.MaxConnPerHost = 0
+		require.NoError(t, cfg.Validate())
+	})
+}

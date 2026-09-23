@@ -1,0 +1,11 @@
+kind: bug-fix
+
+summary: Reject negative concurrency limits at configuration load time
+
+description: |
+  A negative `bulk.flush_max_pending`, `output.elasticsearch.max_conn_per_host`,
+  or any endpoint `limit.max` produced a semaphore that could never be acquired,
+  silently wedging the bulker or blocking all requests. Fleet Server now rejects
+  such values with a configuration error on startup rather than accepting them.
+
+component: fleet-server
