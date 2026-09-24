@@ -322,6 +322,10 @@ func (b *Bulker) ReadSecrets(ctx context.Context, secretIds []string) (map[strin
 			b.readSecretsLimit.Release(1)
 		}
 		if err != nil {
+			if errors.Is(err, ErrSecretNotFound) {
+				zerolog.Ctx(ctx).Warn().Str("secret_id", id).Msg("secret not found; policy will load without it")
+				continue
+			}
 			return nil, err
 		}
 		result[id] = val
