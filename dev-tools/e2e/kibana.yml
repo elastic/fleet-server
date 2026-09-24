@@ -54,12 +54,9 @@ xpack.fleet.agentPolicies:
     namespace: default
     package_policies:
       - name: fleet_server-2
-        id: default-fleet-server
+        id: apm-fleet-server
         package:
           name: fleet_server
-xpack.fleet.enableExperimental:
-  - outputSecretsStorage
-
 xpack.fleet.outputs:
   - id: fleet-default-output
     name: default
