@@ -511,9 +511,13 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	actCh := aSub.Ch()
 
 	for _, output := range agent.Outputs {
-		if output.APIKey == "" {
-			// use revision_idx=0 if the agent has a single output where no API key is defined
-			// This will force the policy monitor to emit a new policy to regerate API keys
+		if output.APIKey == "" && output.PermissionsHash != "" {
+			// A non-empty PermissionsHash means a key was previously minted for this
+			// output. If APIKey is now empty something cleared it — force revID=0 so the
+			// policy monitor re-emits the current policy and Prepare can recover the key.
+			// Entries with an empty hash have no expressed intent for a key (e.g. an
+			// external OTLP output after an mOTLP→external transition) and are skipped to
+			// avoid an indefinite re-emit loop.
 			revID = 0
 			break
 		}
@@ -1193,6 +1197,22 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 		return nil, fmt.Errorf("failed to prepare OTel exporters: %w", err)
 	}
 
+	// Remove otlp outputs from the delivered policy. Elastic Agent has no OTLP output
+	// implementation — OTLP delivery is configured entirely through the otelcol exporters
+	// block, which prepareOTelExporters has already populated from these outputs.
+	// Also prune the corresponding secret_paths entries collected above: the agent never
+	// receives the OTLP output block, so its secret paths must not appear in secret_paths.
+	for name, out := range pp.Outputs {
+		if out.Type != policy.OutputTypeOTLP {
+			continue
+		}
+		delete(pp.Policy.Data.Outputs, name)
+		prefix := "outputs." + name + "."
+		pp.SecretKeys = slices.DeleteFunc(pp.SecretKeys, func(key string) bool {
+			return strings.HasPrefix(key, prefix)
+		})
+	}
+
 	// Replace raw inputs with the secret-substituted version built during policy parsing.
 	pp.Policy.Data.Inputs = pp.Inputs
 
@@ -1255,13 +1275,37 @@ func prepareOTelExporters(outputs map[string]map[string]any, exporters map[strin
 		case policy.OTelExporterTypeElasticsearch:
 			ot, ok := output["type"].(string)
 			if !ok || (ot != policy.OutputTypeElasticsearch && ot != policy.OutputTypeRemoteElasticsearch) {
-				return fmt.Errorf("unexpected output type %q found for exporter %q", name, id)
+				return fmt.Errorf("unexpected output type %q found for exporter %q", ot, id)
 			}
 			apiKey, ok := output["api_key"].(string)
 			if !ok || apiKey == "" {
 				return fmt.Errorf("api key not found in output %q for exporter %q", name, id)
 			}
 			config["api_key"] = base64.StdEncoding.EncodeToString([]byte(apiKey))
+		case "otlp", "otlphttp":
+			ot, ok := output["type"].(string)
+			if !ok || ot != policy.OutputTypeOTLP {
+				return fmt.Errorf("unexpected output type %q found for exporter %q", ot, id)
+			}
+			apiKey, _ := output["api_key"].(string)
+			if apiKey == "" {
+				// External OTLP output — auth is already embedded in the exporter config by Kibana.
+				break
+			}
+			headers, _ := config["headers"].(map[string]any)
+			if headers == nil {
+				headers = make(map[string]any)
+			}
+			// Remove any existing authorization header regardless of case. HTTP headers are
+			// case-insensitive; a user-supplied `authorization` entry would otherwise sit
+			// alongside `Authorization` with no defined winner. The mOTLP key takes precedence.
+			for k := range headers {
+				if strings.EqualFold(k, "Authorization") {
+					delete(headers, k)
+				}
+			}
+			headers["Authorization"] = "ApiKey " + base64.StdEncoding.EncodeToString([]byte(apiKey))
+			config["headers"] = headers
 		default:
 			return fmt.Errorf("OTel exporter %q not supported", exporterType)
 		}
@@ -1567,7 +1611,7 @@ func (ct *CheckinT) processPolicyDetails(ctx context.Context, zlog zerolog.Logge
 	// Update API keys if the policy has changed, or if the revision differs.
 	if policyID != agent.AgentPolicyID || revisionIDX != agent.PolicyRevisionIdx {
 		for outputName, output := range agent.Outputs {
-			if output.Type != policy.OutputTypeElasticsearch {
+			if output.APIKeyID == "" && len(output.ToRetireAPIKeyIds) == 0 {
 				continue
 			}
 			if err := updateAPIKey(ctx, zlog, ct.bulker, agent.Id, output.APIKeyID, output.PermissionsHash, output.ToRetireAPIKeyIds, outputName); err != nil {
