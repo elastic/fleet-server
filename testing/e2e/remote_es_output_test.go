@@ -156,6 +156,7 @@ func (suite *AgentContainerSuite) TestRemoteESOutputWithSecrets() {
 	agentErrs := make([]error, numAgents)
 	var wg sync.WaitGroup
 	for i := range numAgents {
+		i := i
 		wg.Go(func() {
 			agentReq := testcontainers.ContainerRequest{
 				Image: suite.dockerImg,
