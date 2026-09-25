@@ -31,6 +31,7 @@ const (
 	REQUESTDIAGNOSTICS   ActionType = "REQUEST_DIAGNOSTICS"
 	SETTINGS             ActionType = "SETTINGS"
 	UNENROLL             ActionType = "UNENROLL"
+	UNINSTALL            ActionType = "UNINSTALL"
 	UPGRADE              ActionType = "UPGRADE"
 )
 
@@ -289,6 +290,19 @@ type ActionSignature struct {
 
 // ActionUnenroll The UNENROLL action data.
 type ActionUnenroll = interface{}
+
+// ActionUninstall The UNINSTALL action data.
+type ActionUninstall struct {
+	// Delay Grace period before the uninstall executes on the agent, as a
+	// duration string (e.g. "30m"). When empty the agent applies its
+	// default (1h).
+	Delay string `json:"delay,omitempty"`
+
+	// UninstallToken Uninstall token required to uninstall a tamper-protected (Elastic
+	// Defend) agent. Passed through to the agent, which forwards it to the
+	// uninstall command. Empty when the agent is not tamper-protected.
+	UninstallToken string `json:"uninstall_token,omitempty"`
+}
 
 // ActionUpgrade the UPGRADE action data.
 type ActionUpgrade struct {
@@ -1718,6 +1732,32 @@ func (t *Action_Data) FromActionPrivilegeLevelChange(v ActionPrivilegeLevelChang
 
 // MergeActionPrivilegeLevelChange performs a merge with any union data inside the Action_Data, using the provided ActionPrivilegeLevelChange
 func (t *Action_Data) MergeActionPrivilegeLevelChange(v ActionPrivilegeLevelChange) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsActionUninstall returns the union data inside the Action_Data as a ActionUninstall
+func (t Action_Data) AsActionUninstall() (ActionUninstall, error) {
+	var body ActionUninstall
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromActionUninstall overwrites any union data inside the Action_Data as the provided ActionUninstall
+func (t *Action_Data) FromActionUninstall(v ActionUninstall) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeActionUninstall performs a merge with any union data inside the Action_Data, using the provided ActionUninstall
+func (t *Action_Data) MergeActionUninstall(v ActionUninstall) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err

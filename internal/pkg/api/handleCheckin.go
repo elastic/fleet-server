@@ -81,6 +81,7 @@ var validActionTypes = map[string]bool{
 	string(UPGRADE):              true,
 	string(MIGRATE):              true,
 	string(PRIVILEGELEVELCHANGE): true,
+	string(UNINSTALL):            true,
 }
 
 // invalidKeyState tracks how many times an agent has checked in with an invalid API key
@@ -1061,6 +1062,14 @@ func convertActionData(aType ActionType, raw json.RawMessage) (ad Action_Data, e
 		return
 	case UNENROLL: // Action types with no data
 		return ad, nil
+	case UNINSTALL:
+		d := ActionUninstall{}
+		err = json.Unmarshal(raw, &d)
+		if err != nil {
+			return
+		}
+		err = ad.FromActionUninstall(d)
+		return
 	case MIGRATE:
 		d := ActionMigrate{}
 		err = json.Unmarshal(raw, &d)

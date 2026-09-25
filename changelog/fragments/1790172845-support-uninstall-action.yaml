@@ -1,0 +1,15 @@
+kind: feature
+
+summary: Add support for the UNINSTALL action.
+
+description: |
+  Fleet Server now recognizes the UNINSTALL action type: it is accepted as a
+  valid action during checkin and carries an optional `delay` grace period and
+  an optional `uninstall_token` (required to uninstall a tamper-protected agent)
+  in its data. When acknowledged, the agent's API keys are invalidated and the
+  agent is marked inactive. This allows Fleet to remotely uninstall an Elastic
+  Agent.
+
+component: fleet-server
+
+# issue: https://github.com/elastic/elastic-agent/issues/3367
