@@ -69,6 +69,9 @@ func (c *Elasticsearch) InitDefaults() {
 
 // Validate ensures that the configuration is valid.
 func (c *Elasticsearch) Validate() error {
+	if c.MaxConnPerHost <= 0 {
+		return fmt.Errorf("output.elasticsearch.max_conn_per_host must be positive, got %d", c.MaxConnPerHost)
+	}
 	if c.ProxyURL != "" && !c.ProxyDisable {
 		if _, err := urlutil.ParseURL(c.ProxyURL); err != nil {
 			return err
@@ -261,13 +264,13 @@ func (c *Elasticsearch) DiagRequests(ctx context.Context) []byte {
 		hostURL, err := makeURL(c.Protocol, "", host, 9200)
 		if err != nil {
 			zerolog.Ctx(ctx).Warn().Err(err).Str("host", host).Msg("Unable to transform host to url.URL")
-			res.WriteString(fmt.Sprintf("Unable to transform host %q to url.URL: %v\n", host, err))
+			fmt.Fprintf(&res, "Unable to transform host %q to url.URL: %v\n", host, err)
 			continue
 		}
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, hostURL, nil)
 		if err != nil {
 			zerolog.Ctx(ctx).Warn().Err(err).Str("host", host).Msg("Unable to create request to host")
-			res.WriteString(fmt.Sprintf("Unable to create request to host %q: %v\n", host, err))
+			fmt.Fprintf(&res, "Unable to create request to host %q: %v\n", host, err)
 			continue
 		}
 		req.Header = headers.Clone()

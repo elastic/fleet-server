@@ -76,6 +76,14 @@ func (c *ServerBulk) InitDefaults() {
 	c.EnrollBulker.InitDefaults()
 }
 
+// Validate ensures that the configuration is valid.
+func (c *ServerBulk) Validate() error {
+	if c.FlushMaxPending <= 0 {
+		return fmt.Errorf("bulk.flush_max_pending must be positive, got %d", c.FlushMaxPending)
+	}
+	return nil
+}
+
 // Server is the configuration for the server
 type (
 	Server struct {

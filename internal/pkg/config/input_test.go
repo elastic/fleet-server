@@ -13,6 +13,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBindAddress(t *testing.T) {
@@ -48,4 +49,24 @@ func TestBindAddress(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestServerBulkValidate(t *testing.T) {
+	t.Run("rejects negative FlushMaxPending", func(t *testing.T) {
+		cfg := ServerBulk{}
+		cfg.InitDefaults()
+		cfg.FlushMaxPending = -1
+		require.Error(t, cfg.Validate())
+	})
+	t.Run("rejects zero FlushMaxPending", func(t *testing.T) {
+		cfg := ServerBulk{}
+		cfg.InitDefaults()
+		cfg.FlushMaxPending = 0
+		require.Error(t, cfg.Validate())
+	})
+	t.Run("accepts positive FlushMaxPending", func(t *testing.T) {
+		cfg := ServerBulk{}
+		cfg.InitDefaults()
+		require.NoError(t, cfg.Validate())
+	})
 }
