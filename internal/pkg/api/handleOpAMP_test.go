@@ -221,7 +221,7 @@ inputs:
 		t.Run(tc.name, func(t *testing.T) {
 			ec := &protobufs.EffectiveConfig{
 				ConfigMap: &protobufs.AgentConfigMap{
-					ConfigMap: map[string]*protobufs.AgentConfigFile{
+					ConfigMap: map[string]*protobufs.AgentConfigObject{
 						"": {Body: []byte(tc.body)},
 					},
 				},
@@ -336,7 +336,7 @@ func TestUpdateAgentWithAgentToServerMessage(t *testing.T) {
 		},
 		EffectiveConfig: &protobufs.EffectiveConfig{
 			ConfigMap: &protobufs.AgentConfigMap{
-				ConfigMap: map[string]*protobufs.AgentConfigFile{
+				ConfigMap: map[string]*protobufs.AgentConfigObject{
 					"": {
 						Body:        []byte("password: hunter2\nnum: 2\n"),
 						ContentType: "text/yaml",
