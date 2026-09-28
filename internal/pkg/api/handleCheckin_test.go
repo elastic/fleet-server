@@ -2005,7 +2005,6 @@ func TestProcessPolicySecretPathsConcurrentDispatch(t *testing.T) {
 	secretPaths := make([][]string, agents)
 	errs := make([]error, agents)
 	for a := range agents {
-		a := a
 		agent := &model.Agent{
 			ESDocument: model.ESDocument{Id: fmt.Sprintf("agent%d", a)},
 			Outputs: map[string]*model.PolicyOutput{
