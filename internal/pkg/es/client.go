@@ -21,7 +21,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/rs/zerolog"
 
-	backoff "github.com/cenkalti/backoff/v4"
+	backoff "github.com/cenkalti/backoff/v7"
 	"github.com/elastic/go-elasticsearch/v8"
 )
 

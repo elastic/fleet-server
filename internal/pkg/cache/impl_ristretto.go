@@ -7,13 +7,13 @@
 package cache
 
 import (
-	"github.com/dgraph-io/ristretto"
+	"github.com/dgraph-io/ristretto/v2"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 )
 
 func newCache(cfg config.Cache) (Cacher, error) {
-	rcfg := &ristretto.Config{
+	rcfg := &ristretto.Config[string, any]{
 		NumCounters: cfg.NumCounters,
 		MaxCost:     cfg.MaxCost,
 		BufferItems: 64,
