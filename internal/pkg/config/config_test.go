@@ -150,7 +150,7 @@ func TestConfig(t *testing.T) {
 			err: "output.elasticsearch.max_conn_per_host must be positive, got -1",
 		},
 		"bad-limit-max": {
-			err: "limit max must not be negative, got -1",
+			err: "checkin_limit.max must not be negative, got -1",
 		},
 	}
 

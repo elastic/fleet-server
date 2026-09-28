@@ -12,17 +12,23 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestLimitValidate(t *testing.T) {
+func TestServerLimitsValidate(t *testing.T) {
 	t.Run("rejects negative Max", func(t *testing.T) {
-		cfg := Limit{Max: -1}
-		require.Error(t, cfg.Validate())
+		cfg := ServerLimits{CheckinLimit: Limit{Max: -1}}
+		err := cfg.Validate()
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "checkin_limit")
 	})
 	t.Run("accepts zero Max", func(t *testing.T) {
-		cfg := Limit{Max: 0}
+		cfg := ServerLimits{CheckinLimit: Limit{Max: 0}}
+		require.NoError(t, cfg.Validate())
+	})
+	t.Run("ignores Max on limits that do not use it", func(t *testing.T) {
+		cfg := ServerLimits{ActionLimit: Limit{Max: -1}, PolicyLimit: Limit{Max: -1}}
 		require.NoError(t, cfg.Validate())
 	})
 	t.Run("accepts positive Max", func(t *testing.T) {
-		cfg := Limit{Max: 100}
+		cfg := ServerLimits{CheckinLimit: Limit{Max: 100}}
 		require.NoError(t, cfg.Validate())
 	})
 }
