@@ -10,14 +10,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-<<<<<<< HEAD
 	"github.com/elastic/go-elasticsearch/v9"
 	"github.com/elastic/go-elasticsearch/v9/esapi"
-=======
-	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/rs/zerolog"
->>>>>>> 4f3259a (fix(apikey): log warning when Invalidate finds key not present in ES (#7866))
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 )
