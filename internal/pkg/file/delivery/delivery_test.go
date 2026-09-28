@@ -20,7 +20,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/file"
 	itesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
-	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v9"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -390,7 +390,7 @@ func mockESClient(t *testing.T) (*elasticsearch.Client, *MockTransport) {
 	}
 
 	mocktrans.RoundTripFn = func(req *http.Request) (*http.Response, error) { return mocktrans.Response, nil }
-	client, err := elasticsearch.NewClient(elasticsearch.Config{
+	client, err := elasticsearch.NewClient(elasticsearch.Config{ //nolint:staticcheck // uses deprecated Config; migration requires elastictransport dependency change
 		Transport: &mocktrans,
 	})
 	require.NoError(t, err)

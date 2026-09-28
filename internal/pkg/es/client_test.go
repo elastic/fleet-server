@@ -24,7 +24,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/testing/certs"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v9"
 )
 
 var enabled bool = true
@@ -322,7 +322,7 @@ func TestWithRetryOnTLSHandshakeError(t *testing.T) {
 	wrappedCertErr := &url.Error{Op: "Get", URL: "https://es.example", Err: certErr}
 
 	t.Run("composes with no prior predicate", func(t *testing.T) {
-		var cfg elasticsearch.Config
+		var cfg elasticsearch.Config //nolint:staticcheck // tests ConfigOption which uses deprecated elasticsearch.Config
 		WithRetryOnTLSHandshakeError()(&cfg)
 
 		require.NotNil(t, cfg.RetryOnError)
@@ -332,7 +332,7 @@ func TestWithRetryOnTLSHandshakeError(t *testing.T) {
 	})
 
 	t.Run("composes with prior predicate (OR semantics)", func(t *testing.T) {
-		var cfg elasticsearch.Config
+		var cfg elasticsearch.Config //nolint:staticcheck // tests ConfigOption which uses deprecated elasticsearch.Config
 		// Prior predicate retries only on ECONNREFUSED.
 		WithRetryOnErrs(syscall.ECONNREFUSED)(&cfg)
 		WithRetryOnTLSHandshakeError()(&cfg)

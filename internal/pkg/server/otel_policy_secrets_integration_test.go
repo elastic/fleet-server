@@ -20,7 +20,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v9"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/api"
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
@@ -97,11 +97,7 @@ func createAgentPolicyWithOtelSecrets(t *testing.T, ctx context.Context, bulker 
 		t.Fatal(err)
 	}
 
-	esCfg := elasticsearch.Config{
-		Username: "elastic",
-		Password: "changeme",
-	}
-	es, err := elasticsearch.NewClient(esCfg)
+	es, err := elasticsearch.New(elasticsearch.WithBasicAuth("elastic", "changeme"))
 	if err != nil {
 		t.Fatal(err)
 	}

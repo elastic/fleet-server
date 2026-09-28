@@ -12,7 +12,7 @@ import (
 	"testing"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/testing/esutil"
-	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v9"
 	"github.com/stretchr/testify/assert"
 )
 

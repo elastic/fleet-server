@@ -12,7 +12,7 @@ import (
 	"math"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
-	"github.com/elastic/go-elasticsearch/v8/esapi"
+	"github.com/elastic/go-elasticsearch/v9/esapi"
 	"github.com/rs/zerolog"
 	"go.elastic.co/apm/v2"
 )

@@ -33,7 +33,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v9"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/api"
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
@@ -157,11 +157,7 @@ func startTestServer(t *testing.T, ctx context.Context, policyD model.PolicyData
 
 	// In order to create a functional enrollement token we need to use the ES endpoint to create a new api key
 	// then add the key (id/value) to the enrollment index
-	esCfg := elasticsearch.Config{
-		Username: "elastic",
-		Password: "changeme",
-	}
-	es, err := elasticsearch.NewClient(esCfg)
+	es, err := elasticsearch.New(elasticsearch.WithBasicAuth("elastic", "changeme"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -338,11 +334,7 @@ func TestServerConfigErrorReload(t *testing.T) {
 
 	// In order to create a functional enrollement token we need to use the ES endpoint to create a new api key
 	// then add the key (id/value) to the enrollment index
-	esCfg := elasticsearch.Config{
-		Username: "elastic",
-		Password: "changeme",
-	}
-	es, err := elasticsearch.NewClient(esCfg)
+	es, err := elasticsearch.New(elasticsearch.WithBasicAuth("elastic", "changeme"))
 	require.NoError(t, err)
 	key, err := apikey.Create(ctx, es, "default", "", "true", []byte(`{
 	    "fleet-apikey-enroll": {

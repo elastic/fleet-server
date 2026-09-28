@@ -10,7 +10,7 @@ import (
 	"io"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
-	"github.com/elastic/go-elasticsearch/v8/esapi"
+	"github.com/elastic/go-elasticsearch/v9/esapi"
 	"github.com/rs/zerolog"
 )
 

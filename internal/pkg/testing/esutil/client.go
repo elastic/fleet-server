@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v9"
 	"github.com/stretchr/testify/require"
 )
 
@@ -34,7 +34,7 @@ func MockESClient(t *testing.T) (*elasticsearch.Client, *MockTransport) {
 	}
 
 	mocktrans.RoundTripFn = func(req *http.Request) (*http.Response, error) { return mocktrans.Response, nil }
-	client, err := elasticsearch.NewClient(elasticsearch.Config{
+	client, err := elasticsearch.NewClient(elasticsearch.Config{ //nolint:staticcheck // uses deprecated Config; migration requires elastictransport dependency change
 		Transport: &mocktrans,
 	})
 	require.NoError(t, err)

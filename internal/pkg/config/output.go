@@ -22,7 +22,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger/zap"
 
-	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v9"
 	"github.com/rs/zerolog"
 )
 
@@ -84,13 +84,13 @@ func (c *Elasticsearch) Validate() error {
 }
 
 // ToESConfig converts the configuration object into the config for the elasticsearch client.
-func (c *Elasticsearch) ToESConfig(longPoll bool) (elasticsearch.Config, error) {
+func (c *Elasticsearch) ToESConfig(longPoll bool) (elasticsearch.Config, error) { //nolint:staticcheck // uses deprecated elasticsearch.Config; full migration to functional options tracked separately
 	// build the addresses
 	addrs := make([]string, len(c.Hosts))
 	for i, host := range c.Hosts {
 		addr, err := makeURL(c.Protocol, c.Path, host, 9200)
 		if err != nil {
-			return elasticsearch.Config{}, err
+			return elasticsearch.Config{}, err //nolint:staticcheck // uses deprecated elasticsearch.Config
 		}
 		addrs[i] = addr
 	}
@@ -125,7 +125,7 @@ func (c *Elasticsearch) ToESConfig(longPoll bool) (elasticsearch.Config, error) 
 	if c.TLS != nil && c.TLS.IsEnabled() {
 		tls, err := tlscommon.LoadTLSConfig(c.TLS, zap.NewStub("elasticsearch-output"))
 		if err != nil {
-			return elasticsearch.Config{}, err
+			return elasticsearch.Config{}, err //nolint:staticcheck // uses deprecated elasticsearch.Config
 		}
 		httpTransport.TLSClientConfig = tls.ToConfig()
 	}
@@ -134,7 +134,7 @@ func (c *Elasticsearch) ToESConfig(longPoll bool) (elasticsearch.Config, error) 
 		if c.ProxyURL != "" {
 			proxyURL, err := urlutil.ParseURL(c.ProxyURL)
 			if err != nil {
-				return elasticsearch.Config{}, err
+				return elasticsearch.Config{}, err //nolint:staticcheck // uses deprecated elasticsearch.Config
 			}
 			httpTransport.Proxy = http.ProxyURL(proxyURL)
 		} else {
@@ -164,12 +164,12 @@ func (c *Elasticsearch) ToESConfig(longPoll bool) (elasticsearch.Config, error) 
 	if c.ServiceToken == "" && c.ServiceTokenPath != "" {
 		p, err := os.ReadFile(c.ServiceTokenPath)
 		if err != nil {
-			return elasticsearch.Config{}, fmt.Errorf("unable to read service_token_path: %w", err)
+			return elasticsearch.Config{}, fmt.Errorf("unable to read service_token_path: %w", err) //nolint:staticcheck // uses deprecated elasticsearch.Config
 		}
 		serviceToken = string(p)
 	}
 
-	return elasticsearch.Config{
+	return elasticsearch.Config{ //nolint:staticcheck // uses deprecated elasticsearch.Config; full migration tracked separately
 		Addresses:    addrs,
 		ServiceToken: serviceToken,
 		Header:       h,
@@ -261,13 +261,13 @@ func (c *Elasticsearch) DiagRequests(ctx context.Context) []byte {
 		hostURL, err := makeURL(c.Protocol, "", host, 9200)
 		if err != nil {
 			zerolog.Ctx(ctx).Warn().Err(err).Str("host", host).Msg("Unable to transform host to url.URL")
-			res.WriteString(fmt.Sprintf("Unable to transform host %q to url.URL: %v\n", host, err))
+			fmt.Fprintf(&res, "Unable to transform host %q to url.URL: %v\n", host, err)
 			continue
 		}
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, hostURL, nil)
 		if err != nil {
 			zerolog.Ctx(ctx).Warn().Err(err).Str("host", host).Msg("Unable to create request to host")
-			res.WriteString(fmt.Sprintf("Unable to create request to host %q: %v\n", host, err))
+			fmt.Fprintf(&res, "Unable to create request to host %q: %v\n", host, err)
 			continue
 		}
 		req.Header = headers.Clone()
