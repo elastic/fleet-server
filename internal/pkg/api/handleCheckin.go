@@ -1063,6 +1063,12 @@ func convertActionData(aType ActionType, raw json.RawMessage) (ad Action_Data, e
 	case UNENROLL: // Action types with no data
 		return ad, nil
 	case UNINSTALL:
+		// All UNINSTALL data fields (delay, uninstall_token) are optional, so a
+		// missing data attribute is valid: treat it as empty rather than failing to
+		// convert (which would drop the action from the checkin response).
+		if raw == nil {
+			return ad, nil
+		}
 		d := ActionUninstall{}
 		err = json.Unmarshal(raw, &d)
 		if err != nil {

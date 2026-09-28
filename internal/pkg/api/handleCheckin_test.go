@@ -213,11 +213,11 @@ func TestConvertActionData(t *testing.T) {
 		expect: Action_Data{json.RawMessage(`{}`)},
 		hasErr: false,
 	}, {
-		name:   "uninstall action - nil input fails",
+		name:   "uninstall action - nil data succeeds (all fields optional)",
 		aType:  UNINSTALL,
 		raw:    nil,
 		expect: Action_Data{},
-		hasErr: true,
+		hasErr: false,
 	}, {
 		name:   "migrate action - nil input fails",
 		aType:  MIGRATE,
