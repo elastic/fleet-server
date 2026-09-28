@@ -42,12 +42,12 @@ func (m *MockBulk) Update(ctx context.Context, index, id string, body []byte, op
 
 func (m *MockBulk) Read(ctx context.Context, index, id string, opts ...bulk.Opt) ([]byte, error) {
 	args := m.Called(ctx, index, id, opts)
-	return args.Get(0).([]byte), args.Error(1)
+	return args.Get(0).([]byte), args.Error(1) //nolint:errcheck // testify mock: type assertion intentionally panics on wrong type
 }
 
 func (m *MockBulk) ReadRaw(ctx context.Context, index, id string, opts ...bulk.Opt) (*bulk.MgetResponseItem, error) {
 	args := m.Called(ctx, index, id, opts)
-	return args.Get(0).(*bulk.MgetResponseItem), args.Error(1)
+	return args.Get(0).(*bulk.MgetResponseItem), args.Error(1) //nolint:errcheck // testify mock: type assertion intentionally panics on wrong type
 }
 
 func (m *MockBulk) Delete(ctx context.Context, index, id string, opts ...bulk.Opt) error {
@@ -57,32 +57,32 @@ func (m *MockBulk) Delete(ctx context.Context, index, id string, opts ...bulk.Op
 
 func (m *MockBulk) MCreate(ctx context.Context, ops []bulk.MultiOp, opts ...bulk.Opt) ([]bulk.BulkIndexerResponseItem, error) {
 	args := m.Called(ctx, ops, opts)
-	return args.Get(0).([]bulk.BulkIndexerResponseItem), args.Error(1)
+	return args.Get(0).([]bulk.BulkIndexerResponseItem), args.Error(1) //nolint:errcheck // testify mock: type assertion intentionally panics on wrong type
 }
 
 func (m *MockBulk) MIndex(ctx context.Context, ops []bulk.MultiOp, opts ...bulk.Opt) ([]bulk.BulkIndexerResponseItem, error) {
 	args := m.Called(ctx, ops, opts)
-	return args.Get(0).([]bulk.BulkIndexerResponseItem), args.Error(1)
+	return args.Get(0).([]bulk.BulkIndexerResponseItem), args.Error(1) //nolint:errcheck // testify mock: type assertion intentionally panics on wrong type
 }
 
 func (m *MockBulk) MUpdate(ctx context.Context, ops []bulk.MultiOp, opts ...bulk.Opt) ([]bulk.BulkIndexerResponseItem, error) {
 	args := m.Called(ctx, ops, opts)
-	return args.Get(0).([]bulk.BulkIndexerResponseItem), args.Error(1)
+	return args.Get(0).([]bulk.BulkIndexerResponseItem), args.Error(1) //nolint:errcheck // testify mock: type assertion intentionally panics on wrong type
 }
 
 func (m *MockBulk) MDelete(ctx context.Context, ops []bulk.MultiOp, opts ...bulk.Opt) ([]bulk.BulkIndexerResponseItem, error) {
 	args := m.Called(ctx, ops, opts)
-	return args.Get(0).([]bulk.BulkIndexerResponseItem), args.Error(1)
+	return args.Get(0).([]bulk.BulkIndexerResponseItem), args.Error(1) //nolint:errcheck // testify mock: type assertion intentionally panics on wrong type
 }
 
 func (m *MockBulk) Search(ctx context.Context, index string, body []byte, opts ...bulk.Opt) (*es.ResultT, error) {
 	args := m.Called(ctx, index, body, opts)
-	return args.Get(0).(*es.ResultT), args.Error(1)
+	return args.Get(0).(*es.ResultT), args.Error(1) //nolint:errcheck // testify mock: type assertion intentionally panics on wrong type
 }
 
 func (m *MockBulk) Client() *elasticsearch.Client {
 	args := m.Called()
-	return args.Get(0).(*elasticsearch.Client)
+	return args.Get(0).(*elasticsearch.Client) //nolint:errcheck // testify mock: type assertion intentionally panics on wrong type
 }
 
 func (m *MockBulk) GetBulker(outputName string) bulk.Bulk {
@@ -90,22 +90,22 @@ func (m *MockBulk) GetBulker(outputName string) bulk.Bulk {
 	if args.Get(0) == nil {
 		return nil
 	}
-	return args.Get(0).(bulk.Bulk)
+	return args.Get(0).(bulk.Bulk) //nolint:errcheck // testify mock: type assertion intentionally panics on wrong type
 }
 
 func (m *MockBulk) GetBulkerMap() map[string]bulk.Bulk {
 	args := m.Called()
-	return args.Get(0).(map[string]bulk.Bulk)
+	return args.Get(0).(map[string]bulk.Bulk) //nolint:errcheck // testify mock: type assertion intentionally panics on wrong type
 }
 
 func (m *MockBulk) CreateAndGetBulker(ctx context.Context, zlog zerolog.Logger, outputName string, outputMap map[string]map[string]any) (bulk.Bulk, bool, error) {
 	args := m.Called(ctx, zlog, outputName, outputMap)
-	return args.Get(0).(bulk.Bulk), args.Get(1).(bool), nil
+	return args.Get(0).(bulk.Bulk), args.Get(1).(bool), nil //nolint:errcheck // testify mock: type assertion intentionally panics on wrong type
 }
 
 func (m *MockBulk) CancelFn() context.CancelFunc {
 	args := m.Called()
-	return args.Get(0).(context.CancelFunc)
+	return args.Get(0).(context.CancelFunc) //nolint:errcheck // testify mock: type assertion intentionally panics on wrong type
 }
 
 func (m *MockBulk) ReadSecrets(ctx context.Context, secretIds []string) (map[string]string, error) {
@@ -118,17 +118,17 @@ func (m *MockBulk) ReadSecrets(ctx context.Context, secretIds []string) (map[str
 
 func (m *MockBulk) APIKeyCreate(ctx context.Context, name, ttl string, roles []byte, meta any) (*bulk.APIKey, error) {
 	args := m.Called(ctx, name, ttl, roles, meta)
-	return args.Get(0).(*bulk.APIKey), args.Error(1)
+	return args.Get(0).(*bulk.APIKey), args.Error(1) //nolint:errcheck // testify mock: type assertion intentionally panics on wrong type
 }
 
 func (m *MockBulk) APIKeyRead(ctx context.Context, id string, _ bool) (*bulk.APIKeyMetadata, error) {
 	args := m.Called(ctx, id)
-	return args.Get(0).(*bulk.APIKeyMetadata), args.Error(1)
+	return args.Get(0).(*bulk.APIKeyMetadata), args.Error(1) //nolint:errcheck // testify mock: type assertion intentionally panics on wrong type
 }
 
 func (m *MockBulk) APIKeyAuth(ctx context.Context, key bulk.APIKey) (*bulk.SecurityInfo, error) {
 	args := m.Called(ctx, key)
-	return args.Get(0).(*bulk.SecurityInfo), args.Error(1)
+	return args.Get(0).(*bulk.SecurityInfo), args.Error(1) //nolint:errcheck // testify mock: type assertion intentionally panics on wrong type
 }
 
 func (m *MockBulk) APIKeyInvalidate(ctx context.Context, ids ...string) error {

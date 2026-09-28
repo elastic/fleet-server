@@ -32,9 +32,9 @@ const (
 	defaultMaxRetries   = 5
 )
 
-type ConfigOption func(config *elasticsearch.Config)
+type ConfigOption func(config *elasticsearch.Config) //nolint:staticcheck // uses deprecated elasticsearch.Config; full migration to functional options tracked separately
 
-func applyDefaultOptions(escfg *elasticsearch.Config) {
+func applyDefaultOptions(escfg *elasticsearch.Config) { //nolint:staticcheck // uses deprecated elasticsearch.Config
 	exp := backoff.NewExponentialBackOff()
 	exp.InitialInterval = initialRetryBackoff
 	exp.RandomizationFactor = randomizationFactor
@@ -89,7 +89,7 @@ func NewClient(ctx context.Context, cfg *config.Config, longPoll bool, opts ...C
 
 	zlog.Debug().Msg("init es")
 
-	es, err := elasticsearch.NewClient(escfg)
+	es, err := elasticsearch.NewClient(escfg) //nolint:staticcheck // uses deprecated NewClient; full migration tracked separately
 	if err != nil {
 		zlog.Error().Err(err).Msg("fail elasticsearch init")
 		return nil, err
@@ -99,7 +99,7 @@ func NewClient(ctx context.Context, cfg *config.Config, longPoll bool, opts ...C
 }
 
 func WithUserAgent(name string, bi build.Info) ConfigOption {
-	return func(config *elasticsearch.Config) {
+	return func(config *elasticsearch.Config) { //nolint:staticcheck // uses deprecated elasticsearch.Config
 		ua := userAgent(name, bi)
 		// Set User-Agent header
 		if config.Header == nil {
@@ -110,7 +110,7 @@ func WithUserAgent(name string, bi build.Info) ConfigOption {
 }
 
 func InstrumentRoundTripper() ConfigOption {
-	return func(config *elasticsearch.Config) {
+	return func(config *elasticsearch.Config) { //nolint:staticcheck // uses deprecated elasticsearch.Config
 		config.Transport = apmelasticsearch.WrapRoundTripper(
 			config.Transport,
 		)
@@ -118,7 +118,7 @@ func InstrumentRoundTripper() ConfigOption {
 }
 
 func WithRetryOnErrs(errs ...error) ConfigOption {
-	return func(config *elasticsearch.Config) {
+	return func(config *elasticsearch.Config) { //nolint:staticcheck // uses deprecated elasticsearch.Config
 		config.RetryOnError = func(_ *http.Request, err error) bool {
 			for _, e := range errs {
 				if errors.Is(err, e) {
@@ -145,7 +145,7 @@ func WithRetryOnErrs(errs ...error) ConfigOption {
 // config: the resulting predicate returns true if either the previously set
 // one does, or the error is a TLS handshake error.
 func WithRetryOnTLSHandshakeError() ConfigOption {
-	return func(config *elasticsearch.Config) {
+	return func(config *elasticsearch.Config) { //nolint:staticcheck // uses deprecated elasticsearch.Config
 		prev := config.RetryOnError
 		config.RetryOnError = func(req *http.Request, err error) bool {
 			// Compose with any previously-installed RetryOnError predicate
@@ -172,13 +172,13 @@ func isTLSHandshakeError(err error) bool {
 }
 
 func WithMaxRetries(retries int) ConfigOption {
-	return func(config *elasticsearch.Config) {
+	return func(config *elasticsearch.Config) { //nolint:staticcheck // uses deprecated elasticsearch.Config
 		config.MaxRetries = retries
 	}
 }
 
 func WithRetryOnStatus(status int) ConfigOption {
-	return func(config *elasticsearch.Config) {
+	return func(config *elasticsearch.Config) { //nolint:staticcheck // uses deprecated elasticsearch.Config
 		if slices.Contains(config.RetryOnStatus, status) {
 			return
 		}
@@ -188,7 +188,7 @@ func WithRetryOnStatus(status int) ConfigOption {
 }
 
 func WithBackoff(exp *backoff.ExponentialBackOff) ConfigOption {
-	return func(config *elasticsearch.Config) {
+	return func(config *elasticsearch.Config) { //nolint:staticcheck // uses deprecated elasticsearch.Config
 		if exp == nil {
 			// no retry backoff
 			config.RetryBackoff = nil

@@ -47,7 +47,7 @@ func (m *blockingTransport) RoundTrip(_ *http.Request) (*http.Response, error) {
 
 func newTestBulkerWithTransport(t *testing.T, transport http.RoundTripper, opts ...BulkOpt) *Bulker {
 	t.Helper()
-	esClient, err := elasticsearch.NewClient(elasticsearch.Config{
+	esClient, err := elasticsearch.NewClient(elasticsearch.Config{ //nolint:staticcheck // uses deprecated Config; migration requires elastictransport dependency change
 		Transport: transport,
 		Addresses: []string{"http://localhost:9200"},
 	})

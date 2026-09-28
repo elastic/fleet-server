@@ -33,12 +33,7 @@ const testFleetRoles = `
 func TestRead_existingKey(t *testing.T) {
 	ctx := testlog.SetLogger(t).WithContext(t.Context())
 
-	cfg := elasticsearch.Config{
-		Username: "elastic",
-		Password: "changeme",
-	}
-
-	es, err := elasticsearch.NewClient(cfg)
+	es, err := elasticsearch.New(elasticsearch.WithBasicAuth("elastic", "changeme"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,12 +78,7 @@ func TestRead_existingKey(t *testing.T) {
 func TestRead_noKey(t *testing.T) {
 	ctx := testlog.SetLogger(t).WithContext(t.Context())
 
-	cfg := elasticsearch.Config{
-		Username: "elastic",
-		Password: "changeme",
-	}
-
-	es, err := elasticsearch.NewClient(cfg)
+	es, err := elasticsearch.New(elasticsearch.WithBasicAuth("elastic", "changeme"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,12 +103,7 @@ func TestCreateAPIKeyWithMetadata(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := testlog.SetLogger(t).WithContext(t.Context())
 
-			cfg := elasticsearch.Config{
-				Username: "elastic",
-				Password: "changeme",
-			}
-
-			es, err := elasticsearch.NewClient(cfg)
+			es, err := elasticsearch.New(elasticsearch.WithBasicAuth("elastic", "changeme"))
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -134,7 +134,7 @@ func SetupBulk(ctx context.Context, t testing.TB, opts ...BulkOpt) Bulk {
 
 	// Set up the client with username and password since this test is generic for any index and uses it's own index/mapping
 	e := getEnvironment()
-	cli, err := es.NewClient(ctx, &defaultCfg, false, func(config *elasticsearch.Config) {
+	cli, err := es.NewClient(ctx, &defaultCfg, false, func(config *elasticsearch.Config) { //nolint:staticcheck // ConfigOption uses deprecated elasticsearch.Config; migration tracked separately
 		config.ServiceToken = "" // reset service token
 		config.Username = e.Username
 		config.Password = e.Password

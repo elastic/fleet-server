@@ -140,8 +140,8 @@ func NewSimple(index string, esCli, monCli *elasticsearch.Client, opts ...Option
 // WithFetchSize sets the fetch size of the monitor.
 func WithFetchSize(fetchSize int) Option {
 	return func(m SimpleMonitor) {
-		if fetchSize > 0 {
-			m.(*simpleMonitorT).fetchSize = fetchSize
+		if sm, ok := m.(*simpleMonitorT); ok && fetchSize > 0 {
+			sm.fetchSize = fetchSize
 		}
 	}
 }
@@ -149,33 +149,43 @@ func WithFetchSize(fetchSize int) Option {
 // WithPollTimeout sets the global checkpoint polling timeout
 func WithPollTimeout(to time.Duration) Option {
 	return func(m SimpleMonitor) {
-		m.(*simpleMonitorT).pollTimeout = to
+		if sm, ok := m.(*simpleMonitorT); ok {
+			sm.pollTimeout = to
+		}
 	}
 }
 
 // WithExpiration adds the expiration field to the monitor query.
 func WithExpiration(withExpiration bool) Option {
 	return func(m SimpleMonitor) {
-		m.(*simpleMonitorT).withExpiration = withExpiration
+		if sm, ok := m.(*simpleMonitorT); ok {
+			sm.withExpiration = withExpiration
+		}
 	}
 }
 
 // WithReadyChan allows to pass the channel that will signal when monitor is ready.
 func WithReadyChan(readyCh chan error) Option {
 	return func(m SimpleMonitor) {
-		m.(*simpleMonitorT).readyCh = readyCh
+		if sm, ok := m.(*simpleMonitorT); ok {
+			sm.readyCh = readyCh
+		}
 	}
 }
 
 func WithAPMTracer(tracer *apm.Tracer) Option {
 	return func(m SimpleMonitor) {
-		m.(*simpleMonitorT).tracer = tracer
+		if sm, ok := m.(*simpleMonitorT); ok {
+			sm.tracer = tracer
+		}
 	}
 }
 
 func WithDebounceTime(dur time.Duration) Option {
 	return func(m SimpleMonitor) {
-		m.(*simpleMonitorT).debounceTime = dur
+		if sm, ok := m.(*simpleMonitorT); ok {
+			sm.debounceTime = dur
+		}
 	}
 }
 
