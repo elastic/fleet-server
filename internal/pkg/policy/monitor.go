@@ -298,6 +298,7 @@ func (m *monitorT) dispatchPending(ctx context.Context) {
 			m.mut.Lock()
 			m.pendingQ.pushFront(s) // context cancelled before sub is handled, put it back
 			m.mut.Unlock()
+			m.kickDeploy() // ensure the pushed-back item gets dispatched by the next loop iteration
 			if !errors.Is(err, context.Canceled) {
 				m.log.Warn().Err(err).Msg("Policy limit error")
 			}
@@ -323,6 +324,7 @@ func (m *monitorT) dispatchPending(ctx context.Context) {
 			m.mut.Lock()
 			m.pendingQ.pushFront(s)
 			m.mut.Unlock()
+			m.kickDeploy() // ensure the pushed-back item gets dispatched by the next loop iteration
 			m.log.Debug().Err(err).Msg("context termination detected in policy dispatch")
 			return
 		}
@@ -332,6 +334,7 @@ func (m *monitorT) dispatchPending(ctx context.Context) {
 			m.mut.Lock()
 			m.pendingQ.pushFront(s) // context cancelled before sub is handled, put it back
 			m.mut.Unlock()
+			m.kickDeploy() // ensure the pushed-back item gets dispatched by the next loop iteration
 			m.log.Debug().Err(ctx.Err()).Msg("context termination detected in policy dispatch")
 			return
 		case s.ch <- cloned:
