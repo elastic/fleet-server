@@ -97,7 +97,7 @@ steps:
     artifact_paths:
       - "artifacts/dra/fleet-server/*/manifest-*.json"
     plugins:
-      - elastic/oblt-google-auth#v1.2.0:
+      - elastic/oblt-google-auth#v1.3.4:
           lifetime: 10800 # seconds
           project-id: "elastic-observability-ci"
           project-number: "911195782929"
