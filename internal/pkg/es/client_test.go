@@ -335,15 +335,9 @@ func TestDefaultRetryOnError(t *testing.T) {
 		{"nil does not retry", nil, false},
 	}
 
-	// isTLSHandshakeError is the inner predicate; test it directly for each case.
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			retryFn := func(_ *http.Request, err error) bool {
-				return errors.Is(err, syscall.ECONNREFUSED) ||
-					errors.Is(err, syscall.ECONNRESET) ||
-					isTLSHandshakeError(err)
-			}
-			require.Equal(t, tc.want, retryFn(nil, tc.err))
+			require.Equal(t, tc.want, defaultRetryOnError(nil, tc.err))
 		})
 	}
 }
