@@ -447,12 +447,13 @@ func (ack *AckT) updateAPIKey(ctx context.Context,
 	agentID string,
 	apiKeyID, permissionHash string,
 	toRetireAPIKeyIDs []model.ToRetireAPIKeyIdsItems, outputName string) error {
-	return updateAPIKey(ctx, zlog, ack.bulk, agentID, apiKeyID, permissionHash, toRetireAPIKeyIDs, outputName)
+	return updateAPIKey(ctx, zlog, ack.bulk, ack.cache, agentID, apiKeyID, permissionHash, toRetireAPIKeyIDs, outputName)
 }
 
 func updateAPIKey(ctx context.Context,
 	zlog zerolog.Logger,
 	bulk bulk.Bulk,
+	c cache.Cache,
 	agentID string,
 	apiKeyID, permissionHash string,
 	toRetireAPIKeyIDs []model.ToRetireAPIKeyIdsItems, outputName string) error {
@@ -507,7 +508,7 @@ func updateAPIKey(ctx context.Context,
 				}
 			}
 		}
-		invalidateAPIKeys(ctx, zlog, bulk, toRetireAPIKeyIDs, apiKeyID)
+		invalidateAPIKeys(ctx, zlog, bulk, c, toRetireAPIKeyIDs, apiKeyID)
 		deleteRetiredSecrets(ctx, zlog, bulk, toRetireAPIKeyIDs)
 	}
 
@@ -576,7 +577,7 @@ func cleanRoles(roles json.RawMessage) (json.RawMessage, int, error) {
 }
 
 func (ack *AckT) invalidateAPIKeys(ctx context.Context, zlog zerolog.Logger, toRetireAPIKeyIDs []model.ToRetireAPIKeyIdsItems, skip string) {
-	invalidateAPIKeys(ctx, zlog, ack.bulk, toRetireAPIKeyIDs, skip)
+	invalidateAPIKeys(ctx, zlog, ack.bulk, ack.cache, toRetireAPIKeyIDs, skip)
 }
 
 func (ack *AckT) handleUnenroll(ctx context.Context, zlog zerolog.Logger, agent *model.Agent) error {
@@ -712,7 +713,7 @@ func makeUpdatePolicyBody(policyID string, newRev int64) []byte {
 	return buf.Bytes()
 }
 
-func invalidateAPIKeys(ctx context.Context, zlog zerolog.Logger, bulk bulk.Bulk, toRetireAPIKeyIDs []model.ToRetireAPIKeyIdsItems, skip string) {
+func invalidateAPIKeys(ctx context.Context, zlog zerolog.Logger, bulk bulk.Bulk, c cache.Cache, toRetireAPIKeyIDs []model.ToRetireAPIKeyIdsItems, skip string) {
 	ids := make([]string, 0, len(toRetireAPIKeyIDs))
 	remoteIds := make(map[string][]string)
 	for _, k := range toRetireAPIKeyIDs {
@@ -732,6 +733,10 @@ func invalidateAPIKeys(ctx context.Context, zlog zerolog.Logger, bulk bulk.Bulk,
 		zlog.Info().Strs("fleet.policy.apiKeyIDsToRetire", ids).Msg("Invalidate old API keys")
 		if err := bulk.APIKeyInvalidate(ctx, ids...); err != nil {
 			zlog.Info().Err(err).Strs("ids", ids).Msg("Failed to invalidate API keys")
+		} else if c != nil {
+			for _, id := range ids {
+				c.SetAPIKey(cache.APIKey{ID: id}, false)
+			}
 		}
 	}
 	// using remote es bulker to invalidate api key

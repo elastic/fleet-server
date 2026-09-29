@@ -25,6 +25,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
+	testcache "github.com/elastic/fleet-server/v7/internal/pkg/testing/cache"
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 
 	"github.com/stretchr/testify/assert"
@@ -628,6 +629,76 @@ func TestInvalidateAPIKeys(t *testing.T) {
 		ack.invalidateAPIKeys(context.Background(), logger, out.ToRetireAPIKeyIds, skip)
 
 		bulker.AssertExpectations(t)
+	}
+}
+
+func TestInvalidateAPIKeysCacheEviction(t *testing.T) {
+	tests := []struct {
+		name           string
+		toRetire       []model.ToRetireAPIKeyIdsItems
+		skip           string
+		invalidateErr  error
+		wantEvicted    []string
+		wantNotEvicted []string
+	}{{
+		name: "evicts successfully invalidated keys from cache",
+		toRetire: []model.ToRetireAPIKeyIdsItems{
+			{ID: "key1"},
+			{ID: "key2"},
+		},
+		invalidateErr:  nil,
+		wantEvicted:    []string{"key1", "key2"},
+		wantNotEvicted: nil,
+	}, {
+		name: "does not evict when ES invalidation fails",
+		toRetire: []model.ToRetireAPIKeyIdsItems{
+			{ID: "key1"},
+		},
+		invalidateErr:  errors.New("ES error"),
+		wantEvicted:    nil,
+		wantNotEvicted: []string{"key1"},
+	}, {
+		name: "does not evict skipped key",
+		toRetire: []model.ToRetireAPIKeyIdsItems{
+			{ID: "key1"},
+			{ID: "key2"},
+		},
+		skip:           "key1",
+		invalidateErr:  nil,
+		wantEvicted:    []string{"key2"},
+		wantNotEvicted: []string{"key1"},
+	}}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			bulker := ftesting.NewMockBulk()
+			mockCache := testcache.NewMockCache()
+
+			ids := make([]string, 0)
+			for _, k := range tc.toRetire {
+				if k.ID != tc.skip && k.ID != "" && k.Output == "" {
+					ids = append(ids, k.ID)
+				}
+			}
+			if len(ids) > 0 {
+				bulker.On("APIKeyInvalidate", context.Background(), mock.MatchedBy(func(got []string) bool {
+					return assert.ElementsMatch(t, ids, got)
+				})).Return(tc.invalidateErr)
+			}
+			for _, id := range tc.wantEvicted {
+				mockCache.On("SetAPIKey", cache.APIKey{ID: id}, false).Return()
+			}
+
+			logger := testlog.SetLogger(t)
+			ack := &AckT{bulk: bulker, cache: mockCache}
+			ack.invalidateAPIKeys(context.Background(), logger, tc.toRetire, tc.skip)
+
+			bulker.AssertExpectations(t)
+			mockCache.AssertExpectations(t)
+			for _, id := range tc.wantNotEvicted {
+				mockCache.AssertNotCalled(t, "SetAPIKey", cache.APIKey{ID: id}, false)
+			}
+		})
 	}
 }
 

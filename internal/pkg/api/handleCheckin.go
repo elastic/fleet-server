@@ -176,7 +176,7 @@ func (ct *CheckinT) handleCheckin(zlog zerolog.Logger, w http.ResponseWriter, r 
 		// invalidate remote API keys of force unenrolled agents
 		if errors.Is(err, ErrAgentInactive) && agent != nil {
 			ctx := zlog.WithContext(r.Context())
-			invalidateAPIKeysOfInactiveAgent(ctx, zlog, ct.bulker, agent)
+			invalidateAPIKeysOfInactiveAgent(ctx, zlog, ct.bulker, ct.cache, agent)
 		}
 		if ct.cfg.Features.GracefulForceUnenroll.Enabled && isInvalidAPIKeyErr(err) {
 			return ct.handleInvalidAPIKey(zlog, w, id, err)
@@ -198,7 +198,7 @@ func (ct *CheckinT) handleCheckin(zlog zerolog.Logger, w http.ResponseWriter, r 
 	return ct.ProcessRequest(zlog, w, r, start, agent, newVer)
 }
 
-func invalidateAPIKeysOfInactiveAgent(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agent *model.Agent) {
+func invalidateAPIKeysOfInactiveAgent(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, c cache.Cache, agent *model.Agent) {
 	remoteAPIKeys := make([]model.ToRetireAPIKeyIdsItems, 0)
 	apiKeys := agent.APIKeyIDs()
 	for _, key := range apiKeys {
@@ -207,7 +207,7 @@ func invalidateAPIKeysOfInactiveAgent(ctx context.Context, zlog zerolog.Logger, 
 		}
 	}
 	zlog.Info().Any("fleet.policy.apiKeyIDsToRetire", remoteAPIKeys).Msg("handleCheckin invalidate remote API keys")
-	invalidateAPIKeys(ctx, zlog, bulker, remoteAPIKeys, "")
+	invalidateAPIKeys(ctx, zlog, bulker, c, remoteAPIKeys, "")
 }
 
 // isInvalidAPIKeyErr reports whether err represents an invalid or disabled API key
@@ -1570,7 +1570,7 @@ func (ct *CheckinT) processPolicyDetails(ctx context.Context, zlog zerolog.Logge
 			if output.Type != policy.OutputTypeElasticsearch {
 				continue
 			}
-			if err := updateAPIKey(ctx, zlog, ct.bulker, agent.Id, output.APIKeyID, output.PermissionsHash, output.ToRetireAPIKeyIds, outputName); err != nil {
+			if err := updateAPIKey(ctx, zlog, ct.bulker, ct.cache, agent.Id, output.APIKeyID, output.PermissionsHash, output.ToRetireAPIKeyIds, outputName); err != nil {
 				// Only returns ErrUpdatingInactiveAgent
 				return 0, nil, err
 			}
