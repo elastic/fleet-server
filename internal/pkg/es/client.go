@@ -38,8 +38,9 @@ const (
 // ConfigOption configures the Elasticsearch client built by NewClient.
 // Obtain values using the With* functions in this package.
 type ConfigOption struct {
-	esOpts []elasticsearch.Option
-	rtWrap func(http.RoundTripper) http.RoundTripper
+	esOpts    []elasticsearch.Option
+	rtWrap    func(http.RoundTripper) http.RoundTripper
+	retryPred func(*http.Request, error) bool // OR-composed with defaults in NewClient
 }
 
 func newESOption(opt elasticsearch.Option) ConfigOption {
@@ -53,7 +54,19 @@ func NewConfigOption(opts ...elasticsearch.Option) ConfigOption {
 	return ConfigOption{esOpts: opts}
 }
 
-func defaultOptions(disableRetry bool) []elasticsearch.Option {
+// defaultRetryOnError is the baseline retry predicate: retry on connection
+// refused/reset (server may be restarting) and TLS handshake failures (the
+// latter matters when multiple ES hosts chain to different CAs — a single bad
+// host should not abort the request when another live host is available).
+// Timeouts are retried only for document creates (see shouldRetryTimeoutForCreate).
+func defaultRetryOnError(req *http.Request, err error) bool {
+	return errors.Is(err, syscall.ECONNREFUSED) ||
+		errors.Is(err, syscall.ECONNRESET) ||
+		isTLSHandshakeError(err) ||
+		shouldRetryTimeoutForCreate(req, err)
+}
+
+func defaultOptions(disableRetry bool, retryPred func(*http.Request, error) bool) []elasticsearch.Option {
 	if disableRetry {
 		return []elasticsearch.Option{
 			elasticsearch.WithTransportOptions(elastictransport.WithDisableRetry()),
@@ -67,17 +80,7 @@ func defaultOptions(disableRetry bool) []elasticsearch.Option {
 
 	return []elasticsearch.Option{
 		elasticsearch.WithTransportOptions(
-			elastictransport.WithRetryOnError(func(req *http.Request, err error) bool {
-				// Retry on connection refused/reset (server may be restarting) and TLS
-				// handshake failures. The latter matters when multiple ES hosts have
-				// certificates chaining to different CAs: a single bad host should not
-				// abort the request when another live host is available. Timeouts are
-				// retried only for document creates (see shouldRetryTimeoutForCreate).
-				return errors.Is(err, syscall.ECONNREFUSED) ||
-					errors.Is(err, syscall.ECONNRESET) ||
-					isTLSHandshakeError(err) ||
-					shouldRetryTimeoutForCreate(req, err)
-			}),
+			elastictransport.WithRetryOnError(retryPred),
 			elastictransport.WithRetryOnStatus(
 				http.StatusTooManyRequests,
 				http.StatusRequestTimeout,
@@ -106,11 +109,19 @@ func NewClient(ctx context.Context, cfg *config.Config, longPoll bool, opts ...C
 	mcph := cfg.Output.Elasticsearch.MaxConnPerHost
 
 	// Apply any transport wrappers (e.g. APM instrumentation) in order.
+	// Collect caller retry predicates for OR-composition with the default.
 	var rt http.RoundTripper = tCfg.Transport
+	combinedPred := defaultRetryOnError
 	var callerESopts []elasticsearch.Option
 	for _, opt := range opts {
 		if opt.rtWrap != nil {
 			rt = opt.rtWrap(rt)
+		}
+		if opt.retryPred != nil {
+			prev, p := combinedPred, opt.retryPred
+			combinedPred = func(r *http.Request, err error) bool {
+				return prev(r, err) || p(r, err)
+			}
 		}
 		callerESopts = append(callerESopts, opt.esOpts...)
 	}
@@ -134,7 +145,7 @@ func NewClient(ctx context.Context, cfg *config.Config, longPoll bool, opts ...C
 
 	zlog.Debug().Msg("init es")
 
-	allOpts := append(append(baseOpts, defaultOptions(tCfg.DisableRetry)...), callerESopts...)
+	allOpts := append(append(baseOpts, defaultOptions(tCfg.DisableRetry, combinedPred)...), callerESopts...)
 	es, err := elasticsearch.New(allOpts...)
 	if err != nil {
 		zlog.Error().Err(err).Msg("fail elasticsearch init")
@@ -160,35 +171,35 @@ func InstrumentRoundTripper() ConfigOption {
 	}
 }
 
+// WithRetryOnErrs adds extra error values to the retry predicate. The default
+// predicate (ECONNREFUSED, ECONNRESET, TLS handshake errors) is always active;
+// this option only widens it — it never replaces the defaults.
 func WithRetryOnErrs(errs ...error) ConfigOption {
-	return newESOption(elasticsearch.WithTransportOptions(
-		elastictransport.WithRetryOnError(func(req *http.Request, err error) bool {
+	return ConfigOption{
+		retryPred: func(_ *http.Request, err error) bool {
 			for _, e := range errs {
 				if errors.Is(err, e) {
 					return true
 				}
 			}
 			return false
-		}),
-	))
+		},
+	}
 }
 
 // WithRetryOnTLSHandshakeError enables retries on TLS handshake failures such
 // as certificate verification errors ("x509: certificate signed by unknown
 // authority", expired certs, hostname mismatches, etc.).
 //
-// When the Elasticsearch output has multiple hosts whose certificates chain to
-// different CAs, the underlying connection pool already marks a failed host
-// dead via OnFailure on any transport error — but the request itself is only
-// retried on a different host if RetryOnError returns true. Without this
-// option, a TLS handshake failure against one host would abort the current
-// request even when another host in the pool is still live and reachable.
+// TLS handshake errors are already included in the default retry predicate, so
+// this option is a no-op when used with NewClient. It is kept for call sites
+// that build clients independently and want to be explicit about TLS retries.
 func WithRetryOnTLSHandshakeError() ConfigOption {
-	return newESOption(elasticsearch.WithTransportOptions(
-		elastictransport.WithRetryOnError(func(req *http.Request, err error) bool {
+	return ConfigOption{
+		retryPred: func(_ *http.Request, err error) bool {
 			return isTLSHandshakeError(err)
-		}),
-	))
+		},
+	}
 }
 
 // isTLSHandshakeError reports whether err originated from a TLS certificate
@@ -210,7 +221,7 @@ func isTLSHandshakeError(err error) bool {
 // callers can treat as success. Other request types are not necessarily
 // idempotent and are never retried on timeout.
 func shouldRetryTimeoutForCreate(req *http.Request, err error) bool {
-	if req.Method != http.MethodPut || req.URL.Query().Get("op_type") != opTypeCreate {
+	if req == nil || req.Method != http.MethodPut || req.URL.Query().Get("op_type") != opTypeCreate {
 		return false
 	}
 	// A done request context means the caller gave up or its deadline passed,

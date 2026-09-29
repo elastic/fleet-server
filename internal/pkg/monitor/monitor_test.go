@@ -13,6 +13,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elastic/elastic-transport-go/v8/elastictransport"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/stretchr/testify/require"
 
@@ -27,10 +28,10 @@ func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 
 func newESClient(t *testing.T, transport http.RoundTripper) *elasticsearch.Client {
 	t.Helper()
-	cli, err := elasticsearch.NewClient(elasticsearch.Config{
-		Addresses: []string{"http://localhost:9200"},
-		Transport: transport,
-	})
+	cli, err := elasticsearch.New(
+		elasticsearch.WithAddresses("http://localhost:9200"),
+		elasticsearch.WithTransportOptions(elastictransport.WithTransport(transport)),
+	)
 	require.NoError(t, err)
 	return cli
 }
