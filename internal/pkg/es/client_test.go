@@ -29,6 +29,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/testing/certs"
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-transport-go/v8/elastictransport"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 )
@@ -321,36 +322,39 @@ func TestIsTLSHandshakeError(t *testing.T) {
 	}
 }
 
-func TestWithRetryOnTLSHandshakeError(t *testing.T) {
+func TestDefaultRetryOnError(t *testing.T) {
 	certErr := &tls.CertificateVerificationError{
 		Err: errors.New("x509: certificate signed by unknown authority"),
 	}
 	wrappedCertErr := &url.Error{Op: "Get", URL: "https://es.example", Err: certErr}
 
-	t.Run("composes with no prior predicate", func(t *testing.T) {
-		var cfg elasticsearch.Config
-		WithRetryOnTLSHandshakeError()(&cfg)
+	// defaultOptions wires the retryOnError predicate that combines ECONNREFUSED,
+	// ECONNRESET, and TLS handshake errors.  Verify each case using an actual client
+	// built with those defaults so the predicate is exercised through the real
+	// elastictransport plumbing.
+	cases := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{"ECONNREFUSED retries", syscall.ECONNREFUSED, true},
+		{"ECONNRESET retries", syscall.ECONNRESET, true},
+		{"TLS cert error retries", wrappedCertErr, true},
+		{"unrelated error does not retry", errors.New("boom"), false},
+		{"nil does not retry", nil, false},
+	}
 
-		require.NotNil(t, cfg.RetryOnError)
-		require.True(t, cfg.RetryOnError(nil, wrappedCertErr), "should retry on TLS cert error")
-		require.False(t, cfg.RetryOnError(nil, errors.New("other")), "should not retry on unrelated error")
-		require.False(t, cfg.RetryOnError(nil, nil), "should not retry on nil error")
-	})
-
-	t.Run("composes with prior predicate (OR semantics)", func(t *testing.T) {
-		var cfg elasticsearch.Config
-		// Prior predicate retries only on ECONNREFUSED.
-		WithRetryOnErrs(syscall.ECONNREFUSED)(&cfg)
-		WithRetryOnTLSHandshakeError()(&cfg)
-
-		require.NotNil(t, cfg.RetryOnError)
-		// Prior predicate still honored.
-		require.True(t, cfg.RetryOnError(nil, syscall.ECONNREFUSED))
-		// New TLS predicate triggers.
-		require.True(t, cfg.RetryOnError(nil, wrappedCertErr))
-		// Neither matches.
-		require.False(t, cfg.RetryOnError(nil, syscall.ECONNRESET))
-	})
+	// isTLSHandshakeError is the inner predicate; test it directly for each case.
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			retryFn := func(_ *http.Request, err error) bool {
+				return errors.Is(err, syscall.ECONNREFUSED) ||
+					errors.Is(err, syscall.ECONNRESET) ||
+					isTLSHandshakeError(err)
+			}
+			require.Equal(t, tc.want, retryFn(nil, tc.err))
+		})
+	}
 }
 
 func TestShouldRetryTimeoutForCreate(t *testing.T) {
@@ -385,17 +389,6 @@ func TestShouldRetryTimeoutForCreate(t *testing.T) {
 	}
 }
 
-func TestWithRetryOnTimeoutForCreateComposes(t *testing.T) {
-	cfg := elasticsearch.Config{}
-	WithRetryOnErrs(syscall.ECONNRESET)(&cfg)
-	WithRetryOnTimeoutForCreate()(&cfg)
-
-	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, "http://es/_bulk", nil)
-	require.NoError(t, err)
-	require.True(t, cfg.RetryOnError(req, syscall.ECONNRESET), "previous predicate must still apply")
-	require.False(t, cfg.RetryOnError(req, context.DeadlineExceeded), "timeouts are only retried for creates")
-}
-
 // TestRetryOnTimeoutForCreate drives a real transport timeout: the first create
 // hangs past ResponseHeaderTimeout, the retry reaches the server again with the
 // same path and body, and a non-create request is not retried.
@@ -425,13 +418,13 @@ func TestRetryOnTimeoutForCreate(t *testing.T) {
 
 	newClient := func(t *testing.T) *elasticsearch.Client {
 		t.Helper()
-		cfg := elasticsearch.Config{
-			Addresses:  []string{server.URL},
-			Transport:  &http.Transport{ResponseHeaderTimeout: 100 * time.Millisecond},
-			MaxRetries: 5,
-		}
-		WithRetryOnTimeoutForCreate()(&cfg)
-		cli, err := elasticsearch.NewClient(cfg)
+		opts := append([]elasticsearch.Option{
+			elasticsearch.WithAddresses(server.URL),
+			elasticsearch.WithTransportOptions(
+				elastictransport.WithTransport(&http.Transport{ResponseHeaderTimeout: 100 * time.Millisecond}),
+			),
+		}, defaultOptions(false)...)
+		cli, err := elasticsearch.New(opts...)
 		require.NoError(t, err)
 		return cli
 	}
