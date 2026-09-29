@@ -76,6 +76,7 @@ TRIG
       provider: "gcp"
       image: "${IMAGE_UBUNTU_X86_64}"
     timeout_in_minutes: 5
+    soft_fail: true
 ANN
 )
 fi
@@ -90,9 +91,8 @@ steps:
       DRA_WORKFLOW: "${TYPE}"
       VERSION_QUALIFIER: "${VERSION_QUALIFIER:-}"
     agents:
-      provider: "gcp"
-      image: "${IMAGE_UBUNTU_X86_64}"
-      machineType: "c2-standard-16"
+      provider: "k8s"
+      ephemeralStorage: "10Gi"
     timeout_in_minutes: 30
     artifact_paths:
       - "artifacts/dra/fleet-server/*/manifest-*.json"

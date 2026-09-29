@@ -164,9 +164,8 @@ steps:
     key: "dra-snapshot"
     command: ".buildkite/scripts/dra.sh snapshot"
     agents:
-      provider: "gcp"
-      image: "${IMAGE_UBUNTU_X86_64}"
-      machineType: "c2-standard-16"
+      provider: "k8s"
+      ephemeralStorage: "5Gi"
     plugins:
       - *oidc_plugin
     depends_on:
@@ -188,9 +187,8 @@ steps:
       source .buildkite/scripts/version_qualifier.sh
       .buildkite/scripts/dra.sh staging
     agents:
-      provider: "gcp"
-      image: "${IMAGE_UBUNTU_X86_64}"
-      machineType: "c2-standard-16"
+      provider: "k8s"
+      ephemeralStorage: "5Gi"
     plugins:
       - *oidc_plugin
     depends_on:
