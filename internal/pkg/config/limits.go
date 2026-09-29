@@ -53,7 +53,6 @@ func (c *ServerLimits) Validate() error {
 		{"enroll_limit", c.EnrollLimit},
 		{"ack_limit", c.AckLimit},
 		{"status_limit", c.StatusLimit},
-		{"opamp_limit", c.OpAMPLimit},
 		{"upload_start_limit", c.UploadStartLimit},
 		{"upload_end_limit", c.UploadEndLimit},
 		{"upload_chunk_limit", c.UploadChunkLimit},
