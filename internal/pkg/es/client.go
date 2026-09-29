@@ -29,7 +29,6 @@ const (
 	initialRetryBackoff = 500 * time.Millisecond
 	maxRetryBackoff     = 10 * time.Second
 	randomizationFactor = 0.5
-	defaultMaxRetries   = 5
 )
 
 // ConfigOption configures the Elasticsearch client built by NewClient.
@@ -39,6 +38,7 @@ type ConfigOption struct {
 	rtWrap        func(http.RoundTripper) http.RoundTripper
 	retryPred     func(*http.Request, error) bool // OR-composed with defaults in NewClient
 	retryStatuses []int                           // unioned with defaults in NewClient
+	userAgent     string                          // if set, overrides User-Agent in the request header
 }
 
 // defaultRetryStatuses is the baseline set of HTTP status codes that trigger a retry.
@@ -72,7 +72,7 @@ func defaultRetryOnError(_ *http.Request, err error) bool {
 		isTLSHandshakeError(err)
 }
 
-func defaultOptions(disableRetry bool, retryPred func(*http.Request, error) bool, retryStatuses []int) []elasticsearch.Option {
+func defaultOptions(disableRetry bool, retryPred func(*http.Request, error) bool, retryStatuses []int, maxRetries int) []elasticsearch.Option {
 	if disableRetry {
 		return []elasticsearch.Option{
 			elasticsearch.WithTransportOptions(elastictransport.WithDisableRetry()),
@@ -94,7 +94,7 @@ func defaultOptions(disableRetry bool, retryPred func(*http.Request, error) bool
 				}
 				return exp.NextBackOff()
 			}),
-			elastictransport.WithMaxRetries(defaultMaxRetries),
+			elastictransport.WithMaxRetries(maxRetries),
 		),
 	}
 }
@@ -134,6 +134,11 @@ func NewClient(ctx context.Context, cfg *config.Config, longPoll bool, opts ...C
 				retryStatuses = append(retryStatuses, s)
 			}
 		}
+		// WithUserAgent overwrites any operator-configured User-Agent header so
+		// fleet-server's identity is always present, matching the old Config API.
+		if opt.userAgent != "" {
+			tCfg.Header.Set("User-Agent", opt.userAgent)
+		}
 		callerESopts = append(callerESopts, opt.esOpts...)
 	}
 
@@ -156,7 +161,7 @@ func NewClient(ctx context.Context, cfg *config.Config, longPoll bool, opts ...C
 
 	zlog.Debug().Msg("init es")
 
-	allOpts := append(append(baseOpts, defaultOptions(tCfg.DisableRetry, combinedPred, retryStatuses)...), callerESopts...)
+	allOpts := append(append(baseOpts, defaultOptions(tCfg.DisableRetry, combinedPred, retryStatuses, tCfg.MaxRetries)...), callerESopts...)
 	es, err := elasticsearch.New(allOpts...)
 	if err != nil {
 		zlog.Error().Err(err).Msg("fail elasticsearch init")
@@ -166,10 +171,12 @@ func NewClient(ctx context.Context, cfg *config.Config, longPoll bool, opts ...C
 	return es, nil
 }
 
+// WithUserAgent sets the User-Agent header that fleet-server sends to
+// Elasticsearch. It overwrites any User-Agent value the operator may have set
+// in output.elasticsearch.headers, matching the behaviour of the old
+// Config-based API where this helper called config.Header.Set directly.
 func WithUserAgent(name string, bi build.Info) ConfigOption {
-	return newESOption(elasticsearch.WithTransportOptions(
-		elastictransport.WithUserAgent(userAgent(name, bi)),
-	))
+	return ConfigOption{userAgent: userAgent(name, bi)}
 }
 
 // InstrumentRoundTripper wraps the underlying HTTP transport with APM tracing.
