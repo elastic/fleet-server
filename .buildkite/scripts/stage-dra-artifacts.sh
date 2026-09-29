@@ -33,7 +33,7 @@ chmod -R a+w "${BASE_DIR}"
 mkdir -p artifacts
 find "${BASE_DIR}" -maxdepth 1 -type f \( -name "*-${VERSION}-darwin-*" -o -name "*-${VERSION}-linux-*" -o -name "*-${VERSION}-windows-*" \) -exec cp {} artifacts/ \;
 
-if ! ls artifacts/* >/dev/null 2>&1; then
+if [[ -z "$(find artifacts -maxdepth 1 -type f ! -name '*.sha512' -print -quit)" ]]; then
   echo "ERROR: no ${WORKFLOW} packages found in ${BASE_DIR}" >&2
   exit 1
 fi
