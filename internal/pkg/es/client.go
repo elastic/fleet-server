@@ -38,9 +38,20 @@ const (
 // ConfigOption configures the Elasticsearch client built by NewClient.
 // Obtain values using the With* functions in this package.
 type ConfigOption struct {
-	esOpts    []elasticsearch.Option
-	rtWrap    func(http.RoundTripper) http.RoundTripper
-	retryPred func(*http.Request, error) bool // OR-composed with defaults in NewClient
+	esOpts        []elasticsearch.Option
+	rtWrap        func(http.RoundTripper) http.RoundTripper
+	retryPred     func(*http.Request, error) bool // OR-composed with defaults in NewClient
+	retryStatuses []int                           // unioned with defaults in NewClient
+}
+
+// defaultRetryStatuses is the baseline set of HTTP status codes that trigger a retry.
+var defaultRetryStatuses = []int{
+	http.StatusTooManyRequests,
+	http.StatusRequestTimeout,
+	http.StatusTooEarly,
+	http.StatusBadGateway,
+	http.StatusServiceUnavailable,
+	http.StatusGatewayTimeout,
 }
 
 func newESOption(opt elasticsearch.Option) ConfigOption {
@@ -66,7 +77,7 @@ func defaultRetryOnError(req *http.Request, err error) bool {
 		shouldRetryTimeoutForCreate(req, err)
 }
 
-func defaultOptions(disableRetry bool, retryPred func(*http.Request, error) bool) []elasticsearch.Option {
+func defaultOptions(disableRetry bool, retryPred func(*http.Request, error) bool, retryStatuses []int) []elasticsearch.Option {
 	if disableRetry {
 		return []elasticsearch.Option{
 			elasticsearch.WithTransportOptions(elastictransport.WithDisableRetry()),
@@ -81,14 +92,7 @@ func defaultOptions(disableRetry bool, retryPred func(*http.Request, error) bool
 	return []elasticsearch.Option{
 		elasticsearch.WithTransportOptions(
 			elastictransport.WithRetryOnError(retryPred),
-			elastictransport.WithRetryOnStatus(
-				http.StatusTooManyRequests,
-				http.StatusRequestTimeout,
-				http.StatusTooEarly,
-				http.StatusBadGateway,
-				http.StatusServiceUnavailable,
-				http.StatusGatewayTimeout,
-			),
+			elastictransport.WithRetryOnStatus(retryStatuses...),
 			elastictransport.WithRetryBackoff(func(attempt int) time.Duration {
 				if attempt == 1 {
 					exp.Reset()
@@ -109,9 +113,15 @@ func NewClient(ctx context.Context, cfg *config.Config, longPoll bool, opts ...C
 	mcph := cfg.Output.Elasticsearch.MaxConnPerHost
 
 	// Apply any transport wrappers (e.g. APM instrumentation) in order.
-	// Collect caller retry predicates for OR-composition with the default.
+	// Collect caller retry predicates (OR-composed) and extra statuses (unioned).
 	var rt http.RoundTripper = tCfg.Transport
 	combinedPred := defaultRetryOnError
+	seenStatuses := make(map[int]struct{}, len(defaultRetryStatuses))
+	retryStatuses := make([]int, len(defaultRetryStatuses))
+	copy(retryStatuses, defaultRetryStatuses)
+	for _, s := range defaultRetryStatuses {
+		seenStatuses[s] = struct{}{}
+	}
 	var callerESopts []elasticsearch.Option
 	for _, opt := range opts {
 		if opt.rtWrap != nil {
@@ -121,6 +131,12 @@ func NewClient(ctx context.Context, cfg *config.Config, longPoll bool, opts ...C
 			prev, p := combinedPred, opt.retryPred
 			combinedPred = func(r *http.Request, err error) bool {
 				return prev(r, err) || p(r, err)
+			}
+		}
+		for _, s := range opt.retryStatuses {
+			if _, ok := seenStatuses[s]; !ok {
+				seenStatuses[s] = struct{}{}
+				retryStatuses = append(retryStatuses, s)
 			}
 		}
 		callerESopts = append(callerESopts, opt.esOpts...)
@@ -145,7 +161,7 @@ func NewClient(ctx context.Context, cfg *config.Config, longPoll bool, opts ...C
 
 	zlog.Debug().Msg("init es")
 
-	allOpts := append(append(baseOpts, defaultOptions(tCfg.DisableRetry, combinedPred)...), callerESopts...)
+	allOpts := append(append(baseOpts, defaultOptions(tCfg.DisableRetry, combinedPred, retryStatuses)...), callerESopts...)
 	es, err := elasticsearch.New(allOpts...)
 	if err != nil {
 		zlog.Error().Err(err).Msg("fail elasticsearch init")
@@ -239,10 +255,11 @@ func WithMaxRetries(retries int) ConfigOption {
 	))
 }
 
+// WithRetryOnStatus adds a single HTTP status code to the retry set. The six
+// default statuses (429, 408, 425, 502, 503, 504) are always retained; this
+// option only widens the set — it never replaces the defaults.
 func WithRetryOnStatus(status int) ConfigOption {
-	return newESOption(elasticsearch.WithTransportOptions(
-		elastictransport.WithRetryOnStatus(status),
-	))
+	return ConfigOption{retryStatuses: []int{status}}
 }
 
 func WithBackoff(exp *backoff.ExponentialBackOff) ConfigOption {
