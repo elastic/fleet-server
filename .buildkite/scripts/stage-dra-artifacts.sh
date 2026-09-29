@@ -4,10 +4,6 @@
 ##  fleet-server's package steps, generates the dependency CSV report, and
 ##  stages both into artifacts/ for the elastic/dra-prep plugin.
 ##
-##  The GCS bucket layout already separates snapshot and staging artifacts by
-##  workflow (see common.sh:get_bucket_uri), so no filename-based filtering is
-##  needed here -- everything downloaded for this WORKFLOW belongs to it.
-##
 
 set -euo pipefail
 
