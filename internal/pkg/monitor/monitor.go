@@ -140,8 +140,8 @@ func NewSimple(index string, esCli, monCli *elasticsearch.Client, opts ...Option
 // WithFetchSize sets the fetch size of the monitor.
 func WithFetchSize(fetchSize int) Option {
 	return func(m SimpleMonitor) {
-		if fetchSize > 0 {
-			m.(*simpleMonitorT).fetchSize = fetchSize
+		if sm, ok := m.(*simpleMonitorT); ok && fetchSize > 0 {
+			sm.fetchSize = fetchSize
 		}
 	}
 }
@@ -149,33 +149,43 @@ func WithFetchSize(fetchSize int) Option {
 // WithPollTimeout sets the global checkpoint polling timeout
 func WithPollTimeout(to time.Duration) Option {
 	return func(m SimpleMonitor) {
-		m.(*simpleMonitorT).pollTimeout = to
+		if sm, ok := m.(*simpleMonitorT); ok {
+			sm.pollTimeout = to
+		}
 	}
 }
 
 // WithExpiration adds the expiration field to the monitor query.
 func WithExpiration(withExpiration bool) Option {
 	return func(m SimpleMonitor) {
-		m.(*simpleMonitorT).withExpiration = withExpiration
+		if sm, ok := m.(*simpleMonitorT); ok {
+			sm.withExpiration = withExpiration
+		}
 	}
 }
 
 // WithReadyChan allows to pass the channel that will signal when monitor is ready.
 func WithReadyChan(readyCh chan error) Option {
 	return func(m SimpleMonitor) {
-		m.(*simpleMonitorT).readyCh = readyCh
+		if sm, ok := m.(*simpleMonitorT); ok {
+			sm.readyCh = readyCh
+		}
 	}
 }
 
 func WithAPMTracer(tracer *apm.Tracer) Option {
 	return func(m SimpleMonitor) {
-		m.(*simpleMonitorT).tracer = tracer
+		if sm, ok := m.(*simpleMonitorT); ok {
+			sm.tracer = tracer
+		}
 	}
 }
 
 func WithDebounceTime(dur time.Duration) Option {
 	return func(m SimpleMonitor) {
-		m.(*simpleMonitorT).debounceTime = dur
+		if sm, ok := m.(*simpleMonitorT); ok {
+			sm.debounceTime = dur
+		}
 	}
 }
 
@@ -230,7 +240,11 @@ func (m *simpleMonitorT) Run(ctx context.Context) (err error) {
 		checkpoint, err := gcheckpt.Query(sCtx, m.monCli, m.index)
 		span.End()
 		if err != nil {
-			m.log.Warn().Err(err).Msg("failed to initialize the global checkpoints, will retry")
+			if errors.Is(err, es.ErrShardRestoring) {
+				m.log.Warn().Msgf("index shard is being restored, poll again in %v", retryDelay)
+			} else {
+				m.log.Warn().Err(err).Msg("failed to initialize the global checkpoints, will retry")
+			}
 			err = sleep.WithContext(ctx, retryDelay)
 			if err != nil {
 				if m.tracer != nil {
@@ -276,6 +290,10 @@ func (m *simpleMonitorT) Run(ctx context.Context) (err error) {
 			if errors.Is(err, es.ErrIndexNotFound) {
 				// Wait until created
 				m.log.Debug().Msgf("index not found, poll again in %v", retryDelay)
+			} else if errors.Is(err, es.ErrShardRestoring) {
+				// Index shard is being restored from a snapshot; this is expected
+				// and self-resolving. Poll again after the retry delay.
+				m.log.Warn().Msgf("index shard is being restored, poll again in %v", retryDelay)
 			} else if errors.Is(err, es.ErrTimeout) {
 				// Timed out, wait again
 				m.log.Debug().Msg("timeout on global checkpoints advance, poll again")

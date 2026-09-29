@@ -88,24 +88,24 @@ resource "ec_deployment" "deployment" {
       size        = "8g"
       zone_count  = 2
     }
-    config = {
-      docker_image = var.elasticsearch_docker_image != "" ? local.docker_image_es : null
-    }
+    config = var.elasticsearch_docker_image != "" ? {
+      docker_image = local.docker_image_es
+    } : null
   }
 
   kibana = {
     size       = "2g"
     zone_count = 1
-    config = {
-      docker_image = var.kibana_docker_image != "" ? local.docker_image_kb : null
-    }
+    config = var.kibana_docker_image != "" ? {
+      docker_image = local.docker_image_kb
+    } : null
   }
 
   integrations_server = {
     size       = "1g"
     zone_count = 1
-    config = {
-      docker_image = var.elastic_agent_docker_image != "" ? local.docker_image_ea : null
-    }
+    config = var.elastic_agent_docker_image != "" ? {
+      docker_image = local.docker_image_ea
+    } : null
   }
 }
