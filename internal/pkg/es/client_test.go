@@ -416,7 +416,7 @@ func TestRetryOnTimeoutForCreate(t *testing.T) {
 			elasticsearch.WithTransportOptions(
 				elastictransport.WithTransport(&http.Transport{ResponseHeaderTimeout: 100 * time.Millisecond}),
 			),
-		}, defaultOptions(false, defaultRetryOnError, nil)...)
+		}, defaultOptions(false, defaultRetryOnError, nil, 5)...)
 		cli, err := elasticsearch.New(opts...)
 		require.NoError(t, err)
 		return cli
