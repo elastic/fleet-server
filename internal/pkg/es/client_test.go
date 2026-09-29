@@ -20,8 +20,10 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
+	"github.com/elastic/elastic-transport-go/v8/elastictransport"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/testing/certs"
+	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/stretchr/testify/require"
 )
 
@@ -340,4 +342,79 @@ func TestDefaultRetryOnError(t *testing.T) {
 			require.Equal(t, tc.want, defaultRetryOnError(nil, tc.err))
 		})
 	}
+}
+
+// roundTripFunc is a test helper implementing http.RoundTripper.
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+// minimalESCfg returns the smallest valid config.Config that points to a
+// placeholder ES host. Tests use an rtWrap to intercept transport calls before
+// any real network I/O happens.
+func minimalESCfg() *config.Config {
+	return &config.Config{
+		Output: config.Output{
+			Elasticsearch: config.Elasticsearch{
+				Protocol:       "http",
+				Hosts:          []string{"localhost:9200"},
+				Timeout:        90 * time.Second,
+				MaxConnPerHost: 128,
+			},
+		},
+	}
+}
+
+// zeroBackoff overrides the retry backoff to zero so tests complete instantly.
+func zeroBackoff() ConfigOption {
+	return NewConfigOption(elasticsearch.WithTransportOptions(
+		elastictransport.WithRetryBackoff(func(_ int) time.Duration { return 0 }),
+		elastictransport.WithMaxRetries(2),
+	))
+}
+
+// TestNewClientDefaultRetryWiring verifies that NewClient wires the default
+// retry predicate into the real elastictransport layer. A RoundTripper that
+// always returns ECONNREFUSED should cause exactly maxRetries+1 attempts.
+func TestNewClientDefaultRetryWiring(t *testing.T) {
+	var attempts int
+	rt := roundTripFunc(func(_ *http.Request) (*http.Response, error) {
+		attempts++
+		return nil, syscall.ECONNREFUSED
+	})
+
+	client, err := NewClient(t.Context(), minimalESCfg(), false,
+		ConfigOption{rtWrap: func(_ http.RoundTripper) http.RoundTripper { return rt }},
+		zeroBackoff(),
+	)
+	require.NoError(t, err)
+
+	req, _ := http.NewRequestWithContext(t.Context(), "GET", "http://localhost:9200/", nil)
+	_, _ = client.Perform(req) //nolint:bodyclose // error path, no body
+	require.Equal(t, 3, attempts, "expected 1 initial + 2 retries")
+}
+
+// TestNewClientWithRetryOnErrsComposition verifies that WithRetryOnErrs
+// OR-composes with (not replaces) the default retry predicate: a custom
+// sentinel error should trigger retries when passed via WithRetryOnErrs,
+// while the defaults (ECONNREFUSED, etc.) remain active even without it.
+func TestNewClientWithRetryOnErrsComposition(t *testing.T) {
+	sentinelErr := errors.New("custom sentinel")
+	var attempts int
+	rt := roundTripFunc(func(_ *http.Request) (*http.Response, error) {
+		attempts++
+		return nil, sentinelErr
+	})
+
+	client, err := NewClient(t.Context(), minimalESCfg(), false,
+		ConfigOption{rtWrap: func(_ http.RoundTripper) http.RoundTripper { return rt }},
+		WithRetryOnErrs(sentinelErr),
+		zeroBackoff(),
+	)
+	require.NoError(t, err)
+
+	req, _ := http.NewRequestWithContext(t.Context(), "GET", "http://localhost:9200/", nil)
+	_, _ = client.Perform(req) //nolint:bodyclose // error path, no body
+	// WithRetryOnErrs widens the predicate: sentinelErr now retries.
+	require.Equal(t, 3, attempts, "expected 1 initial + 2 retries via WithRetryOnErrs")
 }
