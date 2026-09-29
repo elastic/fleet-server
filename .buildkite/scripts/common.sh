@@ -137,7 +137,7 @@ resolve_dra_version() {
     # mage getVersion only appends "-SNAPSHOT" when the SNAPSHOT env var is
     # set, which happens in the separate package.sh job -- apply it here too
     # so it matches the packaged snapshot artifacts.
-    if [[ ${type} == "snapshot" ]]; then
+    if [[ ${type} == "snapshot" && ${version} != *-SNAPSHOT ]]; then
         echo "${version}-SNAPSHOT"
     else
         echo "${version}"
