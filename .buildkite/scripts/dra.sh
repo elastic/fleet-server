@@ -37,6 +37,11 @@ DRA_UPLOAD=true
 if [[ "${BUILDKITE_PULL_REQUEST}" != "false" || "${DRY_RUN:-}" == "true" ]]; then
     DRA_UPLOAD=false
 fi
+# DRA_BRANCH only enables the DRA steps for testing; the plugin publishes
+# under BUILDKITE_BRANCH, so never publish from an overridden branch.
+if [[ -n "${DRA_BRANCH:-}" && "${DRA_BRANCH}" != "${BUILDKITE_BRANCH}" ]]; then
+    DRA_UPLOAD=false
+fi
 
 echo "--- :arrow_right: DRA context"
 echo "BUILDKITE_BRANCH=${BUILDKITE_BRANCH}"
