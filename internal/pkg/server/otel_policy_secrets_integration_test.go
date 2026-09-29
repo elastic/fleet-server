@@ -97,11 +97,9 @@ func createAgentPolicyWithOtelSecrets(t *testing.T, ctx context.Context, bulker 
 		t.Fatal(err)
 	}
 
-	esCfg := elasticsearch.Config{
-		Username: "elastic",
-		Password: "changeme",
-	}
-	es, err := elasticsearch.NewClient(esCfg)
+	es, err := elasticsearch.New(
+		elasticsearch.WithBasicAuth("elastic", "changeme"),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}

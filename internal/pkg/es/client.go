@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"net/http"
 	"runtime"
-	"slices"
 	"syscall"
 	"time"
 
@@ -22,6 +21,7 @@ import (
 	"github.com/rs/zerolog"
 
 	backoff "github.com/cenkalti/backoff/v7"
+	"github.com/elastic/elastic-transport-go/v8/elastictransport"
 	"github.com/elastic/go-elasticsearch/v8"
 )
 
@@ -32,54 +32,94 @@ const (
 	defaultMaxRetries   = 5
 )
 
-type ConfigOption func(config *elasticsearch.Config)
+// ConfigOption configures the Elasticsearch client built by NewClient.
+// Obtain values using the With* functions in this package.
+type ConfigOption struct {
+	esOpts []elasticsearch.Option
+	rtWrap func(http.RoundTripper) http.RoundTripper
+}
 
-func applyDefaultOptions(escfg *elasticsearch.Config) {
+func newESOption(opt elasticsearch.Option) ConfigOption {
+	return ConfigOption{esOpts: []elasticsearch.Option{opt}}
+}
+
+// NewConfigOption wraps one or more elasticsearch.Option values as a ConfigOption.
+// Prefer the typed With* helpers in this package; use this only when you need
+// to pass a raw elasticsearch option that has no helper (e.g. in tests).
+func NewConfigOption(opts ...elasticsearch.Option) ConfigOption {
+	return ConfigOption{esOpts: opts}
+}
+
+func defaultOptions(disableRetry bool) []elasticsearch.Option {
+	if disableRetry {
+		return []elasticsearch.Option{
+			elasticsearch.WithTransportOptions(elastictransport.WithDisableRetry()),
+		}
+	}
+
 	exp := backoff.NewExponentialBackOff()
 	exp.InitialInterval = initialRetryBackoff
 	exp.RandomizationFactor = randomizationFactor
 	exp.MaxInterval = maxRetryBackoff
 
-	opts := []ConfigOption{
-		WithRetryOnErrs(syscall.ECONNREFUSED, syscall.ECONNRESET), // server may be restarting
-
-		// When the Elasticsearch output has multiple hosts whose certificates
-		// chain to different CAs, a single untrusted host would otherwise fail
-		// the request outright. Retrying lets the underlying connection pool's
-		// dead-host failover redirect the attempt to a host that is still in
-		// the live list.
-		WithRetryOnTLSHandshakeError(),
-
-		WithRetryOnStatus(http.StatusTooManyRequests),
-		WithRetryOnStatus(http.StatusRequestTimeout),
-		WithRetryOnStatus(http.StatusTooEarly),
-		WithRetryOnStatus(http.StatusBadGateway),
-		WithRetryOnStatus(http.StatusServiceUnavailable),
-		WithRetryOnStatus(http.StatusGatewayTimeout),
-
-		WithBackoff(exp),
-		WithMaxRetries(defaultMaxRetries),
-	}
-
-	for _, opt := range opts {
-		opt(escfg)
+	return []elasticsearch.Option{
+		elasticsearch.WithTransportOptions(
+			elastictransport.WithRetryOnError(func(_ *http.Request, err error) bool {
+				// Retry on connection refused/reset (server may be restarting) and TLS
+				// handshake failures. The latter matters when multiple ES hosts have
+				// certificates chaining to different CAs: a single bad host should not
+				// abort the request when another live host is available.
+				return errors.Is(err, syscall.ECONNREFUSED) ||
+					errors.Is(err, syscall.ECONNRESET) ||
+					isTLSHandshakeError(err)
+			}),
+			elastictransport.WithRetryOnStatus(
+				http.StatusTooManyRequests,
+				http.StatusRequestTimeout,
+				http.StatusTooEarly,
+				http.StatusBadGateway,
+				http.StatusServiceUnavailable,
+				http.StatusGatewayTimeout,
+			),
+			elastictransport.WithRetryBackoff(func(attempt int) time.Duration {
+				if attempt == 1 {
+					exp.Reset()
+				}
+				return exp.NextBackOff()
+			}),
+			elastictransport.WithMaxRetries(defaultMaxRetries),
+		),
 	}
 }
 
 func NewClient(ctx context.Context, cfg *config.Config, longPoll bool, opts ...ConfigOption) (*elasticsearch.Client, error) {
-	escfg, err := cfg.Output.Elasticsearch.ToESConfig(longPoll)
+	tCfg, err := cfg.Output.Elasticsearch.ToESTransportConfig(longPoll)
 	if err != nil {
 		return nil, err
 	}
 	addr := cfg.Output.Elasticsearch.Hosts
 	mcph := cfg.Output.Elasticsearch.MaxConnPerHost
 
-	// apply default config
-	applyDefaultOptions(&escfg)
-
-	// Apply configuration options
+	// Apply any transport wrappers (e.g. APM instrumentation) in order.
+	var rt http.RoundTripper = tCfg.Transport
+	var callerESopts []elasticsearch.Option
 	for _, opt := range opts {
-		opt(&escfg)
+		if opt.rtWrap != nil {
+			rt = opt.rtWrap(rt)
+		}
+		callerESopts = append(callerESopts, opt.esOpts...)
+	}
+
+	// Build base client options from the resolved transport config.
+	baseOpts := []elasticsearch.Option{
+		elasticsearch.WithAddresses(tCfg.Addresses...),
+		elasticsearch.WithTransportOptions(
+			elastictransport.WithTransport(rt),
+			elastictransport.WithHeader(tCfg.Header),
+		),
+	}
+	if tCfg.ServiceToken != "" {
+		baseOpts = append(baseOpts, elasticsearch.WithServiceToken(tCfg.ServiceToken))
 	}
 
 	zlog := zerolog.Ctx(ctx).With().
@@ -89,7 +129,8 @@ func NewClient(ctx context.Context, cfg *config.Config, longPoll bool, opts ...C
 
 	zlog.Debug().Msg("init es")
 
-	es, err := elasticsearch.NewClient(escfg)
+	allOpts := append(append(baseOpts, defaultOptions(tCfg.DisableRetry)...), callerESopts...)
+	es, err := elasticsearch.New(allOpts...)
 	if err != nil {
 		zlog.Error().Err(err).Msg("fail elasticsearch init")
 		return nil, err
@@ -99,35 +140,32 @@ func NewClient(ctx context.Context, cfg *config.Config, longPoll bool, opts ...C
 }
 
 func WithUserAgent(name string, bi build.Info) ConfigOption {
-	return func(config *elasticsearch.Config) {
-		ua := userAgent(name, bi)
-		// Set User-Agent header
-		if config.Header == nil {
-			config.Header = http.Header{}
-		}
-		config.Header.Set("User-Agent", ua)
-	}
+	return newESOption(elasticsearch.WithTransportOptions(
+		elastictransport.WithUserAgent(userAgent(name, bi)),
+	))
 }
 
+// InstrumentRoundTripper wraps the underlying HTTP transport with APM tracing.
+// Apply this option when APM instrumentation is enabled.
 func InstrumentRoundTripper() ConfigOption {
-	return func(config *elasticsearch.Config) {
-		config.Transport = apmelasticsearch.WrapRoundTripper(
-			config.Transport,
-		)
+	return ConfigOption{
+		rtWrap: func(rt http.RoundTripper) http.RoundTripper {
+			return apmelasticsearch.WrapRoundTripper(rt)
+		},
 	}
 }
 
 func WithRetryOnErrs(errs ...error) ConfigOption {
-	return func(config *elasticsearch.Config) {
-		config.RetryOnError = func(_ *http.Request, err error) bool {
+	return newESOption(elasticsearch.WithTransportOptions(
+		elastictransport.WithRetryOnError(func(_ *http.Request, err error) bool {
 			for _, e := range errs {
 				if errors.Is(err, e) {
 					return true
 				}
 			}
 			return false
-		}
-	}
+		}),
+	))
 }
 
 // WithRetryOnTLSHandshakeError enables retries on TLS handshake failures such
@@ -140,25 +178,12 @@ func WithRetryOnErrs(errs ...error) ConfigOption {
 // retried on a different host if RetryOnError returns true. Without this
 // option, a TLS handshake failure against one host would abort the current
 // request even when another host in the pool is still live and reachable.
-//
-// This option composes with any RetryOnError predicate already set on the
-// config: the resulting predicate returns true if either the previously set
-// one does, or the error is a TLS handshake error.
 func WithRetryOnTLSHandshakeError() ConfigOption {
-	return func(config *elasticsearch.Config) {
-		prev := config.RetryOnError
-		config.RetryOnError = func(req *http.Request, err error) bool {
-			// Compose with any previously-installed RetryOnError predicate
-			// (e.g. WithRetryOnErrs) using OR semantics: if the prior
-			// predicate already wants to retry, honor that and short-circuit.
-			// This way, layering this option on top of an existing classifier
-			// only widens the set of retried errors and never clobbers it.
-			if prev != nil && prev(req, err) {
-				return true
-			}
+	return newESOption(elasticsearch.WithTransportOptions(
+		elastictransport.WithRetryOnError(func(_ *http.Request, err error) bool {
 			return isTLSHandshakeError(err)
-		}
-	}
+		}),
+	))
 }
 
 // isTLSHandshakeError reports whether err originated from a TLS certificate
@@ -172,36 +197,31 @@ func isTLSHandshakeError(err error) bool {
 }
 
 func WithMaxRetries(retries int) ConfigOption {
-	return func(config *elasticsearch.Config) {
-		config.MaxRetries = retries
-	}
+	return newESOption(elasticsearch.WithTransportOptions(
+		elastictransport.WithMaxRetries(retries),
+	))
 }
 
 func WithRetryOnStatus(status int) ConfigOption {
-	return func(config *elasticsearch.Config) {
-		if slices.Contains(config.RetryOnStatus, status) {
-			return
-		}
-
-		config.RetryOnStatus = append(config.RetryOnStatus, status)
-	}
+	return newESOption(elasticsearch.WithTransportOptions(
+		elastictransport.WithRetryOnStatus(status),
+	))
 }
 
 func WithBackoff(exp *backoff.ExponentialBackOff) ConfigOption {
-	return func(config *elasticsearch.Config) {
-		if exp == nil {
-			// no retry backoff
-			config.RetryBackoff = nil
-			return
-		}
-
-		config.RetryBackoff = func(attempt int) time.Duration {
+	if exp == nil {
+		return newESOption(elasticsearch.WithTransportOptions(
+			elastictransport.WithRetryBackoff(nil),
+		))
+	}
+	return newESOption(elasticsearch.WithTransportOptions(
+		elastictransport.WithRetryBackoff(func(attempt int) time.Duration {
 			if attempt == 1 {
 				exp.Reset()
 			}
 			return exp.NextBackOff()
-		}
-	}
+		}),
+	))
 }
 
 func userAgent(name string, bi build.Info) string {
