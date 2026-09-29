@@ -91,8 +91,9 @@ steps:
       DRA_WORKFLOW: "${TYPE}"
       VERSION_QUALIFIER: "${VERSION_QUALIFIER:-}"
     agents:
-      provider: "k8s"
-      ephemeralStorage: "10Gi"
+      provider: "gcp"
+      image: "${IMAGE_UBUNTU_X86_64}"
+      machineType: "c2-standard-16"
     timeout_in_minutes: 30
     artifact_paths:
       - "artifacts/dra/fleet-server/*/manifest-*.json"
