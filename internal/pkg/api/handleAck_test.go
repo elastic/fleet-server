@@ -650,13 +650,13 @@ func TestInvalidateAPIKeysCacheEviction(t *testing.T) {
 		wantEvicted:    []string{"key1", "key2"},
 		wantNotEvicted: nil,
 	}, {
-		name: "does not evict when ES invalidation fails",
+		name: "evicts even when ES invalidation returns an error",
 		toRetire: []model.ToRetireAPIKeyIdsItems{
 			{ID: "key1"},
 		},
 		invalidateErr:  errors.New("ES error"),
-		wantEvicted:    nil,
-		wantNotEvicted: []string{"key1"},
+		wantEvicted:    []string{"key1"},
+		wantNotEvicted: nil,
 	}, {
 		name: "does not evict skipped key",
 		toRetire: []model.ToRetireAPIKeyIdsItems{

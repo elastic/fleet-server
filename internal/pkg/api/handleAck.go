@@ -733,7 +733,12 @@ func invalidateAPIKeys(ctx context.Context, zlog zerolog.Logger, bulk bulk.Bulk,
 		zlog.Info().Strs("fleet.policy.apiKeyIDsToRetire", ids).Msg("Invalidate old API keys")
 		if err := bulk.APIKeyInvalidate(ctx, ids...); err != nil {
 			zlog.Info().Err(err).Strs("ids", ids).Msg("Failed to invalidate API keys")
-		} else if c != nil {
+		}
+		// Evict from cache unconditionally: on partial ES failure (error_count > 0)
+		// we don't know which keys succeeded, so forcing a cache miss for all is
+		// safer. On complete failure the next auth call will revalidate against ES
+		// and re-cache still-valid keys.
+		if c != nil {
 			for _, id := range ids {
 				c.SetAPIKey(cache.APIKey{ID: id}, false)
 			}
