@@ -5,6 +5,7 @@
 package es
 
 import (
+	"bytes"
 	"context"
 	"crypto/fips140"
 	"crypto/tls"
@@ -521,4 +522,74 @@ func TestNewClientWithRetryOnErrsComposition(t *testing.T) {
 	_, _ = client.Perform(req) //nolint:bodyclose // error path, no body
 	// WithRetryOnErrs widens the predicate: sentinelErr now retries.
 	require.Equal(t, 3, attempts, "expected 1 initial + 2 retries via WithRetryOnErrs")
+}
+
+// TestInstrumentRoundTripperAppliesWrapping verifies that InstrumentRoundTripper
+// places an APM wrapper in the transport chain without breaking request routing:
+// the inner transport must still be reached for each request.
+func TestInstrumentRoundTripperAppliesWrapping(t *testing.T) {
+	var innerCalled bool
+	trackRT := roundTripFunc(func(_ *http.Request) (*http.Response, error) {
+		innerCalled = true
+		h := make(http.Header)
+		h.Set("X-Elastic-Product", "Elasticsearch")
+		h.Set("Content-Type", "application/json")
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     h,
+			Body:       io.NopCloser(bytes.NewReader(esPingResponse)),
+		}, nil
+	})
+
+	// First opt replaces the base *http.Transport with trackRT so no real network
+	// I/O occurs.  Second opt wraps trackRT with APM instrumentation.
+	// Request path: elastictransport → APM wrapper → trackRT → fake response.
+	client, err := NewClient(t.Context(), minimalESCfg(), false,
+		ConfigOption{rtWrap: func(_ http.RoundTripper) http.RoundTripper { return trackRT }},
+		InstrumentRoundTripper(),
+	)
+	require.NoError(t, err)
+
+	_, err = FetchESVersion(t.Context(), client)
+	require.NoError(t, err)
+	require.True(t, innerCalled, "APM wrapper must call through to inner transport")
+}
+
+// TestNewClientRetryWithMockES is an end-to-end retry test using a real HTTP
+// server: the server returns 503 for the first two requests and 200 on the
+// third.  It verifies that NewClient's default status-based retry wiring retries
+// on 503 and that the eventual success is surfaced to the caller.
+func TestNewClientRetryWithMockES(t *testing.T) {
+	const failUntil = 2
+	var callCount int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		callCount++
+		w.Header().Set("X-Elastic-Product", "Elasticsearch")
+		if callCount <= failUntil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(esPingResponse)
+	}))
+	defer server.Close()
+
+	cfg := &config.Config{Output: config.Output{Elasticsearch: config.Elasticsearch{
+		Protocol:       "http",
+		Hosts:          []string{server.URL},
+		Timeout:        90 * time.Second,
+		MaxConnPerHost: 128,
+		MaxRetries:     5,
+	}}}
+	client, err := NewClient(t.Context(), cfg, false,
+		NewConfigOption(elasticsearch.WithTransportOptions(
+			elastictransport.WithRetryBackoff(func(_ int) time.Duration { return 0 }),
+		)),
+	)
+	require.NoError(t, err)
+
+	_, err = FetchESVersion(t.Context(), client)
+	require.NoError(t, err, "expected eventual success after 503 retries")
+	require.Equal(t, failUntil+1, callCount, "expected 2 failures + 1 success")
 }
