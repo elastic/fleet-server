@@ -296,7 +296,11 @@ type ActionUpgrade struct {
 	Rollback *bool `json:"rollback,omitempty"`
 
 	// SourceUri The source of the upgrade artifact.
+	// Deprecated: Replaced by sources.
 	SourceUri *string `json:"source_uri,omitempty"`
+
+	// Sources An ordered list of sources for the upgrade artifact.
+	Sources *[]string `json:"sources,omitempty"`
 
 	// Version The version number that the agent should upgrade to.
 	Version string `json:"version"`

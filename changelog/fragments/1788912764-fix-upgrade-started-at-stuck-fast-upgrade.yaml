@@ -1,0 +1,10 @@
+kind: bug-fix
+
+summary: Fix agent permanently stuck in "updating" state after fast upgrade
+
+description: |
+  Agents that completed an upgrade faster than one checkin interval (~60 s)
+  were permanently shown as "updating" in the Fleet UI. Fleet Server now
+  detects the completed upgrade and clears the stuck state on the next checkin.
+
+component: fleet-server

@@ -45,6 +45,16 @@
       "groupName": "go-dependencies"
     },
     {
+      "description": "codegen: oapi-codegen packages that require running 'mage generate' after update",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchPackageNames": [
+        "/^github\\.com/oapi-codegen//"
+      ],
+      "groupName": "codegen"
+    },
+    {
       "description": "elastic: all Elastic org packages",
       "matchManagers": [
         "gomod"
@@ -79,6 +89,26 @@
         "on sunday"
       ],
       "prConcurrentLimit": 10
+    },
+    {
+      "description": "Ignore internal fleet-server module references used in replace directives",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchPackageNames": [
+        "/^github\\.com/elastic/fleet-server/"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "Keep go-json-schema-generate updates manual",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchPackageNames": [
+        "github.com/elastic/go-json-schema-generate"
+      ],
+      "enabled": false
     },
     {
       "description": "GitHub Actions: keep macOS runner updates manual",

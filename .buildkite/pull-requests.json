@@ -10,7 +10,18 @@
         "build_on_comment": true,
         "trigger_comment_regex": "^(?:(?:buildkite\\W+)?(?:build|test)\\W+(?:this|it))|^/test$",
         "always_trigger_comment_regex": "^(?:(?:buildkite\\W+)?(?:build|test)\\W+(?:this|it))|^/test$",
-        "skip_ci_on_only_changed": [ "^.ci/", "^.github/", "catalog-info.yaml", "^.pre-commit-config.yaml", "^.mergify.yml", "\\.md$", "^changelog/", "^docs/"],
+        "skip_ci_on_only_changed": [
+            "^\\.buildkite/pull-requests.json$",
+            "^\\.ci/",
+            "^\\.github/",
+            "^\\.gitignore",
+            "^\\.mergify.yml$",
+            "^\\.pre-commit-config.yaml$",
+            "^catalog-info.yaml$",
+            "^changelog/",
+            "^docs/",
+            "\\.md$"
+        ],
         "fail_on_not_mergeable": true
       },
       {

@@ -5,6 +5,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"crypto/hmac"
 	"crypto/pbkdf2"
@@ -33,6 +34,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/rollback"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
+	"github.com/elastic/go-elasticsearch/v8/esapi"
 
 	"github.com/gofrs/uuid/v5"
 	"github.com/hashicorp/go-version"
@@ -98,28 +100,28 @@ func (et *EnrollerT) handleEnroll(zlog zerolog.Logger, w http.ResponseWriter, r 
 		return err
 	}
 
-	resp, err := et.processRequest(zlog, w, r, rb, key, ver)
+	resp, enrollmentID, err := et.processRequest(zlog, w, r, rb, key, ver)
 	if err != nil {
 		return err
 	}
 
 	ts, _ := logger.CtxStartTime(r.Context())
-	return writeResponse(r.Context(), zlog, w, resp, ts)
+	return writeResponse(r.Context(), zlog, w, resp, enrollmentID, ts)
 }
 
-func (et *EnrollerT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, rb *rollback.Rollback, enrollmentAPIKey *apikey.APIKey, ver string) (*EnrollResponse, error) {
+func (et *EnrollerT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, rb *rollback.Rollback, enrollmentAPIKey *apikey.APIKey, ver string) (*EnrollResponse, string, error) {
 	// Validate that an enrollment record exists for a key with this id.
 	var enrollAPI *model.EnrollmentAPIKey
 	enrollAPI, err := et.retrieveStaticTokenEnrollmentToken(r.Context(), zlog, enrollmentAPIKey)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	if enrollAPI == nil {
 		zlog.Debug().Msgf("Checking enrollment key from database %s", enrollmentAPIKey.ID)
 		key, err := et.fetchEnrollmentKeyRecord(r.Context(), enrollmentAPIKey.ID)
 		if err != nil {
-			return nil, err
+			return nil, "", err
 		}
 		zlog.Debug().Msgf("Found enrollment key %s", key.APIKeyID)
 		enrollAPI = key
@@ -136,12 +138,18 @@ func (et *EnrollerT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, 
 	// Parse the request body
 	req, err := validateRequest(r.Context(), readCounter)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	cntEnroll.bodyIn.Add(readCounter.Count())
 
-	return et._enroll(r.Context(), rb, zlog, req, enrollAPI.PolicyID, enrollAPI.Namespaces, ver)
+	var enrollmentID string
+	if req.EnrollmentId != nil {
+		enrollmentID = *req.EnrollmentId
+	}
+
+	resp, err := et._enroll(r.Context(), rb, zlog, req, enrollAPI.PolicyID, enrollAPI.Namespaces, ver)
+	return resp, enrollmentID, err
 }
 
 // retrieveStaticTokenEnrollmentToken fetches the enrollment key record from the config static tokens.
@@ -306,7 +314,10 @@ func (et *EnrollerT) _enroll(
 
 			// confirm that its on the same policy
 			// it is not supported to have it the same ID enroll into different policies
-			if agent.PolicyID != policyID {
+			// compare base policy IDs: the agent may have been reassigned to a
+			// version-specific policy variant (e.g. "policy#9.6") while enrollment
+			// API keys are only ever bound to the base policy
+			if policyBaseID(agent.PolicyID) != policyBaseID(policyID) {
 				zlog.Warn().
 					Str("AgentId", agent.Id).
 					Str("PolicyId", policyID).
@@ -359,6 +370,11 @@ func (et *EnrollerT) _enroll(
 
 	// Existing agent, only update a subset of the fields
 	if agent.Id != "" {
+		prevVer := ""
+		if agent.Agent != nil {
+			prevVer = agent.Agent.Version
+		}
+
 		agent.Active = true
 		agent.Namespaces = namespaces
 		agent.LocalMetadata = localMeta
@@ -388,6 +404,10 @@ func (et *EnrollerT) _enroll(
 			dl.FieldUnenrolledAt:          nil,
 			dl.FieldUnenrolledReason:      nil,
 			dl.FieldUpdatedAt:             now.UTC().Format(time.RFC3339),
+		}
+		// stamp upgraded_at so Kibana's version-specific policy assignment task will re-evaluate this agent
+		if req.ReplaceToken != nil && *req.ReplaceToken != "" && prevVer != "" && prevVer != ver {
+			doc[dl.FieldUpgradedAt] = now.UTC().Format(time.RFC3339)
 		}
 		err = updateFleetAgent(ctx, et.bulker, agentID, doc)
 		if err != nil {
@@ -423,7 +443,7 @@ func (et *EnrollerT) _enroll(
 			ReplaceToken: replaceHash,
 		}
 
-		err = createFleetAgent(ctx, et.bulker, agentID, agent)
+		err = createFleetAgent(ctx, et.bulker, agentID, agent, et.cfg.Features.SyncEnrollmentWrite)
 		if err != nil {
 			return nil, err
 		}
@@ -556,7 +576,7 @@ LOOP:
 	return nil
 }
 
-func writeResponse(ctx context.Context, zlog zerolog.Logger, w http.ResponseWriter, resp *EnrollResponse, start time.Time) error {
+func writeResponse(ctx context.Context, zlog zerolog.Logger, w http.ResponseWriter, resp *EnrollResponse, enrollmentID string, start time.Time) error {
 	span, _ := apm.StartSpan(ctx, "response", "write")
 	defer span.End()
 
@@ -572,10 +592,14 @@ func writeResponse(ctx context.Context, zlog zerolog.Logger, w http.ResponseWrit
 		return fmt.Errorf("fail send enroll response: %w", err)
 	}
 
-	zlog.Info().
+	logEvent := zlog.Info().
 		Str(LogAgentID, resp.Item.Id).
 		Str(LogPolicyID, resp.Item.PolicyId).
-		Str(LogAccessAPIKeyID, resp.Item.AccessApiKeyId).
+		Str(LogAccessAPIKeyID, resp.Item.AccessApiKeyId)
+	if enrollmentID != "" {
+		logEvent = logEvent.Str(dl.FieldEnrollmentID, enrollmentID)
+	}
+	logEvent.
 		Int(ECSHTTPResponseBodyBytes, numWritten).
 		Int64(ECSEventDuration, time.Since(start).Nanoseconds()).
 		Msg("Elastic Agent successfully enrolled")
@@ -651,13 +675,42 @@ func updateFleetAgent(ctx context.Context, bulker bulk.Bulk, id string, doc bulk
 	return bulker.Update(ctx, dl.FleetAgents, id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3))
 }
 
-func createFleetAgent(ctx context.Context, bulker bulk.Bulk, id string, agent model.Agent) error {
+func createFleetAgent(ctx context.Context, bulker bulk.Bulk, id string, agent model.Agent, syncWrite bool) error {
 	span, ctx := apm.StartSpan(ctx, "createAgent", "create")
 	defer span.End()
 
 	data, err := json.Marshal(agent)
 	if err != nil {
 		return err
+	}
+
+	if syncWrite {
+		// Sync path: write directly with refresh=wait_for so the document is immediately
+		// visible to any retry pod's FindAgent search, preventing ghost agents.
+		req := esapi.IndexRequest{
+			Index:      dl.FleetAgents,
+			DocumentID: id,
+			Body:       bytes.NewReader(data),
+			OpType:     "create",
+			Refresh:    "wait_for",
+		}
+		zlog := zerolog.Ctx(ctx)
+		res, doErr := req.Do(ctx, bulker.Client())
+		if doErr != nil {
+			zlog.Warn().Str("agent_id", id).Err(doErr).Msg("enrollment write transport error")
+			return doErr
+		}
+		defer res.Body.Close()
+		if res.StatusCode == http.StatusConflict {
+			zlog.Debug().Str("agent_id", id).Msg("agent document already exists on enrollment create, treating as success")
+			return nil
+		}
+		if res.IsError() {
+			esResp := res.String()
+			zlog.Warn().Str("agent_id", id).Int("status_code", res.StatusCode).Str("es_response", esResp).Msg("enrollment write ES error")
+			return fmt.Errorf("createFleetAgent: %s", esResp)
+		}
+		return nil
 	}
 
 	_, err = bulker.Create(ctx, dl.FleetAgents, id, data, bulk.WithRefresh())

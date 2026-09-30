@@ -13,6 +13,7 @@ import (
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"go.elastic.co/apm/v2"
 	"go.elastic.co/apm/v2/apmtest"
@@ -93,6 +94,28 @@ func Test_ErrorResp_NoTransaction(t *testing.T) {
 	require.Len(t, payloads.Errors, 0)
 }
 
+func Test_ErrResp_Level(t *testing.T) {
+	tests := []struct {
+		name  string
+		err   error
+		level zerolog.Level
+	}{{
+		name:  "es 429 is warn",
+		err:   &es.ErrElastic{Status: http.StatusTooManyRequests},
+		level: zerolog.WarnLevel,
+	}, {
+		name:  "es 500 is error",
+		err:   &es.ErrElastic{Status: http.StatusInternalServerError},
+		level: zerolog.ErrorLevel,
+	}}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			r := NewHTTPErrResp(tc.err)
+			require.Equal(t, tc.level, r.Level)
+		})
+	}
+}
+
 func Test_ErrResp_Status(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -110,6 +133,12 @@ func Test_ErrResp_Status(t *testing.T) {
 		name: "es error",
 		err: &es.ErrElastic{
 			Status: 500,
+		},
+		status: 503,
+	}, {
+		name: "es 429 error",
+		err: &es.ErrElastic{
+			Status: 429,
 		},
 		status: 503,
 	}, {

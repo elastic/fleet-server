@@ -650,7 +650,20 @@ func (suite *StandAloneSuite) writeOpAMPCollectorConfig(configFilePath, instance
 func (suite *StandAloneSuite) TestOpAMPWithUpstreamCollector() {
 	dir := suite.T().TempDir()
 
-	ctx, cancel := context.WithTimeout(suite.T().Context(), 5*time.Minute)
+	const (
+		// buildTimeout covers the shallow clone of opentelemetry-collector-contrib and
+		// `make otelcontribcol`. Their duration is dominated by the CI agent rather than
+		// by anything fleet-server does; a slow agent should make this test slow instead
+		// of killing the build mid-compile (see elastic/fleet-server#6590).
+		buildTimeout = 15 * time.Minute
+		// opampTimeout covers the OpAMP assertions once the collector is built. Enrollment
+		// is a matter of seconds; the sibling EDOT test uses the same budget.
+		opampTimeout = 2 * time.Minute
+	)
+
+	// ctx bounds the whole test so the fleet-server and collector processes started with
+	// it are torn down no matter which phase fails.
+	ctx, cancel := context.WithTimeout(suite.T().Context(), buildTimeout+opampTimeout)
 	defer cancel()
 
 	apiKey := suite.startFleetServerForOpAMP(ctx, dir, "opamp-e2e-test-key")
@@ -666,10 +679,14 @@ func (suite *StandAloneSuite) TestOpAMPWithUpstreamCollector() {
 	resp.Body.Close()
 	suite.Require().Equal(http.StatusOK, resp.StatusCode)
 
+	// The clone and the build share their own budget, separate from the assertions.
+	buildCtx, buildCancel := context.WithTimeout(ctx, buildTimeout)
+	defer buildCancel()
+
 	// Clone OTel Collector contrib repository (shallow clone of main branch)
 	cloneDir := filepath.Join(dir, "opentelemetry-collector-contrib")
 	suite.T().Logf("Cloning opentelemetry-collector-contrib (main) to %s", cloneDir)
-	cloneCmd := exec.CommandContext(ctx,
+	cloneCmd := exec.CommandContext(buildCtx,
 		"git", "clone",
 		"--depth", "1",
 		"https://github.com/open-telemetry/opentelemetry-collector-contrib",
@@ -685,12 +702,13 @@ func (suite *StandAloneSuite) TestOpAMPWithUpstreamCollector() {
 	err = os.MkdirAll(filepath.Join(cloneDir, "bin"), 0755)
 	suite.Require().NoError(err)
 
-	makeCmd := exec.CommandContext(ctx, "make", "otelcontribcol")
+	makeCmd := exec.CommandContext(buildCtx, "make", "otelcontribcol")
 	makeCmd.Dir = cloneDir
 	makeCmd.Stdout = os.Stdout
 	makeCmd.Stderr = os.Stderr
 	err = makeCmd.Run()
 	suite.Require().NoError(err)
+	buildCancel()
 
 	// The make target places the binary under bin/; move it to the expected path.
 	builtBinary := filepath.Join(cloneDir, "bin", fmt.Sprintf("otelcontribcol_%s_%s", runtime.GOOS, runtime.GOARCH))
@@ -715,12 +733,32 @@ func (suite *StandAloneSuite) TestOpAMPWithUpstreamCollector() {
 	err = otelCmd.Start()
 	suite.Require().NoError(err)
 
-	defer otelCmd.Wait()
+	// The standard library forbids calling cmd.Wait() more than once (it races and
+	// returns "no child processes" on the second call). The goroutine below is the
+	// single Wait() call site; it forwards the exit status over a buffered channel so
+	// the deferred stop below can observe process exit without calling Wait() itself.
+	otelExited := make(chan error, 1)
+	go func() { otelExited <- otelCmd.Wait() }()
+
+	defer func() {
+		if err := otelCmd.Process.Signal(syscall.SIGTERM); err != nil {
+			suite.T().Logf("Unable to signal OTel Collector: %v", err)
+		}
+		select {
+		case <-otelExited:
+		case <-time.After(30 * time.Second):
+			// The 30s fallback guards against the collector not responding to SIGTERM.
+			_ = otelCmd.Process.Kill()
+			<-otelExited
+		}
+	}()
 
 	// Verify that the OTel Collector was enrolled in Fleet by fetching its document from
 	// .fleet-agents and asserting on its contents.
 	suite.T().Logf("Waiting for agent %s to appear in .fleet-agents", instanceUID)
-	agentDoc := suite.WaitForAgentDoc(ctx, instanceUID)
+	opampCtx, opampCancel := context.WithTimeout(ctx, opampTimeout)
+	defer opampCancel()
+	agentDoc := suite.WaitForAgentDoc(opampCtx, instanceUID)
 
 	suite.Equal(instanceUID, agentDoc.Agent.ID, "expected agent.id to match instanceUID")
 	versionOut, err := exec.Command(otelBinaryPath, "--version").Output()
@@ -963,8 +1001,36 @@ func (suite *StandAloneSuite) agentAccessAPIKeyID(ctx context.Context, agentID s
 }
 
 // invalidateESAPIKey calls DELETE /_security/api_key to invalidate the given key ID.
+// It verifies the response body confirms the key was actually invalidated, not just that ES
+// returned 200 (which it does even when the key ID was not found).
+// Fleet-server creates API keys without refresh=true for performance, so the key may not be
+// immediately visible in the .security index. We poll GET /_security/api_key for up to 10 s
+// (matching fleet-server's own invalidateAPIKey logic) before issuing the DELETE.
 func (suite *StandAloneSuite) invalidateESAPIKey(ctx context.Context, keyID string) {
 	suite.T().Helper()
+
+	// Wait for the key to become visible in ES before attempting the DELETE.
+	suite.Require().Eventually(func() bool {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet,
+			"http://"+suite.ESHosts+"/_security/api_key?id="+keyID, nil)
+		if err != nil {
+			return false
+		}
+		req.SetBasicAuth(suite.ElasticUser, suite.ElasticPass)
+		resp, err := suite.Client.Do(req)
+		if err != nil || resp.StatusCode != http.StatusOK {
+			if resp != nil {
+				resp.Body.Close()
+			}
+			return false
+		}
+		defer resp.Body.Close()
+		var result struct {
+			APIKeys []json.RawMessage `json:"api_keys"`
+		}
+		return json.NewDecoder(resp.Body).Decode(&result) == nil && len(result.APIKeys) > 0
+	}, 10*time.Second, time.Second, "API key %s never became visible in ES .security index within 10 s", keyID)
+
 	body, err := json.Marshal(map[string]any{"ids": []string{keyID}})
 	suite.Require().NoError(err)
 	req, err := http.NewRequestWithContext(ctx, http.MethodDelete,
@@ -977,6 +1043,13 @@ func (suite *StandAloneSuite) invalidateESAPIKey(ctx context.Context, keyID stri
 	suite.Require().NoError(err)
 	defer resp.Body.Close()
 	suite.Require().Equal(http.StatusOK, resp.StatusCode, "ES invalidate API key failed")
+	var result struct {
+		InvalidatedAPIKeys []string `json:"invalidated_api_keys"`
+		ErrorCount         int      `json:"error_count"`
+	}
+	suite.Require().NoError(json.NewDecoder(resp.Body).Decode(&result))
+	suite.Require().Contains(result.InvalidatedAPIKeys, keyID, "ES did not actually invalidate API key %s", keyID)
+	suite.Require().Zero(result.ErrorCount, "ES reported errors while invalidating API key %s", keyID)
 }
 
 // TestOpAMPWithEDOTCollector ensures that the EDOT Collector can connect to Fleet Server

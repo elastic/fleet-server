@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/gofrs/uuid/v5"
@@ -312,130 +313,108 @@ func runTestMonitor_NewPolicyExists(t *testing.T, delay time.Duration) {
 	require.False(t, timedout, "never got policy update; timed out after 500ms")
 }
 
+// Test_Monitor_Limit_Delay ensures that the policy monitor spaces the
+// dispatches of one policy revision out according to the configured policy
+// limit, so that responses to agents on the same policy are not all written at
+// once.
+//
+// The test runs inside a synctest bubble: the rate limiter's timers and
+// time.Now() then run on the bubble's synthetic clock, which only advances
+// once every goroutine is blocked. The dispatch delays are therefore exact.
 func Test_Monitor_Limit_Delay(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	ctx = testlog.SetLogger(t).WithContext(ctx)
+	synctest.Test(t, func(t *testing.T) {
+		const interval = 50 * time.Millisecond
 
-	chHitT := make(chan []es.HitT, 1)
-	defer close(chHitT)
-	ms := mmock.NewMockSubscription()
-	ms.On("Output").Return((<-chan []es.HitT)(chHitT))
-	mm := mmock.NewMockMonitor()
-	mm.On("Subscribe").Return(ms).Once()
-	mm.On("Unsubscribe", mock.Anything).Return().Once()
-	bulker := ftesting.NewMockBulk()
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		ctx = testlog.SetLogger(t).WithContext(ctx)
 
-	monitor := NewMonitor(bulker, mm, config.ServerLimits{PolicyLimit: config.Limit{Burst: 1, Interval: time.Millisecond * 50}})
-	pm := monitor.(*monitorT)
-	pm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
-		return []model.Policy{}, nil
-	}
+		chHitT := make(chan []es.HitT, 1)
+		defer close(chHitT)
+		ms := mmock.NewMockSubscription()
+		ms.On("Output").Return((<-chan []es.HitT)(chHitT))
+		mm := mmock.NewMockMonitor()
+		mm.On("Subscribe").Return(ms).Once()
+		mm.On("Unsubscribe", mock.Anything).Return().Once()
+		bulker := ftesting.NewMockBulk()
 
-	var merr error
-	var mwg sync.WaitGroup
-	mwg.Go(func() {
-		merr = monitor.Run(ctx)
-	})
-
-	err := monitor.(*monitorT).waitStart(ctx)
-	require.NoError(t, err)
-
-	agentId := uuid.Must(uuid.NewV4()).String()
-	policyID := uuid.Must(uuid.NewV4()).String()
-	s, err := monitor.Subscribe(agentId, policyID, 0)
-	defer monitor.Unsubscribe(s)
-	require.NoError(t, err)
-
-	agentId = uuid.Must(uuid.NewV4()).String()
-	policyID2 := uuid.Must(uuid.NewV4()).String()
-	s2, err := monitor.Subscribe(agentId, policyID, 0)
-	defer monitor.Unsubscribe(s2)
-	require.NoError(t, err)
-
-	rId := xid.New().String()
-	policy := model.Policy{
-		ESDocument: model.ESDocument{
-			Id:      rId,
-			Version: 1,
-			SeqNo:   1,
-		},
-		PolicyID:       policyID,
-		CoordinatorIdx: 1,
-		Data:           policyDataDefault,
-		RevisionIdx:    1,
-	}
-	policyData, err := json.Marshal(&policy)
-	require.NoError(t, err)
-
-	chHitT <- []es.HitT{{
-		ID:      rId,
-		SeqNo:   1,
-		Version: 1,
-		Source:  policyData,
-	}}
-
-	policy2 := model.Policy{
-		ESDocument: model.ESDocument{
-			Id:      rId,
-			Version: 1,
-			SeqNo:   1,
-		},
-		PolicyID:       policyID2,
-		CoordinatorIdx: 1,
-		Data:           policyDataDefault,
-		RevisionIdx:    1,
-	}
-	policyData, err = json.Marshal(&policy2)
-	require.NoError(t, err)
-	chHitT <- []es.HitT{{
-		ID:      rId,
-		SeqNo:   1,
-		Version: 1,
-		Source:  policyData,
-	}}
-
-	timedout := false
-	tm := time.NewTimer(2 * time.Second)
-	var ts1, ts2 time.Time
-LOOP:
-	for {
-		select {
-		case subPolicy := <-s.Output():
-			ts1 = time.Now().UTC()
-			if !ts2.IsZero() {
-				tm.Stop()
-				break LOOP
-			}
-			diff := cmp.Diff(policy, subPolicy.Policy)
-			require.Empty(t, diff)
-		case subPolicy := <-s2.Output():
-			ts2 = time.Now().UTC()
-			if !ts1.IsZero() {
-				tm.Stop()
-				break LOOP
-			}
-			diff := cmp.Diff(policy2, subPolicy.Policy)
-			require.Empty(t, diff)
-		case <-tm.C:
-			timedout = true
-			break LOOP
+		monitor := NewMonitor(bulker, mm, config.ServerLimits{PolicyLimit: config.Limit{Burst: 1, Interval: interval}})
+		pm := monitor.(*monitorT)
+		pm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
+			return []model.Policy{}, nil
 		}
-	}
 
-	cancel()
-	mwg.Wait()
-	if merr != nil && merr != context.Canceled {
-		t.Fatal(merr)
-	}
-	require.False(t, timedout, "never got policy update; timed out after 2s")
-	d := ts2.Sub(ts1)
-	if ts1.After(ts2) {
-		d *= -1
-	}
-	assert.LessOrEqual(t, 45*time.Millisecond, d) // use 45ms instead of 50ms because we are testing buffered channel output here, not dispatch from the run loop which means we are measuring something that may be smaller then the delay
-	ms.AssertExpectations(t)
-	mm.AssertExpectations(t)
+		var merr error
+		var mwg sync.WaitGroup
+		mwg.Go(func() {
+			merr = monitor.Run(ctx)
+		})
+
+		err := pm.waitStart(ctx)
+		require.NoError(t, err)
+
+		// Seed the policy so that subscribing does not force a policy load.
+		// Handling any run loop event cancels the context of the dispatch that
+		// is in flight, so keeping the hit published below as the only event
+		// the run loop sees means exactly one dispatch runs, uninterrupted.
+		policyID := uuid.Must(uuid.NewV4()).String()
+		pm.mut.Lock()
+		pm.policies[policyID] = policyT{head: makeHead()}
+		pm.mut.Unlock()
+
+		subs := make([]Subscription, 0, 3)
+		for range cap(subs) {
+			sub, err := monitor.Subscribe(uuid.Must(uuid.NewV4()).String(), policyID, 0)
+			require.NoError(t, err)
+			defer monitor.Unsubscribe(sub)
+			subs = append(subs, sub)
+		}
+
+		rId := xid.New().String()
+		policy := model.Policy{
+			ESDocument: model.ESDocument{
+				Id:      rId,
+				Version: 1,
+				SeqNo:   1,
+			},
+			PolicyID:       policyID,
+			CoordinatorIdx: 1,
+			Data:           policyDataDefault,
+			RevisionIdx:    1,
+		}
+		policyData, err := json.Marshal(&policy)
+		require.NoError(t, err)
+
+		start := time.Now()
+		chHitT <- []es.HitT{{
+			ID:      rId,
+			SeqNo:   1,
+			Version: 1,
+			Source:  policyData,
+		}}
+
+		// The subscriptions are dispatched in subscription order: the first one
+		// consumes the limiter's initial burst and the rest are spaced out by
+		// the configured interval.
+		for i, sub := range subs {
+			select {
+			case subPolicy := <-sub.Output():
+				diff := cmp.Diff(policy, subPolicy.Policy)
+				require.Empty(t, diff)
+				assert.Equal(t, time.Duration(i)*interval, time.Since(start), "unexpected dispatch delay for subscription %d", i)
+			case <-time.After(time.Minute):
+				require.FailNowf(t, "policy was not dispatched", "subscription %d never received the policy", i)
+			}
+		}
+
+		cancel()
+		mwg.Wait()
+		if merr != nil {
+			require.ErrorIs(t, merr, context.Canceled)
+		}
+		ms.AssertExpectations(t)
+		mm.AssertExpectations(t)
+	})
 }
 
 func Test_Monitor_cancel_pending(t *testing.T) {

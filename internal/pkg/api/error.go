@@ -629,11 +629,16 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 
 	var esErr *es.ErrElastic
 	if errors.As(err, &esErr) {
+		level := zerolog.ErrorLevel
+		if esErr.Status == http.StatusTooManyRequests {
+			// 429 from ES is transient backpressure; the agent will retry on its next checkin.
+			level = zerolog.WarnLevel
+		}
 		return HTTPErrResp{
 			http.StatusServiceUnavailable,
 			esErr.Error(),
 			"elasticsearch error",
-			zerolog.ErrorLevel,
+			level,
 		}
 	}
 
