@@ -839,6 +839,95 @@ func TestCreateFleetAgentSyncWriteErrorSurfaces(t *testing.T) {
 	require.Error(t, err)
 }
 
+// TestCreateFleetAgentSyncWriteRetry* tests exercise the retry loop in createFleetAgent.
+// Each test that triggers a retry incurs the real 1–2s backoff delay.
+
+func TestCreateFleetAgentSyncWriteTransportErrorThenConflictSucceeds(t *testing.T) {
+	const agentID = "test-agent-id"
+	calls := 0
+	mt := &MockTransport{}
+	mt.RoundTripFn = func(req *http.Request) (*http.Response, error) {
+		assertSyncEnrollParams(t, req)
+		require.Contains(t, req.URL.Path, agentID, "agent UUID must be the same on every attempt")
+		calls++
+		if calls == 1 {
+			return nil, errors.New("connection reset by peer")
+		}
+		return &http.Response{
+			StatusCode: http.StatusConflict,
+			Body:       io.NopCloser(strings.NewReader(`{}`)),
+			Header:     http.Header{"X-Elastic-Product": []string{"Elasticsearch"}},
+		}, nil
+	}
+	cli, err := elasticsearch.NewClient(elasticsearch.Config{
+		Transport:    mt,
+		RetryOnError: func(_ *http.Request, _ error) bool { return false },
+	})
+	require.NoError(t, err)
+
+	bulker := ftesting.NewMockBulk()
+	bulker.On("Client").Return(cli)
+
+	err = createFleetAgent(t.Context(), bulker, agentID, model.Agent{}, true)
+	require.NoError(t, err)
+	require.Equal(t, 2, calls, "expected exactly two transport calls")
+}
+
+func TestCreateFleetAgentSyncWriteTransportErrorThenSucceeds(t *testing.T) {
+	const agentID = "test-agent-id"
+	calls := 0
+	mt := &MockTransport{}
+	mt.RoundTripFn = func(req *http.Request) (*http.Response, error) {
+		assertSyncEnrollParams(t, req)
+		require.Contains(t, req.URL.Path, agentID, "agent UUID must be the same on every attempt")
+		calls++
+		if calls == 1 {
+			return nil, errors.New("connection reset by peer")
+		}
+		return &http.Response{
+			StatusCode: http.StatusCreated,
+			Body:       io.NopCloser(strings.NewReader(`{}`)),
+			Header:     http.Header{"X-Elastic-Product": []string{"Elasticsearch"}},
+		}, nil
+	}
+	cli, err := elasticsearch.NewClient(elasticsearch.Config{
+		Transport:    mt,
+		RetryOnError: func(_ *http.Request, _ error) bool { return false },
+	})
+	require.NoError(t, err)
+
+	bulker := ftesting.NewMockBulk()
+	bulker.On("Client").Return(cli)
+
+	err = createFleetAgent(t.Context(), bulker, agentID, model.Agent{}, true)
+	require.NoError(t, err)
+	require.Equal(t, 2, calls, "expected exactly two transport calls")
+}
+
+func TestCreateFleetAgentSyncWriteAllTransportErrorsFail(t *testing.T) {
+	const agentID = "test-agent-id"
+	calls := 0
+	mt := &MockTransport{}
+	mt.RoundTripFn = func(req *http.Request) (*http.Response, error) {
+		assertSyncEnrollParams(t, req)
+		require.Contains(t, req.URL.Path, agentID, "agent UUID must be the same on every attempt")
+		calls++
+		return nil, errors.New("connection reset by peer")
+	}
+	cli, err := elasticsearch.NewClient(elasticsearch.Config{
+		Transport:    mt,
+		RetryOnError: func(_ *http.Request, _ error) bool { return false },
+	})
+	require.NoError(t, err)
+
+	bulker := ftesting.NewMockBulk()
+	bulker.On("Client").Return(cli)
+
+	err = createFleetAgent(t.Context(), bulker, agentID, model.Agent{}, true)
+	require.Error(t, err)
+	require.Equal(t, 3, calls, "expected all three attempts to be made")
+}
+
 func TestValidateEnrollRequest(t *testing.T) {
 	t.Run("invalid json", func(t *testing.T) {
 		req, err := validateRequest(context.Background(), strings.NewReader("not a json"))
