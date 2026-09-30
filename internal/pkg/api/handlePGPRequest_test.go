@@ -5,7 +5,9 @@
 package api
 
 import (
+	"cmp"
 	"context"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -20,10 +22,19 @@ import (
 )
 
 func Test_PGPRetrieverT_getPGPKey(t *testing.T) {
+	customURL := "https://custom.example.com/pgp-key"
+	customCache := func() *cache.MockCache {
+		m := cache.NewMockCache()
+		m.On("GetPGPKey", mock.Anything).Return([]byte{}, false).Once()
+		m.On("SetPGPKey", mock.Anything, []byte("test")).Once()
+		return m
+	}
+
 	tests := []struct {
 		name           string
 		cache          func() *cache.MockCache
 		dirSetup       func(t *testing.T) string
+		upstreamURL    string
 		upstreamStatus int
 		content        []byte
 		err            error
@@ -99,6 +110,46 @@ func Test_PGPRetrieverT_getPGPKey(t *testing.T) {
 		upstreamStatus: 200,
 		content:        []byte(`test`),
 		err:            nil,
+	}, {
+		name:  "custom upstream fetched",
+		cache: customCache,
+		dirSetup: func(t *testing.T) string {
+			return t.TempDir()
+		},
+		upstreamURL:    customURL,
+		upstreamStatus: 200,
+		content:        []byte(`test`),
+		err:            nil,
+	}, {
+		name:  "custom upstream url changed",
+		cache: customCache,
+		dirSetup: func(t *testing.T) string {
+			dir := t.TempDir()
+			require.NoError(t, os.WriteFile(filepath.Join(dir, customKeyName), []byte("old"), defaultKeyPermissions))
+			require.NoError(t, os.WriteFile(filepath.Join(dir, customKeyMetadataName), []byte("https://old.example.com/pgp-key"), defaultKeyPermissions))
+			return dir
+		},
+		upstreamURL:    customURL,
+		upstreamStatus: 200,
+		content:        []byte(`test`),
+		err:            nil,
+	}, {
+		name: "custom upstream fetch failed with stale key on disk",
+		cache: func() *cache.MockCache {
+			m := cache.NewMockCache()
+			m.On("GetPGPKey", mock.Anything).Return([]byte{}, false).Once()
+			return m
+		},
+		dirSetup: func(t *testing.T) string {
+			dir := t.TempDir()
+			require.NoError(t, os.WriteFile(filepath.Join(dir, customKeyName), []byte("old"), defaultKeyPermissions))
+			require.NoError(t, os.WriteFile(filepath.Join(dir, customKeyMetadataName), []byte("https://old.example.com/pgp-key"), defaultKeyPermissions))
+			return dir
+		},
+		upstreamURL:    customURL,
+		upstreamStatus: 400,
+		content:        nil,
+		err:            ErrUpstreamStatus,
 	}}
 
 	for _, tc := range tests {
@@ -111,13 +162,16 @@ func Test_PGPRetrieverT_getPGPKey(t *testing.T) {
 			}))
 			defer server.Close()
 
-			pt := &PGPRetrieverT{
-				cache: mockCache,
-				cfg: config.PGP{
-					UpstreamURL: server.URL,
-					Dir:         dir,
+			orig := http.DefaultClient.Transport
+			http.DefaultClient.Transport = &http.Transport{
+				DialTLSContext: func(ctx context.Context, network, _ string) (net.Conn, error) {
+					return (&net.Dialer{}).DialContext(ctx, network, server.Listener.Addr().String())
 				},
 			}
+			t.Cleanup(func() { http.DefaultClient.Transport = orig })
+
+			cfg := &config.Server{PGP: config.PGP{UpstreamURL: cmp.Or(tc.upstreamURL, config.DefaultPGPUpstreamURL), Dir: dir}}
+			pt := NewPGPRetrieverT(context.Background(), cfg, nil, mockCache)
 
 			content, err := pt.getPGPKey(context.Background(), testlog.SetLogger(t))
 			require.ErrorIs(t, err, tc.err)

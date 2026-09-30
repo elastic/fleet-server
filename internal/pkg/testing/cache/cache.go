@@ -14,6 +14,7 @@ import (
 
 type MockCache struct {
 	mock.Mock
+	pgpKeys map[string][]byte
 }
 
 func NewMockCache() *MockCache {
@@ -72,9 +73,16 @@ func (m *MockCache) GetUpload(id string) (file.Info, bool) {
 
 func (m *MockCache) SetPGPKey(id string, p []byte) {
 	m.Called(id, p)
+	if m.pgpKeys == nil {
+		m.pgpKeys = make(map[string][]byte)
+	}
+	m.pgpKeys[id] = p
 }
 
 func (m *MockCache) GetPGPKey(id string) ([]byte, bool) {
 	args := m.Called(id)
+	if p, ok := m.pgpKeys[id]; ok {
+		return p, true
+	}
 	return args.Get(0).([]byte), args.Bool(1) //nolint:errcheck // testify mock
 }
