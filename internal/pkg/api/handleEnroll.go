@@ -689,8 +689,11 @@ func createFleetAgent(ctx context.Context, bulker bulk.Bulk, id string, agent mo
 		// Sync path: write directly with refresh=wait_for so the document is immediately
 		// visible to any retry pod's FindAgent search, preventing ghost agents.
 		//
-		// Retries use the same agent UUID so that a 409 (conflict) on any attempt means
-		// the first write landed and we can treat the enrollment as successful.
+		// The ES client already retries 503 and other transient status codes (client.go).
+		// This loop handles transport errors only: when the client closes the connection
+		// before receiving a response, the write outcome is unknown. Retrying with the same
+		// UUID means a 409 on any subsequent attempt confirms the write landed, so we can
+		// treat the enrollment as successful rather than leaving a ghost agent.
 		req := esapi.IndexRequest{
 			Index:      dl.FleetAgents,
 			DocumentID: id,
@@ -711,8 +714,6 @@ func createFleetAgent(ctx context.Context, bulker bulk.Bulk, id string, agent mo
 			}
 			res, doErr := req.Do(ctx, bulker.Client())
 			if doErr != nil {
-				// Transport error: write outcome is unknown (ghost agent risk).
-				// Retry with the same UUID so a 409 on the next attempt confirms the write landed.
 				if attempt < maxAttempts-1 {
 					zlog.Warn().Str("agent_id", id).Int("attempt", attempt+1).Err(doErr).
 						Msg("enrollment write transport error; retrying with same agent UUID")
@@ -721,13 +722,6 @@ func createFleetAgent(ctx context.Context, bulker bulk.Bulk, id string, agent mo
 				zlog.Warn().Str("agent_id", id).Err(doErr).
 					Msg("enrollment write transport error after all attempts; document may have been written (ghost agent risk)")
 				return doErr
-			}
-			// 503: write rejected before translog, safe to retry as a fresh write.
-			if res.StatusCode == http.StatusServiceUnavailable && attempt < maxAttempts-1 {
-				zlog.Warn().Str("agent_id", id).Int("attempt", attempt+1).
-					Msg("enrollment write returned 503; retrying")
-				res.Body.Close()
-				continue
 			}
 			defer res.Body.Close()
 			if res.StatusCode == http.StatusConflict {
