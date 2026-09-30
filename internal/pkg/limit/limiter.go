@@ -42,7 +42,10 @@ func NewLimiter(cfg *config.Limit) *Limiter {
 	}
 
 	if cfg.Max != 0 {
-		l.maxLimit = semaphore.NewWeighted(cfg.Max)
+		// A negative max keeps the limiter closed so that every acquire fails.
+		// Clamp it to zero: semaphore.NewWeighted panics on a negative size,
+		// while a zero-sized semaphore never hands out a token.
+		l.maxLimit = semaphore.NewWeighted(max(cfg.Max, 0))
 	}
 
 	return l
