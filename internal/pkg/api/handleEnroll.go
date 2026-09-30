@@ -708,7 +708,7 @@ func createFleetAgent(ctx context.Context, bulker bulk.Bulk, id string, agent mo
 				select {
 				case <-ctx.Done():
 					return ctx.Err()
-				case <-time.After(time.Second + time.Duration(mrand.Intn(1000))*time.Millisecond):
+				case <-time.After(time.Second + time.Duration(mrand.Intn(1000))*time.Millisecond): //nolint:gosec // jitter for backoff does not require cryptographic randomness
 				}
 				req.Body = bytes.NewReader(data)
 			}
