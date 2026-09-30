@@ -4,7 +4,7 @@ summary: Add debug logging around fleet agent document write during enrollment
 
 description: |
   Two debug log lines now bracket the createFleetAgent call: one before the
-  write (recording agent_id and sync_write mode) and one after a successful
+  write (recording fleet.agent.id and sync_write mode) and one after a successful
   write. The existing transport-error warning in the sync-write path is
   updated to note that the document may have been written despite the error,
   making the ghost-agent risk explicit in the logs.
