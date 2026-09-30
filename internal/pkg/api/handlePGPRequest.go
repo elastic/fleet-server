@@ -25,6 +25,8 @@ import (
 
 const (
 	defaultKeyName        = "default.pgp"
+	customKeyName         = "custom.pgp"
+	customKeyMetadataName = "custom.url"
 	defaultKeyPermissions = 0o0600
 )
 
@@ -41,6 +43,10 @@ type PGPRetrieverT struct {
 }
 
 func NewPGPRetrieverT(cfg *config.Server, bulker bulk.Bulk, c cache.Cache) *PGPRetrieverT {
+	if cfg.PGP.UpstreamURL != config.DefaultPGPUpstreamURL {
+		// evict any previously cached entry for this URL as upstream key may have changed
+		c.DeletePGPKey(cfg.PGP.UpstreamURL)
+	}
 	return &PGPRetrieverT{
 		bulker: bulker,
 		cache:  c,
@@ -80,11 +86,35 @@ func (pt *PGPRetrieverT) getPGPKey(ctx context.Context, zlog zerolog.Logger) ([]
 	span.Context.SetLabel("key", key)
 	defer span.End()
 
+	if pt.cfg.UpstreamURL != config.DefaultPGPUpstreamURL {
+		key = filepath.Join(pt.cfg.Dir, customKeyName)
+		span.Context.SetLabel("key", key)
+		if p, ok := pt.cache.GetPGPKey(pt.cfg.UpstreamURL); ok {
+			return p, nil
+		}
+		p, err := pt.getPGPFromDir(ctx, customKeyName)
+		if err == nil {
+			pt.cache.SetPGPKey(pt.cfg.UpstreamURL, p)
+			return p, nil
+		}
+		if !errors.Is(err, fs.ErrNotExist) {
+			return nil, err
+		}
+		p, err = pt.getPGPFromUpstream(ctx)
+		if err != nil {
+			return nil, err
+		}
+		pt.cache.SetPGPKey(pt.cfg.UpstreamURL, p)
+		pt.writeKeyToDir(ctx, zlog, key, p)
+		pt.writeKeyToDir(ctx, zlog, filepath.Join(pt.cfg.Dir, customKeyMetadataName), []byte(pt.cfg.UpstreamURL))
+		return p, nil
+	}
+
 	p, ok := pt.cache.GetPGPKey(key)
 	if ok {
 		return p, nil
 	}
-	p, err := pt.getPGPFromDir(ctx, key)
+	p, err := pt.getPGPFromDir(ctx, defaultKeyName)
 
 	// successfully retrieved from disk
 	if err == nil {
@@ -110,10 +140,20 @@ func (pt *PGPRetrieverT) getPGPKey(ctx context.Context, zlog zerolog.Logger) ([]
 // getPGPFromDir will return the PGP contents if found in the directory
 //
 // Key contents are only returned if the key has valid permission bits.
-func (pt *PGPRetrieverT) getPGPFromDir(ctx context.Context, key string) ([]byte, error) {
+// When upstreamURL is non-empty the metadata file is checked first and a
+// mismatch causes the caller to fall back to the upstream fetch.
+func (pt *PGPRetrieverT) getPGPFromDir(ctx context.Context, keyName string) ([]byte, error) {
 	span, _ := apm.StartSpan(ctx, "getPGPFromDir", "process")
 	defer span.End()
 
+	if keyName == customKeyName {
+		metadata, err := os.ReadFile(filepath.Join(pt.cfg.Dir, customKeyMetadataName))
+		if err != nil || string(metadata) != pt.cfg.UpstreamURL {
+			return nil, fs.ErrNotExist
+		}
+	}
+
+	key := filepath.Join(pt.cfg.Dir, keyName)
 	stat, err := os.Stat(key)
 	if err != nil {
 		return nil, err
@@ -174,5 +214,4 @@ func (pt *PGPRetrieverT) writeKeyToDir(ctx context.Context, zlog zerolog.Logger,
 		return
 	}
 	zlog.Info().Str("path", fullPath).Msg("Key written to storage.")
-
 }

@@ -32,3 +32,6 @@ func (c *NoCache) SetWithTTL(_ string, _ any, _ int64, _ time.Duration) bool {
 
 func (c *NoCache) Close() {
 }
+
+func (c *NoCache) Del(_ string) {
+}
