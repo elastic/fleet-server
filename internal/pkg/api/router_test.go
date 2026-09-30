@@ -95,7 +95,7 @@ func TestLimiter(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			h := testStatusServer(t, tt.cfg)
 			w := httptest.NewRecorder()
-			r := httptest.NewRequest("GET", "/api/status", nil)
+			r := httptest.NewRequestWithContext(t.Context(), "GET", "/api/status", nil)
 
 			h.ServeHTTP(w, r)
 			resp := w.Result()
