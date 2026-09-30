@@ -1,0 +1,14 @@
+kind: bug-fix
+
+summary: Retry enrollment write in sync path to reduce ghost agents
+
+description: |
+  When the sync enrollment write path (SyncEnrollmentWrite feature flag) receives
+  a transport error or a 503 from Elasticsearch, the write is retried up to two
+  additional times using the same agent UUID. Retrying with the same UUID means
+  that a 409 (conflict) on any subsequent attempt confirms the original write
+  landed and the enrollment is treated as successful, eliminating the ghost agent
+  that would otherwise result from a timed-out write whose document was silently
+  committed by Elasticsearch.
+
+component: fleet-server

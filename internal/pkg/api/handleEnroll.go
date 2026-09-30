@@ -687,6 +687,9 @@ func createFleetAgent(ctx context.Context, bulker bulk.Bulk, id string, agent mo
 	if syncWrite {
 		// Sync path: write directly with refresh=wait_for so the document is immediately
 		// visible to any retry pod's FindAgent search, preventing ghost agents.
+		//
+		// Retries use the same agent UUID so that a 409 (conflict) on any attempt means
+		// the first write landed and we can treat the enrollment as successful.
 		req := esapi.IndexRequest{
 			Index:      dl.FleetAgents,
 			DocumentID: id,
@@ -695,22 +698,49 @@ func createFleetAgent(ctx context.Context, bulker bulk.Bulk, id string, agent mo
 			Refresh:    "wait_for",
 		}
 		zlog := zerolog.Ctx(ctx)
-		res, doErr := req.Do(ctx, bulker.Client())
-		if doErr != nil {
-			zlog.Warn().Str("agent_id", id).Err(doErr).Msg("enrollment write transport error")
-			return doErr
-		}
-		defer res.Body.Close()
-		if res.StatusCode == http.StatusConflict {
-			zlog.Debug().Str("agent_id", id).Msg("agent document already exists on enrollment create, treating as success")
+		const maxAttempts = 3
+		for attempt := 0; attempt < maxAttempts; attempt++ {
+			if attempt > 0 {
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case <-time.After(time.Duration(attempt) * 100 * time.Millisecond):
+				}
+				req.Body = bytes.NewReader(data)
+			}
+			res, doErr := req.Do(ctx, bulker.Client())
+			if doErr != nil {
+				// Transport error: write outcome is unknown (ghost agent risk).
+				// Retry with the same UUID so a 409 on the next attempt confirms the write landed.
+				if attempt < maxAttempts-1 {
+					zlog.Warn().Str("agent_id", id).Int("attempt", attempt+1).Err(doErr).
+						Msg("enrollment write transport error; retrying with same agent UUID")
+					continue
+				}
+				zlog.Warn().Str("agent_id", id).Err(doErr).
+					Msg("enrollment write transport error after all attempts; document may have been written (ghost agent risk)")
+				return doErr
+			}
+			// 503: write rejected before translog, safe to retry as a fresh write.
+			if res.StatusCode == http.StatusServiceUnavailable && attempt < maxAttempts-1 {
+				zlog.Warn().Str("agent_id", id).Int("attempt", attempt+1).
+					Msg("enrollment write returned 503; retrying")
+				res.Body.Close()
+				continue
+			}
+			defer res.Body.Close()
+			if res.StatusCode == http.StatusConflict {
+				zlog.Debug().Str("agent_id", id).Msg("agent document already exists on enrollment create, treating as success")
+				return nil
+			}
+			if res.IsError() {
+				esResp := res.String()
+				zlog.Warn().Str("agent_id", id).Int("status_code", res.StatusCode).Str("es_response", esResp).Msg("enrollment write ES error")
+				return fmt.Errorf("createFleetAgent: %s", esResp)
+			}
 			return nil
 		}
-		if res.IsError() {
-			esResp := res.String()
-			zlog.Warn().Str("agent_id", id).Int("status_code", res.StatusCode).Str("es_response", esResp).Msg("enrollment write ES error")
-			return fmt.Errorf("createFleetAgent: %s", esResp)
-		}
-		return nil
+		return fmt.Errorf("createFleetAgent: all %d attempts failed", maxAttempts) // unreachable; satisfies compiler
 	}
 
 	_, err = bulker.Create(ctx, dl.FleetAgents, id, data, bulk.WithRefresh())
