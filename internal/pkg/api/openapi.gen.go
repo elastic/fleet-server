@@ -296,11 +296,6 @@ type ActionUnenroll = interface{}
 
 // ActionUninstall The UNINSTALL action data.
 type ActionUninstall struct {
-	// Delay Grace period before the uninstall executes on the agent, as a
-	// duration string (e.g. "30m"). When empty the agent applies its
-	// default (1h).
-	Delay string `json:"delay,omitempty"`
-
 	// UninstallToken Uninstall token required to uninstall a tamper-protected (Elastic
 	// Defend) agent. Passed through to the agent, which forwards it to the
 	// uninstall command. Empty when the agent is not tamper-protected.

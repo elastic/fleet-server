@@ -48,10 +48,11 @@ func Test_Agent_Uninstall_Action(t *testing.T) {
 	uninstallActionID := uuid.Must(uuid.NewV4()).String()
 	CreateActionDocument(t, ctx, srv, model.Action{
 		Agents:     []string{resp.Item.Id},
+		StartTime:  time.Now().Add(30 * time.Minute).Format(time.RFC3339),
 		Expiration: time.Now().Add(2000 * time.Hour).Format(time.RFC3339),
 		ActionID:   uninstallActionID,
 		Type:       string(api.UNINSTALL),
-		Data:       []byte(`{"delay":"30m"}`),
+		Data:       []byte(`{}`),
 	})
 
 	t.Log("Checkin so that the agent receives the UNINSTALL action")

@@ -195,19 +195,13 @@ func TestConvertActionData(t *testing.T) {
 		expect: Action_Data{},
 		hasErr: false,
 	}, {
-		name:   "uninstall action with delay",
+		name:   "uninstall action with uninstall token",
 		aType:  UNINSTALL,
-		raw:    json.RawMessage(`{"delay":"30m"}`),
-		expect: Action_Data{json.RawMessage(`{"delay":"30m"}`)},
+		raw:    json.RawMessage(`{"uninstall_token":"secret-token"}`),
+		expect: Action_Data{json.RawMessage(`{"uninstall_token":"secret-token"}`)},
 		hasErr: false,
 	}, {
-		name:   "uninstall action with delay and uninstall token",
-		aType:  UNINSTALL,
-		raw:    json.RawMessage(`{"delay":"30m","uninstall_token":"secret-token"}`),
-		expect: Action_Data{json.RawMessage(`{"delay":"30m","uninstall_token":"secret-token"}`)},
-		hasErr: false,
-	}, {
-		name:   "uninstall action without delay",
+		name:   "uninstall action without data",
 		aType:  UNINSTALL,
 		raw:    json.RawMessage(`{}`),
 		expect: Action_Data{json.RawMessage(`{}`)},

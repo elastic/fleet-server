@@ -704,13 +704,6 @@ components:
       description: The UNINSTALL action data.
       type: object
       properties:
-        delay:
-          description: |
-            Grace period before the uninstall executes on the agent, as a
-            duration string (e.g. "30m"). When empty the agent applies its
-            default (1h).
-          type: string
-          x-go-type-skip-optional-pointer: true
         uninstall_token:
           description: |
             Uninstall token required to uninstall a tamper-protected (Elastic

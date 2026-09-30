@@ -1063,9 +1063,10 @@ func convertActionData(aType ActionType, raw json.RawMessage) (ad Action_Data, e
 	case UNENROLL: // Action types with no data
 		return ad, nil
 	case UNINSTALL:
-		// All UNINSTALL data fields (delay, uninstall_token) are optional, so a
-		// missing data attribute is valid: treat it as empty rather than failing to
-		// convert (which would drop the action from the checkin response).
+		// The UNINSTALL data field (uninstall_token) is optional, so a missing data
+		// attribute is valid: treat it as empty rather than failing to convert
+		// (which would drop the action from the checkin response). Scheduling is
+		// handled by the action's top-level start_time, not by a data field.
 		if raw == nil {
 			return ad, nil
 		}
