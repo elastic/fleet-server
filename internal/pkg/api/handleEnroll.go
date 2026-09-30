@@ -443,10 +443,19 @@ func (et *EnrollerT) _enroll(
 			ReplaceToken: replaceHash,
 		}
 
-		err = createFleetAgent(ctx, et.bulker, agentID, agent, et.cfg.Features.SyncEnrollmentWrite)
+		syncWrite := et.cfg.Features.SyncEnrollmentWrite
+		zlog.Debug().
+			Str(LogAgentID, agentID).
+			Bool("sync_write", syncWrite).
+			Msg("creating fleet agent document")
+		err = createFleetAgent(ctx, et.bulker, agentID, agent, syncWrite)
 		if err != nil {
 			return nil, err
 		}
+		zlog.Debug().
+			Str(LogAgentID, agentID).
+			Bool("sync_write", syncWrite).
+			Msg("fleet agent document created")
 		// Register delete fleet agent for enrollment error rollback
 		rb.Register("delete agent", func(ctx context.Context) error {
 			return deleteAgent(ctx, zlog, et.bulker, agentID)
@@ -697,7 +706,7 @@ func createFleetAgent(ctx context.Context, bulker bulk.Bulk, id string, agent mo
 		zlog := zerolog.Ctx(ctx)
 		res, doErr := req.Do(ctx, bulker.Client())
 		if doErr != nil {
-			zlog.Warn().Str("agent_id", id).Err(doErr).Msg("enrollment write transport error")
+			zlog.Warn().Str("agent_id", id).Err(doErr).Msg("enrollment write transport error; document may have been written (ghost agent risk)")
 			return doErr
 		}
 		defer res.Body.Close()
