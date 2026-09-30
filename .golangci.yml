@@ -155,6 +155,13 @@ linters:
       # Which file paths to exclude: they will be analyzed, but issues from them won't be reported.
       # "/" will be replaced by the current OS file path separator to properly work on Windows.
       # Default: []
+    rules:
+      # elasticsearch.Config and elasticsearch.NewClient are deprecated in v9 in favour of
+      # functional options via elasticsearch.New(). Our architecture in es/client.go is built
+      # around the Config struct; migration is tracked as a follow-up.
+      - text: "SA1019: elasticsearch\\.(Config|NewClient|NewBaseClient)"
+        linters:
+          - staticcheck
     paths:
       - third_party$
       - builtin$

@@ -2251,7 +2251,166 @@ func (Test) CloudE2EUp() error {
 	applyCmd.Dir = filepath.Join("dev-tools", "cloud", "terraform")
 	applyCmd.Stdout = os.Stdout
 	applyCmd.Stderr = os.Stderr
-	return applyCmd.Run()
+	if err := applyCmd.Run(); err != nil {
+		return err
+	}
+	return waitForCloudStack()
+}
+
+const (
+	// cloudReadyTimeout is the deadline for each readiness check in
+	// waitForCloudStack. A cold 1g ECH instance can take minutes to answer
+	// through the proxy.
+	cloudReadyTimeout  = 5 * time.Minute
+	cloudReadyInterval = 10 * time.Second
+)
+
+// cloudTFDir is the terraform root used by the cloud e2e targets.
+var cloudTFDir = filepath.Join("dev-tools", "cloud", "terraform")
+
+// cloudTFOutput reads a single output value from the cloud e2e terraform state.
+func cloudTFOutput(name string) (string, error) {
+	v, err := sh.Output("terraform", "output", "--raw", "--state="+filepath.Join(cloudTFDir, "terraform.tfstate"), name)
+	if err != nil {
+		return "", fmt.Errorf("unable to retrieve %q from the terraform state: %w", name, err)
+	}
+	return v, nil
+}
+
+// waitForCloudStack blocks until the deployment is actually usable by the
+// tests, rather than merely created: the fleet endpoint must be published and
+// both Kibana and fleet-server must be serving their status endpoints.
+//
+// Elastic Cloud reports a deployment as created before any of that is true, so
+// keeping the wait here means the tests themselves only have to survive
+// transient blips.
+func waitForCloudStack() error {
+	fleetURL, err := waitForFleetURL()
+	if err != nil {
+		return err
+	}
+	kibanaURL, err := cloudTFOutput("kibana_url")
+	if err != nil {
+		return err
+	}
+	user, err := cloudTFOutput("elasticsearch_username")
+	if err != nil {
+		return err
+	}
+	pass, err := cloudTFOutput("elasticsearch_password")
+	if err != nil {
+		return err
+	}
+
+	if err := waitForStatusOK("Kibana", kibanaURL, user, pass); err != nil {
+		return err
+	}
+	// fleet-server's status endpoint is unauthenticated.
+	return waitForStatusOK("fleet-server", fleetURL, "", "")
+}
+
+// waitForFleetURL polls the fleet_url output until it is non-empty, running a
+// terraform refresh between attempts.
+//
+// terraform apply can report success while integrations_server.endpoints is
+// still null, which makes fleet_url resolve to an empty string even though the
+// deployment is healthy and its other endpoints are populated. That is
+// eventual consistency in the Elastic Cloud API rather than a broken
+// deployment, and refreshing re-reads the endpoints.
+func waitForFleetURL() (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), cloudReadyTimeout)
+	defer cancel()
+
+	for attempt := 1; ctx.Err() == nil; attempt++ {
+		fleetURL, err := cloudTFOutput("fleet_url")
+		if err != nil {
+			return "", err
+		}
+		if fleetURL != "" {
+			log.Printf("Attempt %d: the fleet-server endpoint is published.", attempt)
+			return fleetURL, nil
+		}
+		log.Printf("Attempt %d: the fleet-server endpoint is not published yet, refreshing the terraform state...", attempt)
+		if err := refreshCloudTFState(ctx); err != nil {
+			log.Printf("terraform refresh failed, will retry: %v", err)
+		}
+		select {
+		case <-time.After(cloudReadyInterval):
+		case <-ctx.Done():
+		}
+	}
+	return "", fmt.Errorf("the fleet-server endpoint was not published after %s: integrations_server.endpoints is still null", cloudReadyTimeout)
+}
+
+// refreshCloudTFState re-reads the deployment from the Elastic Cloud API so
+// that the outputs computed from it are up to date.
+func refreshCloudTFState(ctx context.Context) error {
+	cmd := exec.CommandContext(ctx, "terraform", "apply", "-refresh-only", "-auto-approve", "-input=false")
+	cmd.Dir = cloudTFDir
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
+// waitForStatusOK polls baseURL's /api/status until it answers 200.
+func waitForStatusOK(name, baseURL, user, pass string) error {
+	statusURL := strings.TrimSuffix(baseURL, "/") + "/api/status"
+	ctx, cancel := context.WithTimeout(context.Background(), cloudReadyTimeout)
+	defer cancel()
+	client := &http.Client{}
+
+	var lastErr error
+	for attempt := 1; ctx.Err() == nil; attempt++ {
+		lastErr = probeStatusOK(ctx, client, statusURL, user, pass)
+		if lastErr == nil {
+			log.Printf("Attempt %d: %s is serving.", attempt, name)
+			return nil
+		}
+		// Auth failures are not transient — stop immediately.
+		var authErr *errAuthFailure
+		if errors.As(lastErr, &authErr) {
+			return fmt.Errorf("%s: %w", name, lastErr)
+		}
+		log.Printf("Attempt %d: %s is not ready yet (%v), retrying in %s...", attempt, name, lastErr, cloudReadyInterval)
+		select {
+		case <-time.After(cloudReadyInterval):
+		case <-ctx.Done():
+		}
+	}
+	return fmt.Errorf("%s did not become available after %s: %w", name, cloudReadyTimeout, lastErr)
+}
+
+// errAuthFailure is returned by probeStatusOK on 401/403 to signal that
+// retrying will not help.
+type errAuthFailure struct{ code int }
+
+func (e *errAuthFailure) Error() string { return fmt.Sprintf("status %d", e.code) }
+
+// probeStatusOK does a single request against a status endpoint.
+func probeStatusOK(ctx context.Context, client *http.Client, statusURL, user, pass string) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, statusURL, nil)
+	if err != nil {
+		return fmt.Errorf("unable to create status request: %w", err)
+	}
+	if user != "" || pass != "" {
+		req.SetBasicAuth(user, pass)
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	_, _ = io.Copy(io.Discard, resp.Body)
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return nil
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return &errAuthFailure{code: resp.StatusCode}
+	default:
+		return fmt.Errorf("status %d", resp.StatusCode)
+	}
 }
 
 // CloudE2EDown destroys the testing cloud deployment.
@@ -2302,23 +2461,21 @@ func stackImageTagFromEnv() (string, error) {
 
 // CloudE2ERun runs tests against the remote cloud deployment.
 func (Test) CloudE2ERun() error {
-	fleetURL, err := sh.Output("terraform", "output", "--raw", "--state="+filepath.Join("dev-tools", "cloud", "terraform", "terraform.tfstate"), "fleet_url")
+	fleetURL, err := cloudTFOutput("fleet_url")
 	if err != nil {
-		return fmt.Errorf("unable to retrive fleet-server cloud url: %w", err)
+		return err
 	}
-
-	kibanaURL, err := sh.Output("terraform", "output", "--raw", "--state="+filepath.Join("dev-tools", "cloud", "terraform", "terraform.tfstate"), "kibana_url")
+	kibanaURL, err := cloudTFOutput("kibana_url")
 	if err != nil {
-		return fmt.Errorf("unable to retrive kibana cloud url: %w", err)
+		return err
 	}
-
-	user, err := sh.Output("terraform", "output", "--raw", "--state="+filepath.Join("dev-tools", "cloud", "terraform", "terraform.tfstate"), "elasticsearch_username")
+	user, err := cloudTFOutput("elasticsearch_username")
 	if err != nil {
-		return fmt.Errorf("unable to retrive es username: %w", err)
+		return err
 	}
-	pass, err := sh.Output("terraform", "output", "--raw", "--state="+filepath.Join("dev-tools", "cloud", "terraform", "terraform.tfstate"), "elasticsearch_password")
+	pass, err := cloudTFOutput("elasticsearch_password")
 	if err != nil {
-		return fmt.Errorf("unable to retrive es password: %w", err)
+		return err
 	}
 
 	var b bytes.Buffer

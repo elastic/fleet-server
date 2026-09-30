@@ -26,7 +26,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v9"
 
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 )
@@ -421,5 +421,25 @@ func Test_Elasticsearch_DiagRequests(t *testing.T) {
 		p := es.DiagRequests(ctx)
 		require.NotEmpty(t, p)
 		require.Contains(t, string(p), "request 0 successful.")
+	})
+}
+
+func TestElasticsearchValidate(t *testing.T) {
+	t.Run("rejects negative MaxConnPerHost", func(t *testing.T) {
+		cfg := Elasticsearch{}
+		cfg.InitDefaults()
+		cfg.MaxConnPerHost = -1
+		require.Error(t, cfg.Validate())
+	})
+	t.Run("rejects zero MaxConnPerHost", func(t *testing.T) {
+		cfg := Elasticsearch{}
+		cfg.InitDefaults()
+		cfg.MaxConnPerHost = 0
+		require.Error(t, cfg.Validate())
+	})
+	t.Run("accepts positive MaxConnPerHost", func(t *testing.T) {
+		cfg := Elasticsearch{}
+		cfg.InitDefaults()
+		require.NoError(t, cfg.Validate())
 	})
 }

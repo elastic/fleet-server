@@ -97,6 +97,14 @@ func (suite *AgentContainerSuite) TestRemoteESOutputWithSecrets() {
 	suite.Require().NoError(err)
 	suite.FleetIsHealthy(ctx, endpoint)
 
+	// Wait until the fleet-server agent's ES document has version metadata
+	// indexed in .fleet-agents. Kibana's isOutputSecretStorageEnabled() queries
+	// .fleet-agents directly, so there is a window after FleetIsHealthy returns
+	// where the agent is visible via the Kibana API but not yet in ES — causing
+	// checkFleetServerVersionsForSecretsStorage to find zero agents and disable
+	// secret storage. See: elastic/kibana x-pack/.../fleet_server/index.ts.
+	suite.WaitForFleetServerSecretsEnabled(ctx, suite.agentID)
+
 	// Create a service token for the remote ES output.
 	serviceToken := suite.CreateServiceToken(ctx)
 
