@@ -5,6 +5,7 @@
 package config
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -38,6 +39,33 @@ type ServerLimits struct {
 
 // InitDefaults initializes the defaults for the configuration.
 func (c *ServerLimits) InitDefaults() {}
+
+// Validate ensures that the configuration is valid.
+func (c *ServerLimits) Validate() error {
+	type namedLimit struct {
+		name string
+		l    Limit
+	}
+	// action_limit and policy_limit are omitted: their max is never read.
+	for _, nl := range []namedLimit{
+		{"checkin_limit", c.CheckinLimit},
+		{"artifact_limit", c.ArtifactLimit},
+		{"enroll_limit", c.EnrollLimit},
+		{"ack_limit", c.AckLimit},
+		{"status_limit", c.StatusLimit},
+		{"upload_start_limit", c.UploadStartLimit},
+		{"upload_end_limit", c.UploadEndLimit},
+		{"upload_chunk_limit", c.UploadChunkLimit},
+		{"file_delivery_limit", c.DeliverFileLimit},
+		{"pgp_retrieval_limit", c.GetPGPKey},
+		{"audit_unenroll_limit", c.AuditUnenrollLimit},
+	} {
+		if nl.l.Max < 0 {
+			return fmt.Errorf("%s.max must not be negative, got %d", nl.name, nl.l.Max)
+		}
+	}
+	return nil
+}
 
 func (c *ServerLimits) LoadLimits(limits *envLimits) {
 	l := limits.Server
