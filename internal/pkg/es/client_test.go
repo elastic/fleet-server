@@ -17,10 +17,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
 
+	backoff "github.com/cenkalti/backoff/v7"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/elastic-transport-go/v8/elastictransport"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
@@ -489,4 +491,67 @@ func TestNewClientRetryWithMockES(t *testing.T) {
 	_, err = FetchESVersion(t.Context(), client)
 	require.NoError(t, err, "expected eventual success after 503 retries")
 	require.Equal(t, failUntil+1, callCount, "expected 2 failures + 1 success")
+}
+
+// TestExponentialBackoffFromAttemptSchedule pins the delay schedule: each
+// attempt's delay must fall within the randomization band around the
+// 1.5x-growth interval, capped at maxRetryBackoff.
+func TestExponentialBackoffFromAttemptSchedule(t *testing.T) {
+	expected := float64(initialRetryBackoff)
+	for attempt := 1; attempt <= 12; attempt++ {
+		if attempt > 1 {
+			expected = min(expected*1.5, float64(maxRetryBackoff))
+		}
+		lo := time.Duration(expected * (1 - randomizationFactor))
+		hi := time.Duration(expected * (1 + randomizationFactor))
+		for range 50 {
+			d := exponentialBackoffFromAttempt(attempt)
+			require.GreaterOrEqual(t, d, lo, "attempt %d", attempt)
+			require.LessOrEqual(t, d, hi, "attempt %d", attempt)
+		}
+	}
+}
+
+// TestRetryBackoffConcurrent drives concurrent failing requests through a
+// client using WithBackoff and the default backoff; run with -race to catch
+// shared mutable backoff state.
+func TestRetryBackoffConcurrent(t *testing.T) {
+	newRT := func() roundTripFunc {
+		return func(_ *http.Request) (*http.Response, error) { return nil, syscall.ECONNREFUSED }
+	}
+	tmpl := backoff.NewExponentialBackOff()
+	tmpl.InitialInterval = time.Millisecond
+	tmpl.MaxInterval = 5 * time.Millisecond
+
+	cases := map[string][]ConfigOption{
+		"default":     {},
+		"WithBackoff": {WithBackoff(tmpl)},
+	}
+	for name, extra := range cases {
+		t.Run(name, func(t *testing.T) {
+			rt := newRT()
+			opts := append([]ConfigOption{
+				{rtWrap: func(_ http.RoundTripper) http.RoundTripper { return rt }},
+				WithMaxRetries(3),
+			}, extra...)
+			if name == "default" {
+				opts = append(opts, NewConfigOption(elasticsearch.WithTransportOptions(
+					elastictransport.WithRetryBackoff(func(a int) time.Duration {
+						return exponentialBackoffFromAttempt(a) / 1000
+					}),
+				)))
+			}
+			client, err := NewClient(t.Context(), minimalESCfg(), false, opts...)
+			require.NoError(t, err)
+
+			var wg sync.WaitGroup
+			for range 16 {
+				wg.Go(func() {
+					req, _ := http.NewRequestWithContext(t.Context(), "GET", "http://localhost:9200/", nil)
+					_, _ = client.Perform(req) //nolint:bodyclose // error path
+				})
+			}
+			wg.Wait()
+		})
+	}
 }
