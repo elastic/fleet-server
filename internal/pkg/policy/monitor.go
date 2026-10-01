@@ -264,17 +264,21 @@ func (m *monitorT) waitStart(ctx context.Context) error {
 	return nil
 }
 
-// requeuePending returns a subscriber to the front of the pending queue and kicks
-// the run loop. The kick is required because a replacement dispatchPending, started
-// after this one was cancelled, may already have found the queue empty and exited.
-func (m *monitorT) requeuePending(s *subT) {
+// requeuePending returns a subscriber to the front of the pending queue and, if kick is set,
+// kicks the run loop. The kick is required when dispatchPending was cancelled because a
+// replacement dispatchPending may already have found the queue empty and exited.
+// It must not be set for errors that are not a cancellation, as the replacement would fail
+// the same way and re-kick in a busy loop.
+func (m *monitorT) requeuePending(s *subT, kick bool) {
 	if m.beforeRequeue != nil {
 		m.beforeRequeue()
 	}
 	m.mut.Lock()
 	m.pendingQ.pushFront(s)
 	m.mut.Unlock()
-	m.kickDeploy()
+	if kick {
+		m.kickDeploy()
+	}
 }
 
 // dispatchPending will dispatch all pending policy changes to the subscriptions in the queue.
@@ -311,7 +315,8 @@ func (m *monitorT) dispatchPending(ctx context.Context) {
 		// If too many (checkin) responses are written concurrently memory usage may explode due to allocating gzip writers.
 		err := m.limit.Wait(ctx)
 		if err != nil {
-			m.requeuePending(s) // context cancelled before sub is handled, put it back
+			// Wait can also fail without ctx being done (e.g. the wait would exceed ctx's deadline).
+			m.requeuePending(s, ctx.Err() != nil) // sub not handled, put it back
 			if !errors.Is(err, context.Canceled) {
 				m.log.Warn().Err(err).Msg("Policy limit error")
 			}
@@ -334,14 +339,14 @@ func (m *monitorT) dispatchPending(ctx context.Context) {
 
 		// Clone and send without holding m.mut.
 		if err := ctx.Err(); err != nil {
-			m.requeuePending(s) // context cancelled before sub is handled, put it back
+			m.requeuePending(s, true) // context cancelled before sub is handled, put it back
 			m.log.Debug().Err(err).Msg("context termination detected in policy dispatch")
 			return
 		}
 		cloned := policy.pp.Clone()
 		select {
 		case <-ctx.Done():
-			m.requeuePending(s) // context cancelled before sub is handled, put it back
+			m.requeuePending(s, true) // context cancelled before sub is handled, put it back
 			m.log.Debug().Err(ctx.Err()).Msg("context termination detected in policy dispatch")
 			return
 		case s.ch <- cloned:
