@@ -7,13 +7,13 @@
 ### Fixes [fleet-server-9.5.5-fixes]
 
 
-* Fix agent permanently stuck in &#34;updating&#34; state after fast upgrade. [#7656](https://github.com/elastic/fleet-server/pull/7656) [#7756](https://github.com/elastic/fleet-server/pull/7756) [#7945](https://github.com/elastic/fleet-server/pull/7945) 
+* Fix agent permanently stuck in &#34;updating&#34; state after fast upgrade. [#7798](https://github.com/elastic/fleet-server/pull/7798) 
 
   Agents that completed an upgrade faster than one checkin interval (~60 s)
   were permanently shown as &#34;updating&#34; in the Fleet UI. Fleet Server now
   detects the completed upgrade and clears the stuck state on the next checkin.
   
-* Reject invalid concurrency limits at configuration load time. [#7656](https://github.com/elastic/fleet-server/pull/7656) [#7756](https://github.com/elastic/fleet-server/pull/7756) [#7945](https://github.com/elastic/fleet-server/pull/7945) 
+* Reject invalid concurrency limits at configuration load time. [#7930](https://github.com/elastic/fleet-server/pull/7930) 
 
   `bulk.flush_max_pending` and `output.elasticsearch.max_conn_per_host` must now
   be positive. A zero or negative value produced a semaphore that could never be
