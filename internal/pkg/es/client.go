@@ -185,7 +185,7 @@ func isTLSHandshakeError(err error) bool {
 // idempotent and are never retried on timeout. It composes with any previously
 // installed RetryOnError predicate using OR semantics.
 func WithRetryOnTimeoutForCreate() ConfigOption {
-	return func(config *elasticsearch.Config) { //nolint:staticcheck // uses deprecated elasticsearch.Config
+	return func(config *elasticsearch.Config) {
 		prev := config.RetryOnError
 		config.RetryOnError = func(req *http.Request, err error) bool {
 			if prev != nil && prev(req, err) {
