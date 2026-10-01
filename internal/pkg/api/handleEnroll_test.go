@@ -17,6 +17,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elastic/elastic-transport-go/v8/elastictransport"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -809,7 +810,9 @@ func TestCreateFleetAgentSyncWrite409Succeeds(t *testing.T) {
 			Header:     http.Header{"X-Elastic-Product": []string{"Elasticsearch"}},
 		}, nil
 	}
-	cli, err := elasticsearch.NewClient(elasticsearch.Config{Transport: mt})
+	cli, err := elasticsearch.New(
+		elasticsearch.WithTransportOptions(elastictransport.WithTransport(mt)),
+	)
 	require.NoError(t, err)
 
 	bulker := ftesting.NewMockBulk()
@@ -829,7 +832,9 @@ func TestCreateFleetAgentSyncWriteErrorSurfaces(t *testing.T) {
 			Header:     http.Header{"X-Elastic-Product": []string{"Elasticsearch"}},
 		}, nil
 	}
-	cli, err := elasticsearch.NewClient(elasticsearch.Config{Transport: mt})
+	cli, err := elasticsearch.New(
+		elasticsearch.WithTransportOptions(elastictransport.WithTransport(mt)),
+	)
 	require.NoError(t, err)
 
 	bulker := ftesting.NewMockBulk()
