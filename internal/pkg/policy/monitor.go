@@ -316,7 +316,7 @@ func (m *monitorT) dispatchPending(ctx context.Context) {
 		err := m.limit.Wait(ctx)
 		if err != nil {
 			// Wait can also fail without ctx being done (e.g. the wait would exceed ctx's deadline).
-			m.requeuePending(s, ctx.Err() != nil) // sub not handled, put it back
+			m.requeuePending(s, errors.Is(ctx.Err(), context.Canceled)) // sub not handled, put it back
 			if !errors.Is(err, context.Canceled) {
 				m.log.Warn().Err(err).Msg("Policy limit error")
 			}
