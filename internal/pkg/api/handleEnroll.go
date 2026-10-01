@@ -16,7 +16,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	mrand "math/rand"
 	"net/http"
 	"strconv"
 	"strings"
@@ -676,6 +675,11 @@ func updateFleetAgent(ctx context.Context, bulker bulk.Bulk, id string, doc bulk
 	return bulker.Update(ctx, dl.FleetAgents, id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3))
 }
 
+// syncEnrollWriteTimeout bounds the sync enrollment write, including client retries. It stays
+// below Horde's 10m enrollment timeout and the proxy's 600s limit so a write that is still
+// being retried is not cut off by the caller.
+const syncEnrollWriteTimeout = 5 * time.Minute
+
 func createFleetAgent(ctx context.Context, bulker bulk.Bulk, id string, agent model.Agent, syncWrite bool) error {
 	span, ctx := apm.StartSpan(ctx, "createAgent", "create")
 	defer span.End()
@@ -689,11 +693,11 @@ func createFleetAgent(ctx context.Context, bulker bulk.Bulk, id string, agent mo
 		// Sync path: write directly with refresh=wait_for so the document is immediately
 		// visible to any retry pod's FindAgent search, preventing ghost agents.
 		//
-		// The ES client already retries 503 and other transient status codes (client.go).
-		// This loop handles transport errors only: when the client closes the connection
-		// before receiving a response, the write outcome is unknown. Retrying with the same
-		// UUID means a 409 on any subsequent attempt confirms the write landed, so we can
-		// treat the enrollment as successful rather than leaving a ghost agent.
+		// The ES client retries transient failures, including timeouts for create requests
+		// (es.WithRetryOnTimeoutForCreate). A timed-out write has an unknown outcome, so the
+		// retries reuse the same agent UUID: a 409 then confirms the first write landed and is
+		// treated as success rather than leaving a ghost agent. The timeout below bounds the
+		// write across all of those retries.
 		req := esapi.IndexRequest{
 			Index:      dl.FleetAgents,
 			DocumentID: id,
@@ -702,40 +706,24 @@ func createFleetAgent(ctx context.Context, bulker bulk.Bulk, id string, agent mo
 			Refresh:    "wait_for",
 		}
 		zlog := zerolog.Ctx(ctx)
-		const maxAttempts = 3
-		for attempt := range maxAttempts {
-			if attempt > 0 {
-				select {
-				case <-ctx.Done():
-					return ctx.Err()
-				case <-time.After(time.Second + time.Duration(mrand.Intn(1000))*time.Millisecond): //nolint:gosec // jitter for backoff does not require cryptographic randomness
-				}
-				req.Body = bytes.NewReader(data)
-			}
-			res, doErr := req.Do(ctx, bulker.Client())
-			if doErr != nil {
-				if attempt < maxAttempts-1 {
-					zlog.Warn().Str("agent_id", id).Int("attempt", attempt+1).Err(doErr).
-						Msg("enrollment write transport error; retrying with same agent UUID")
-					continue
-				}
-				zlog.Warn().Str("agent_id", id).Err(doErr).
-					Msg("enrollment write transport error after all attempts; document may have been written (ghost agent risk)")
-				return doErr
-			}
-			defer res.Body.Close()
-			if res.StatusCode == http.StatusConflict {
-				zlog.Debug().Str("agent_id", id).Msg("agent document already exists on enrollment create, treating as success")
-				return nil
-			}
-			if res.IsError() {
-				esResp := res.String()
-				zlog.Warn().Str("agent_id", id).Int("status_code", res.StatusCode).Str("es_response", esResp).Msg("enrollment write ES error")
-				return fmt.Errorf("createFleetAgent: %s", esResp)
-			}
+		writeCtx, cancel := context.WithTimeout(ctx, syncEnrollWriteTimeout)
+		defer cancel()
+		res, doErr := req.Do(writeCtx, bulker.Client())
+		if doErr != nil {
+			zlog.Warn().Str("agent_id", id).Err(doErr).Msg("enrollment write transport error; document may have been written (ghost agent risk)")
+			return doErr
+		}
+		defer res.Body.Close()
+		if res.StatusCode == http.StatusConflict {
+			zlog.Debug().Str("agent_id", id).Msg("agent document already exists on enrollment create, treating as success")
 			return nil
 		}
-		return fmt.Errorf("createFleetAgent: all %d attempts failed", maxAttempts) // unreachable; satisfies compiler
+		if res.IsError() {
+			esResp := res.String()
+			zlog.Warn().Str("agent_id", id).Int("status_code", res.StatusCode).Str("es_response", esResp).Msg("enrollment write ES error")
+			return fmt.Errorf("createFleetAgent: %s", esResp)
+		}
+		return nil
 	}
 
 	_, err = bulker.Create(ctx, dl.FleetAgents, id, data, bulk.WithRefresh())

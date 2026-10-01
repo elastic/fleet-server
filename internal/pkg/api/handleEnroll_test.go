@@ -858,10 +858,32 @@ func requireSameBodies(t *testing.T, bodies [][]byte) {
 	}
 }
 
-// TestCreateFleetAgentSyncWriteRetry* tests exercise the retry loop in createFleetAgent.
-// Each test that triggers a retry incurs the real 1–2s backoff delay.
+// enrollTimeoutErr is a transport timeout, like the response header timeout.
+type enrollTimeoutErr struct{}
 
-func TestCreateFleetAgentSyncWriteTransportErrorThenConflictSucceeds(t *testing.T) {
+func (enrollTimeoutErr) Error() string   { return "net/http: timeout awaiting response headers" }
+func (enrollTimeoutErr) Timeout() bool   { return true }
+func (enrollTimeoutErr) Temporary() bool { return true }
+
+// newEnrollESClient returns a client with the same timeout retry policy as production.
+func newEnrollESClient(t *testing.T, mt *MockTransport, maxRetries int) *elasticsearch.Client {
+	t.Helper()
+	cfg := elasticsearch.Config{Transport: mt, MaxRetries: maxRetries}
+	es.WithRetryOnTimeoutForCreate()(&cfg)
+	cli, err := elasticsearch.NewClient(cfg)
+	require.NoError(t, err)
+	return cli
+}
+
+func syncEnrollResponse(status int) *http.Response {
+	return &http.Response{
+		StatusCode: status,
+		Body:       io.NopCloser(strings.NewReader(`{}`)),
+		Header:     http.Header{"X-Elastic-Product": []string{"Elasticsearch"}},
+	}
+}
+
+func TestCreateFleetAgentSyncWriteTimeoutThenConflictSucceeds(t *testing.T) {
 	const agentID = "test-agent-id"
 	calls := 0
 	var bodies [][]byte
@@ -872,30 +894,20 @@ func TestCreateFleetAgentSyncWriteTransportErrorThenConflictSucceeds(t *testing.
 		recordSyncEnrollBody(t, req, &bodies)
 		calls++
 		if calls == 1 {
-			return nil, errors.New("connection reset by peer")
+			return nil, enrollTimeoutErr{}
 		}
-		return &http.Response{
-			StatusCode: http.StatusConflict,
-			Body:       io.NopCloser(strings.NewReader(`{}`)),
-			Header:     http.Header{"X-Elastic-Product": []string{"Elasticsearch"}},
-		}, nil
+		return syncEnrollResponse(http.StatusConflict), nil
 	}
-	cli, err := elasticsearch.NewClient(elasticsearch.Config{
-		Transport:    mt,
-		RetryOnError: func(_ *http.Request, _ error) bool { return false },
-	})
-	require.NoError(t, err)
-
 	bulker := ftesting.NewMockBulk()
-	bulker.On("Client").Return(cli)
+	bulker.On("Client").Return(newEnrollESClient(t, mt, 5))
 
-	err = createFleetAgent(t.Context(), bulker, agentID, model.Agent{}, true)
+	err := createFleetAgent(t.Context(), bulker, agentID, model.Agent{}, true)
 	require.NoError(t, err)
 	require.Equal(t, 2, calls, "expected exactly two transport calls")
 	requireSameBodies(t, bodies)
 }
 
-func TestCreateFleetAgentSyncWriteTransportErrorThenSucceeds(t *testing.T) {
+func TestCreateFleetAgentSyncWriteTimeoutThenSucceeds(t *testing.T) {
 	const agentID = "test-agent-id"
 	calls := 0
 	var bodies [][]byte
@@ -906,31 +918,22 @@ func TestCreateFleetAgentSyncWriteTransportErrorThenSucceeds(t *testing.T) {
 		recordSyncEnrollBody(t, req, &bodies)
 		calls++
 		if calls == 1 {
-			return nil, errors.New("connection reset by peer")
+			return nil, enrollTimeoutErr{}
 		}
-		return &http.Response{
-			StatusCode: http.StatusCreated,
-			Body:       io.NopCloser(strings.NewReader(`{}`)),
-			Header:     http.Header{"X-Elastic-Product": []string{"Elasticsearch"}},
-		}, nil
+		return syncEnrollResponse(http.StatusCreated), nil
 	}
-	cli, err := elasticsearch.NewClient(elasticsearch.Config{
-		Transport:    mt,
-		RetryOnError: func(_ *http.Request, _ error) bool { return false },
-	})
-	require.NoError(t, err)
-
 	bulker := ftesting.NewMockBulk()
-	bulker.On("Client").Return(cli)
+	bulker.On("Client").Return(newEnrollESClient(t, mt, 5))
 
-	err = createFleetAgent(t.Context(), bulker, agentID, model.Agent{}, true)
+	err := createFleetAgent(t.Context(), bulker, agentID, model.Agent{}, true)
 	require.NoError(t, err)
 	require.Equal(t, 2, calls, "expected exactly two transport calls")
 	requireSameBodies(t, bodies)
 }
 
-func TestCreateFleetAgentSyncWriteAllTransportErrorsFail(t *testing.T) {
+func TestCreateFleetAgentSyncWriteTimeoutsExhaustClientRetries(t *testing.T) {
 	const agentID = "test-agent-id"
+	const maxRetries = 2
 	calls := 0
 	var bodies [][]byte
 	mt := &MockTransport{}
@@ -939,21 +942,48 @@ func TestCreateFleetAgentSyncWriteAllTransportErrorsFail(t *testing.T) {
 		require.Contains(t, req.URL.Path, agentID, "agent UUID must be the same on every attempt")
 		recordSyncEnrollBody(t, req, &bodies)
 		calls++
-		return nil, errors.New("connection reset by peer")
+		return nil, enrollTimeoutErr{}
 	}
-	cli, err := elasticsearch.NewClient(elasticsearch.Config{
-		Transport:    mt,
-		RetryOnError: func(_ *http.Request, _ error) bool { return false },
-	})
-	require.NoError(t, err)
-
 	bulker := ftesting.NewMockBulk()
-	bulker.On("Client").Return(cli)
+	bulker.On("Client").Return(newEnrollESClient(t, mt, maxRetries))
 
-	err = createFleetAgent(t.Context(), bulker, agentID, model.Agent{}, true)
+	err := createFleetAgent(t.Context(), bulker, agentID, model.Agent{}, true)
 	require.Error(t, err)
-	require.Equal(t, 3, calls, "expected all three attempts to be made")
+	require.Equal(t, 1+maxRetries, calls, "createFleetAgent must not add attempts on top of the client's retry budget")
 	requireSameBodies(t, bodies)
+}
+
+func TestCreateFleetAgentSyncWriteNonTimeoutErrorNotRetried(t *testing.T) {
+	calls := 0
+	mt := &MockTransport{}
+	mt.RoundTripFn = func(req *http.Request) (*http.Response, error) {
+		calls++
+		return nil, errors.New("unexpected EOF")
+	}
+	bulker := ftesting.NewMockBulk()
+	bulker.On("Client").Return(newEnrollESClient(t, mt, 5))
+
+	err := createFleetAgent(t.Context(), bulker, "test-agent-id", model.Agent{}, true)
+	require.Error(t, err)
+	require.Equal(t, 1, calls)
+}
+
+func TestCreateFleetAgentSyncWriteCallerGaveUpNotRetried(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	calls := 0
+	mt := &MockTransport{}
+	mt.RoundTripFn = func(req *http.Request) (*http.Response, error) {
+		calls++
+		cancel()
+		return nil, enrollTimeoutErr{}
+	}
+	bulker := ftesting.NewMockBulk()
+	bulker.On("Client").Return(newEnrollESClient(t, mt, 5))
+
+	err := createFleetAgent(ctx, bulker, "test-agent-id", model.Agent{}, true)
+	require.Error(t, err)
+	require.Equal(t, 1, calls)
 }
 
 func TestValidateEnrollRequest(t *testing.T) {
