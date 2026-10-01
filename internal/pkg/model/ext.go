@@ -9,6 +9,10 @@ import (
 	"maps"
 	"slices"
 	"time"
+
+	"github.com/elastic/elastic-agent-libs/str"
+
+	"github.com/elastic/fleet-server/v7/internal/pkg/smap"
 )
 
 // Time returns the time for the current leader.
@@ -82,6 +86,20 @@ func (a *Agent) APIKeyIDs() []ToRetireAPIKeyIdsItems {
 
 }
 
+// FeatureIncludeTagsInEvents is the policy feature that adds the agent tags to the events.
+const FeatureIncludeTagsInEvents = "include_tags_in_events"
+
+// FeatureEnabled reports whether agent.features.<name>.enabled is true in the policy.
+func (d *PolicyData) FeatureEnabled(name string) bool {
+	if d == nil {
+		return false
+	}
+	features, _ := d.Agent["features"].(map[string]any)
+	feature, _ := features[name].(map[string]any)
+	enabled, _ := feature["enabled"].(bool)
+	return enabled
+}
+
 func ClonePolicyData(d *PolicyData) *PolicyData {
 	if d == nil {
 		return nil
@@ -120,6 +138,14 @@ func ClonePolicyData(d *PolicyData) *PolicyData {
 		res.Service = cloneOTelService(d.Service)
 	}
 	return res
+}
+
+func (a *Agent) ComputeTagsHash() (string, error) {
+	tags := str.MakeSet(a.Tags...).ToSlice()
+	if len(tags) == 0 {
+		return "", nil
+	}
+	return smap.Map{"tags": tags}.Hash()
 }
 
 func cloneOTelService(s *Service) *Service {

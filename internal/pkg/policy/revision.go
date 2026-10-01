@@ -12,6 +12,9 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 )
 
+// RevisionForce is used to force the delivery of the current policy revision to an agent.
+const RevisionForce int64 = 0
+
 // Revision is a policy revision that is sent as an action ID to an agent.
 type Revision struct {
 	PolicyID    string
