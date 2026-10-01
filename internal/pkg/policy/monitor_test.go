@@ -861,3 +861,127 @@ func Test_Monitor_dispatchPending_limiterDeadlineDoesNotKick(t *testing.T) {
 	default:
 	}
 }
+
+// Test_Monitor_requeue_kick_cancels_replacement_before_pop covers the interleaving where the kick
+// from a cancelled dispatch A (which requeues after a replacement B found the queue empty)
+// cancels replacement C before C has popped. C then pops under a cancelled context and requeues
+// without kicking, so the subscribers must be delivered by dispatch D, which A's kick starts.
+// The test holds C and D before their first pop and releases them in both orders.
+func Test_Monitor_requeue_kick_cancels_replacement_before_pop(t *testing.T) {
+	for name, releaseCFirst := range map[string]bool{"release C then D": true, "release D then C": false} {
+		t.Run(name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+				ctx = testlog.SetLogger(t).WithContext(ctx)
+
+				chHitT := make(chan []es.HitT, 1)
+				defer close(chHitT)
+				ms := mmock.NewMockSubscription()
+				ms.On("Output").Return((<-chan []es.HitT)(chHitT))
+				mm := mmock.NewMockMonitor()
+				mm.On("Subscribe").Return(ms).Once()
+				mm.On("Unsubscribe", mock.Anything).Return().Once()
+
+				monitor := NewMonitor(ftesting.NewMockBulk(), mm, config.ServerLimits{PolicyLimit: config.Limit{Burst: 1, Interval: time.Hour}})
+				pm := monitor.(*monitorT)
+				pm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
+					return []model.Policy{}, nil
+				}
+
+				// Dispatch ids in start order: 1=A (hit), 2=B (kickLoad), 3=C (subscribe), 4=D (A's kick).
+				gates := map[int]chan struct{}{3: make(chan struct{}), 4: make(chan struct{})}
+				var gmu sync.Mutex
+				n := 0
+				pm.beforePop = func() {
+					gmu.Lock()
+					n++
+					g := gates[n]
+					gmu.Unlock()
+					if g != nil {
+						<-g
+					}
+				}
+				reached := make(chan struct{})
+				release := make(chan struct{})
+				var once sync.Once
+				pm.beforeRequeue = func() {
+					once.Do(func() { close(reached) })
+					<-release
+				}
+
+				var mwg sync.WaitGroup
+				mwg.Go(func() { _ = monitor.Run(ctx) })
+				require.NoError(t, pm.waitStart(ctx))
+
+				policyID := uuid.Must(uuid.NewV4()).String()
+				pm.mut.Lock()
+				pm.policies[policyID] = policyT{head: makeHead()}
+				pm.mut.Unlock()
+
+				subs := make([]Subscription, 2)
+				for i := range subs {
+					sub, err := monitor.Subscribe(uuid.Must(uuid.NewV4()).String(), policyID, 0)
+					require.NoError(t, err)
+					defer monitor.Unsubscribe(sub)
+					subs[i] = sub
+				}
+				rId := xid.New().String()
+				policy := model.Policy{
+					ESDocument:     model.ESDocument{Id: rId, Version: 1, SeqNo: 1},
+					PolicyID:       policyID,
+					CoordinatorIdx: 1,
+					Data:           policyDataDefault,
+					RevisionIdx:    1,
+				}
+				policyData, err := json.Marshal(&policy)
+				require.NoError(t, err)
+				chHitT <- []es.HitT{{ID: rId, SeqNo: 1, Version: 1, Source: policyData}}
+
+				select {
+				case <-subs[0].Output():
+				case <-time.After(time.Minute):
+					require.Fail(t, "first subscriber was not dispatched")
+				}
+				synctest.Wait() // A holds subs[1], rate waiting
+
+				pm.kickLoad() // cancels A (held before requeue); B pops empty
+				<-reached
+				synctest.Wait()
+
+				// New subscriber needing the policy enqueues S and starts C, held before its pop.
+				sub3, err := monitor.Subscribe(uuid.Must(uuid.NewV4()).String(), policyID, 0)
+				require.NoError(t, err)
+				defer monitor.Unsubscribe(sub3)
+				synctest.Wait()
+
+				pm.limit.SetLimit(rate.Inf)
+				close(release) // A requeues; kicks if emptyPop; Run cancels C and starts D (held)
+				synctest.Wait()
+
+				if releaseCFirst {
+					close(gates[3])
+					synctest.Wait()
+					close(gates[4])
+				} else {
+					close(gates[4])
+					synctest.Wait()
+					close(gates[3])
+				}
+
+				for i, sub := range []Subscription{subs[1], sub3} {
+					select {
+					case <-sub.Output():
+					case <-time.After(time.Minute):
+						require.FailNowf(t, "stranded", "subscriber %d was never dispatched", i)
+					}
+				}
+				gmu.Lock()
+				require.Equal(t, 4, n, "A's kick must have started dispatch D")
+				gmu.Unlock()
+				cancel()
+				mwg.Wait()
+			})
+		})
+	}
+}
