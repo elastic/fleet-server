@@ -12,9 +12,14 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
+	"sync"
+	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
@@ -24,7 +29,12 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/testing/certs"
 	"github.com/stretchr/testify/require"
 
+<<<<<<< HEAD
 	"github.com/elastic/go-elasticsearch/v9"
+=======
+	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v8/esapi"
+>>>>>>> 3f68093 (fix: retry sync enrollment write on transport error to reduce ghost agents (#7945))
 )
 
 var enabled bool = true
@@ -344,5 +354,114 @@ func TestWithRetryOnTLSHandshakeError(t *testing.T) {
 		require.True(t, cfg.RetryOnError(nil, wrappedCertErr))
 		// Neither matches.
 		require.False(t, cfg.RetryOnError(nil, syscall.ECONNRESET))
+	})
+}
+
+func TestShouldRetryTimeoutForCreate(t *testing.T) {
+	newReq := func(t *testing.T, ctx context.Context, method, rawURL string) *http.Request {
+		t.Helper()
+		req, err := http.NewRequestWithContext(ctx, method, rawURL, nil)
+		require.NoError(t, err)
+		return req
+	}
+	timeoutErr := &net.DNSError{IsTimeout: true}
+	canceledCtx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	tests := []struct {
+		name string
+		req  *http.Request
+		err  error
+		want bool
+	}{
+		{"create timeout", newReq(t, t.Context(), http.MethodPut, "http://es/.fleet-agents/_doc/abc?op_type=create&refresh=wait_for"), timeoutErr, true},
+		{"create deadline exceeded", newReq(t, t.Context(), http.MethodPut, "http://es/.fleet-agents/_doc/abc?op_type=create"), context.DeadlineExceeded, true},
+		{"create non-timeout error", newReq(t, t.Context(), http.MethodPut, "http://es/.fleet-agents/_doc/abc?op_type=create"), errors.New("boom"), false},
+		{"create timeout after caller context done", newReq(t, canceledCtx, http.MethodPut, "http://es/.fleet-agents/_doc/abc?op_type=create"), timeoutErr, false},
+		{"index without op_type", newReq(t, t.Context(), http.MethodPut, "http://es/.fleet-agents/_doc/abc"), timeoutErr, false},
+		{"bulk", newReq(t, t.Context(), http.MethodPost, "http://es/_bulk?op_type=create"), timeoutErr, false},
+		{"search", newReq(t, t.Context(), http.MethodPost, "http://es/.fleet-agents/_search"), timeoutErr, false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.want, shouldRetryTimeoutForCreate(tc.req, tc.err))
+		})
+	}
+}
+
+func TestWithRetryOnTimeoutForCreateComposes(t *testing.T) {
+	cfg := elasticsearch.Config{}
+	WithRetryOnErrs(syscall.ECONNRESET)(&cfg)
+	WithRetryOnTimeoutForCreate()(&cfg)
+
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, "http://es/_bulk", nil)
+	require.NoError(t, err)
+	require.True(t, cfg.RetryOnError(req, syscall.ECONNRESET), "previous predicate must still apply")
+	require.False(t, cfg.RetryOnError(req, context.DeadlineExceeded), "timeouts are only retried for creates")
+}
+
+// TestRetryOnTimeoutForCreate drives a real transport timeout: the first create
+// hangs past ResponseHeaderTimeout, the retry reaches the server again with the
+// same path and body, and a non-create request is not retried.
+func TestRetryOnTimeoutForCreate(t *testing.T) {
+	const index = ".fleet-agents"
+	wantRecorded := "/" + index + "/_doc/abc {\"k\":\"v\"}"
+	var calls atomic.Int32
+	var mu sync.Mutex
+	var bodies []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Elastic-Product", "Elasticsearch")
+		b, _ := io.ReadAll(r.Body)
+		mu.Lock()
+		bodies = append(bodies, r.URL.Path+" "+string(b))
+		mu.Unlock()
+		if calls.Add(1) == 1 {
+			select {
+			case <-time.After(2 * time.Second):
+			case <-r.Context().Done():
+			}
+			return
+		}
+		w.WriteHeader(http.StatusConflict)
+		fmt.Fprint(w, `{}`)
+	}))
+	defer server.Close()
+
+	newClient := func(t *testing.T) *elasticsearch.Client {
+		t.Helper()
+		cfg := elasticsearch.Config{
+			Addresses:  []string{server.URL},
+			Transport:  &http.Transport{ResponseHeaderTimeout: 100 * time.Millisecond},
+			MaxRetries: 5,
+		}
+		WithRetryOnTimeoutForCreate()(&cfg)
+		cli, err := elasticsearch.NewClient(cfg)
+		require.NoError(t, err)
+		return cli
+	}
+
+	t.Run("create is retried with same path and body", func(t *testing.T) {
+		calls.Store(0)
+		bodies = nil
+		res, err := esapi.IndexRequest{
+			Index:      index,
+			DocumentID: "abc",
+			Body:       strings.NewReader(`{"k":"v"}`),
+			OpType:     opTypeCreate,
+		}.Do(t.Context(), newClient(t))
+		require.NoError(t, err)
+		defer res.Body.Close()
+		require.Equal(t, http.StatusConflict, res.StatusCode)
+		require.Equal(t, int32(2), calls.Load())
+		mu.Lock()
+		defer mu.Unlock()
+		require.Equal(t, []string{wantRecorded, wantRecorded}, bodies)
+	})
+
+	t.Run("search is not retried on timeout", func(t *testing.T) {
+		calls.Store(0)
+		_, err := esapi.SearchRequest{Index: []string{index}}.Do(t.Context(), newClient(t))
+		require.Error(t, err)
+		require.Equal(t, int32(1), calls.Load())
 	})
 }
