@@ -703,7 +703,7 @@ func createFleetAgent(ctx context.Context, bulker bulk.Bulk, id string, agent mo
 		}
 		zlog := zerolog.Ctx(ctx)
 		const maxAttempts = 3
-		for attempt := 0; attempt < maxAttempts; attempt++ {
+		for attempt := range maxAttempts {
 			if attempt > 0 {
 				select {
 				case <-ctx.Done():
