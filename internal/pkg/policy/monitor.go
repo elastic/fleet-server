@@ -107,6 +107,8 @@ type monitorT struct {
 	// beforeRequeue is used in tests to pause a cancelled dispatchPending
 	// right before it returns its subscriber to pendingQ.
 	beforeRequeue func()
+	// beforePop is used in tests to pause a dispatchPending before its first pop from pendingQ.
+	beforePop func()
 }
 
 // NewMonitor creates the policy monitor for subscribing agents.
@@ -311,6 +313,9 @@ func (m *monitorT) dispatchPending(ctx context.Context) {
 	}
 	span, ctx := apm.StartSpan(ctx, "dispatch pending", "dispatch")
 	defer span.End()
+	if m.beforePop != nil {
+		m.beforePop()
+	}
 
 	ts := time.Now()
 	nQueued := 0
