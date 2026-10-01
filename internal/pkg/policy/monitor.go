@@ -100,6 +100,9 @@ type monitorT struct {
 
 	startCh    chan struct{}
 	dispatchCh chan struct{}
+	// beforeRequeue is used in tests to pause a cancelled dispatchPending
+	// right before it returns its subscriber to pendingQ.
+	beforeRequeue func()
 }
 
 // NewMonitor creates the policy monitor for subscribing agents.
@@ -261,6 +264,19 @@ func (m *monitorT) waitStart(ctx context.Context) error {
 	return nil
 }
 
+// requeuePending returns a subscriber to the front of the pending queue and kicks
+// the run loop. The kick is required because a replacement dispatchPending, started
+// after this one was cancelled, may already have found the queue empty and exited.
+func (m *monitorT) requeuePending(s *subT) {
+	if m.beforeRequeue != nil {
+		m.beforeRequeue()
+	}
+	m.mut.Lock()
+	m.pendingQ.pushFront(s)
+	m.mut.Unlock()
+	m.kickDeploy()
+}
+
 // dispatchPending will dispatch all pending policy changes to the subscriptions in the queue.
 // dispatches are rate limited by the monitor's limiter.
 func (m *monitorT) dispatchPending(ctx context.Context) {
@@ -295,10 +311,7 @@ func (m *monitorT) dispatchPending(ctx context.Context) {
 		// If too many (checkin) responses are written concurrently memory usage may explode due to allocating gzip writers.
 		err := m.limit.Wait(ctx)
 		if err != nil {
-			m.mut.Lock()
-			m.pendingQ.pushFront(s) // context cancelled before sub is handled, put it back
-			m.mut.Unlock()
-			m.kickDeploy() // ensure the pushed-back item gets dispatched by the next loop iteration
+			m.requeuePending(s) // context cancelled before sub is handled, put it back
 			if !errors.Is(err, context.Canceled) {
 				m.log.Warn().Err(err).Msg("Policy limit error")
 			}
@@ -321,20 +334,14 @@ func (m *monitorT) dispatchPending(ctx context.Context) {
 
 		// Clone and send without holding m.mut.
 		if err := ctx.Err(); err != nil {
-			m.mut.Lock()
-			m.pendingQ.pushFront(s)
-			m.mut.Unlock()
-			m.kickDeploy() // ensure the pushed-back item gets dispatched by the next loop iteration
+			m.requeuePending(s) // context cancelled before sub is handled, put it back
 			m.log.Debug().Err(err).Msg("context termination detected in policy dispatch")
 			return
 		}
 		cloned := policy.pp.Clone()
 		select {
 		case <-ctx.Done():
-			m.mut.Lock()
-			m.pendingQ.pushFront(s) // context cancelled before sub is handled, put it back
-			m.mut.Unlock()
-			m.kickDeploy() // ensure the pushed-back item gets dispatched by the next loop iteration
+			m.requeuePending(s) // context cancelled before sub is handled, put it back
 			m.log.Debug().Err(ctx.Err()).Msg("context termination detected in policy dispatch")
 			return
 		case s.ch <- cloned:
