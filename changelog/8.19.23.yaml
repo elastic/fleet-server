@@ -1,0 +1,24 @@
+version: 8.19.23
+entries:
+    - kind: bug-fix
+      summary: Reject invalid concurrency limits at configuration load time
+      description: |
+        `bulk.flush_max_pending` and `output.elasticsearch.max_conn_per_host` must now
+        be positive. A zero or negative value produced a semaphore that could never be
+        acquired, silently wedging the bulker. The `max` setting of the endpoint limits
+        that bound concurrent requests (for example `checkin_limit` or `status_limit`)
+        must now be zero or positive. Invalid values are reported as a configuration
+        error on startup.
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/7677
+        - https://github.com/elastic/fleet-server/pull/7900
+        - https://github.com/elastic/fleet-server/pull/7943
+        - https://github.com/elastic/fleet-server/pull/7756
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1790150306
+      file:
+        name: 1790150306-guard-negative-semaphore-size.yaml
+        checksum: 83769d6567000c3fc59f79cd4667da2ed2f9f7c7
