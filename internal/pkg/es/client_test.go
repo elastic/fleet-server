@@ -386,7 +386,7 @@ func TestShouldRetryTimeoutForCreate(t *testing.T) {
 }
 
 func TestWithRetryOnTimeoutForCreateComposes(t *testing.T) {
-	cfg := elasticsearch.Config{}
+	cfg := elasticsearch.Config{} //nolint:staticcheck // uses deprecated elasticsearch.Config
 	WithRetryOnErrs(syscall.ECONNRESET)(&cfg)
 	WithRetryOnTimeoutForCreate()(&cfg)
 
@@ -425,13 +425,13 @@ func TestRetryOnTimeoutForCreate(t *testing.T) {
 
 	newClient := func(t *testing.T) *elasticsearch.Client {
 		t.Helper()
-		cfg := elasticsearch.Config{
+		cfg := elasticsearch.Config{ //nolint:staticcheck // uses deprecated elasticsearch.Config
 			Addresses:  []string{server.URL},
 			Transport:  &http.Transport{ResponseHeaderTimeout: 100 * time.Millisecond},
 			MaxRetries: 5,
 		}
 		WithRetryOnTimeoutForCreate()(&cfg)
-		cli, err := elasticsearch.NewClient(cfg)
+		cli, err := elasticsearch.NewClient(cfg) //nolint:staticcheck // uses deprecated NewClient
 		require.NoError(t, err)
 		return cli
 	}
