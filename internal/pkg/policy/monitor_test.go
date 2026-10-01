@@ -811,3 +811,38 @@ func Test_Monitor_cancelled_dispatch_does_not_strand_subscriber(t *testing.T) {
 		mwg.Wait()
 	})
 }
+
+// Test_Monitor_dispatchPending_limiterDeadlineDoesNotKick asserts that a limiter error that is
+// not a cancellation (the wait would exceed the context deadline) returns the subscriber to
+// pendingQ without kicking, otherwise the run loop would busy loop re-dispatching.
+func Test_Monitor_dispatchPending_limiterDeadlineDoesNotKick(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
+	defer cancel()
+	ctx = testlog.SetLogger(t).WithContext(ctx)
+
+	monitor := NewMonitor(ftesting.NewMockBulk(), mmock.NewMockMonitor(), config.ServerLimits{PolicyLimit: config.Limit{Burst: 1, Interval: time.Hour}})
+	pm := monitor.(*monitorT)
+	pm.log = zerolog.Ctx(ctx).With().Logger()
+	require.True(t, pm.limit.Allow(), "consume the limiter burst")
+
+	policyID := uuid.Must(uuid.NewV4()).String()
+	sub := NewSub(policyID, uuid.Must(uuid.NewV4()).String(), 0)
+	pm.mut.Lock()
+	pm.policies[policyID] = policyT{head: makeHead()}
+	pm.pendingQ.pushBack(sub)
+	pm.mut.Unlock()
+
+	pm.dispatchPending(ctx)
+	require.NoError(t, ctx.Err(), "context must not be done for this scenario")
+
+	pm.mut.Lock()
+	requeued := pm.pendingQ.popFront()
+	pm.mut.Unlock()
+	require.Same(t, sub, requeued, "subscriber must be returned to pendingQ")
+
+	select {
+	case <-pm.deployCh:
+		require.Fail(t, "deploy must not be kicked for a non-cancellation limiter error")
+	default:
+	}
+}
