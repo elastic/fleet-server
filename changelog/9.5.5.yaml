@@ -1,0 +1,41 @@
+version: 9.5.5
+entries:
+    - kind: bug-fix
+      summary: Fix agent permanently stuck in "updating" state after fast upgrade
+      description: |
+        Agents that completed an upgrade faster than one checkin interval (~60 s)
+        were permanently shown as "updating" in the Fleet UI. Fleet Server now
+        detects the completed upgrade and clears the stuck state on the next checkin.
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/7656
+        - https://github.com/elastic/fleet-server/pull/7756
+        - https://github.com/elastic/fleet-server/pull/7945
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1788912764
+      file:
+        name: 1788912764-fix-upgrade-started-at-stuck-fast-upgrade.yaml
+        checksum: 1e9f85bc348a11c95b0d1f88170a2681a08cf3a6
+    - kind: bug-fix
+      summary: Reject invalid concurrency limits at configuration load time
+      description: |
+        `bulk.flush_max_pending` and `output.elasticsearch.max_conn_per_host` must now
+        be positive. A zero or negative value produced a semaphore that could never be
+        acquired, silently wedging the bulker. The `max` setting of the endpoint limits
+        that bound concurrent requests (for example `checkin_limit` or `status_limit`)
+        must now be zero or positive. Invalid values are reported as a configuration
+        error on startup.
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/7656
+        - https://github.com/elastic/fleet-server/pull/7756
+        - https://github.com/elastic/fleet-server/pull/7945
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1790150306
+      file:
+        name: 1790150306-guard-negative-semaphore-size.yaml
+        checksum: 83769d6567000c3fc59f79cd4667da2ed2f9f7c7
