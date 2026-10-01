@@ -9,6 +9,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"runtime"
 
@@ -21,8 +22,56 @@ import (
 	"github.com/elastic/go-elasticsearch/v8"
 )
 
+<<<<<<< HEAD
 type ConfigOption func(config *elasticsearch.Config)
 
+=======
+const (
+	initialRetryBackoff = 500 * time.Millisecond
+	maxRetryBackoff     = 10 * time.Second
+	randomizationFactor = 0.5
+	defaultMaxRetries   = 5
+
+	opTypeCreate = "create"
+)
+
+type ConfigOption func(config *elasticsearch.Config)
+
+func applyDefaultOptions(escfg *elasticsearch.Config) {
+	exp := backoff.NewExponentialBackOff()
+	exp.InitialInterval = initialRetryBackoff
+	exp.RandomizationFactor = randomizationFactor
+	exp.MaxInterval = maxRetryBackoff
+
+	opts := []ConfigOption{
+		WithRetryOnErrs(syscall.ECONNREFUSED, syscall.ECONNRESET), // server may be restarting
+
+		// When the Elasticsearch output has multiple hosts whose certificates
+		// chain to different CAs, a single untrusted host would otherwise fail
+		// the request outright. Retrying lets the underlying connection pool's
+		// dead-host failover redirect the attempt to a host that is still in
+		// the live list.
+		WithRetryOnTLSHandshakeError(),
+
+		WithRetryOnTimeoutForCreate(),
+
+		WithRetryOnStatus(http.StatusTooManyRequests),
+		WithRetryOnStatus(http.StatusRequestTimeout),
+		WithRetryOnStatus(http.StatusTooEarly),
+		WithRetryOnStatus(http.StatusBadGateway),
+		WithRetryOnStatus(http.StatusServiceUnavailable),
+		WithRetryOnStatus(http.StatusGatewayTimeout),
+
+		WithBackoff(exp),
+		WithMaxRetries(defaultMaxRetries),
+	}
+
+	for _, opt := range opts {
+		opt(escfg)
+	}
+}
+
+>>>>>>> 3f68093 (fix: retry sync enrollment write on transport error to reduce ghost agents (#7945))
 func NewClient(ctx context.Context, cfg *config.Config, longPoll bool, opts ...ConfigOption) (*elasticsearch.Client, error) {
 	escfg, err := cfg.Output.Elasticsearch.ToESConfig(longPoll)
 	if err != nil {
@@ -125,6 +174,76 @@ func isTLSHandshakeError(err error) bool {
 	return errors.As(err, &certErr)
 }
 
+<<<<<<< HEAD
+=======
+// WithRetryOnTimeoutForCreate enables retries on timeouts, but only for
+// document create requests (PUT <index>/_doc/<id>?op_type=create).
+//
+// A timed-out request has an unknown outcome: Elasticsearch may still commit
+// the write after the client gives up. A create with a fixed _id is safe to
+// retry because a second attempt returns 409 if the first one landed, which
+// callers can treat as success. Other request types are not necessarily
+// idempotent and are never retried on timeout. It composes with any previously
+// installed RetryOnError predicate using OR semantics.
+func WithRetryOnTimeoutForCreate() ConfigOption {
+	return func(config *elasticsearch.Config) {
+		prev := config.RetryOnError
+		config.RetryOnError = func(req *http.Request, err error) bool {
+			if prev != nil && prev(req, err) {
+				return true
+			}
+			return shouldRetryTimeoutForCreate(req, err)
+		}
+	}
+}
+
+func shouldRetryTimeoutForCreate(req *http.Request, err error) bool {
+	if req.Method != http.MethodPut || req.URL.Query().Get("op_type") != opTypeCreate {
+		return false
+	}
+	// A done request context means the caller gave up or its deadline passed,
+	// so another attempt cannot succeed.
+	if req.Context().Err() != nil {
+		return false
+	}
+	var netErr net.Error
+	return errors.As(err, &netErr) && netErr.Timeout()
+}
+
+func WithMaxRetries(retries int) ConfigOption {
+	return func(config *elasticsearch.Config) {
+		config.MaxRetries = retries
+	}
+}
+
+func WithRetryOnStatus(status int) ConfigOption {
+	return func(config *elasticsearch.Config) {
+		if slices.Contains(config.RetryOnStatus, status) {
+			return
+		}
+
+		config.RetryOnStatus = append(config.RetryOnStatus, status)
+	}
+}
+
+func WithBackoff(exp *backoff.ExponentialBackOff) ConfigOption {
+	return func(config *elasticsearch.Config) {
+		if exp == nil {
+			// no retry backoff
+			config.RetryBackoff = nil
+			return
+		}
+
+		config.RetryBackoff = func(attempt int) time.Duration {
+			if attempt == 1 {
+				exp.Reset()
+			}
+			return exp.NextBackOff()
+		}
+	}
+}
+
+>>>>>>> 3f68093 (fix: retry sync enrollment write on transport error to reduce ghost agents (#7945))
 func userAgent(name string, bi build.Info) string {
 	return fmt.Sprintf("Elastic-%s/%s (%s; %s; %s; %s)",
 		name,
