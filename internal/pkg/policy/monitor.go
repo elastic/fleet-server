@@ -98,6 +98,10 @@ type monitorT struct {
 	policiesIndex string
 	limit         *rate.Limiter
 
+	// emptyPop is true if the most recent pop from pendingQ found it empty.
+	// Guarded by mut.
+	emptyPop bool
+
 	startCh    chan struct{}
 	dispatchCh chan struct{}
 	// beforeRequeue is used in tests to pause a cancelled dispatchPending
@@ -264,17 +268,30 @@ func (m *monitorT) waitStart(ctx context.Context) error {
 	return nil
 }
 
-// requeuePending returns a subscriber to the front of the pending queue and, if kick is set,
-// kicks the run loop. The kick is required when dispatchPending was cancelled because a
-// replacement dispatchPending may already have found the queue empty and exited.
-// It must not be set for errors that are not a cancellation, as the replacement would fail
-// the same way and re-kick in a busy loop.
-func (m *monitorT) requeuePending(s *subT, kick bool) {
+// popPending removes the first subscriber from the pending queue.
+// It records whether the queue was empty so requeuePending knows if a dispatch was missed.
+func (m *monitorT) popPending() *subT {
+	m.mut.Lock()
+	defer m.mut.Unlock()
+	s := m.pendingQ.popFront()
+	m.emptyPop = s == nil
+	return s
+}
+
+// requeuePending returns a subscriber to the front of the pending queue after its
+// dispatchPending was cancelled.
+// If the replacement dispatchPending already found the queue empty and exited, nothing
+// would deliver the subscriber, so the run loop is kicked to start another dispatch.
+// The kick is skipped otherwise: it cancels the active dispatch, which would requeue and
+// kick again, so a replacement blocked in the rate limiter could never make progress.
+func (m *monitorT) requeuePending(s *subT) {
 	if m.beforeRequeue != nil {
 		m.beforeRequeue()
 	}
 	m.mut.Lock()
 	m.pendingQ.pushFront(s)
+	kick := m.emptyPop
+	m.emptyPop = false
 	m.mut.Unlock()
 	if kick {
 		m.kickDeploy()
@@ -301,9 +318,7 @@ func (m *monitorT) dispatchPending(ctx context.Context) {
 	// Hold m.mut only for queue/map access; release before rate-limiting,
 	// Clone(), and channel sends so Subscribe/Unsubscribe/updatePolicy are
 	// not blocked during those potentially slow operations.
-	m.mut.Lock()
-	s := m.pendingQ.popFront()
-	m.mut.Unlock()
+	s := m.popPending()
 
 	if s == nil {
 		return
@@ -316,7 +331,7 @@ func (m *monitorT) dispatchPending(ctx context.Context) {
 		err := m.limit.Wait(ctx)
 		if err != nil {
 			// Wait can also fail without ctx being done (e.g. the wait would exceed ctx's deadline).
-			m.requeuePending(s, errors.Is(ctx.Err(), context.Canceled)) // sub not handled, put it back
+			m.requeuePending(s) // sub not handled, put it back
 			if !errors.Is(err, context.Canceled) {
 				m.log.Warn().Err(err).Msg("Policy limit error")
 			}
@@ -339,14 +354,14 @@ func (m *monitorT) dispatchPending(ctx context.Context) {
 
 		// Clone and send without holding m.mut.
 		if err := ctx.Err(); err != nil {
-			m.requeuePending(s, true) // context cancelled before sub is handled, put it back
+			m.requeuePending(s) // context cancelled before sub is handled, put it back
 			m.log.Debug().Err(err).Msg("context termination detected in policy dispatch")
 			return
 		}
 		cloned := policy.pp.Clone()
 		select {
 		case <-ctx.Done():
-			m.requeuePending(s, true) // context cancelled before sub is handled, put it back
+			m.requeuePending(s) // context cancelled before sub is handled, put it back
 			m.log.Debug().Err(ctx.Err()).Msg("context termination detected in policy dispatch")
 			return
 		case s.ch <- cloned:
@@ -365,9 +380,7 @@ func (m *monitorT) dispatchPending(ctx context.Context) {
 			return
 		}
 
-		m.mut.Lock()
-		s = m.pendingQ.popFront()
-		m.mut.Unlock()
+		s = m.popPending()
 		nQueued++
 	}
 
