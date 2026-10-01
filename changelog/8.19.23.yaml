@@ -11,10 +11,7 @@ entries:
         error on startup.
       component: fleet-server
       pr:
-        - https://github.com/elastic/fleet-server/pull/7677
-        - https://github.com/elastic/fleet-server/pull/7900
-        - https://github.com/elastic/fleet-server/pull/7943
-        - https://github.com/elastic/fleet-server/pull/7756
+        - https://github.com/elastic/fleet-server/pull/7932
       issue: []
       impact: ""
       action: ""

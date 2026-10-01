@@ -27,6 +27,6 @@ Review important information about the  8.19.23 release.
 
 
 
-* Reject invalid concurrency limits at configuration load time. https://github.com/elastic/fleet-server/pull/7677[#7677] https://github.com/elastic/fleet-server/pull/7900[#7900] https://github.com/elastic/fleet-server/pull/7943[#7943] https://github.com/elastic/fleet-server/pull/7756[#7756] 
+* Reject invalid concurrency limits at configuration load time. https://github.com/elastic/fleet-server/pull/7932[#7932] 
 
 // end 8.19.23 relnotes
