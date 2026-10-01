@@ -684,39 +684,54 @@ func TestMonitor_StaleRevisionSkipsSecretResolution(t *testing.T) {
 	assert.Equal(t, int64(8), pm.policies[policyID].pp.Policy.RevisionIdx, "cached revision must not change for stale input")
 }
 
-// Test_Monitor_dispatchPending_cancelKicksDeploy asserts that a dispatchPending
-// call whose context is cancelled returns the subscriber to pendingQ and kicks
-// the run loop. Without the kick, a replacement dispatchPending that popped an
-// empty queue before the push-back would exit and strand the subscriber.
-func Test_Monitor_dispatchPending_cancelKicksDeploy(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
-	ctx = testlog.SetLogger(t).WithContext(ctx)
+// Test_Monitor_dispatchPending_cancelKick asserts that a cancelled dispatchPending returns its
+// subscriber to pendingQ and kicks the run loop only if a replacement dispatch already found
+// the queue empty. Otherwise the kick would cancel an active replacement that holds the
+// subscriber, which would requeue and kick again in a cancellation loop.
+func Test_Monitor_dispatchPending_cancelKick(t *testing.T) {
+	for name, tc := range map[string]struct {
+		replacementFoundEmptyQueue bool
+		expectKick                 bool
+	}{
+		"replacement found empty queue": {replacementFoundEmptyQueue: true, expectKick: true},
+		"replacement has not popped":    {replacementFoundEmptyQueue: false, expectKick: false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(t.Context())
+			ctx = testlog.SetLogger(t).WithContext(ctx)
 
-	monitor := NewMonitor(ftesting.NewMockBulk(), mmock.NewMockMonitor(), config.ServerLimits{})
-	pm := monitor.(*monitorT)
-	pm.log = zerolog.Ctx(ctx).With().Logger()
+			monitor := NewMonitor(ftesting.NewMockBulk(), mmock.NewMockMonitor(), config.ServerLimits{})
+			pm := monitor.(*monitorT)
+			pm.log = zerolog.Ctx(ctx).With().Logger()
+			if tc.replacementFoundEmptyQueue {
+				// The replacement dispatch runs while the cancelled one holds the subscriber.
+				pm.beforeRequeue = func() { require.Nil(t, pm.popPending()) }
+			}
 
-	policyID := uuid.Must(uuid.NewV4()).String()
-	sub := NewSub(policyID, uuid.Must(uuid.NewV4()).String(), 0)
-	pm.mut.Lock()
-	pm.policies[policyID] = policyT{head: makeHead()}
-	pm.pendingQ.pushBack(sub)
-	pm.mut.Unlock()
+			policyID := uuid.Must(uuid.NewV4()).String()
+			sub := NewSub(policyID, uuid.Must(uuid.NewV4()).String(), 0)
+			pm.mut.Lock()
+			pm.policies[policyID] = policyT{head: makeHead()}
+			pm.pendingQ.pushBack(sub)
+			pm.mut.Unlock()
 
-	// The context is already cancelled, so the rate limiter wait fails after
-	// the subscriber has been popped from pendingQ.
-	cancel()
-	pm.dispatchPending(ctx)
+			// The context is already cancelled, so the rate limiter wait fails after
+			// the subscriber has been popped from pendingQ.
+			cancel()
+			pm.dispatchPending(ctx)
 
-	pm.mut.Lock()
-	requeued := pm.pendingQ.popFront()
-	pm.mut.Unlock()
-	require.Same(t, sub, requeued, "subscriber must be returned to pendingQ")
+			pm.mut.Lock()
+			requeued := pm.pendingQ.popFront()
+			pm.mut.Unlock()
+			require.Same(t, sub, requeued, "subscriber must be returned to pendingQ")
 
-	select {
-	case <-pm.deployCh:
-	default:
-		require.Fail(t, "deploy was not kicked after subscriber was returned to pendingQ")
+			select {
+			case <-pm.deployCh:
+				require.True(t, tc.expectKick, "deploy must not be kicked")
+			default:
+				require.False(t, tc.expectKick, "deploy was not kicked")
+			}
+		})
 	}
 }
 
@@ -814,7 +829,7 @@ func Test_Monitor_cancelled_dispatch_does_not_strand_subscriber(t *testing.T) {
 
 // Test_Monitor_dispatchPending_limiterDeadlineDoesNotKick asserts that a limiter error that is
 // not a cancellation (the wait would exceed the context deadline) returns the subscriber to
-// pendingQ without kicking, otherwise the run loop would busy loop re-dispatching.
+// pendingQ without kicking when no replacement dispatch missed it.
 func Test_Monitor_dispatchPending_limiterDeadlineDoesNotKick(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
 	defer cancel()
