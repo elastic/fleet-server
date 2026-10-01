@@ -29,12 +29,8 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/testing/certs"
 	"github.com/stretchr/testify/require"
 
-<<<<<<< HEAD
 	"github.com/elastic/go-elasticsearch/v9"
-=======
-	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/elastic/go-elasticsearch/v8/esapi"
->>>>>>> 3f68093 (fix: retry sync enrollment write on transport error to reduce ghost agents (#7945))
+	"github.com/elastic/go-elasticsearch/v9/esapi"
 )
 
 var enabled bool = true
