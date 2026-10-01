@@ -1,0 +1,11 @@
+kind: bug-fix
+
+summary: Retry enrollment write in sync path to reduce ghost agents
+
+description: |
+  Transient Elasticsearch errors during agent enrollment could leave ghost agents —
+  offline agent records that were never successfully enrolled. Fleet Server now
+  retries the enrollment write on these transient errors, reducing the likelihood
+  of ghost agents appearing during large-scale enrollment bursts.
+
+component: fleet-server
