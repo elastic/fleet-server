@@ -683,3 +683,131 @@ func TestMonitor_StaleRevisionSkipsSecretResolution(t *testing.T) {
 	assert.NoError(t, err, "stale revision should be skipped without error, not trigger secret resolution")
 	assert.Equal(t, int64(8), pm.policies[policyID].pp.Policy.RevisionIdx, "cached revision must not change for stale input")
 }
+
+// Test_Monitor_dispatchPending_cancelKicksDeploy asserts that a dispatchPending
+// call whose context is cancelled returns the subscriber to pendingQ and kicks
+// the run loop. Without the kick, a replacement dispatchPending that popped an
+// empty queue before the push-back would exit and strand the subscriber.
+func Test_Monitor_dispatchPending_cancelKicksDeploy(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	ctx = testlog.SetLogger(t).WithContext(ctx)
+
+	monitor := NewMonitor(ftesting.NewMockBulk(), mmock.NewMockMonitor(), config.ServerLimits{})
+	pm := monitor.(*monitorT)
+	pm.log = zerolog.Ctx(ctx).With().Logger()
+
+	policyID := uuid.Must(uuid.NewV4()).String()
+	sub := NewSub(policyID, uuid.Must(uuid.NewV4()).String(), 0)
+	pm.mut.Lock()
+	pm.policies[policyID] = policyT{head: makeHead()}
+	pm.pendingQ.pushBack(sub)
+	pm.mut.Unlock()
+
+	// The context is already cancelled, so the rate limiter wait fails after
+	// the subscriber has been popped from pendingQ.
+	cancel()
+	pm.dispatchPending(ctx)
+
+	pm.mut.Lock()
+	requeued := pm.pendingQ.popFront()
+	pm.mut.Unlock()
+	require.Same(t, sub, requeued, "subscriber must be returned to pendingQ")
+
+	select {
+	case <-pm.deployCh:
+	default:
+		require.Fail(t, "deploy was not kicked after subscriber was returned to pendingQ")
+	}
+}
+
+// Test_Monitor_cancelled_dispatch_does_not_strand_subscriber reproduces the race where a
+// cancelled dispatchPending (A) has popped a subscriber but not yet returned it to pendingQ
+// when its replacement (B) runs. B finds the queue empty and exits, so the subscriber must be
+// delivered by the extra dispatch that A kicks after returning it.
+func Test_Monitor_cancelled_dispatch_does_not_strand_subscriber(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		ctx = testlog.SetLogger(t).WithContext(ctx)
+
+		chHitT := make(chan []es.HitT, 1)
+		defer close(chHitT)
+		ms := mmock.NewMockSubscription()
+		ms.On("Output").Return((<-chan []es.HitT)(chHitT))
+		mm := mmock.NewMockMonitor()
+		mm.On("Subscribe").Return(ms).Once()
+		mm.On("Unsubscribe", mock.Anything).Return().Once()
+
+		// Burst of 1 and a long interval: the first subscriber is dispatched immediately,
+		// the second blocks in the rate limiter holding the popped subscriber.
+		monitor := NewMonitor(ftesting.NewMockBulk(), mm, config.ServerLimits{PolicyLimit: config.Limit{Burst: 1, Interval: time.Hour}})
+		pm := monitor.(*monitorT)
+		pm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
+			return []model.Policy{}, nil
+		}
+		// Hold the cancelled dispatch right before it returns its subscriber to pendingQ.
+		reached := make(chan struct{})
+		release := make(chan struct{})
+		var once sync.Once
+		pm.beforeRequeue = func() {
+			once.Do(func() { close(reached) })
+			<-release
+		}
+
+		var mwg sync.WaitGroup
+		mwg.Go(func() { _ = monitor.Run(ctx) })
+		require.NoError(t, pm.waitStart(ctx))
+
+		policyID := uuid.Must(uuid.NewV4()).String()
+		pm.mut.Lock()
+		pm.policies[policyID] = policyT{head: makeHead()}
+		pm.mut.Unlock()
+
+		subs := make([]Subscription, 2)
+		for i := range subs {
+			sub, err := monitor.Subscribe(uuid.Must(uuid.NewV4()).String(), policyID, 0)
+			require.NoError(t, err)
+			defer monitor.Unsubscribe(sub)
+			subs[i] = sub
+		}
+
+		rId := xid.New().String()
+		policy := model.Policy{
+			ESDocument:     model.ESDocument{Id: rId, Version: 1, SeqNo: 1},
+			PolicyID:       policyID,
+			CoordinatorIdx: 1,
+			Data:           policyDataDefault,
+			RevisionIdx:    1,
+		}
+		policyData, err := json.Marshal(&policy)
+		require.NoError(t, err)
+		chHitT <- []es.HitT{{ID: rId, SeqNo: 1, Version: 1, Source: policyData}}
+
+		// First subscriber is dispatched; dispatch A is now rate-waiting with the second.
+		select {
+		case <-subs[0].Output():
+		case <-time.After(time.Minute):
+			require.Fail(t, "first subscriber was not dispatched")
+		}
+		synctest.Wait()
+
+		// A new event cancels A and starts B. A is held before the push-back, so B pops an empty queue and exits.
+		pm.kickLoad()
+		<-reached
+		synctest.Wait()
+
+		// Let the rate limiter pass so the extra dispatch kicked by A can deliver, then let A push back.
+		pm.limit.SetLimit(rate.Inf)
+		close(release)
+
+		select {
+		case p := <-subs[1].Output():
+			require.Equal(t, int64(1), p.Policy.RevisionIdx)
+		case <-time.After(time.Minute):
+			require.Fail(t, "second subscriber was stranded in pendingQ")
+		}
+
+		cancel()
+		mwg.Wait()
+	})
+}
