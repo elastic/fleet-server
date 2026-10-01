@@ -839,16 +839,37 @@ func TestCreateFleetAgentSyncWriteErrorSurfaces(t *testing.T) {
 	require.Error(t, err)
 }
 
+// recordSyncEnrollBody reads the request body and appends it to bodies so tests can
+// assert the same document is replayed on every retry attempt.
+func recordSyncEnrollBody(t *testing.T, req *http.Request, bodies *[][]byte) {
+	t.Helper()
+	b, err := io.ReadAll(req.Body)
+	require.NoError(t, err)
+	*bodies = append(*bodies, b)
+}
+
+// requireSameBodies asserts that every recorded body is non-empty and identical.
+func requireSameBodies(t *testing.T, bodies [][]byte) {
+	t.Helper()
+	require.NotEmpty(t, bodies)
+	require.NotEmpty(t, bodies[0], "request body must not be empty")
+	for i, b := range bodies[1:] {
+		require.Equal(t, string(bodies[0]), string(b), "request body on attempt %d must match the first attempt", i+2)
+	}
+}
+
 // TestCreateFleetAgentSyncWriteRetry* tests exercise the retry loop in createFleetAgent.
 // Each test that triggers a retry incurs the real 1–2s backoff delay.
 
 func TestCreateFleetAgentSyncWriteTransportErrorThenConflictSucceeds(t *testing.T) {
 	const agentID = "test-agent-id"
 	calls := 0
+	var bodies [][]byte
 	mt := &MockTransport{}
 	mt.RoundTripFn = func(req *http.Request) (*http.Response, error) {
 		assertSyncEnrollParams(t, req)
 		require.Contains(t, req.URL.Path, agentID, "agent UUID must be the same on every attempt")
+		recordSyncEnrollBody(t, req, &bodies)
 		calls++
 		if calls == 1 {
 			return nil, errors.New("connection reset by peer")
@@ -871,15 +892,18 @@ func TestCreateFleetAgentSyncWriteTransportErrorThenConflictSucceeds(t *testing.
 	err = createFleetAgent(t.Context(), bulker, agentID, model.Agent{}, true)
 	require.NoError(t, err)
 	require.Equal(t, 2, calls, "expected exactly two transport calls")
+	requireSameBodies(t, bodies)
 }
 
 func TestCreateFleetAgentSyncWriteTransportErrorThenSucceeds(t *testing.T) {
 	const agentID = "test-agent-id"
 	calls := 0
+	var bodies [][]byte
 	mt := &MockTransport{}
 	mt.RoundTripFn = func(req *http.Request) (*http.Response, error) {
 		assertSyncEnrollParams(t, req)
 		require.Contains(t, req.URL.Path, agentID, "agent UUID must be the same on every attempt")
+		recordSyncEnrollBody(t, req, &bodies)
 		calls++
 		if calls == 1 {
 			return nil, errors.New("connection reset by peer")
@@ -902,15 +926,18 @@ func TestCreateFleetAgentSyncWriteTransportErrorThenSucceeds(t *testing.T) {
 	err = createFleetAgent(t.Context(), bulker, agentID, model.Agent{}, true)
 	require.NoError(t, err)
 	require.Equal(t, 2, calls, "expected exactly two transport calls")
+	requireSameBodies(t, bodies)
 }
 
 func TestCreateFleetAgentSyncWriteAllTransportErrorsFail(t *testing.T) {
 	const agentID = "test-agent-id"
 	calls := 0
+	var bodies [][]byte
 	mt := &MockTransport{}
 	mt.RoundTripFn = func(req *http.Request) (*http.Response, error) {
 		assertSyncEnrollParams(t, req)
 		require.Contains(t, req.URL.Path, agentID, "agent UUID must be the same on every attempt")
+		recordSyncEnrollBody(t, req, &bodies)
 		calls++
 		return nil, errors.New("connection reset by peer")
 	}
@@ -926,6 +953,7 @@ func TestCreateFleetAgentSyncWriteAllTransportErrorsFail(t *testing.T) {
 	err = createFleetAgent(t.Context(), bulker, agentID, model.Agent{}, true)
 	require.Error(t, err)
 	require.Equal(t, 3, calls, "expected all three attempts to be made")
+	requireSameBodies(t, bodies)
 }
 
 func TestValidateEnrollRequest(t *testing.T) {
