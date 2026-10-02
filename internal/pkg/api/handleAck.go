@@ -756,12 +756,13 @@ func invalidateAPIKeys(ctx context.Context, zlog zerolog.Logger, bulk bulk.Bulk,
 	if len(ids) > 0 {
 		zlog.Info().Strs("fleet.policy.apiKeyIDsToRetire", ids).Msg("Invalidate old API keys")
 		if err := bulk.APIKeyInvalidate(ctx, ids...); err != nil {
-			zlog.Info().Err(err).Strs("ids", ids).Msg("Failed to invalidate API keys")
+			zlog.Warn().Err(err).Strs("ids", ids).Msg("Failed to invalidate API keys. API keys will be orphaned.")
 		}
 	}
 	// using remote es bulker to invalidate api key
 	for outputName, outputIds := range remoteIds {
 		outputBulk := bulk.GetBulker(outputName)
+		usedPrimaryFallback := false
 
 		var outputPolicy *model.Policy
 		if outputBulk == nil {
@@ -769,24 +770,27 @@ func invalidateAPIKeys(ctx context.Context, zlog zerolog.Logger, bulk bulk.Bulk,
 			var err error
 			outputPolicy, err = dl.QueryOutputFromPolicy(ctx, bulk, outputName)
 			if err != nil || outputPolicy == nil {
-				zlog.Warn().Str(ecs.PolicyOutputName, outputName).Any("ids", outputIds).Msg("Output policy not found, falling back to primary cluster for key invalidation")
+				zlog.Warn().Err(err).Str(ecs.PolicyOutputName, outputName).Any("ids", outputIds).Msg("Output policy not found, falling back to primary cluster for key invalidation")
 			} else {
 				outputBulk, _, err = bulk.CreateAndGetBulker(ctx, zlog, outputName, outputPolicy.Data.Outputs)
 				if err != nil {
-					zlog.Warn().Str(ecs.PolicyOutputName, outputName).Any("ids", outputIds).Msg("Failed to recreate output bulker, falling back to primary cluster for key invalidation")
+					zlog.Warn().Err(err).Str(ecs.PolicyOutputName, outputName).Any("ids", outputIds).Msg("Failed to recreate output bulker, falling back to primary cluster for key invalidation")
 				}
 			}
 		}
 		if outputBulk == nil {
 			if outputPolicy != nil && outputPolicy.Data.Outputs[outputName]["type"] == policy.OutputTypeRemoteElasticsearch {
 				zlog.Warn().Str(ecs.PolicyOutputName, outputName).Any("ids", outputIds).
-					Msg("Cannot invalidate remote ES API keys: remote cluster unreachable, keys may leak")
+					Msg("Cannot invalidate remote ES API keys: remote cluster unreachable, API keys will be orphaned")
 				continue
 			}
 			outputBulk = bulk
+			usedPrimaryFallback = true
 		}
 		if err := outputBulk.APIKeyInvalidate(ctx, outputIds...); err != nil {
-			zlog.Info().Err(err).Strs("ids", outputIds).Str(ecs.PolicyOutputName, outputName).Msg("Failed to invalidate API keys")
+			zlog.Warn().Err(err).Strs("ids", outputIds).Str(ecs.PolicyOutputName, outputName).
+				Bool("fallback_to_primary", usedPrimaryFallback).
+				Msg("Failed to invalidate output API keys. API keys will be orphaned.")
 		}
 	}
 }
