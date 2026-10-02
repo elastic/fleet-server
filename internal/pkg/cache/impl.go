@@ -12,5 +12,6 @@ type Cacher interface {
 	Get(key string) (any, bool)
 	Set(key string, value any, cost int64) bool
 	SetWithTTL(key string, value any, cost int64, ttl time.Duration) bool
+	Del(key string)
 	Close()
 }

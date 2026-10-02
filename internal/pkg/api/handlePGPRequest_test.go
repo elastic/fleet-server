@@ -111,10 +111,14 @@ func Test_PGPRetrieverT_getPGPKey(t *testing.T) {
 			}))
 			defer server.Close()
 
+			upstreamURL := config.DefaultPGPUpstreamURL
+			if tc.upstreamStatus != 0 {
+				upstreamURL = server.URL
+			}
 			pt := &PGPRetrieverT{
 				cache: mockCache,
 				cfg: config.PGP{
-					UpstreamURL: server.URL,
+					UpstreamURL: upstreamURL,
 					Dir:         dir,
 				},
 			}
@@ -125,4 +129,52 @@ func Test_PGPRetrieverT_getPGPKey(t *testing.T) {
 			mockCache.AssertExpectations(t)
 		})
 	}
+}
+
+func TestPGPKeyCustomUpstream(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/one":
+			_, _ = w.Write([]byte("first key"))
+		case "/two":
+			_, _ = w.Write([]byte("second key"))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	dir := t.TempDir()
+	defaultPath := filepath.Join(dir, defaultKeyName)
+	require.NoError(t, os.WriteFile(defaultPath, []byte("default key"), defaultKeyPermissions))
+
+	newMock := func(key []byte) *cache.MockCache {
+		m := cache.NewMockCache()
+		m.On("DeletePGPKey", mock.Anything).Once()
+		m.On("GetPGPKey", mock.Anything).Return([]byte(nil), false).Once()
+		m.On("SetPGPKey", mock.Anything, key).Once()
+		return m
+	}
+
+	cfg := &config.Server{PGP: config.PGP{UpstreamURL: server.URL + "/one", Dir: dir}}
+	pt := NewPGPRetrieverT(cfg, nil, newMock([]byte("first key")))
+	p, err := pt.getPGPKey(t.Context(), testlog.SetLogger(t))
+	require.NoError(t, err)
+	require.Equal(t, []byte("first key"), p)
+
+	cfg.PGP.UpstreamURL = server.URL + "/two"
+	pt = NewPGPRetrieverT(cfg, nil, newMock([]byte("second key")))
+	p, err = pt.getPGPKey(t.Context(), testlog.SetLogger(t))
+	require.NoError(t, err)
+	require.Equal(t, []byte("second key"), p)
+
+	server.Close()
+	pt = NewPGPRetrieverT(cfg, nil, newMock([]byte("second key")))
+	p, err = pt.getPGPKey(t.Context(), testlog.SetLogger(t))
+	require.NoError(t, err)
+	require.Equal(t, []byte("second key"), p)
+
+	stored, err := os.ReadFile(defaultPath)
+	require.NoError(t, err)
+	require.Equal(t, "default key", string(stored))
 }

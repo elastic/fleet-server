@@ -40,6 +40,7 @@ type Cache interface {
 
 	SetPGPKey(id string, p []byte)
 	GetPGPKey(id string) ([]byte, bool)
+	DeletePGPKey(id string)
 }
 
 type APIKey = apikey.APIKey
@@ -360,4 +361,12 @@ func (c *CacheT) GetPGPKey(id string) ([]byte, bool) {
 		return key, ok
 	}
 	return nil, false
+}
+
+func (c *CacheT) DeletePGPKey(id string) {
+	c.mut.RLock()
+	defer c.mut.RUnlock()
+
+	c.cache.Del("pgp:" + id)
+	c.log.Trace().Str("id", id).Msg("PGP key cache DELETE")
 }

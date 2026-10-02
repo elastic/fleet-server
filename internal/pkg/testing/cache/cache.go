@@ -78,3 +78,7 @@ func (m *MockCache) GetPGPKey(id string) ([]byte, bool) {
 	args := m.Called(id)
 	return args.Get(0).([]byte), args.Bool(1)
 }
+
+func (m *MockCache) DeletePGPKey(id string) {
+	m.Called(id)
+}
