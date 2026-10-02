@@ -2109,21 +2109,21 @@ func TestProcessPolicyOTLPOutput(t *testing.T) {
 	}{
 		{
 			name:       "external OTLP, grpc — exporter unchanged, output dropped",
-			exporterID: "otlp/" + outputName,
+			exporterID: policy.OTelExporterTypeOTLP + "/" + outputName,
 		},
 		{
 			name:       "external OTLP, http — exporter unchanged, output dropped",
-			exporterID: "otlphttp/" + outputName,
+			exporterID: policy.OTelExporterTypeOTLPHTTP + "/" + outputName,
 		},
 		{
 			name:       "managed OTLP, grpc — Authorization header injected, output dropped",
-			exporterID: "otlp/" + outputName,
+			exporterID: policy.OTelExporterTypeOTLP + "/" + outputName,
 			managed:    true,
 			wantHeader: wantHeader,
 		},
 		{
 			name:       "managed OTLP, http — Authorization header injected, output dropped",
-			exporterID: "otlphttp/" + outputName,
+			exporterID: policy.OTelExporterTypeOTLPHTTP + "/" + outputName,
 			managed:    true,
 			wantHeader: wantHeader,
 		},
@@ -2258,7 +2258,7 @@ func TestPrepareOTelExporters(t *testing.T) {
 		{
 			name:      "otlp exporter with wrong output type",
 			outputs:   map[string]map[string]any{"default": esOutput},
-			exporters: map[string]any{"otlp/default": nil},
+			exporters: map[string]any{policy.OTelExporterTypeOTLP + "/default": nil},
 			wantErr:   "unexpected output type",
 		},
 		{
@@ -2276,12 +2276,12 @@ func TestPrepareOTelExporters(t *testing.T) {
 		{
 			name:      "otlp exporter with external output — no header injected",
 			outputs:   map[string]map[string]any{"myotlp": otlpExternalOutput},
-			exporters: map[string]any{"otlp/myotlp": nil},
+			exporters: map[string]any{policy.OTelExporterTypeOTLP + "/myotlp": nil},
 		},
 		{
 			name:       "managed otlp exporter injects Authorization header",
 			outputs:    map[string]map[string]any{"myotlp": otlpOutput},
-			exporters:  map[string]any{"otlp/myotlp": nil},
+			exporters:  map[string]any{policy.OTelExporterTypeOTLP + "/myotlp": nil},
 			wantHeader: "ApiKey " + otlpAPIKeyB64,
 		},
 	}
