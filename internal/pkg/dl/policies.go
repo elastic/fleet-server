@@ -64,6 +64,7 @@ func QueryLatestPolicies(ctx context.Context, bulker bulk.Bulk, opt ...Option) (
 			return nil, err
 		}
 	}
+	shareStrings(policies)
 	return policies, nil
 }
 
