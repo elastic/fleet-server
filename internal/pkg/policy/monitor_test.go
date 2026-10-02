@@ -724,3 +724,75 @@ func TestMonitor_ProcessHitsSharesStrings(t *testing.T) {
 	assert.Equal(t, query, b)
 	assert.Same(t, unsafe.StringData(a), unsafe.StringData(b), "policies from one set of hits share the query")
 }
+
+// TestMonitor_UpdatePolicyKeepsNewerRevision verifies that updatePolicy never replaces a cached
+// policy with an older or equal revision, even though the caller checked beforehand: nothing stops
+// another processPolicies call from storing a newer revision in between.
+func TestMonitor_UpdatePolicyKeepsNewerRevision(t *testing.T) {
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
+	policyID := uuid.Must(uuid.NewV4()).String()
+	makePolicy := func(rev int64) ParsedPolicy {
+		return ParsedPolicy{Policy: model.Policy{PolicyID: policyID, RevisionIdx: rev, Data: policyDataDefault}}
+	}
+	pm := &monitorT{
+		log:      zerolog.Ctx(ctx).With().Logger(),
+		policies: map[string]policyT{policyID: {pp: makePolicy(9), head: makeHead()}},
+		pendingQ: makeHead(),
+	}
+
+	for _, rev := range []int64{8, 9} {
+		stale := makePolicy(rev)
+		assert.False(t, pm.updatePolicy(ctx, &stale), "revision %d must not replace revision 9", rev)
+		assert.Equal(t, int64(9), pm.policies[policyID].pp.Policy.RevisionIdx)
+	}
+
+	newer := makePolicy(10)
+	assert.True(t, pm.updatePolicy(ctx, &newer))
+	assert.Equal(t, int64(10), pm.policies[policyID].pp.Policy.RevisionIdx)
+}
+
+// hookedSecretsBulk calls onRead whenever secrets are read, which happens in the middle of
+// processing a policy, after processPolicies has decided the policy is fresh.
+type hookedSecretsBulk struct {
+	ftesting.MockBulk
+	onRead func()
+}
+
+func (b *hookedSecretsBulk) ReadSecrets(_ context.Context, _ []string) (map[string]string, error) {
+	b.onRead()
+	return map[string]string{}, nil
+}
+
+// TestMonitor_ProcessPoliciesDoesNotRegressRevision simulates a concurrent processPolicies call
+// storing a newer revision while this one is parsing an older one, and verifies the older revision
+// does not overwrite it.
+func TestMonitor_ProcessPoliciesDoesNotRegressRevision(t *testing.T) {
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
+	policyID := uuid.Must(uuid.NewV4()).String()
+	makePolicy := func(rev int64) ParsedPolicy {
+		return ParsedPolicy{Policy: model.Policy{PolicyID: policyID, RevisionIdx: rev, Data: policyDataDefault}}
+	}
+
+	pm := &monitorT{
+		log:      zerolog.Ctx(ctx).With().Logger(),
+		policies: map[string]policyT{policyID: {pp: makePolicy(1), head: makeHead()}},
+		pendingQ: makeHead(),
+	}
+	pm.bulker = &hookedSecretsBulk{onRead: func() {
+		// Another call stores revision 3 while revision 2 is being parsed.
+		pm.mut.Lock()
+		defer pm.mut.Unlock()
+		pm.policies[policyID] = policyT{pp: makePolicy(3), head: makeHead()}
+	}}
+
+	revision2 := model.Policy{
+		PolicyID:    policyID,
+		RevisionIdx: 2,
+		Data: &model.PolicyData{
+			Outputs:          map[string]map[string]any{"default": {"type": "elasticsearch"}},
+			SecretReferences: []model.SecretReferencesItems{{ID: "some-secret-id"}},
+		},
+	}
+	require.NoError(t, pm.processPolicies(ctx, []model.Policy{revision2}))
+	assert.Equal(t, int64(3), pm.policies[policyID].pp.Policy.RevisionIdx, "an older revision must not overwrite a newer one")
+}
