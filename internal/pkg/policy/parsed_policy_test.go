@@ -118,6 +118,16 @@ func TestParsedPolicyCloneIsolation(t *testing.T) {
 	var m model.Policy
 	var d model.PolicyData
 	require.NoError(t, json.Unmarshal([]byte(testPolicy), &d))
+
+	d.Exporters = map[string]any{
+		"otlphttp/default": map[string]any{
+			"endpoint": "https://otlp.example.com",
+			"headers": map[string]any{
+				"authorization": "ApiKey original",
+				"x-custom":      "original",
+			},
+		},
+	}
 	m.Data = &d
 	m.Namespaces = []string{"ns1"}
 
@@ -197,6 +207,21 @@ func TestParsedPolicyCloneIsolation(t *testing.T) {
 	clone.Agent["__clone_marker__"] = "mutated"
 	_, tainted := original.Agent["__clone_marker__"]
 	require.False(t, tainted, "Agent: clone mutation affected original")
+
+	// Mutate Policy.Data.Exporters on the clone, replaying what prepareOTelExporters does:
+	// delete the lowercase authorization header and write back the canonical form.
+	cloneHeaders := clone.Policy.Data.Exporters["otlphttp/default"].(map[string]any)["headers"].(map[string]any)
+	delete(cloneHeaders, "authorization")
+	cloneHeaders["Authorization"] = "ApiKey mutated"
+	clone.Policy.Data.Exporters["otlphttp/default"].(map[string]any)["__clone_marker__"] = "mutated"
+
+	origHeaders := original.Policy.Data.Exporters["otlphttp/default"].(map[string]any)["headers"].(map[string]any)
+	require.Equal(t, "ApiKey original", origHeaders["authorization"],
+		"Policy.Data.Exporters: nested headers clone mutation affected original")
+	require.NotContains(t, origHeaders, "Authorization",
+		"Policy.Data.Exporters: clone added Authorization key to original headers")
+	require.NotContains(t, original.Policy.Data.Exporters["otlphttp/default"].(map[string]any), "__clone_marker__",
+		"Policy.Data.Exporters: top-level clone mutation affected original")
 }
 
 // TestParsedPolicyMixedSecretsReplacement tests that secrets specified in a policy
