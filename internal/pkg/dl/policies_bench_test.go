@@ -10,8 +10,11 @@ import (
 	"fmt"
 	"math/rand"
 	"runtime"
+	"runtime/metrics"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -254,10 +257,45 @@ func heapInUse() uint64 {
 	return m.HeapAlloc
 }
 
+// peakHeapDuring runs fn and returns the highest heap size (live objects plus garbage not yet
+// collected) seen by a sampler that reads it every 50 microseconds while fn runs. The value is
+// a lower bound of the true peak, since the heap can briefly exceed it between two samples.
+func peakHeapDuring(fn func()) uint64 {
+	var peak atomic.Uint64
+	stop := make(chan struct{})
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		sample := []metrics.Sample{{Name: "/memory/classes/heap/objects:bytes"}}
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+			}
+			metrics.Read(sample)
+			if v := sample[0].Value.Uint64(); v > peak.Load() {
+				peak.Store(v)
+			}
+			time.Sleep(50 * time.Microsecond)
+		}
+	}()
+	fn()
+	close(stop)
+	<-done
+	return peak.Load()
+}
+
 // BenchmarkQueryLatestPolicies decodes a full set of 100 policies (about 19 MB of JSON) the way the
-// policy monitor does on every load. Besides time and allocations it reports how much heap the
-// decoded policies keep alive ("retained-MB"), since the policy monitor holds them for as long as
-// they are the latest revision.
+// policy monitor does on every load. Besides time and allocations it reports two memory figures:
+//   - retained-MB: the heap the decoded policies keep alive. The policy monitor holds them for as
+//     long as they are the latest revision, so this is the steady-state cost.
+//   - peak-MB: the highest total heap used by policy data while reloading, i.e. the previous
+//     load (still held by the monitor while the new one is decoded) plus the new load plus any
+//     garbage produced on the way. This is the figure that matters for the container memory limit.
+//
+// Both are measured on top of the heap before any policy was loaded and are exact in the case of
+// retained-MB and sampled (see peakHeapDuring) in the case of peak-MB.
 func BenchmarkQueryLatestPolicies(b *testing.B) {
 	docs := syntheticPolicies(100)
 	var rawBytes int
@@ -272,6 +310,20 @@ func BenchmarkQueryLatestPolicies(b *testing.B) {
 	require.NoError(b, err)
 	require.Len(b, policies, len(docs))
 	retained := heapInUse() - before
+
+	// Reload while the first result is still held, as the policy monitor does. Take the highest
+	// of a few reloads because a single sampled run can miss the peak.
+	var peak uint64
+	for i := 0; i < 5; i++ {
+		heapInUse() // collect the garbage left by the previous reload so each run starts clean
+		p := peakHeapDuring(func() {
+			reloaded, err := QueryLatestPolicies(ctx, bulker)
+			if err != nil || len(reloaded) != len(docs) {
+				b.Fatalf("unexpected result: %d policies, err=%v", len(reloaded), err)
+			}
+		})
+		peak = max(peak, p-before)
+	}
 	runtime.KeepAlive(policies)
 
 	b.ReportAllocs()
@@ -284,5 +336,7 @@ func BenchmarkQueryLatestPolicies(b *testing.B) {
 		}
 	}
 	b.StopTimer()
-	b.ReportMetric(float64(retained)/1e6, "retained-MB") // reported last: ResetTimer would delete it
+	// Reported last because ResetTimer deletes metrics reported before it.
+	b.ReportMetric(float64(retained)/1e6, "retained-MB")
+	b.ReportMetric(float64(peak)/1e6, "peak-MB")
 }
