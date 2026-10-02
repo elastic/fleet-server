@@ -86,7 +86,7 @@ func FindAgent(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, name strin
 	return agent, nil
 }
 
-func UpdateAgent(ctx context.Context, bulker bulk.Bulk, agentID string, fields bulk.UpdateFields) error {
+func UpdateAgent(ctx context.Context, bulker bulk.Bulk, agentID string, fields bulk.UpdateFields, opts ...bulk.Opt) error {
 	span, ctx := apm.StartSpan(ctx, "updateAgent", "update")
 	defer span.End()
 
@@ -94,5 +94,5 @@ func UpdateAgent(ctx context.Context, bulker bulk.Bulk, agentID string, fields b
 	if err != nil {
 		return err
 	}
-	return bulker.Update(ctx, FleetAgents, agentID, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3))
+	return bulker.Update(ctx, FleetAgents, agentID, body, append(opts, bulk.WithRetryOnConflict(3))...)
 }

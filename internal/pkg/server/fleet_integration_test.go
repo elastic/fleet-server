@@ -1997,7 +1997,7 @@ func Test_Checkin_AgentTags(t *testing.T) {
 		assert.Equal(t, []any{"a", "b"}, policy.Agent["tags"])
 		assert.Equal(t, agentTagsPolicy(true).Agent["features"], policy.Agent["features"])
 
-		doc, err := dl.FindAgent(ctx, srv.bulker, dl.QueryAgentByID, dl.FieldID, agent.ID)
+		doc, err := dl.GetAgent(ctx, srv.bulker, agent.ID)
 		require.NoError(t, err)
 		assert.Equal(t, abHash, doc.TagsHash)
 	})
@@ -2011,7 +2011,7 @@ func Test_Checkin_AgentTags(t *testing.T) {
 		assert.Equal(t, rev1, action.Id)
 		assert.Equal(t, []any{"c"}, policy.Agent["tags"])
 
-		doc, err := dl.FindAgent(ctx, srv.bulker, dl.QueryAgentByID, dl.FieldID, agent.ID)
+		doc, err := dl.GetAgent(ctx, srv.bulker, agent.ID)
 		require.NoError(t, err)
 		assert.Equal(t, cHash, doc.TagsHash)
 	})
@@ -2030,7 +2030,7 @@ func Test_Checkin_AgentTags(t *testing.T) {
 		assert.Equal(t, rev1, action.Id)
 		assert.NotContains(t, policy.Agent, "tags")
 
-		doc, err := dl.FindAgent(ctx, srv.bulker, dl.QueryAgentByID, dl.FieldID, agent.ID)
+		doc, err := dl.GetAgent(ctx, srv.bulker, agent.ID)
 		require.NoError(t, err)
 		assert.Empty(t, doc.TagsHash)
 	})
@@ -2051,7 +2051,7 @@ func Test_Checkin_AgentTags(t *testing.T) {
 
 		// The check-in writes its message to the agent document right after it subscribes.
 		require.Eventually(t, func() bool {
-			doc, err := dl.FindAgent(ctx, srv.bulker, dl.QueryAgentByID, dl.FieldID, agent.ID)
+			doc, err := dl.GetAgent(ctx, srv.bulker, agent.ID)
 			return err == nil && doc.LastCheckinMessage == "open check-in"
 		}, 15*time.Second, 500*time.Millisecond, "the open check-in was not recorded")
 
@@ -2066,7 +2066,7 @@ func Test_Checkin_AgentTags(t *testing.T) {
 		assert.Equal(t, rev2, result.action.Id)
 		assert.NotContains(t, result.policy.Agent, "tags")
 
-		doc, err := dl.FindAgent(ctx, srv.bulker, dl.QueryAgentByID, dl.FieldID, agent.ID)
+		doc, err := dl.GetAgent(ctx, srv.bulker, agent.ID)
 		require.NoError(t, err)
 		assert.Empty(t, doc.TagsHash, "the sent policy had no tags, so the stored hash must stay empty")
 	})
@@ -2077,7 +2077,7 @@ func Test_Checkin_AgentTags(t *testing.T) {
 		assert.Equal(t, rev2, action.Id)
 		assert.Equal(t, []any{"d"}, policy.Agent["tags"])
 
-		doc, err := dl.FindAgent(ctx, srv.bulker, dl.QueryAgentByID, dl.FieldID, agent.ID)
+		doc, err := dl.GetAgent(ctx, srv.bulker, agent.ID)
 		require.NoError(t, err)
 		assert.Equal(t, dHash, doc.TagsHash)
 	})
@@ -2100,7 +2100,7 @@ func Test_Checkin_AgentTags(t *testing.T) {
 		err = agent.CheckinLongPoll(ctx, 3)
 		require.NoError(t, err)
 
-		doc, err := dl.FindAgent(ctx, srv.bulker, dl.QueryAgentByID, dl.FieldID, agent.ID)
+		doc, err := dl.GetAgent(ctx, srv.bulker, agent.ID)
 		require.NoError(t, err)
 		assert.Equal(t, dHash, doc.TagsHash, "no policy was sent, so the stored hash must not change")
 	})
@@ -2136,7 +2136,7 @@ func NewFakeAgent(ctx context.Context, srv *tserver, enrollBody string) (*FakeAg
 	if err := json.NewDecoder(res.Body).Decode(&enrollResp); err != nil {
 		return nil, err
 	}
-	agent, err := dl.FindAgent(ctx, srv.bulker, dl.QueryAgentByID, dl.FieldID, enrollResp.Item.Id)
+	agent, err := dl.GetAgent(ctx, srv.bulker, enrollResp.Item.Id)
 	if err != nil {
 		return nil, err
 	}

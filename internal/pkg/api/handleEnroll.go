@@ -409,7 +409,7 @@ func (et *EnrollerT) _enroll(
 		if req.ReplaceToken != nil && *req.ReplaceToken != "" && prevVer != "" && prevVer != ver {
 			doc[dl.FieldUpgradedAt] = now.UTC().Format(time.RFC3339)
 		}
-		err = dl.UpdateAgent(ctx, et.bulker, agentID, doc)
+		err = dl.UpdateAgent(ctx, et.bulker, agentID, doc, bulk.WithRefresh())
 		if err != nil {
 			return nil, err
 		}
