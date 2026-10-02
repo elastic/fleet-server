@@ -195,6 +195,11 @@ func TestConvertActionData(t *testing.T) {
 		expect: Action_Data{},
 		hasErr: false,
 	}, {
+		name:   "restart action",
+		aType:  RESTART,
+		expect: Action_Data{},
+		hasErr: false,
+	}, {
 		name:   "migrate action - nil input fails",
 		aType:  MIGRATE,
 		raw:    nil,
@@ -350,6 +355,9 @@ func TestFilterActions(t *testing.T) {
 		}, {
 			ActionID: "5678",
 			Type:     "UNENROLL",
+		}, {
+			ActionID: "9012",
+			Type:     "RESTART",
 		}},
 		resp: []model.Action{{
 			ActionID: "1234",
@@ -357,6 +365,9 @@ func TestFilterActions(t *testing.T) {
 		}, {
 			ActionID: "5678",
 			Type:     "UNENROLL",
+		}, {
+			ActionID: "9012",
+			Type:     "RESTART",
 		}},
 	}, {
 		name: "filter POLICY_CHANGE action",
