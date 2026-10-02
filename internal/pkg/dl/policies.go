@@ -64,9 +64,6 @@ func QueryLatestPolicies(ctx context.Context, bulker bulk.Bulk, opt ...Option) (
 			return nil, err
 		}
 	}
-	// Do this once, after every policy is decoded and before any caller sees them, so that
-	// text repeated across policies is held in memory only once. See shareStrings.
-	shareStrings(policies)
 	return policies, nil
 }
 
