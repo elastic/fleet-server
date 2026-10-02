@@ -423,6 +423,19 @@ func (m *monitorT) processPolicies(ctx context.Context, policies []model.Policy)
 	dl.ShareStrings(fresh)
 
 	for _, policy := range fresh {
+		// processPolicies can run concurrently (the monitor loop and loads triggered by
+		// GetPolicy / LatestRev), so a newer revision of this policy may have been stored while
+		// the batch was being shared and the earlier policies were parsed. Check again right
+		// before the costly secret resolution and parse, as the single check used to do.
+		// updatePolicy repeats the check under the lock, which is what guarantees a newer
+		// revision is never replaced.
+		if m.isStaleRevision(policy.PolicyID, policy.RevisionIdx) {
+			m.log.Debug().
+				Str(ecs.PolicyID, policy.PolicyID).
+				Int64(ecs.RevisionIdx, policy.RevisionIdx).
+				Msg("skipping policy revision that became stale while processing")
+			continue
+		}
 		pp, err := NewParsedPolicy(ctx, m.bulker, policy)
 		if err != nil {
 			return err
@@ -486,6 +499,17 @@ func (m *monitorT) updatePolicy(ctx context.Context, pp *ParsedPolicy) bool {
 		}
 		m.policies[newPolicy.PolicyID] = p
 		zlog.Info().Str(ecs.PolicyID, newPolicy.PolicyID).Msg("New policy found on update and added")
+		return false
+	}
+
+	// Another processPolicies call may have stored a newer revision since the caller checked
+	// (see processPolicies), and the caller does not hold the lock between checking and updating.
+	// This check is made while holding the lock, so a newer revision can never be replaced by an
+	// older one.
+	if newPolicy.RevisionIdx <= p.pp.Policy.RevisionIdx {
+		zlog.Warn().
+			Int64("cached_revision_idx", p.pp.Policy.RevisionIdx).
+			Msg("not updating policy: a newer or equal revision is already cached")
 		return false
 	}
 
