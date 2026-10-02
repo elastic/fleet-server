@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-package dl
+package policy
 
 import (
 	"bytes"
@@ -17,10 +17,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
+	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 )
 
 const (
@@ -34,6 +35,7 @@ const (
 	benchDataset   = "dataset"
 	benchField     = "field"
 	benchES        = "elasticsearch"
+	benchType      = "type"
 	benchLogs      = "logs"
 	benchHosts     = "hosts"
 )
@@ -101,19 +103,6 @@ type benchPolicy struct {
 	Data        benchData `json:"data"`
 }
 
-// searchOnlyBulk answers Search with the given policy documents; any other method panics (nil
-// embedded interface). Like a real Elasticsearch response, every Search call materializes a new
-// copy of the documents, so the raw JSON that exists while a load is decoded is part of the heap
-// that the benchmark measures.
-type searchOnlyBulk struct {
-	bulk.Bulk
-	docs [][]byte
-}
-
-func (b searchOnlyBulk) Search(context.Context, string, []byte, ...bulk.Opt) (*es.ResultT, error) {
-	return freshResult(b.docs), nil
-}
-
 var queryVocab = strings.Fields(`SELECT FROM WHERE AND OR JOIN LEFT ON name path pid uid gid cmdline
 	processes file hash sha256 users groups process_open_files listening_ports mounts last time
 	datetime unixepoch LIKE IN NOT NULL LIMIT ORDER BY GROUP COUNT CASE WHEN THEN ELSE END`)
@@ -171,7 +160,7 @@ func syntheticPolicies(numPolicies int, uniqueQueries bool) [][]byte {
 				Meta:            map[string]any{"package": map[string]any{"name": "integration-" + typ, benchVersion: "1.2.3"}},
 				Streams: []benchStream{{
 					ID:         fmt.Sprintf("%s-stream-%d-%d", typ, p, i),
-					DataStream: map[string]string{benchDataset: dataset, FiledType: benchLogs},
+					DataStream: map[string]string{benchDataset: dataset, benchType: benchLogs},
 					Paths:      []string{"/var/log/messages", "/var/log/syslog"},
 					Processors: []map[string]any{{"add_fields": map[string]any{
 						"target": "event", "fields": map[string]any{benchDataset: dataset},
@@ -224,13 +213,13 @@ func syntheticPolicies(numPolicies int, uniqueQueries bool) [][]byte {
 		doc := benchPolicy{
 			Timestamp:   benchTimestamp,
 			PolicyID:    fmt.Sprintf("policy-%d", p),
-			RevisionIdx: 1 + p%7,
+			RevisionIdx: benchBaseRevision,
 			Namespaces:  []string{benchSpace},
 			Data: benchData{
 				ID:       fmt.Sprintf("policy-%d", p),
 				Revision: 1 + p%7,
 				Outputs: map[string]map[string]any{benchOutput: {
-					FiledType: benchES, benchHosts: []any{"https://es.example.test:443"},
+					benchType: benchES, benchHosts: []any{"https://es.example.test:443"},
 				}},
 				Agent:             map[string]any{"monitoring": map[string]any{"enabled": true}},
 				Fleet:             map[string]any{benchHosts: []any{"https://fleet.example.test:443"}},
@@ -248,19 +237,35 @@ func syntheticPolicies(numPolicies int, uniqueQueries bool) [][]byte {
 	return docs
 }
 
-// freshResult builds the search result for docs, copying each document as an Elasticsearch
-// response would hold its own copy of the hit sources.
-func freshResult(docs [][]byte) *es.ResultT {
-	buckets := make([]es.Bucket, len(docs))
+// benchBaseRevision is the revision_idx every synthetic policy starts with. It has a fixed number of
+// digits so that hitsFor can write a newer revision over it without changing the document size.
+const benchBaseRevision = 1_000_000
+
+// revisionOffsets returns, for each document, where the digits of its revision_idx start.
+func revisionOffsets(tb testing.TB, docs [][]byte) []int {
+	tb.Helper()
+	marker := fmt.Appendf(nil, `"revision_idx":%d`, benchBaseRevision)
+	offsets := make([]int, len(docs))
 	for i, d := range docs {
-		buckets[i] = es.Bucket{
-			Key: fmt.Sprintf("policy-%d", i),
-			Aggregations: map[string]es.HitsT{
-				FieldRevisionIdx: {Hits: []es.HitT{{ID: fmt.Sprintf("doc-%d", i), Source: bytes.Clone(d)}}},
-			},
-		}
+		at := bytes.Index(d, marker)
+		require.GreaterOrEqual(tb, at, 0, "revision_idx not found in document %d", i)
+		offsets[i] = at + len(`"revision_idx":`)
 	}
-	return &es.ResultT{Aggregations: map[string]es.Aggregation{FieldPolicyID: {Buckets: buckets}}}
+	return offsets
+}
+
+// hitsFor returns the documents as search hits at revision rev, each with its own copy of the
+// source, as hits received from Elasticsearch would have. The monitor ignores a revision that is
+// not newer than the one it holds, so every load needs a higher rev than the last.
+func hitsFor(docs [][]byte, offsets []int, rev int) []es.HitT {
+	digits := fmt.Appendf(nil, "%d", rev)
+	hits := make([]es.HitT, len(docs))
+	for i, d := range docs {
+		src := bytes.Clone(d)
+		copy(src[offsets[i]:], digits)
+		hits[i] = es.HitT{Source: src}
+	}
+	return hits
 }
 
 func heapInUse() uint64 {
@@ -300,64 +305,69 @@ func peakHeapDuring(fn func()) uint64 {
 	return peak.Load()
 }
 
-// BenchmarkQueryLatestPolicies decodes a full set of 100 policies (about 19 MB of JSON) the way the
-// policy monitor does on every load, with one sub-benchmark per kind of content:
+// BenchmarkMonitorProcessHits feeds a full set of 100 policies (about 19 MB of JSON) to the policy
+// monitor the way policy changes reach it, with one sub-benchmark per kind of content:
 //   - duplicated: most policies repeat the same osquery pack queries, as seen in large deployments.
 //   - unique: every policy has its own copy of each query, so there is nothing to deduplicate.
 //
+// This is the path that decodes the policies, builds the ParsedPolicy for each and stores it in the
+// monitor, so it includes everything the monitor keeps alive per policy.
+//
 // Besides time and allocations it reports two memory figures:
-//   - retained-MB: the heap the decoded policies keep alive. The policy monitor holds them for as
-//     long as they are the latest revision, so this is the steady-state cost.
-//   - peak-MB: the highest total heap used by policy data while reloading, i.e. the previous
-//     load (still held by the monitor while the new one is decoded) plus the Elasticsearch
-//     response, the new load and any garbage produced on the way. This is the figure that matters
-//     for the container memory limit.
+//   - retained-MB: the heap the monitor keeps alive for the policies it holds. This is the
+//     steady-state cost.
+//   - peak-MB: the highest total heap used by policy data while a new revision of every policy is
+//     processed, i.e. the policies already held, the incoming hits (a copy of the JSON, as an
+//     Elasticsearch response would be), the new policies and any garbage produced on the way. This
+//     is the figure that matters for the container memory limit.
 //
 // Both are measured on top of the heap before any policy was loaded. retained-MB is exact;
 // peak-MB is sampled (see peakHeapDuring).
-func BenchmarkQueryLatestPolicies(b *testing.B) {
-	b.Run("duplicated", func(b *testing.B) { benchmarkQueryLatestPolicies(b, false) })
-	b.Run("unique", func(b *testing.B) { benchmarkQueryLatestPolicies(b, true) })
+func BenchmarkMonitorProcessHits(b *testing.B) {
+	b.Run("duplicated", func(b *testing.B) { benchmarkMonitorProcessHits(b, false) })
+	b.Run("unique", func(b *testing.B) { benchmarkMonitorProcessHits(b, true) })
 }
 
-func benchmarkQueryLatestPolicies(b *testing.B, uniqueQueries bool) {
+func benchmarkMonitorProcessHits(b *testing.B, uniqueQueries bool) {
 	docs := syntheticPolicies(100, uniqueQueries)
+	offsets := revisionOffsets(b, docs)
 	var rawBytes int
 	for _, d := range docs {
 		rawBytes += len(d)
 	}
-	bulker := searchOnlyBulk{docs: docs}
 	ctx := context.Background()
+	m := &monitorT{
+		log:      zerolog.Nop(),
+		bulker:   ftesting.NewMockBulk(),
+		policies: map[string]policyT{},
+		pendingQ: makeHead(),
+	}
+	rev := benchBaseRevision
+	load := func() {
+		rev++
+		if err := m.processHits(ctx, hitsFor(docs, offsets, rev)); err != nil {
+			b.Fatalf("processHits: %v", err)
+		}
+	}
 
 	before := heapInUse()
-	policies, err := QueryLatestPolicies(ctx, bulker)
-	require.NoError(b, err)
-	require.Len(b, policies, len(docs))
+	load()
+	require.Len(b, m.policies, len(docs))
 	retained := heapInUse() - before
 
-	// Reload while the first result is still held, as the policy monitor does. Take the highest
-	// of a few reloads because a single sampled run can miss the peak.
+	// Reload while the first set is still held, as the monitor does when new revisions arrive.
+	// Take the highest of a few reloads because a single sampled run can miss the peak.
 	var peak uint64
 	for range 5 {
 		heapInUse() // collect the garbage left by the previous reload so each run starts clean
-		p := peakHeapDuring(func() {
-			reloaded, err := QueryLatestPolicies(ctx, bulker)
-			if err != nil || len(reloaded) != len(docs) {
-				b.Fatalf("unexpected result: %d policies, err=%v", len(reloaded), err)
-			}
-		})
-		peak = max(peak, p-before)
+		peak = max(peak, peakHeapDuring(load)-before)
 	}
-	runtime.KeepAlive(policies)
 
 	b.ReportAllocs()
 	b.SetBytes(int64(rawBytes))
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		got, err := QueryLatestPolicies(ctx, bulker)
-		if err != nil || len(got) != len(docs) {
-			b.Fatalf("unexpected result: %d policies, err=%v", len(got), err)
-		}
+	for b.Loop() {
+		load()
 	}
 	b.StopTimer()
 	// Reported last because ResetTimer deletes metrics reported before it.

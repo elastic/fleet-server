@@ -55,8 +55,8 @@ func testPolicy(query string) model.Policy {
 				"download": map[string]any{"sourceURI": strings.Clone("https://artifacts.example.test/downloads/" + strings.Repeat("x", 40))},
 			},
 			Inputs: []map[string]any{{
-				testType: strings.Clone(benchOsquery),
-				benchOsquery: map[string]any{
+				testType: strings.Clone(testOsquery),
+				testOsquery: map[string]any{
 					testPacks: map[string]any{
 						testPack: map[string]any{
 							testQueries: map[string]any{
@@ -71,20 +71,23 @@ func testPolicy(query string) model.Policy {
 				},
 			}},
 			Outputs: map[string]map[string]any{
-				benchOutput: {testType: strings.Clone(benchES)},
+				testOutput: {testType: strings.Clone(testES)},
 			},
 		},
 	}
 }
 
 const (
+	testOsquery = "osquery"
+	testOutput  = "primary"
+	testES      = "elasticsearch"
 	testType    = "type"
 	testPacks   = "packs"
 	testPack    = "pack-1"
 	testQueries = "queries"
 )
 
-var queryPath = []string{benchOsquery, testPacks, testPack, testQueries, "q1"}
+var queryPath = []string{testOsquery, testPacks, testPack, testQueries, "q1"}
 
 func queryOf(t *testing.T, p model.Policy) string {
 	t.Helper()
