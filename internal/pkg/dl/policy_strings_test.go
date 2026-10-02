@@ -52,7 +52,7 @@ func testPolicy(query string) model.Policy {
 		PolicyID: "policy-1",
 		Data: &model.PolicyData{
 			Agent: map[string]any{
-				"download": map[string]any{"sourceURI": strings.Clone("https://artifacts.example.test/downloads")},
+				"download": map[string]any{"sourceURI": strings.Clone("https://artifacts.example.test/downloads/" + strings.Repeat("x", 40))},
 			},
 			Inputs: []map[string]any{{
 				testType: strings.Clone(benchOsquery),
@@ -113,13 +113,15 @@ func TestShareStrings(t *testing.T) {
 		}
 	})
 
-	t.Run("equal values share memory", func(t *testing.T) {
+	t.Run("long equal values share memory", func(t *testing.T) {
 		assert.True(t, sameBacking(queryOf(t, policies[0]), queryOf(t, policies[1])))
 
 		a := stringAt(t, policies[0].Data.Agent, "download", "sourceURI")
 		b := stringAt(t, policies[1].Data.Agent, "download", "sourceURI")
 		assert.True(t, sameBacking(a, b))
+	})
 
+	t.Run("short values are left alone", func(t *testing.T) {
 		la := listAt(t, policies[0].Data.Inputs[0], append(queryPath, "platforms")...)
 		lb := listAt(t, policies[1].Data.Inputs[0], append(queryPath, "platforms")...)
 		require.Len(t, la, 2)
@@ -128,12 +130,8 @@ func TestShareStrings(t *testing.T) {
 			sa, okA := la[i].(string)
 			sb, okB := lb[i].(string)
 			require.True(t, okA && okB)
-			assert.True(t, sameBacking(sa, sb))
+			assert.False(t, sameBacking(sa, sb), "strings below minSharedLen are not tracked")
 		}
-
-		oa := stringAt(t, policies[0].Data.Outputs[benchOutput], testType)
-		ob := stringAt(t, policies[1].Data.Outputs[benchOutput], testType)
-		assert.True(t, sameBacking(oa, ob))
 	})
 
 	t.Run("maps stay independent", func(t *testing.T) {
@@ -146,6 +144,30 @@ func TestShareStrings(t *testing.T) {
 	t.Run("policy without data is untouched", func(t *testing.T) {
 		assert.Nil(t, policies[2].Data)
 	})
+}
+
+func TestShareStringsCap(t *testing.T) {
+	oldMax := maxSharedStrings
+	maxSharedStrings = 1
+	t.Cleanup(func() { maxSharedStrings = oldMax })
+
+	first := strings.Repeat("a", minSharedLen)
+	second := strings.Repeat("b", minSharedLen)
+	policy := func() model.Policy {
+		return model.Policy{Data: &model.PolicyData{Inputs: []map[string]any{{
+			"first":  strings.Clone(first),
+			"second": strings.Clone(second),
+		}}}}
+	}
+	policies := []model.Policy{policy(), policy()}
+
+	shareStrings(policies)
+
+	assert.True(t, sameBacking(stringAt(t, policies[0].Data.Inputs[0], "first"), stringAt(t, policies[1].Data.Inputs[0], "first")),
+		"a string tracked before the cap was reached is still shared")
+	assert.False(t, sameBacking(stringAt(t, policies[0].Data.Inputs[0], "second"), stringAt(t, policies[1].Data.Inputs[0], "second")),
+		"a new string is not tracked once the cap is reached")
+	assert.Equal(t, second, stringAt(t, policies[1].Data.Inputs[0], "second"), "content is unchanged either way")
 }
 
 func TestShareStringsNilSections(t *testing.T) {

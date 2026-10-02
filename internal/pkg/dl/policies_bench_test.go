@@ -132,7 +132,11 @@ func randomQuery(r *rand.Rand, size int) string {
 // few hundred osquery pack queries (about 70% short, a few several KB long). Identifiers that
 // are unique per policy (package policy ids, schedule ids) are kept unique so that they cannot
 // be shared.
-func syntheticPolicies(numPolicies int) [][]byte {
+//
+// With uniqueQueries set, every policy gets its own copy of each query (made distinct by a
+// trailing comment naming the policy), which models a deployment whose policies share almost
+// nothing. It is the worst case for anything that tries to deduplicate content.
+func syntheticPolicies(numPolicies int, uniqueQueries bool) [][]byte {
 	r := rand.New(rand.NewSource(1)) //nolint:gosec // deterministic benchmark data
 	const distinctQueries = 300
 	queries := make([]string, distinctQueries)
@@ -182,8 +186,12 @@ func syntheticPolicies(numPolicies int) [][]byte {
 				n := 40 + r.Intn(40)
 				for q := 0; q < n; q++ {
 					idx := (k*70 + q) % distinctQueries
+					query := queries[idx]
+					if uniqueQueries {
+						query += fmt.Sprintf(" /* policy %d */", p)
+					}
 					entry := benchQuery{
-						Query:      queries[idx],
+						Query:      query,
 						ScheduleID: fmt.Sprintf("%08d-%04d-4000-8000-%012d", p, k*100+q, r.Int63n(1_000_000_000_000)),
 						StartDate:  benchTimestamp,
 						SpaceID:    benchSpace,
@@ -293,7 +301,11 @@ func peakHeapDuring(fn func()) uint64 {
 }
 
 // BenchmarkQueryLatestPolicies decodes a full set of 100 policies (about 19 MB of JSON) the way the
-// policy monitor does on every load. Besides time and allocations it reports two memory figures:
+// policy monitor does on every load, with one sub-benchmark per kind of content:
+//   - duplicated: most policies repeat the same osquery pack queries, as seen in large deployments.
+//   - unique: every policy has its own copy of each query, so there is nothing to deduplicate.
+//
+// Besides time and allocations it reports two memory figures:
 //   - retained-MB: the heap the decoded policies keep alive. The policy monitor holds them for as
 //     long as they are the latest revision, so this is the steady-state cost.
 //   - peak-MB: the highest total heap used by policy data while reloading, i.e. the previous
@@ -304,7 +316,12 @@ func peakHeapDuring(fn func()) uint64 {
 // Both are measured on top of the heap before any policy was loaded. retained-MB is exact;
 // peak-MB is sampled (see peakHeapDuring).
 func BenchmarkQueryLatestPolicies(b *testing.B) {
-	docs := syntheticPolicies(100)
+	b.Run("duplicated", func(b *testing.B) { benchmarkQueryLatestPolicies(b, false) })
+	b.Run("unique", func(b *testing.B) { benchmarkQueryLatestPolicies(b, true) })
+}
+
+func benchmarkQueryLatestPolicies(b *testing.B, uniqueQueries bool) {
+	docs := syntheticPolicies(100, uniqueQueries)
 	var rawBytes int
 	for _, d := range docs {
 		rawBytes += len(d)
