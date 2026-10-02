@@ -656,6 +656,165 @@ func TestPolicyOTLPOutputPrepareManagedToExternal(t *testing.T) {
 	})
 }
 
+func TestPolicyOTLPOutputPrepareRetiresRemovedOutput(t *testing.T) {
+	const (
+		removedOutputName  = "otlp-managed-removed"
+		incomingOutputName = "otlp-external-incoming"
+
+		removedKeyID    = "removed-output-key-id"
+		removedSecretID = "removed-output-secret-id"
+		pendingKeyID    = "pending-rotation-key-id"
+		pendingSecretID = "pending-rotation-secret-id"
+	)
+	removedSecretRef := "$co.elastic.secret{" + removedSecretID + "}"
+
+	// policyMap contains only the incoming external OTLP output.
+	policyMap := map[string]map[string]any{
+		incomingOutputName: {"type": OutputTypeOTLP},
+	}
+	// incomingOutput describes the new external OTLP output (Role == nil → no key management).
+	incomingOutput := Output{
+		Type: OutputTypeOTLP,
+		Name: incomingOutputName,
+		Role: nil,
+	}
+
+	// parseParkParams decodes an Update body and returns the script params map.
+	parseParkParams := func(t *testing.T, body []byte) map[string]any {
+		t.Helper()
+		var req struct {
+			Script struct {
+				Params map[string]any `json:"params"`
+			} `json:"script"`
+		}
+		require.NoError(t, json.Unmarshal(body, &req))
+		return req.Script.Params
+	}
+
+	// isParkOnto returns a mock.MatchedBy matcher that accepts an Update body that parks a
+	// retirement record onto the named incoming output.
+	isParkOnto := func(incomingName string) any {
+		return mock.MatchedBy(func(body []byte) bool {
+			var req struct {
+				Script struct {
+					Params map[string]any `json:"params"`
+				} `json:"script"`
+			}
+			if json.Unmarshal(body, &req) != nil {
+				return false
+			}
+			return req.Script.Params["output_name"] == incomingName &&
+				req.Script.Params[dl.FieldPolicyOutputToRetireAPIKeyIDs] != nil
+		})
+	}
+
+	// isRemoveOf returns a mock.MatchedBy matcher that accepts an Update body that removes the
+	// named output entry from the agent doc.
+	isRemoveOf := func(outputName string) any {
+		return mock.MatchedBy(func(body []byte) bool {
+			var req struct {
+				Script struct {
+					Source string         `json:"source"`
+					Params map[string]any `json:"params"`
+				} `json:"script"`
+			}
+			if json.Unmarshal(body, &req) != nil {
+				return false
+			}
+			return req.Script.Source == "ctx._source['outputs'].remove(params.output_name)" &&
+				req.Script.Params["output_name"] == outputName
+		})
+	}
+
+	tests := []struct {
+		name           string
+		pendingRecords []model.ToRetireAPIKeyIdsItems
+		wantCalls      int
+	}{
+		{
+			name:      "removed output has active key only",
+			wantCalls: 2,
+		},
+		{
+			name: "removed output has active key and pending rotation record",
+			pendingRecords: []model.ToRetireAPIKeyIdsItems{
+				{ID: pendingKeyID, SecretID: pendingSecretID, Output: removedOutputName, OutputType: OutputTypeOTLP},
+			},
+			wantCalls: 3,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			logger := testlog.SetLogger(t)
+			bulker := ftesting.NewMockBulk()
+
+			agent := &model.Agent{
+				ESDocument: model.ESDocument{Id: "agent-id"},
+				Outputs: map[string]*model.PolicyOutput{
+					removedOutputName: {
+						Type:              OutputTypeOTLP,
+						APIKey:            removedSecretRef,
+						APIKeyID:          removedKeyID,
+						PermissionsHash:   "old-hash",
+						ToRetireAPIKeyIds: tc.pendingRecords,
+					},
+				},
+			}
+
+			// Register expected Update calls in order. Park calls (onto the incoming output) must all
+			// precede the remove call; NotBefore enforces the ordering.
+			var prevCall *mock.Call
+			for range tc.wantCalls - 1 {
+				c := bulker.On("Update", mock.Anything, mock.Anything, mock.Anything, isParkOnto(incomingOutputName), mock.Anything).
+					Return(nil).Once()
+				if prevCall != nil {
+					c.NotBefore(prevCall)
+				}
+				prevCall = c
+			}
+			removeCall := bulker.On("Update", mock.Anything, mock.Anything, mock.Anything, isRemoveOf(removedOutputName), mock.Anything).
+				Return(nil).Once()
+			if prevCall != nil {
+				removeCall.NotBefore(prevCall)
+			}
+
+			err := incomingOutput.Prepare(context.Background(), logger, bulker, agent, policyMap)
+			require.NoError(t, err)
+
+			require.Len(t, bulker.Calls, tc.wantCalls)
+
+			// If there were pending records, verify the first call transferred one of them.
+			if len(tc.pendingRecords) > 0 {
+				transferParams := parseParkParams(t, bulker.Calls[0].Arguments.Get(3).([]byte))
+				transferRecord, ok := transferParams[dl.FieldPolicyOutputToRetireAPIKeyIDs].(map[string]any)
+				require.True(t, ok, "first Update must be a transfer of the pending record")
+				assert.Equal(t, pendingKeyID, transferRecord["id"])
+			}
+
+			// The second-to-last call parks the removed output's active key onto the incoming output.
+			// Requirement (a): this call precedes the remove — enforced by NotBefore above.
+			parkParams := parseParkParams(t, bulker.Calls[tc.wantCalls-2].Arguments.Get(3).([]byte))
+			parkRecord, ok := parkParams[dl.FieldPolicyOutputToRetireAPIKeyIDs].(map[string]any)
+			require.True(t, ok, "park body must contain a retirement record map")
+			assert.Equal(t, removedKeyID, parkRecord["id"])
+			assert.Equal(t, removedOutputName, parkRecord["output"])
+			assert.Equal(t, OutputTypeOTLP, parkRecord["output_type"])
+			assert.Equal(t, removedSecretID, parkRecord["secret_id"])
+			assert.NotEmpty(t, parkRecord["retired_at"])
+
+			// Requirement (b): the removed output is gone; the incoming output is present.
+			assert.NotContains(t, agent.Outputs, removedOutputName, "removed output must be deleted from agent.Outputs")
+			assert.Contains(t, agent.Outputs, incomingOutputName, "incoming output must be present in agent.Outputs")
+
+			// External OTLP: no api_key injected into the policy map.
+			assert.Empty(t, policyMap[incomingOutputName]["api_key"])
+
+			bulker.AssertExpectations(t)
+		})
+	}
+}
+
 func TestPolicyRemoteESOutputPrepareNoRole(t *testing.T) {
 	logger := testlog.SetLogger(t)
 	bulker := ftesting.NewMockBulk()
