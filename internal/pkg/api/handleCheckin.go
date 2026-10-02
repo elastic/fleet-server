@@ -519,16 +519,16 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 		}
 	}
 
-	// Send the policy again if the agent tags changed since the last sent policy
-	tagsHash, err := agent.ComputeTagsHash()
-	if err != nil {
-		return fmt.Errorf("hash agent tags: %w", err)
-	}
-	if tagsHash != agent.TagsHash {
-		p, err := ct.pm.GetPolicy(r.Context(), agent.PolicyID)
-		if err != nil || p == nil {
-			zlog.Debug().Err(err).Str(ecs.PolicyID, agent.PolicyID).Msg("unable to get policy to check agent tags")
-		} else if p.Data.FeatureEnabled(model.FeatureIncludeTagsInEvents) {
+	// Send the policy again if the feature is on and the agent tags changed since the last sent policy
+	p, err := ct.pm.GetPolicy(r.Context(), agent.PolicyID)
+	if err != nil || p == nil {
+		zlog.Debug().Err(err).Str(ecs.PolicyID, agent.PolicyID).Msg("unable to get policy to check agent tags")
+	} else if p.Data.FeatureEnabled(model.FeatureIncludeTagsInEvents) {
+		tagsHash, err := agent.ComputeTagsHash()
+		if err != nil {
+			return fmt.Errorf("hash agent tags: %w", err)
+		}
+		if tagsHash != agent.TagsHash {
 			zlog.Debug().Msg("agent tags changed, forcing policy resend")
 			revID = policy.RevisionForce
 		}
