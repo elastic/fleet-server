@@ -5,6 +5,7 @@
 package dl
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -100,14 +101,17 @@ type benchPolicy struct {
 	Data        benchData `json:"data"`
 }
 
-// searchOnlyBulk answers Search with a canned result; any other method panics (nil embedded interface).
+// searchOnlyBulk answers Search with the given policy documents; any other method panics (nil
+// embedded interface). Like a real Elasticsearch response, every Search call materializes a new
+// copy of the documents, so the raw JSON that exists while a load is decoded is part of the heap
+// that the benchmark measures.
 type searchOnlyBulk struct {
 	bulk.Bulk
-	res *es.ResultT
+	docs [][]byte
 }
 
 func (b searchOnlyBulk) Search(context.Context, string, []byte, ...bulk.Opt) (*es.ResultT, error) {
-	return b.res, nil
+	return freshResult(b.docs), nil
 }
 
 var queryVocab = strings.Fields(`SELECT FROM WHERE AND OR JOIN LEFT ON name path pid uid gid cmdline
@@ -236,13 +240,15 @@ func syntheticPolicies(numPolicies int) [][]byte {
 	return docs
 }
 
-func syntheticResult(docs [][]byte) *es.ResultT {
+// freshResult builds the search result for docs, copying each document as an Elasticsearch
+// response would hold its own copy of the hit sources.
+func freshResult(docs [][]byte) *es.ResultT {
 	buckets := make([]es.Bucket, len(docs))
 	for i, d := range docs {
 		buckets[i] = es.Bucket{
 			Key: fmt.Sprintf("policy-%d", i),
 			Aggregations: map[string]es.HitsT{
-				FieldRevisionIdx: {Hits: []es.HitT{{ID: fmt.Sprintf("doc-%d", i), Source: d}}},
+				FieldRevisionIdx: {Hits: []es.HitT{{ID: fmt.Sprintf("doc-%d", i), Source: bytes.Clone(d)}}},
 			},
 		}
 	}
@@ -291,18 +297,19 @@ func peakHeapDuring(fn func()) uint64 {
 //   - retained-MB: the heap the decoded policies keep alive. The policy monitor holds them for as
 //     long as they are the latest revision, so this is the steady-state cost.
 //   - peak-MB: the highest total heap used by policy data while reloading, i.e. the previous
-//     load (still held by the monitor while the new one is decoded) plus the new load plus any
-//     garbage produced on the way. This is the figure that matters for the container memory limit.
+//     load (still held by the monitor while the new one is decoded) plus the Elasticsearch
+//     response, the new load and any garbage produced on the way. This is the figure that matters
+//     for the container memory limit.
 //
-// Both are measured on top of the heap before any policy was loaded and are exact in the case of
-// retained-MB and sampled (see peakHeapDuring) in the case of peak-MB.
+// Both are measured on top of the heap before any policy was loaded. retained-MB is exact;
+// peak-MB is sampled (see peakHeapDuring).
 func BenchmarkQueryLatestPolicies(b *testing.B) {
 	docs := syntheticPolicies(100)
 	var rawBytes int
 	for _, d := range docs {
 		rawBytes += len(d)
 	}
-	bulker := searchOnlyBulk{res: syntheticResult(docs)}
+	bulker := searchOnlyBulk{docs: docs}
 	ctx := context.Background()
 
 	before := heapInUse()
