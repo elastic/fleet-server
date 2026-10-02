@@ -10,10 +10,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 	"testing"
 	"testing/synctest"
 	"time"
+	"unsafe"
 
 	"github.com/gofrs/uuid/v5"
 	"github.com/google/go-cmp/cmp"
@@ -682,4 +684,115 @@ func TestMonitor_StaleRevisionSkipsSecretResolution(t *testing.T) {
 	err := pm.processPolicies(ctx, []model.Policy{policyWithSecret})
 	assert.NoError(t, err, "stale revision should be skipped without error, not trigger secret resolution")
 	assert.Equal(t, int64(8), pm.policies[policyID].pp.Policy.RevisionIdx, "cached revision must not change for stale input")
+}
+
+// TestMonitor_ProcessHitsSharesStrings verifies that policies arriving from the policy index
+// monitor (processHits), which is how every revision after startup reaches the monitor, share
+// equal long strings with each other once stored. This path never goes through a full load.
+func TestMonitor_ProcessHitsSharesStrings(t *testing.T) {
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
+	query := strings.Repeat("SELECT name, path FROM processes WHERE ", 4)
+
+	hit := func(policyID string) es.HitT {
+		src, err := json.Marshal(model.Policy{
+			PolicyID:    policyID,
+			RevisionIdx: 1,
+			Data: &model.PolicyData{
+				Outputs: map[string]map[string]any{"default": {"type": "elasticsearch"}},
+				Inputs:  []map[string]any{{"query": query}},
+			},
+		})
+		require.NoError(t, err)
+		return es.HitT{Source: src}
+	}
+
+	pm := &monitorT{
+		log:      zerolog.Ctx(ctx).With().Logger(),
+		bulker:   ftesting.NewMockBulk(),
+		policies: map[string]policyT{},
+		pendingQ: makeHead(),
+	}
+	require.NoError(t, pm.processHits(ctx, []es.HitT{hit("policy-a"), hit("policy-b")}))
+
+	queryOf := func(policyID string) string {
+		q, ok := pm.policies[policyID].pp.Policy.Data.Inputs[0]["query"].(string)
+		require.True(t, ok)
+		return q
+	}
+	a, b := queryOf("policy-a"), queryOf("policy-b")
+	assert.Equal(t, query, a)
+	assert.Equal(t, query, b)
+	assert.Same(t, unsafe.StringData(a), unsafe.StringData(b), "policies from one set of hits share the query")
+}
+
+// TestMonitor_UpdatePolicyKeepsNewerRevision verifies that updatePolicy never replaces a cached
+// policy with an older or equal revision, even though the caller checked beforehand: nothing stops
+// another processPolicies call from storing a newer revision in between.
+func TestMonitor_UpdatePolicyKeepsNewerRevision(t *testing.T) {
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
+	policyID := uuid.Must(uuid.NewV4()).String()
+	makePolicy := func(rev int64) ParsedPolicy {
+		return ParsedPolicy{Policy: model.Policy{PolicyID: policyID, RevisionIdx: rev, Data: policyDataDefault}}
+	}
+	pm := &monitorT{
+		log:      zerolog.Ctx(ctx).With().Logger(),
+		policies: map[string]policyT{policyID: {pp: makePolicy(9), head: makeHead()}},
+		pendingQ: makeHead(),
+	}
+
+	for _, rev := range []int64{8, 9} {
+		stale := makePolicy(rev)
+		assert.False(t, pm.updatePolicy(ctx, &stale), "revision %d must not replace revision 9", rev)
+		assert.Equal(t, int64(9), pm.policies[policyID].pp.Policy.RevisionIdx)
+	}
+
+	newer := makePolicy(10)
+	assert.True(t, pm.updatePolicy(ctx, &newer))
+	assert.Equal(t, int64(10), pm.policies[policyID].pp.Policy.RevisionIdx)
+}
+
+// hookedSecretsBulk calls onRead whenever secrets are read, which happens in the middle of
+// processing a policy, after processPolicies has decided the policy is fresh.
+type hookedSecretsBulk struct {
+	ftesting.MockBulk
+	onRead func()
+}
+
+func (b *hookedSecretsBulk) ReadSecrets(_ context.Context, _ []string) (map[string]string, error) {
+	b.onRead()
+	return map[string]string{}, nil
+}
+
+// TestMonitor_ProcessPoliciesDoesNotRegressRevision simulates a concurrent processPolicies call
+// storing a newer revision while this one is parsing an older one, and verifies the older revision
+// does not overwrite it.
+func TestMonitor_ProcessPoliciesDoesNotRegressRevision(t *testing.T) {
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
+	policyID := uuid.Must(uuid.NewV4()).String()
+	makePolicy := func(rev int64) ParsedPolicy {
+		return ParsedPolicy{Policy: model.Policy{PolicyID: policyID, RevisionIdx: rev, Data: policyDataDefault}}
+	}
+
+	pm := &monitorT{
+		log:      zerolog.Ctx(ctx).With().Logger(),
+		policies: map[string]policyT{policyID: {pp: makePolicy(1), head: makeHead()}},
+		pendingQ: makeHead(),
+	}
+	pm.bulker = &hookedSecretsBulk{onRead: func() {
+		// Another call stores revision 3 while revision 2 is being parsed.
+		pm.mut.Lock()
+		defer pm.mut.Unlock()
+		pm.policies[policyID] = policyT{pp: makePolicy(3), head: makeHead()}
+	}}
+
+	revision2 := model.Policy{
+		PolicyID:    policyID,
+		RevisionIdx: 2,
+		Data: &model.PolicyData{
+			Outputs:          map[string]map[string]any{"default": {"type": "elasticsearch"}},
+			SecretReferences: []model.SecretReferencesItems{{ID: "some-secret-id"}},
+		},
+	}
+	require.NoError(t, pm.processPolicies(ctx, []model.Policy{revision2}))
+	assert.Equal(t, int64(3), pm.policies[policyID].pp.Policy.RevisionIdx, "an older revision must not overwrite a newer one")
 }
