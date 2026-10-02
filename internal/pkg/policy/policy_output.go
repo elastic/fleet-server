@@ -34,7 +34,11 @@ const (
 	OutputTypeKafka               = "kafka"
 	OutputTypeOTLP                = "otlp"
 
+	// OTelExporterType* constants identify the exporter-id prefix (e.g. "elasticsearch/default" → "elasticsearch").
+	// These share string values with the OutputType* constants but represent a different namespace.
 	OTelExporterTypeElasticsearch = "elasticsearch"
+	OTelExporterTypeOTLP          = "otlp"
+	OTelExporterTypeOTLPHTTP      = "otlphttp"
 )
 
 var (
