@@ -151,23 +151,30 @@ func TestShareStringsCap(t *testing.T) {
 	maxSharedStrings = 1
 	t.Cleanup(func() { maxSharedStrings = oldMax })
 
+	const key = "value"
 	first := strings.Repeat("a", minSharedLen)
 	second := strings.Repeat("b", minSharedLen)
+	// Each string sits in its own input. shareStrings visits inputs in slice order, whereas the
+	// order of keys within one map is unspecified, so this makes the test deterministic: "first"
+	// always takes the only table slot before "second" is seen.
 	policy := func() model.Policy {
-		return model.Policy{Data: &model.PolicyData{Inputs: []map[string]any{{
-			"first":  strings.Clone(first),
-			"second": strings.Clone(second),
-		}}}}
+		return model.Policy{Data: &model.PolicyData{Inputs: []map[string]any{
+			{key: strings.Clone(first)},
+			{key: strings.Clone(second)},
+		}}}
 	}
 	policies := []model.Policy{policy(), policy()}
 
 	shareStrings(policies)
 
-	assert.True(t, sameBacking(stringAt(t, policies[0].Data.Inputs[0], "first"), stringAt(t, policies[1].Data.Inputs[0], "first")),
+	valueOf := func(p model.Policy, input int) string {
+		return stringAt(t, p.Data.Inputs[input], key)
+	}
+	assert.True(t, sameBacking(valueOf(policies[0], 0), valueOf(policies[1], 0)),
 		"a string tracked before the cap was reached is still shared")
-	assert.False(t, sameBacking(stringAt(t, policies[0].Data.Inputs[0], "second"), stringAt(t, policies[1].Data.Inputs[0], "second")),
+	assert.False(t, sameBacking(valueOf(policies[0], 1), valueOf(policies[1], 1)),
 		"a new string is not tracked once the cap is reached")
-	assert.Equal(t, second, stringAt(t, policies[1].Data.Inputs[0], "second"), "content is unchanged either way")
+	assert.Equal(t, second, valueOf(policies[1], 1), "content is unchanged either way")
 }
 
 func TestShareStringsNilSections(t *testing.T) {
