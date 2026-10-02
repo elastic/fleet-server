@@ -16,6 +16,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/elastic/elastic-transport-go/v8/elastictransport"
 	"github.com/elastic/go-elasticsearch/v8"
@@ -873,9 +874,16 @@ func (enrollTimeoutErr) Temporary() bool { return true }
 // newEnrollESClient returns a client with the same timeout retry policy as production.
 func newEnrollESClient(t *testing.T, mt *MockTransport, maxRetries int) *elasticsearch.Client {
 	t.Helper()
-	cfg := elasticsearch.Config{Transport: mt, MaxRetries: maxRetries}
-	es.WithRetryOnTimeoutForCreate()(&cfg)
-	cli, err := elasticsearch.NewClient(cfg)
+	cfg := &config.Config{Output: config.Output{Elasticsearch: config.Elasticsearch{
+		Protocol:       "http",
+		Hosts:          []string{"localhost:9200"},
+		MaxRetries:     maxRetries,
+		MaxConnPerHost: 128,
+		Timeout:        90 * time.Second,
+	}}}
+	cli, err := es.NewClient(t.Context(), cfg, false,
+		es.NewConfigOption(elasticsearch.WithTransportOptions(elastictransport.WithTransport(mt))),
+	)
 	require.NoError(t, err)
 	return cli
 }
