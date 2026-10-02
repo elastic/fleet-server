@@ -225,6 +225,9 @@ type Agent struct {
 	// User provided tags for the Elastic Agent
 	Tags []string `json:"tags,omitempty"`
 
+	// Hash of the tags last sent to the Elastic Agent in the agent.tags policy key
+	TagsHash string `json:"tags_hash,omitempty"`
+
 	// Type
 	Type string `json:"type"`
 
