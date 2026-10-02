@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elastic/elastic-transport-go/v8/elastictransport"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/stretchr/testify/require"
 )
@@ -34,9 +35,9 @@ func MockESClient(t *testing.T) (*elasticsearch.Client, *MockTransport) {
 	}
 
 	mocktrans.RoundTripFn = func(req *http.Request) (*http.Response, error) { return mocktrans.Response, nil }
-	client, err := elasticsearch.NewClient(elasticsearch.Config{
-		Transport: &mocktrans,
-	})
+	client, err := elasticsearch.New(
+		elasticsearch.WithTransportOptions(elastictransport.WithTransport(&mocktrans)),
+	)
 	require.NoError(t, err)
 	return client, &mocktrans
 }

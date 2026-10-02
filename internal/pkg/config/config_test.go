@@ -556,7 +556,7 @@ func defaultElastic() Elasticsearch {
 		Protocol:         "http",
 		ServiceToken:     "test-token",
 		Hosts:            []string{"localhost:9200"},
-		MaxRetries:       3,
+		MaxRetries:       5,
 		MaxConnPerHost:   128,
 		MaxContentLength: 104857600,
 		Timeout:          90 * time.Second,

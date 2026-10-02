@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/elastic-transport-go/v8/elastictransport"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/stretchr/testify/require"
 )
@@ -47,10 +48,10 @@ func (m *blockingTransport) RoundTrip(_ *http.Request) (*http.Response, error) {
 
 func newTestBulkerWithTransport(t *testing.T, transport http.RoundTripper, opts ...BulkOpt) *Bulker {
 	t.Helper()
-	esClient, err := elasticsearch.NewClient(elasticsearch.Config{
-		Transport: transport,
-		Addresses: []string{"http://localhost:9200"},
-	})
+	esClient, err := elasticsearch.New(
+		elasticsearch.WithAddresses("http://localhost:9200"),
+		elasticsearch.WithTransportOptions(elastictransport.WithTransport(transport)),
+	)
 	require.NoError(t, err)
 	return NewBulker(esClient, nil, opts...)
 }
