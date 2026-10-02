@@ -155,9 +155,9 @@ func syntheticPolicies(numPolicies int, uniqueQueries bool) [][]byte {
 	inputTypes := []string{"logfile", "journald", "winlog", "filestream", "aws-s3", "cel", "httpjson", "udp"}
 
 	docs := make([][]byte, 0, numPolicies)
-	for p := 0; p < numPolicies; p++ {
+	for p := range numPolicies {
 		inputs := make([]benchInput, 0, 16)
-		for i := 0; i < 8; i++ {
+		for i := range 8 {
 			typ := inputTypes[i%len(inputTypes)]
 			dataset := "integration." + typ
 			inputs = append(inputs, benchInput{
@@ -181,10 +181,10 @@ func syntheticPolicies(numPolicies int, uniqueQueries bool) [][]byte {
 		}
 		if p%4 != 3 { // 75% of the policies carry the osquery pack
 			packs := map[string]benchPack{}
-			for k := 0; k < 4; k++ {
+			for k := range 4 {
 				qs := map[string]benchQuery{}
 				n := 40 + r.Intn(40)
-				for q := 0; q < n; q++ {
+				for q := range n {
 					idx := (k*70 + q) % distinctQueries
 					query := queries[idx]
 					if uniqueQueries {
@@ -338,7 +338,7 @@ func benchmarkQueryLatestPolicies(b *testing.B, uniqueQueries bool) {
 	// Reload while the first result is still held, as the policy monitor does. Take the highest
 	// of a few reloads because a single sampled run can miss the peak.
 	var peak uint64
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		heapInUse() // collect the garbage left by the previous reload so each run starts clean
 		p := peakHeapDuring(func() {
 			reloaded, err := QueryLatestPolicies(ctx, bulker)
