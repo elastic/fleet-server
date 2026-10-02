@@ -81,6 +81,7 @@ var validActionTypes = map[string]bool{
 	string(UPGRADE):              true,
 	string(MIGRATE):              true,
 	string(PRIVILEGELEVELCHANGE): true,
+	string(UNINSTALL):            true,
 }
 
 // invalidKeyState tracks how many times an agent has checked in with an invalid API key
@@ -1061,6 +1062,21 @@ func convertActionData(aType ActionType, raw json.RawMessage) (ad Action_Data, e
 		return
 	case UNENROLL: // Action types with no data
 		return ad, nil
+	case UNINSTALL:
+		// The UNINSTALL data field (uninstall_token) is optional, so a missing data
+		// attribute is valid: treat it as empty rather than failing to convert
+		// (which would drop the action from the checkin response). Scheduling is
+		// handled by the action's top-level start_time, not by a data field.
+		if raw == nil {
+			return ad, nil
+		}
+		d := ActionUninstall{}
+		err = json.Unmarshal(raw, &d)
+		if err != nil {
+			return
+		}
+		err = ad.FromActionUninstall(d)
+		return
 	case MIGRATE:
 		d := ActionMigrate{}
 		err = json.Unmarshal(raw, &d)

@@ -307,6 +307,57 @@ func TestHandleAckEvents(t *testing.T) {
 			},
 		},
 		{
+			name: "uninstall action found invalidates api key",
+			events: []AckRequest_Events_Item{{
+				json.RawMessage(`{
+				"action_id": "2b12dcd8-bde0-4045-92dc-c4b27668d733"
+			    }`), // an UNINSTALL action
+			}},
+			res: newAckResponse(false, []AckResponseItem{{
+				Status:  http.StatusOK,
+				Message: new(http.StatusText(http.StatusOK)),
+			}}),
+			bulker: func(t *testing.T) *ftesting.MockBulk {
+				m := ftesting.NewMockBulk()
+				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "2b12dcd8-bde0-4045-92dc-c4b27668d733")), mock.Anything).Return(&es.ResultT{HitsT: es.HitsT{
+					Hits: []es.HitT{{
+						Source: []byte(`{"action_id":"2b12dcd8-bde0-4045-92dc-c4b27668d733","type":"UNINSTALL"}`),
+					}},
+				}}, nil)
+				m.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
+				// handleUnenroll marks the agent inactive (invalidating its API keys); the
+				// Update call proves UNINSTALL is dispatched through the invalidation path.
+				m.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+				return m
+			},
+		},
+		{
+			name: "uninstall action cancelled or failed does not invalidate api key",
+			events: []AckRequest_Events_Item{{
+				json.RawMessage(`{
+				"action_id": "2b12dcd8-bde0-4045-92dc-c4b27668d733",
+				"error": "uninstall cancelled during grace period"
+			    }`), // a cancelled/failed UNINSTALL action
+			}},
+			res: newAckResponse(false, []AckResponseItem{{
+				Status:  http.StatusOK,
+				Message: new(http.StatusText(http.StatusOK)),
+			}}),
+			bulker: func(t *testing.T) *ftesting.MockBulk {
+				m := ftesting.NewMockBulk()
+				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "2b12dcd8-bde0-4045-92dc-c4b27668d733")), mock.Anything).Return(&es.ResultT{HitsT: es.HitsT{
+					Hits: []es.HitT{{
+						Source: []byte(`{"action_id":"2b12dcd8-bde0-4045-92dc-c4b27668d733","type":"UNINSTALL"}`),
+					}},
+				}}, nil)
+				m.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
+				// No Update mock: a cancelled/failed UNINSTALL must NOT invalidate the
+				// agent's keys or mark it inactive, so the agent keeps running. An
+				// unexpected Update call would fail this test.
+				return m
+			},
+		},
+		{
 			name: "action found, create result general error",
 			events: []AckRequest_Events_Item{{
 				json.RawMessage(`{

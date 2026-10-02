@@ -195,6 +195,24 @@ func TestConvertActionData(t *testing.T) {
 		expect: Action_Data{},
 		hasErr: false,
 	}, {
+		name:   "uninstall action with uninstall token",
+		aType:  UNINSTALL,
+		raw:    json.RawMessage(`{"uninstall_token":"secret-token"}`),
+		expect: Action_Data{json.RawMessage(`{"uninstall_token":"secret-token"}`)},
+		hasErr: false,
+	}, {
+		name:   "uninstall action without data",
+		aType:  UNINSTALL,
+		raw:    json.RawMessage(`{}`),
+		expect: Action_Data{json.RawMessage(`{}`)},
+		hasErr: false,
+	}, {
+		name:   "uninstall action - nil data succeeds (all fields optional)",
+		aType:  UNINSTALL,
+		raw:    nil,
+		expect: Action_Data{},
+		hasErr: false,
+	}, {
 		name:   "migrate action - nil input fails",
 		aType:  MIGRATE,
 		raw:    nil,
@@ -350,6 +368,9 @@ func TestFilterActions(t *testing.T) {
 		}, {
 			ActionID: "5678",
 			Type:     "UNENROLL",
+		}, {
+			ActionID: "9012",
+			Type:     "UNINSTALL",
 		}},
 		resp: []model.Action{{
 			ActionID: "1234",
@@ -357,6 +378,9 @@ func TestFilterActions(t *testing.T) {
 		}, {
 			ActionID: "5678",
 			Type:     "UNENROLL",
+		}, {
+			ActionID: "9012",
+			Type:     "UNINSTALL",
 		}},
 	}, {
 		name: "filter POLICY_CHANGE action",
