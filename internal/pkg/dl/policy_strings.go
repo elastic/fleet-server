@@ -76,7 +76,11 @@ func (s *stringSharer) shareMap(m map[string]any) {
 	}
 }
 
-// shareStrings makes equal long string values across the passed policies share one allocation.
+// ShareStrings makes equal long string values across the passed policies share one allocation.
+//
+// Call it only on policies that are about to be kept in memory, as the policy monitor does. It
+// costs CPU in proportion to the size of the policies, so it is wasted on callers that read a
+// policy and drop it (for example the enroll handler, which picks one policy out of the set).
 //
 // Why: the policy monitor keeps the decoded form of every policy in memory for as long as it
 // is the latest revision, and JSON decoding allocates a fresh copy of every string it reads.
@@ -101,7 +105,7 @@ func (s *stringSharer) shareMap(m map[string]any) {
 //   - Map keys are not shared. A map cannot have its key strings swapped in place, so sharing
 //     them means rebuilding every map, which costs a lot more allocation for little extra
 //     saving.
-func shareStrings(policies []model.Policy) {
+func ShareStrings(policies []model.Policy) {
 	s := &stringSharer{seen: map[string]any{}}
 	for i := range policies {
 		d := policies[i].Data

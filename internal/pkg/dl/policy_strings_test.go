@@ -103,7 +103,7 @@ func TestShareStrings(t *testing.T) {
 	}
 	require.False(t, sameBacking(queryOf(t, policies[0]), queryOf(t, policies[1])), "precondition: strings start unshared")
 
-	shareStrings(policies)
+	ShareStrings(policies)
 
 	t.Run("content is unchanged", func(t *testing.T) {
 		for i := range policies {
@@ -165,7 +165,7 @@ func TestShareStringsCap(t *testing.T) {
 	}
 	policies := []model.Policy{policy(), policy()}
 
-	shareStrings(policies)
+	ShareStrings(policies)
 
 	valueOf := func(p model.Policy, input int) string {
 		return stringAt(t, p.Data.Inputs[input], key)
@@ -179,7 +179,7 @@ func TestShareStringsCap(t *testing.T) {
 
 func TestShareStringsNilSections(t *testing.T) {
 	policies := []model.Policy{{Data: &model.PolicyData{}}}
-	require.NotPanics(t, func() { shareStrings(policies) })
+	require.NotPanics(t, func() { ShareStrings(policies) })
 	assert.Nil(t, policies[0].Data.Agent)
 	assert.Nil(t, policies[0].Data.Inputs)
 	assert.Nil(t, policies[0].Data.Outputs)

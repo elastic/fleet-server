@@ -403,6 +403,7 @@ func (m *monitorT) processPolicies(ctx context.Context, policies []model.Policy)
 		Str(ecs.PolicyID, policies[0].PolicyID).Msg("process policies")
 
 	latest := m.groupByLatest(policies)
+	fresh := make([]model.Policy, 0, len(latest))
 	for _, policy := range latest {
 		if m.isStaleRevision(policy.PolicyID, policy.RevisionIdx) {
 			m.log.Warn().
@@ -411,6 +412,17 @@ func (m *monitorT) processPolicies(ctx context.Context, policies []model.Policy)
 				Msg("skipping stale policy revision; secret resolution and policy parse skipped")
 			continue
 		}
+		fresh = append(fresh, policy)
+	}
+
+	// Every policy that reaches this point is kept by the monitor, whether it came from a full
+	// load (loadPolicies) or from the policy index monitor (processHits), so this is where
+	// equal strings across policies are made to share memory. Doing it here and not when the
+	// policies are fetched means it is skipped for fetches whose result is dropped, and it
+	// covers revisions that arrive after startup, which never go through a full load.
+	dl.ShareStrings(fresh)
+
+	for _, policy := range fresh {
 		pp, err := NewParsedPolicy(ctx, m.bulker, policy)
 		if err != nil {
 			return err
