@@ -24,6 +24,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
+	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 
@@ -712,8 +713,9 @@ func TestInvalidateAPIKeysRemoteOutputReadFromPoliciesNotFound(t *testing.T) {
 		m.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{HitsT: es.HitsT{
 			Hits: []es.HitT{},
 		}}, nil).Once()
-
 		m.On("GetBulker", "remote1").Return(nil)
+		// When the remote bulker cannot be resolved, the primary cluster is used as a fallback.
+		m.On("APIKeyInvalidate", mock.Anything, []string{"toRetire1"}).Return(nil).Once()
 		return m
 	}
 
@@ -725,6 +727,72 @@ func TestInvalidateAPIKeysRemoteOutputReadFromPoliciesNotFound(t *testing.T) {
 
 	bulker.AssertExpectations(t)
 	remoteBulker.AssertExpectations(t)
+}
+
+// TestInvalidateAPIKeysOutputTypeRouting verifies that output_type drives routing at partition
+// time: known primary-cluster types (otlp, elasticsearch) go straight to the primary bulker
+// without a GetBulker call, while records with an empty output_type preserve the pre-migration
+// name-based routing path.
+func TestInvalidateAPIKeysOutputTypeRouting(t *testing.T) {
+	tests := []struct {
+		name        string
+		record      model.ToRetireAPIKeyIdsItems
+		setupBulker func(*ftesting.MockBulk)
+	}{
+		{
+			name: "otlp type routes to primary without GetBulker",
+			record: model.ToRetireAPIKeyIdsItems{
+				ID:         "otlp-key",
+				Output:     "my-otlp",
+				OutputType: policy.OutputTypeOTLP,
+			},
+			setupBulker: func(m *ftesting.MockBulk) {
+				m.On("APIKeyInvalidate", mock.Anything, []string{"otlp-key"}).Return(nil).Once()
+				// GetBulker must not be called — if it is, the mock panics (no expectation set).
+			},
+		},
+		{
+			name: "elasticsearch type with named output stays on name-based path",
+			record: model.ToRetireAPIKeyIdsItems{
+				ID:         "es-key",
+				Output:     "my-es",
+				OutputType: policy.OutputTypeElasticsearch,
+			},
+			setupBulker: func(m *ftesting.MockBulk) {
+				// elasticsearch normalizes both local and remote ES — keep on name-based
+				// path so remote keys are not incorrectly sent to the primary cluster.
+				remoteBulker := ftesting.NewMockBulk()
+				remoteBulker.On("APIKeyInvalidate", mock.Anything, []string{"es-key"}).Return(nil).Once()
+				m.On("GetBulker", "my-es").Return(remoteBulker)
+			},
+		},
+		{
+			name: "empty output_type with named output falls back to name-based routing",
+			record: model.ToRetireAPIKeyIdsItems{
+				ID:     "legacy-key",
+				Output: "remote1",
+				// OutputType intentionally empty — pre-migration record
+			},
+			setupBulker: func(m *ftesting.MockBulk) {
+				remoteBulker := ftesting.NewMockBulk()
+				remoteBulker.On("APIKeyInvalidate", mock.Anything, []string{"legacy-key"}).Return(nil).Once()
+				m.On("GetBulker", "remote1").Return(remoteBulker)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			bulker := ftesting.NewMockBulk()
+			tt.setupBulker(bulker)
+
+			logger := testlog.SetLogger(t)
+			ack := &AckT{bulk: bulker}
+			ack.invalidateAPIKeys(context.Background(), logger, []model.ToRetireAPIKeyIdsItems{tt.record}, "")
+
+			bulker.AssertExpectations(t)
+		})
+	}
 }
 
 func TestAckHandleUpgrade(t *testing.T) {
