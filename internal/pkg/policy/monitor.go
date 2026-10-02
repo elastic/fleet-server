@@ -98,8 +98,17 @@ type monitorT struct {
 	policiesIndex string
 	limit         *rate.Limiter
 
+	// emptyPop is true if the most recent pop from pendingQ found it empty.
+	// Guarded by mut.
+	emptyPop bool
+
 	startCh    chan struct{}
 	dispatchCh chan struct{}
+	// beforeRequeue is used in tests to pause a cancelled dispatchPending
+	// right before it returns its subscriber to pendingQ.
+	beforeRequeue func()
+	// beforePop is used in tests to pause a dispatchPending before its first pop from pendingQ.
+	beforePop func()
 }
 
 // NewMonitor creates the policy monitor for subscribing agents.
@@ -261,6 +270,36 @@ func (m *monitorT) waitStart(ctx context.Context) error {
 	return nil
 }
 
+// popPending removes the first subscriber from the pending queue.
+// It records whether the queue was empty so requeuePending knows if a dispatch was missed.
+func (m *monitorT) popPending() *subT {
+	m.mut.Lock()
+	defer m.mut.Unlock()
+	s := m.pendingQ.popFront()
+	m.emptyPop = s == nil
+	return s
+}
+
+// requeuePending returns a subscriber to the front of the pending queue after its
+// dispatchPending was cancelled.
+// If the replacement dispatchPending already found the queue empty and exited, nothing
+// would deliver the subscriber, so the run loop is kicked to start another dispatch.
+// The kick is skipped otherwise: it cancels the active dispatch, which would requeue and
+// kick again, so a replacement blocked in the rate limiter could never make progress.
+func (m *monitorT) requeuePending(s *subT) {
+	if m.beforeRequeue != nil {
+		m.beforeRequeue()
+	}
+	m.mut.Lock()
+	m.pendingQ.pushFront(s)
+	kick := m.emptyPop
+	m.emptyPop = false
+	m.mut.Unlock()
+	if kick {
+		m.kickDeploy()
+	}
+}
+
 // dispatchPending will dispatch all pending policy changes to the subscriptions in the queue.
 // dispatches are rate limited by the monitor's limiter.
 func (m *monitorT) dispatchPending(ctx context.Context) {
@@ -274,6 +313,9 @@ func (m *monitorT) dispatchPending(ctx context.Context) {
 	}
 	span, ctx := apm.StartSpan(ctx, "dispatch pending", "dispatch")
 	defer span.End()
+	if m.beforePop != nil {
+		m.beforePop()
+	}
 
 	ts := time.Now()
 	nQueued := 0
@@ -281,9 +323,7 @@ func (m *monitorT) dispatchPending(ctx context.Context) {
 	// Hold m.mut only for queue/map access; release before rate-limiting,
 	// Clone(), and channel sends so Subscribe/Unsubscribe/updatePolicy are
 	// not blocked during those potentially slow operations.
-	m.mut.Lock()
-	s := m.pendingQ.popFront()
-	m.mut.Unlock()
+	s := m.popPending()
 
 	if s == nil {
 		return
@@ -295,9 +335,8 @@ func (m *monitorT) dispatchPending(ctx context.Context) {
 		// If too many (checkin) responses are written concurrently memory usage may explode due to allocating gzip writers.
 		err := m.limit.Wait(ctx)
 		if err != nil {
-			m.mut.Lock()
-			m.pendingQ.pushFront(s) // context cancelled before sub is handled, put it back
-			m.mut.Unlock()
+			// Wait can also fail without ctx being done (e.g. the wait would exceed ctx's deadline).
+			m.requeuePending(s) // sub not handled, put it back
 			if !errors.Is(err, context.Canceled) {
 				m.log.Warn().Err(err).Msg("Policy limit error")
 			}
@@ -320,18 +359,14 @@ func (m *monitorT) dispatchPending(ctx context.Context) {
 
 		// Clone and send without holding m.mut.
 		if err := ctx.Err(); err != nil {
-			m.mut.Lock()
-			m.pendingQ.pushFront(s)
-			m.mut.Unlock()
+			m.requeuePending(s) // context cancelled before sub is handled, put it back
 			m.log.Debug().Err(err).Msg("context termination detected in policy dispatch")
 			return
 		}
 		cloned := policy.pp.Clone()
 		select {
 		case <-ctx.Done():
-			m.mut.Lock()
-			m.pendingQ.pushFront(s) // context cancelled before sub is handled, put it back
-			m.mut.Unlock()
+			m.requeuePending(s) // context cancelled before sub is handled, put it back
 			m.log.Debug().Err(ctx.Err()).Msg("context termination detected in policy dispatch")
 			return
 		case s.ch <- cloned:
@@ -350,9 +385,7 @@ func (m *monitorT) dispatchPending(ctx context.Context) {
 			return
 		}
 
-		m.mut.Lock()
-		s = m.pendingQ.popFront()
-		m.mut.Unlock()
+		s = m.popPending()
 		nQueued++
 	}
 
