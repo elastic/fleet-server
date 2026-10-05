@@ -53,13 +53,16 @@ func QueryLatestPolicies(ctx context.Context, bulker bulk.Bulk, opt ...Option) (
 		return []model.Policy{}, nil
 	}
 	policies := make([]model.Policy, len(policyID.Buckets))
+	// One decoder for the whole result, so that text repeated across the policies is held in
+	// memory only once. See PolicyDecoder.
+	dec := NewPolicyDecoder()
 	for i, bucket := range policyID.Buckets {
 		revisionIdx, ok := bucket.Aggregations[FieldRevisionIdx]
 		if !ok || len(revisionIdx.Hits) != 1 {
 			return nil, ErrMissingAggregations
 		}
 		hit := revisionIdx.Hits[0]
-		err = hit.Unmarshal(&policies[i])
+		err = dec.Decode(hit, &policies[i])
 		if err != nil {
 			return nil, err
 		}
