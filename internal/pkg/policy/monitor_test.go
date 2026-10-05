@@ -10,6 +10,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"runtime"
+	"strings"
 	"sync"
 	"testing"
 	"testing/synctest"
@@ -417,110 +419,86 @@ func Test_Monitor_Limit_Delay(t *testing.T) {
 	})
 }
 
-func Test_Monitor_cancel_pending(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
-	ctx = testlog.SetLogger(t).WithContext(ctx)
+// Test_Monitor_pending_sub_gets_latest_revision ensures that a subscriber waiting in the rate
+// limiter when a new revision arrives receives the new revision, not the one that was current
+// when it was popped from the pending queue.
+func Test_Monitor_pending_sub_gets_latest_revision(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		ctx = testlog.SetLogger(t).WithContext(ctx)
 
-	chHitT := make(chan []es.HitT, 2)
-	defer close(chHitT)
-	ms := mmock.NewMockSubscription()
-	ms.On("Output").Return((<-chan []es.HitT)(chHitT))
-	mm := mmock.NewMockMonitor()
-	mm.On("Subscribe").Return(ms).Once()
-	mm.On("Unsubscribe", mock.Anything).Return().Once()
-	bulker := ftesting.NewMockBulk()
+		chHitT := make(chan []es.HitT, 2)
+		defer close(chHitT)
+		ms := mmock.NewMockSubscription()
+		ms.On("Output").Return((<-chan []es.HitT)(chHitT))
+		mm := mmock.NewMockMonitor()
+		mm.On("Subscribe").Return(ms).Once()
+		mm.On("Unsubscribe", mock.Anything).Return().Once()
 
-	monitor := NewMonitor(bulker, mm, config.ServerLimits{})
-	pm := monitor.(*monitorT)
-	pm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
-		return []model.Policy{}, nil
-	}
-	pm.dispatchCh = make(chan struct{}, 1)
-
-	agentId := uuid.Must(uuid.NewV4()).String()
-	policyId := uuid.Must(uuid.NewV4()).String()
-
-	rId := xid.New().String()
-	policy := model.Policy{
-		ESDocument: model.ESDocument{
-			Id:      rId,
-			Version: 1,
-			SeqNo:   1,
-		},
-		PolicyID:    policyId,
-		Data:        policyDataDefault,
-		RevisionIdx: 1,
-	}
-	policyData, err := json.Marshal(&policy)
-	require.NoError(t, err)
-	policy2 := model.Policy{
-		ESDocument: model.ESDocument{
-			Id:      rId,
-			Version: 1,
-			SeqNo:   1,
-		},
-		PolicyID:    policyId,
-		Data:        policyDataDefault,
-		RevisionIdx: 2,
-	}
-	policyData2, err := json.Marshal(&policy2)
-	require.NoError(t, err)
-
-	// Send both revisions to monitor as as seperate hits
-	chHitT <- []es.HitT{{
-		ID:      rId,
-		SeqNo:   1,
-		Version: 1,
-		Source:  policyData,
-	}}
-	chHitT <- []es.HitT{{
-		ID:      rId,
-		SeqNo:   2,
-		Version: 1,
-		Source:  policyData2,
-	}}
-
-	// start monitor
-	var merr error
-	var mwg sync.WaitGroup
-	mwg.Go(func() {
-		merr = monitor.Run(ctx)
-	})
-	err = monitor.(*monitorT).waitStart(ctx)
-	require.NoError(t, err)
-
-	// subscribe with revision 0
-	s, err := monitor.Subscribe(agentId, policyId, 0)
-	defer monitor.Unsubscribe(s)
-	require.NoError(t, err)
-
-	// This sleep allows the main run to call dispatch
-	// but dispatch will not proceed until there is a signal from the dispatchCh
-	time.Sleep(100 * time.Millisecond)
-	pm.dispatchCh <- struct{}{}
-
-	tm := time.NewTimer(time.Second)
-	policies := make([]*ParsedPolicy, 0, 2)
-LOOP:
-	for {
-		select {
-		case p := <-s.Output():
-			policies = append(policies, p)
-		case <-tm.C:
-			break LOOP
+		// Burst of 1 and a long interval: the first subscriber is dispatched immediately,
+		// the second waits in the rate limiter.
+		monitor := NewMonitor(ftesting.NewMockBulk(), mm, config.ServerLimits{PolicyLimit: config.Limit{Burst: 1, Interval: time.Hour}})
+		pm := monitor.(*monitorT)
+		pm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
+			return []model.Policy{}, nil
 		}
-	}
 
-	cancel()
-	mwg.Wait()
-	if merr != nil && merr != context.Canceled {
-		t.Fatal(merr)
-	}
-	require.Len(t, policies, 1, "expected to recieve one revision")
-	require.Equal(t, policies[0].Policy.RevisionIdx, int64(2))
-	ms.AssertExpectations(t)
-	mm.AssertExpectations(t)
+		var mwg sync.WaitGroup
+		mwg.Go(func() { _ = monitor.Run(ctx) })
+		require.NoError(t, pm.waitStart(ctx))
+
+		policyID := uuid.Must(uuid.NewV4()).String()
+		pm.mut.Lock()
+		pm.policies[policyID] = policyT{head: makeHead()}
+		pm.mut.Unlock()
+
+		subs := make([]Subscription, 2)
+		for i := range subs {
+			sub, err := monitor.Subscribe(uuid.Must(uuid.NewV4()).String(), policyID, 0)
+			require.NoError(t, err)
+			defer monitor.Unsubscribe(sub)
+			subs[i] = sub
+		}
+
+		rId := xid.New().String()
+		hit := func(seqNo, revisionIdx int64) []es.HitT {
+			policyData, err := json.Marshal(&model.Policy{
+				ESDocument:     model.ESDocument{Id: rId, Version: 1, SeqNo: seqNo},
+				PolicyID:       policyID,
+				CoordinatorIdx: 1,
+				Data:           policyDataDefault,
+				RevisionIdx:    revisionIdx,
+			})
+			require.NoError(t, err)
+			return []es.HitT{{ID: rId, SeqNo: seqNo, Version: 1, Source: policyData}}
+		}
+
+		// Revision 1 reaches the first subscriber; the second waits in the limiter.
+		chHitT <- hit(1, 1)
+		select {
+		case p := <-subs[0].Output():
+			require.Equal(t, int64(1), p.Policy.RevisionIdx)
+		case <-time.After(time.Minute):
+			require.Fail(t, "first subscriber was not dispatched")
+		}
+		synctest.Wait()
+
+		// Revision 2 arrives while the second subscriber is waiting for the limiter.
+		chHitT <- hit(2, 2)
+
+		select {
+		case p := <-subs[1].Output():
+			require.Equal(t, int64(2), p.Policy.RevisionIdx, "waiting subscriber must receive the latest revision")
+		case <-time.After(2 * time.Hour):
+			require.Fail(t, "second subscriber was never dispatched")
+		}
+		synctest.Wait()
+		require.Empty(t, subs[1].Output(), "second subscriber must receive exactly one revision")
+
+		cancel()
+		mwg.Wait()
+	})
 }
 
 func TestMonitor_LatestRev(t *testing.T) {
@@ -684,62 +662,9 @@ func TestMonitor_StaleRevisionSkipsSecretResolution(t *testing.T) {
 	assert.Equal(t, int64(8), pm.policies[policyID].pp.Policy.RevisionIdx, "cached revision must not change for stale input")
 }
 
-// Test_Monitor_dispatchPending_cancelKick asserts that a cancelled dispatchPending returns its
-// subscriber to pendingQ and kicks the run loop only if a replacement dispatch already found
-// the queue empty. Otherwise the kick would cancel an active replacement that holds the
-// subscriber, which would requeue and kick again in a cancellation loop.
-func Test_Monitor_dispatchPending_cancelKick(t *testing.T) {
-	for name, tc := range map[string]struct {
-		replacementFoundEmptyQueue bool
-		expectKick                 bool
-	}{
-		"replacement found empty queue": {replacementFoundEmptyQueue: true, expectKick: true},
-		"replacement has not popped":    {replacementFoundEmptyQueue: false, expectKick: false},
-	} {
-		t.Run(name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(t.Context())
-			ctx = testlog.SetLogger(t).WithContext(ctx)
-
-			monitor := NewMonitor(ftesting.NewMockBulk(), mmock.NewMockMonitor(), config.ServerLimits{})
-			pm := monitor.(*monitorT)
-			pm.log = zerolog.Ctx(ctx).With().Logger()
-			if tc.replacementFoundEmptyQueue {
-				// The replacement dispatch runs while the cancelled one holds the subscriber.
-				pm.beforeRequeue = func() { require.Nil(t, pm.popPending()) }
-			}
-
-			policyID := uuid.Must(uuid.NewV4()).String()
-			sub := NewSub(policyID, uuid.Must(uuid.NewV4()).String(), 0)
-			pm.mut.Lock()
-			pm.policies[policyID] = policyT{head: makeHead()}
-			pm.pendingQ.pushBack(sub)
-			pm.mut.Unlock()
-
-			// The context is already cancelled, so the rate limiter wait fails after
-			// the subscriber has been popped from pendingQ.
-			cancel()
-			pm.dispatchPending(ctx)
-
-			pm.mut.Lock()
-			requeued := pm.pendingQ.popFront()
-			pm.mut.Unlock()
-			require.Same(t, sub, requeued, "subscriber must be returned to pendingQ")
-
-			select {
-			case <-pm.deployCh:
-				require.True(t, tc.expectKick, "deploy must not be kicked")
-			default:
-				require.False(t, tc.expectKick, "deploy was not kicked")
-			}
-		})
-	}
-}
-
-// Test_Monitor_cancelled_dispatch_does_not_strand_subscriber reproduces the race where a
-// cancelled dispatchPending (A) has popped a subscriber but not yet returned it to pendingQ
-// when its replacement (B) runs. B finds the queue empty and exits, so the subscriber must be
-// delivered by the extra dispatch that A kicks after returning it.
-func Test_Monitor_cancelled_dispatch_does_not_strand_subscriber(t *testing.T) {
+// Test_Monitor_new_event_does_not_strand_subscriber_in_rate_limiter ensures that a subscriber
+// waiting in the rate limiter when a new event arrives still gets its policy.
+func Test_Monitor_new_event_does_not_strand_subscriber_in_rate_limiter(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -760,15 +685,6 @@ func Test_Monitor_cancelled_dispatch_does_not_strand_subscriber(t *testing.T) {
 		pm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
 			return []model.Policy{}, nil
 		}
-		// Hold the cancelled dispatch right before it returns its subscriber to pendingQ.
-		reached := make(chan struct{})
-		release := make(chan struct{})
-		var once sync.Once
-		pm.beforeRequeue = func() {
-			once.Do(func() { close(reached) })
-			<-release
-		}
-
 		var mwg sync.WaitGroup
 		mwg.Go(func() { _ = monitor.Run(ctx) })
 		require.NoError(t, pm.waitStart(ctx))
@@ -806,19 +722,15 @@ func Test_Monitor_cancelled_dispatch_does_not_strand_subscriber(t *testing.T) {
 		}
 		synctest.Wait()
 
-		// A new event cancels A and starts B. A is held before the push-back, so B pops an empty queue and exits.
+		// A new event arrives while the dispatcher holds subs[1] in the limiter.
 		pm.kickLoad()
-		<-reached
-		synctest.Wait()
 
-		// Let the rate limiter pass so the extra dispatch kicked by A can deliver, then let A push back.
-		pm.limit.SetLimit(rate.Inf)
-		close(release)
-
+		// The limiter allows one send per hour. Within two hours of fake time,
+		// the dispatcher must deliver subs[1].
 		select {
 		case p := <-subs[1].Output():
 			require.Equal(t, int64(1), p.Policy.RevisionIdx)
-		case <-time.After(time.Minute):
+		case <-time.After(2 * time.Hour):
 			require.Fail(t, "second subscriber was stranded in pendingQ")
 		}
 
@@ -827,161 +739,102 @@ func Test_Monitor_cancelled_dispatch_does_not_strand_subscriber(t *testing.T) {
 	})
 }
 
-// Test_Monitor_dispatchPending_limiterDeadlineDoesNotKick asserts that a limiter error that is
-// not a cancellation (the wait would exceed the context deadline) returns the subscriber to
-// pendingQ without kicking when no replacement dispatch missed it.
-func Test_Monitor_dispatchPending_limiterDeadlineDoesNotKick(t *testing.T) {
-	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
-	defer cancel()
-	ctx = testlog.SetLogger(t).WithContext(ctx)
+// Test_Monitor_repeated_events_run_a_single_dispatcher sends a burst of events while a
+// subscriber waits in the rate limiter. Events must not start overlapping dispatchers, since
+// each can miss a subscriber the other holds between popping it from pendingQ and sending to
+// it, and the subscriber must still get its policy.
+func Test_Monitor_repeated_events_run_a_single_dispatcher(t *testing.T) {
+	for range 25 {
+		synctest.Test(t, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			ctx = testlog.SetLogger(t).WithContext(ctx)
 
-	monitor := NewMonitor(ftesting.NewMockBulk(), mmock.NewMockMonitor(), config.ServerLimits{PolicyLimit: config.Limit{Burst: 1, Interval: time.Hour}})
-	pm := monitor.(*monitorT)
-	pm.log = zerolog.Ctx(ctx).With().Logger()
-	require.True(t, pm.limit.Allow(), "consume the limiter burst")
+			chHitT := make(chan []es.HitT, 1)
+			defer close(chHitT)
+			ms := mmock.NewMockSubscription()
+			ms.On("Output").Return((<-chan []es.HitT)(chHitT))
+			mm := mmock.NewMockMonitor()
+			mm.On("Subscribe").Return(ms).Once()
+			mm.On("Unsubscribe", mock.Anything).Return().Once()
 
-	policyID := uuid.Must(uuid.NewV4()).String()
-	sub := NewSub(policyID, uuid.Must(uuid.NewV4()).String(), 0)
-	pm.mut.Lock()
-	pm.policies[policyID] = policyT{head: makeHead()}
-	pm.pendingQ.pushBack(sub)
-	pm.mut.Unlock()
+			// Burst of 1 and a long interval: the first subscriber is dispatched immediately,
+			// the second waits in the rate limiter holding the popped subscriber.
+			monitor := NewMonitor(ftesting.NewMockBulk(), mm, config.ServerLimits{PolicyLimit: config.Limit{Burst: 1, Interval: time.Hour}})
+			pm := monitor.(*monitorT)
+			pm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
+				return []model.Policy{}, nil
+			}
 
-	pm.dispatchPending(ctx)
-	require.NoError(t, ctx.Err(), "context must not be done for this scenario")
+			var mwg sync.WaitGroup
+			mwg.Go(func() { _ = monitor.Run(ctx) })
+			require.NoError(t, pm.waitStart(ctx))
 
-	pm.mut.Lock()
-	requeued := pm.pendingQ.popFront()
-	pm.mut.Unlock()
-	require.Same(t, sub, requeued, "subscriber must be returned to pendingQ")
+			policyID := uuid.Must(uuid.NewV4()).String()
+			pm.mut.Lock()
+			pm.policies[policyID] = policyT{head: makeHead()}
+			pm.mut.Unlock()
 
-	select {
-	case <-pm.deployCh:
-		require.Fail(t, "deploy must not be kicked for a non-cancellation limiter error")
-	default:
+			subs := make([]Subscription, 2)
+			for i := range subs {
+				sub, err := monitor.Subscribe(uuid.Must(uuid.NewV4()).String(), policyID, 0)
+				require.NoError(t, err)
+				defer monitor.Unsubscribe(sub)
+				subs[i] = sub
+			}
+
+			rId := xid.New().String()
+			policy := model.Policy{
+				ESDocument:     model.ESDocument{Id: rId, Version: 1, SeqNo: 1},
+				PolicyID:       policyID,
+				CoordinatorIdx: 1,
+				Data:           policyDataDefault,
+				RevisionIdx:    1,
+			}
+			policyData, err := json.Marshal(&policy)
+			require.NoError(t, err)
+			chHitT <- []es.HitT{{ID: rId, SeqNo: 1, Version: 1, Source: policyData}}
+
+			select {
+			case <-subs[0].Output():
+			case <-time.After(time.Minute):
+				require.Fail(t, "first subscriber was not dispatched")
+			}
+			synctest.Wait() // the dispatcher holds subs[1], rate waiting
+
+			// Fire events back to back, without waiting for the run loop to settle between them.
+			// At most one dispatchPending may be running at any time: overlapping dispatchers can
+			// each miss a subscriber the other one holds.
+			maxDispatchers := 0
+			for range 50 {
+				pm.kickLoad()
+				runtime.Gosched()
+				maxDispatchers = max(maxDispatchers, countDispatchers())
+			}
+			require.LessOrEqual(t, maxDispatchers, 1, "dispatchPending ran concurrently")
+
+			select {
+			case p := <-subs[1].Output():
+				require.Equal(t, int64(1), p.Policy.RevisionIdx)
+			case <-time.After(2 * time.Hour):
+				require.Fail(t, "second subscriber was stranded in pendingQ")
+			}
+
+			cancel()
+			mwg.Wait()
+		})
 	}
 }
 
-// Test_Monitor_requeue_kick_cancels_replacement_before_pop covers the interleaving where the kick
-// from a cancelled dispatch A (which requeues after a replacement B found the queue empty)
-// cancels replacement C before C has popped. C then pops under a cancelled context and requeues
-// without kicking, so the subscribers must be delivered by dispatch D, which A's kick starts.
-// The test holds C and D before their first pop and releases them in both orders.
-func Test_Monitor_requeue_kick_cancels_replacement_before_pop(t *testing.T) {
-	for name, releaseCFirst := range map[string]bool{"release C then D": true, "release D then C": false} {
-		t.Run(name, func(t *testing.T) {
-			synctest.Test(t, func(t *testing.T) {
-				ctx, cancel := context.WithCancel(context.Background())
-				defer cancel()
-				ctx = testlog.SetLogger(t).WithContext(ctx)
-
-				chHitT := make(chan []es.HitT, 1)
-				defer close(chHitT)
-				ms := mmock.NewMockSubscription()
-				ms.On("Output").Return((<-chan []es.HitT)(chHitT))
-				mm := mmock.NewMockMonitor()
-				mm.On("Subscribe").Return(ms).Once()
-				mm.On("Unsubscribe", mock.Anything).Return().Once()
-
-				monitor := NewMonitor(ftesting.NewMockBulk(), mm, config.ServerLimits{PolicyLimit: config.Limit{Burst: 1, Interval: time.Hour}})
-				pm := monitor.(*monitorT)
-				pm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
-					return []model.Policy{}, nil
-				}
-
-				// Dispatch ids in start order: 1=A (hit), 2=B (kickLoad), 3=C (subscribe), 4=D (A's kick).
-				gates := map[int]chan struct{}{3: make(chan struct{}), 4: make(chan struct{})}
-				var gmu sync.Mutex
-				n := 0
-				pm.beforePop = func() {
-					gmu.Lock()
-					n++
-					g := gates[n]
-					gmu.Unlock()
-					if g != nil {
-						<-g
-					}
-				}
-				reached := make(chan struct{})
-				release := make(chan struct{})
-				var once sync.Once
-				pm.beforeRequeue = func() {
-					once.Do(func() { close(reached) })
-					<-release
-				}
-
-				var mwg sync.WaitGroup
-				mwg.Go(func() { _ = monitor.Run(ctx) })
-				require.NoError(t, pm.waitStart(ctx))
-
-				policyID := uuid.Must(uuid.NewV4()).String()
-				pm.mut.Lock()
-				pm.policies[policyID] = policyT{head: makeHead()}
-				pm.mut.Unlock()
-
-				subs := make([]Subscription, 2)
-				for i := range subs {
-					sub, err := monitor.Subscribe(uuid.Must(uuid.NewV4()).String(), policyID, 0)
-					require.NoError(t, err)
-					defer monitor.Unsubscribe(sub)
-					subs[i] = sub
-				}
-				rId := xid.New().String()
-				policy := model.Policy{
-					ESDocument:     model.ESDocument{Id: rId, Version: 1, SeqNo: 1},
-					PolicyID:       policyID,
-					CoordinatorIdx: 1,
-					Data:           policyDataDefault,
-					RevisionIdx:    1,
-				}
-				policyData, err := json.Marshal(&policy)
-				require.NoError(t, err)
-				chHitT <- []es.HitT{{ID: rId, SeqNo: 1, Version: 1, Source: policyData}}
-
-				select {
-				case <-subs[0].Output():
-				case <-time.After(time.Minute):
-					require.Fail(t, "first subscriber was not dispatched")
-				}
-				synctest.Wait() // A holds subs[1], rate waiting
-
-				pm.kickLoad() // cancels A (held before requeue); B pops empty
-				<-reached
-				synctest.Wait()
-
-				// New subscriber needing the policy enqueues S and starts C, held before its pop.
-				sub3, err := monitor.Subscribe(uuid.Must(uuid.NewV4()).String(), policyID, 0)
-				require.NoError(t, err)
-				defer monitor.Unsubscribe(sub3)
-				synctest.Wait()
-
-				pm.limit.SetLimit(rate.Inf)
-				close(release) // A requeues; kicks if emptyPop; Run cancels C and starts D (held)
-				synctest.Wait()
-
-				if releaseCFirst {
-					close(gates[3])
-					synctest.Wait()
-					close(gates[4])
-				} else {
-					close(gates[4])
-					synctest.Wait()
-					close(gates[3])
-				}
-
-				for i, sub := range []Subscription{subs[1], sub3} {
-					select {
-					case <-sub.Output():
-					case <-time.After(time.Minute):
-						require.FailNowf(t, "stranded", "subscriber %d was never dispatched", i)
-					}
-				}
-				gmu.Lock()
-				require.Equal(t, 4, n, "A's kick must have started dispatch D")
-				gmu.Unlock()
-				cancel()
-				mwg.Wait()
-			})
-		})
+// countDispatchers returns how many goroutines are currently inside (*monitorT).dispatchPending.
+func countDispatchers() int {
+	buf := make([]byte, 1<<20)
+	buf = buf[:runtime.Stack(buf, true)]
+	n := 0
+	for g := range strings.SplitSeq(string(buf), "\n\n") {
+		if strings.Contains(g, "(*monitorT).dispatchPending(") {
+			n++
+		}
 	}
+	return n
 }
