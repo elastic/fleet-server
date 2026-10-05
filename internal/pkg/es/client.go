@@ -9,6 +9,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"math"
 	"math/rand"
 	"net"
 	"net/http"
@@ -78,22 +79,34 @@ func defaultRetryOnError(req *http.Request, err error) bool {
 		shouldRetryTimeoutForCreate(req, err)
 }
 
-// exponentialBackoffFromAttempt computes a jittered exponential back-off
-// duration using the cenkalti/backoff defaults (multiplier 1.5, same initial
-// and max intervals as the client constants).  It derives the duration purely
-// from the attempt counter, so it carries no shared mutable state and is safe
-// for concurrent use across multiple in-flight requests.
-func exponentialBackoffFromAttempt(attempt int) time.Duration {
-	interval := float64(initialRetryBackoff)
+// exponentialBackoffDelay computes a jittered exponential back-off delay from
+// the attempt counter alone (attempt starts at 1), so it carries no shared
+// mutable state and is safe for concurrent use across in-flight requests. The
+// result is clamped to the representable time.Duration range, mirroring
+// backoff.ExponentialBackOff's overflow handling.
+func exponentialBackoffDelay(attempt int, initial, maxInterval time.Duration, multiplier, randomization float64) time.Duration {
+	interval := float64(initial)
 	for i := 1; i < attempt; i++ {
-		interval *= backoff.DefaultMultiplier
-		if interval > float64(maxRetryBackoff) {
-			interval = float64(maxRetryBackoff)
+		interval *= multiplier
+		if interval > float64(maxInterval) {
+			interval = float64(maxInterval)
 			break
 		}
 	}
-	delta := randomizationFactor * interval
-	return time.Duration(interval-delta) + time.Duration(rand.Float64()*2*delta) //nolint:gosec // non-cryptographic jitter
+	delta := randomization * interval
+	d := interval - delta + rand.Float64()*2*delta //nolint:gosec // non-cryptographic jitter
+	switch {
+	case d != d || d <= 0: // NaN or non-positive
+		return 0
+	case d >= math.MaxInt64:
+		return time.Duration(math.MaxInt64)
+	}
+	return time.Duration(d)
+}
+
+// exponentialBackoffFromAttempt is the default retry backoff schedule.
+func exponentialBackoffFromAttempt(attempt int) time.Duration {
+	return exponentialBackoffDelay(attempt, initialRetryBackoff, maxRetryBackoff, backoff.DefaultMultiplier, randomizationFactor)
 }
 
 func defaultOptions(disableRetry bool, retryPred func(*http.Request, error) bool, retryStatuses []int, maxRetries int) []elasticsearch.Option {
@@ -293,16 +306,7 @@ func WithBackoff(cfg *backoff.ExponentialBackOff) ConfigOption {
 	randomFactor := cfg.RandomizationFactor
 	return newESOption(elasticsearch.WithTransportOptions(
 		elastictransport.WithRetryBackoff(func(attempt int) time.Duration {
-			interval := float64(initialInterval)
-			for i := 1; i < attempt; i++ {
-				interval *= multiplier
-				if interval > float64(maxInterval) {
-					interval = float64(maxInterval)
-					break
-				}
-			}
-			delta := randomFactor * interval
-			return time.Duration(interval-delta) + time.Duration(rand.Float64()*2*delta) //nolint:gosec // non-cryptographic jitter
+			return exponentialBackoffDelay(attempt, initialInterval, maxInterval, multiplier, randomFactor)
 		}),
 	))
 }

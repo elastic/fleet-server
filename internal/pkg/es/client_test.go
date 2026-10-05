@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -618,32 +619,29 @@ func TestExponentialBackoffFromAttemptSchedule(t *testing.T) {
 // client using WithBackoff and the default backoff; run with -race to catch
 // shared mutable backoff state.
 func TestRetryBackoffConcurrent(t *testing.T) {
-	newRT := func() roundTripFunc {
-		return func(_ *http.Request) (*http.Response, error) { return nil, syscall.ECONNREFUSED }
-	}
 	tmpl := backoff.NewExponentialBackOff()
 	tmpl.InitialInterval = time.Millisecond
 	tmpl.MaxInterval = 5 * time.Millisecond
 
-	cases := map[string][]ConfigOption{
-		"default":     {},
-		"WithBackoff": {WithBackoff(tmpl)},
+	cases := []struct {
+		name    string
+		retries int
+		extra   []ConfigOption
+	}{
+		// Uses the production backoff callback wired by defaultOptions; one
+		// retry keeps the real ~500ms delay short.
+		{name: "default", retries: 1},
+		{name: "WithBackoff", retries: 3, extra: []ConfigOption{WithBackoff(tmpl)}},
 	}
-	for name, extra := range cases {
-		t.Run(name, func(t *testing.T) {
-			rt := newRT()
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			rt := roundTripFunc(func(_ *http.Request) (*http.Response, error) { return nil, syscall.ECONNREFUSED })
+			cfg := minimalESCfg()
+			cfg.Output.Elasticsearch.MaxRetries = tc.retries
 			opts := append([]ConfigOption{
 				{rtWrap: func(_ http.RoundTripper) http.RoundTripper { return rt }},
-				WithMaxRetries(3),
-			}, extra...)
-			if name == "default" {
-				opts = append(opts, NewConfigOption(elasticsearch.WithTransportOptions(
-					elastictransport.WithRetryBackoff(func(a int) time.Duration {
-						return exponentialBackoffFromAttempt(a) / 1000
-					}),
-				)))
-			}
-			client, err := NewClient(t.Context(), minimalESCfg(), false, opts...)
+			}, tc.extra...)
+			client, err := NewClient(t.Context(), cfg, false, opts...)
 			require.NoError(t, err)
 
 			var wg sync.WaitGroup
@@ -655,5 +653,17 @@ func TestRetryBackoffConcurrent(t *testing.T) {
 			}
 			wg.Wait()
 		})
+	}
+}
+
+// TestExponentialBackoffDelayOverflow verifies large intervals clamp to the
+// maximum Duration instead of overflowing to a negative (immediate) delay.
+func TestExponentialBackoffDelayOverflow(t *testing.T) {
+	maxD := time.Duration(math.MaxInt64)
+	for range 100 {
+		d := exponentialBackoffDelay(1, maxD, maxD, backoff.DefaultMultiplier, backoff.DefaultRandomizationFactor)
+		require.Positive(t, d)
+		d = exponentialBackoffDelay(50, maxD, maxD, backoff.DefaultMultiplier, backoff.DefaultRandomizationFactor)
+		require.Positive(t, d)
 	}
 }
