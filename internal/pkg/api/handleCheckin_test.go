@@ -195,6 +195,11 @@ func TestConvertActionData(t *testing.T) {
 		expect: Action_Data{},
 		hasErr: false,
 	}, {
+		name:   "restart action",
+		aType:  RESTART,
+		expect: Action_Data{},
+		hasErr: false,
+	}, {
 		name:   "migrate action - nil input fails",
 		aType:  MIGRATE,
 		raw:    nil,
@@ -350,6 +355,9 @@ func TestFilterActions(t *testing.T) {
 		}, {
 			ActionID: "5678",
 			Type:     "UNENROLL",
+		}, {
+			ActionID: "9012",
+			Type:     "RESTART",
 		}},
 		resp: []model.Action{{
 			ActionID: "1234",
@@ -357,6 +365,9 @@ func TestFilterActions(t *testing.T) {
 		}, {
 			ActionID: "5678",
 			Type:     "UNENROLL",
+		}, {
+			ActionID: "9012",
+			Type:     "RESTART",
 		}},
 	}, {
 		name: "filter POLICY_CHANGE action",
@@ -1988,7 +1999,7 @@ func TestProcessPolicyRemoteESServiceTokenSecretPaths(t *testing.T) {
 		},
 	}
 
-	action, err := processPolicy(t.Context(), logger, bulker, agent, pp, nil)
+	action, _, err := processPolicy(t.Context(), logger, bulker, agent, pp, nil)
 	require.NoError(t, err)
 
 	pc, err := action.Data.AsActionPolicyChange()
@@ -2002,6 +2013,119 @@ func TestProcessPolicyRemoteESServiceTokenSecretPaths(t *testing.T) {
 	_, hasServiceToken := remotePolicy["service_token"]
 	assert.False(t, hasServiceToken, "service_token should be deleted by Prepare before delivery to agents")
 	assert.Equal(t, policy.OutputTypeElasticsearch, remotePolicy["type"])
+}
+
+// TestProcessPolicyAgentTags ensures that processPolicy injects the agent tags and records their hash
+// only when agent.features.include_tags_in_events.enabled is true.
+func TestProcessPolicyAgentTags(t *testing.T) {
+	logger := testlog.SetLogger(t)
+
+	flagOn := func() map[string]any {
+		return map[string]any{"features": map[string]any{"include_tags_in_events": map[string]any{"enabled": true}}}
+	}
+
+	abHash, err := (&model.Agent{Tags: []string{"a", "b"}}).ComputeTagsHash()
+	require.NoError(t, err)
+
+	tests := []struct {
+		name         string
+		agentSection map[string]any
+		tags         []string
+		tagsHash     string
+		wantTags     []any
+		wantUpdate   bulk.UpdateFields
+	}{
+		{
+			name:       "no agent section",
+			tags:       []string{"a", "b"},
+			wantTags:   []any{"a", "b"},
+			wantUpdate: bulk.UpdateFields{dl.FieldTagsHash: abHash},
+		},
+		{
+			name:         "flag off",
+			agentSection: map[string]any{},
+			tags:         []string{"a", "b"},
+			wantTags:     []any{"a", "b"},
+			wantUpdate:   bulk.UpdateFields{dl.FieldTagsHash: abHash},
+		},
+		{
+			name:         "flag on, same hash",
+			agentSection: flagOn(),
+			tags:         []string{"a", "b"},
+			tagsHash:     abHash,
+			wantTags:     []any{"a", "b"},
+		},
+		{
+			name:         "unsorted duplicate tags",
+			agentSection: flagOn(),
+			tags:         []string{"b", "a", "b"},
+			tagsHash:     abHash,
+			wantTags:     []any{"a", "b"},
+		},
+		{
+			name:         "tags removed",
+			agentSection: flagOn(),
+			tagsHash:     abHash,
+			wantUpdate:   bulk.UpdateFields{dl.FieldTagsHash: ""},
+		},
+		{
+			name:         "no tags, no hash",
+			agentSection: flagOn(),
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			d := model.PolicyData{
+				Outputs: map[string]map[string]any{
+					"default": {"type": "elasticsearch", "hosts": []any{"https://local.es.example:443"}},
+				},
+				OutputPermissions: json.RawMessage(`{"default": {"_fallback": {"cluster": ["monitor"]}}}`),
+				Agent:             tc.agentSection,
+			}
+
+			bulker := ftesting.NewMockBulk()
+			pp, err := policy.NewParsedPolicy(t.Context(), bulker, model.Policy{
+				PolicyID:    "policy1",
+				RevisionIdx: 1,
+				Data:        &d,
+			})
+			require.NoError(t, err)
+			defaultOut := pp.Outputs["default"]
+			require.NotNil(t, defaultOut.Role)
+
+			apiKey := bulk.APIKey{ID: "default-id", Key: "default-key"}
+			agent := &model.Agent{
+				ESDocument: model.ESDocument{Id: "agent1"},
+				Tags:       tc.tags,
+				TagsHash:   tc.tagsHash,
+				Outputs: map[string]*model.PolicyOutput{
+					"default": {
+						APIKey:          apiKey.Agent(),
+						APIKeyID:        apiKey.ID,
+						PermissionsHash: defaultOut.Role.Sha2,
+						Type:            policy.OutputTypeElasticsearch,
+					},
+				},
+			}
+
+			action, agentUpdate, err := processPolicy(t.Context(), logger, bulker, agent, pp.Clone(), nil)
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantUpdate, agentUpdate)
+			bulker.AssertNotCalled(t, "Update", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything, mock.Anything)
+			_, cachedHasTags := pp.Policy.Data.Agent["tags"]
+			assert.False(t, cachedHasTags, "processPolicy must not change the agent section of the cached policy")
+
+			pc, err := action.Data.AsActionPolicyChange()
+			require.NoError(t, err)
+			assert.Equal(t, tc.agentSection["features"], pc.Policy.Agent["features"], "agent.features must reach the agent unchanged")
+			tags, hasTags := pc.Policy.Agent["tags"]
+			if tc.wantTags == nil {
+				assert.False(t, hasTags, "agent.tags must be absent, got %v", tags)
+				return
+			}
+			assert.Equal(t, tc.wantTags, tags)
+		})
+	}
 }
 
 // TestProcessPolicySecretPathsConcurrentDispatch ensures processPolicy does not
@@ -2069,7 +2193,7 @@ func TestProcessPolicySecretPathsConcurrentDispatch(t *testing.T) {
 			},
 		}
 		wg.Go(func() {
-			action, err := processPolicy(t.Context(), logger, bulker, agent, pp.Clone(), nil)
+			action, _, err := processPolicy(t.Context(), logger, bulker, agent, pp.Clone(), nil)
 			if err != nil {
 				errs[a] = err
 				return

@@ -553,6 +553,7 @@ components:
             - $ref: "#/components/schemas/actionInputAction"
             - $ref: "#/components/schemas/actionMigrate"
             - $ref: "#/components/schemas/actionPrivilegeLevelChange"
+            - $ref: "#/components/schemas/actionRestart"
         id:
           description: The action ID.
           type: string
@@ -579,6 +580,7 @@ components:
             - "REQUEST_DIAGNOSTICS"
             - "MIGRATE"
             - "PRIVILEGE_LEVEL_CHANGE"
+            - "RESTART"
           x-go-custom-tag: yaml:"type" # openapi-generator
           x-oapi-codegen-extra-tags: # oapi-codegen tags
             yaml: "type"
@@ -698,6 +700,9 @@ components:
     actionUnenroll:
       description: The UNENROLL action data.
       # unenroll actions have no `data` attribute
+    actionRestart:
+      description: The RESTART action data.
+      # restart actions have no `data` attribute
     actionRequestDiagnostics:
       description: The REQUEST_DIAGNOSTICS action data.
       properties:
