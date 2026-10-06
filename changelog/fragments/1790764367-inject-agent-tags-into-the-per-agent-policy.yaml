@@ -1,0 +1,11 @@
+kind: enhancement
+
+summary: Inject the agent tags into the per-agent policy
+
+description: |
+  Fleet Server now includes the agent tags in the policy so agents can add
+  them to their events.
+
+component: fleet-server
+
+issue: https://github.com/elastic/fleet-server/issues/7321

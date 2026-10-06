@@ -664,6 +664,10 @@
             "type": "string"
           }
         },
+        "tags_hash": {
+          "description": "Hash of the tags last sent to the Elastic Agent in the agent.tags policy key",
+          "type": "string"
+        },
         "local_metadata": {
           "description": "Local metadata information for the Elastic Agent",
           "format": "raw"
