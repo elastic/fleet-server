@@ -7,11 +7,17 @@ package policy
 import (
 	"maps"
 	"regexp"
+	"strconv"
+	"strings"
 )
 
 const (
 	fieldCondition = "condition"
 	fieldStreams   = "streams"
+
+	secretKeyInputsPrefix = "inputs."
+	secretKeyStreamsInfix = fieldStreams + "."
+	removed               = -1
 )
 
 // agentIDConditionRE matches the only condition shape pruned server-side:
@@ -22,59 +28,75 @@ var agentIDConditionRE = regexp.MustCompile(`^\s*\$\{agent\.id\}\s*==\s*'([^'\\\
 
 // FilterInputsForAgent removes inputs and streams whose condition pins them to
 // a different agent id, mirroring what Elastic Agent does after receiving the
-// policy (an input left with no streams is removed). It never mutates inputs:
-// the elements are shared between all agents of a policy, so changed inputs are
-// copied, and the original slice is returned when nothing is pruned.
-func FilterInputsForAgent(inputs []map[string]any, agentID string) []map[string]any {
+// policy (an input left with no streams is removed).
+//
+// secretKeys holds the paths of injected secrets ("inputs.<i>.streams.<j>...").
+// Pruning shifts indexes, so paths of removed entries are dropped and the rest
+// are renumbered to keep pointing at the same values.
+//
+// It never mutates its arguments: input elements are shared between all agents
+// of a policy, so changed inputs are copied. When nothing is pruned both
+// arguments are returned as is.
+func FilterInputsForAgent(inputs []map[string]any, secretKeys []string, agentID string) ([]map[string]any, []string) {
 	out := make([]map[string]any, 0, len(inputs))
+	inputIdx := make([]int, len(inputs))
+	streamIdx := make(map[int][]int)
 	changed := false
-	for _, input := range inputs {
-		filtered, keep := filterInput(input, agentID)
+
+	for i, input := range inputs {
+		filtered, sIdx, keep := filterInput(input, agentID)
 		if !keep {
+			inputIdx[i] = removed
 			changed = true
 			continue
 		}
+		inputIdx[i] = len(out)
 		if filtered != nil {
-			changed = true
 			input = filtered
+			streamIdx[i] = sIdx
+			changed = true
 		}
 		out = append(out, input)
 	}
 	if !changed {
-		return inputs
+		return inputs, secretKeys
 	}
-	return out
+	return out, remapSecretKeys(secretKeys, inputIdx, streamIdx)
 }
 
 // filterInput returns keep=false when the input must be dropped. A non-nil
-// map is a modified copy; nil means the original input is used as is.
-func filterInput(input map[string]any, agentID string) (map[string]any, bool) {
+// map is a modified copy, along with the new index of each original stream
+// (or removed); nil means the original input is used as is.
+func filterInput(input map[string]any, agentID string) (map[string]any, []int, bool) {
 	if pinnedToOtherAgent(input[fieldCondition], agentID) {
-		return nil, false
+		return nil, nil, false
 	}
 
 	streams, ok := input[fieldStreams].([]any)
 	if !ok || len(streams) == 0 {
-		return nil, true
+		return nil, nil, true
 	}
 
 	kept := make([]any, 0, len(streams))
-	for _, s := range streams {
+	idx := make([]int, len(streams))
+	for j, s := range streams {
 		if stream, ok := s.(map[string]any); ok && pinnedToOtherAgent(stream[fieldCondition], agentID) {
+			idx[j] = removed
 			continue
 		}
+		idx[j] = len(kept)
 		kept = append(kept, s)
 	}
 	switch len(kept) {
 	case len(streams):
-		return nil, true
+		return nil, nil, true
 	case 0:
-		return nil, false
+		return nil, nil, false
 	}
 
 	cp := maps.Clone(input)
 	cp[fieldStreams] = kept
-	return cp, true
+	return cp, idx, true
 }
 
 func pinnedToOtherAgent(condition any, agentID string) bool {
@@ -84,4 +106,63 @@ func pinnedToOtherAgent(condition any, agentID string) bool {
 	}
 	m := agentIDConditionRE.FindStringSubmatch(s)
 	return m != nil && m[1] != agentID
+}
+
+// remapSecretKeys rewrites "inputs.<i>[.streams.<j>].<rest>" paths using the
+// old-to-new index maps. Other keys (outputs, fleet, ...) pass through.
+func remapSecretKeys(keys []string, inputIdx []int, streamIdx map[int][]int) []string {
+	out := make([]string, 0, len(keys))
+	for _, key := range keys {
+		if k, ok := remapSecretKey(key, inputIdx, streamIdx); ok {
+			out = append(out, k)
+		}
+	}
+	return out
+}
+
+func remapSecretKey(key string, inputIdx []int, streamIdx map[int][]int) (string, bool) {
+	rest, ok := strings.CutPrefix(key, secretKeyInputsPrefix)
+	if !ok {
+		return key, true
+	}
+	i, rest, ok := cutIndex(rest)
+	if !ok || i >= len(inputIdx) {
+		return key, true
+	}
+	ni := inputIdx[i]
+	if ni == removed {
+		return "", false
+	}
+
+	prefix := secretKeyInputsPrefix + strconv.Itoa(ni)
+	sIdx := streamIdx[i]
+	streamRest, isStream := strings.CutPrefix(rest, secretKeyStreamsInfix)
+	if sIdx == nil || !isStream {
+		if rest == "" {
+			return prefix, true
+		}
+		return prefix + "." + rest, true
+	}
+	j, tail, ok := cutIndex(streamRest)
+	if !ok || j >= len(sIdx) {
+		return prefix + "." + rest, true
+	}
+	if sIdx[j] == removed {
+		return "", false
+	}
+	out := prefix + "." + secretKeyStreamsInfix + strconv.Itoa(sIdx[j])
+	if tail != "" {
+		out += "." + tail
+	}
+	return out, true
+}
+
+// cutIndex splits "<n>[.<rest>]" into n and rest.
+func cutIndex(s string) (int, string, bool) {
+	head, rest, _ := strings.Cut(s, ".")
+	n, err := strconv.Atoi(head)
+	if err != nil || n < 0 {
+		return 0, "", false
+	}
+	return n, rest, true
 }

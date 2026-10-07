@@ -59,7 +59,7 @@ func TestFilterInputsForAgent(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got := FilterInputsForAgent(tc.inputs, self)
+			got, _ := FilterInputsForAgent(tc.inputs, nil, self)
 			ids := make([]string, 0, len(got))
 			for _, in := range got {
 				id, ok := in["id"].(string)
@@ -94,7 +94,7 @@ func TestFilterInputsForAgent_Streams(t *testing.T) {
 		{"id": "no-streams", "streams": []any{}},
 	}
 
-	got := FilterInputsForAgent(inputs, self)
+	got, _ := FilterInputsForAgent(inputs, nil, self)
 
 	require.Len(t, got, 3)
 	assert.Equal(t, "mixed", got[0]["id"])
@@ -112,7 +112,56 @@ func TestFilterInputsForAgent_NothingPrunedReturnsOriginal(t *testing.T) {
 		{"id": "a", "condition": "${agent.id} == 'agent-1'"},
 		{"id": "b"},
 	}
-	got := FilterInputsForAgent(inputs, "agent-1")
+	got, _ := FilterInputsForAgent(inputs, nil, "agent-1")
 	require.Len(t, got, 2)
 	assert.Same(t, &inputs[0], &got[0])
+}
+
+func TestFilterInputsForAgent_RemapsSecretKeys(t *testing.T) {
+	const self = "agent-1"
+	mine := "${agent.id} == 'agent-1'"
+	other := "${agent.id} == 'agent-2'"
+	stream := func(cond string) any { return map[string]any{"condition": cond} }
+
+	inputs := []map[string]any{
+		{"id": "removed", "condition": other},
+		{"id": "kept", "streams": []any{stream(other), stream(mine), stream("")}},
+		{"id": "plain"},
+		{"id": "all-streams-removed", "streams": []any{stream(other)}},
+		{"id": "last"},
+	}
+	keys := []string{
+		"outputs.default.ssl.key",
+		"inputs.0.var",
+		"inputs.1.var",
+		"inputs.1.streams.0.var",
+		"inputs.1.streams.1.var",
+		"inputs.1.streams.2.nested.0.var",
+		"inputs.2.var",
+		"inputs.3.streams.0.var",
+		"inputs.4",
+		"inputs.9.out-of-range",
+		"fleet.hosts",
+	}
+
+	gotInputs, gotKeys := FilterInputsForAgent(inputs, keys, self)
+
+	require.Len(t, gotInputs, 3)
+	assert.Equal(t, []string{
+		"outputs.default.ssl.key",
+		"inputs.0.var",
+		"inputs.0.streams.0.var",
+		"inputs.0.streams.1.nested.0.var",
+		"inputs.1.var",
+		"inputs.2",
+		"inputs.9.out-of-range",
+		"fleet.hosts",
+	}, gotKeys)
+	assert.Len(t, keys, 11, "input keys must not be mutated")
+}
+
+func TestFilterInputsForAgent_NothingPrunedKeepsSecretKeys(t *testing.T) {
+	keys := []string{"inputs.0.var"}
+	_, got := FilterInputsForAgent([]map[string]any{{"id": "a"}}, keys, "agent-1")
+	assert.Equal(t, keys, got)
 }

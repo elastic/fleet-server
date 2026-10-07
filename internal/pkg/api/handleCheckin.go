@@ -1242,7 +1242,7 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 
 	// Replace raw inputs with the secret-substituted version built during policy parsing,
 	// minus inputs pinned to other agents so each agent only receives its own share.
-	pp.Policy.Data.Inputs = policy.FilterInputsForAgent(pp.Inputs, agent.Id)
+	pp.Policy.Data.Inputs, pp.SecretKeys = policy.FilterInputsForAgent(pp.Inputs, pp.SecretKeys, agent.Id)
 
 	// Add the agent tags to the policy.
 	agentUpdate, err := prepareAgentTags(pp.Policy.Data, agent)
