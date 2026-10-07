@@ -554,6 +554,7 @@ components:
             - $ref: "#/components/schemas/actionMigrate"
             - $ref: "#/components/schemas/actionPrivilegeLevelChange"
             - $ref: "#/components/schemas/actionUninstall"
+            - $ref: "#/components/schemas/actionRestart"
         id:
           description: The action ID.
           type: string
@@ -581,6 +582,7 @@ components:
             - "MIGRATE"
             - "PRIVILEGE_LEVEL_CHANGE"
             - "UNINSTALL"
+            - "RESTART"
           x-go-custom-tag: yaml:"type" # openapi-generator
           x-oapi-codegen-extra-tags: # oapi-codegen tags
             yaml: "type"
@@ -703,6 +705,9 @@ components:
     actionUninstall:
       description: The UNINSTALL action data.
       # uninstall actions have no `data` attribute
+    actionRestart:
+      description: The RESTART action data.
+      # restart actions have no `data` attribute
     actionRequestDiagnostics:
       description: The REQUEST_DIAGNOSTICS action data.
       properties:

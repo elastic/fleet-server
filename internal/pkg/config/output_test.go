@@ -25,15 +25,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/go-elasticsearch/v8"
-
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 )
 
-func TestToESConfig(t *testing.T) {
+func TestToESTransportConfig(t *testing.T) {
 	testcases := map[string]struct {
 		cfg    Elasticsearch
-		result elasticsearch.Config
+		result ESTransportConfig
 	}{
 		"http": {
 			cfg: Elasticsearch{
@@ -44,7 +42,7 @@ func TestToESConfig(t *testing.T) {
 				MaxConnPerHost: 128,
 				Timeout:        90 * time.Second,
 			},
-			result: elasticsearch.Config{
+			result: ESTransportConfig{
 				Addresses:    []string{"http://localhost:9200"},
 				ServiceToken: "test-token",
 				Header:       http.Header{},
@@ -70,7 +68,7 @@ func TestToESConfig(t *testing.T) {
 				MaxConnPerHost:   128,
 				Timeout:          90 * time.Second,
 			},
-			result: elasticsearch.Config{
+			result: ESTransportConfig{
 				Addresses:    []string{"http://localhost:9200"},
 				ServiceToken: "test-token",
 				Header:       http.Header{},
@@ -98,7 +96,7 @@ func TestToESConfig(t *testing.T) {
 				MaxConnPerHost: 256,
 				Timeout:        120 * time.Second,
 			},
-			result: elasticsearch.Config{
+			result: ESTransportConfig{
 				Addresses:    []string{"http://localhost:9200", "http://other-host:9200"},
 				ServiceToken: "test-token",
 				Header:       http.Header{"X-Custom-Header": {"Header-Value"}},
@@ -129,7 +127,7 @@ func TestToESConfig(t *testing.T) {
 					VerificationMode: tlscommon.VerifyNone,
 				},
 			},
-			result: elasticsearch.Config{
+			result: ESTransportConfig{
 				Addresses:    []string{"https://localhost:9200", "https://other-host:9200"},
 				ServiceToken: "test-token",
 				Header:       http.Header{"X-Custom-Header": {"Header-Value"}},
@@ -167,7 +165,7 @@ func TestToESConfig(t *testing.T) {
 					VerificationMode: tlscommon.VerifyNone,
 				},
 			},
-			result: elasticsearch.Config{
+			result: ESTransportConfig{
 				Addresses:    []string{"http://localhost:9200", "https://other-host:9200"},
 				ServiceToken: "test-token",
 				Header:       http.Header{"X-Custom-Header": {"Header-Value"}},
@@ -201,18 +199,17 @@ func TestToESConfig(t *testing.T) {
 	for name, test := range testcases {
 		t.Run(name, func(t *testing.T) {
 			_ = testlog.SetLogger(t)
-			res, err := test.cfg.ToESConfig(false)
+			res, err := test.cfg.ToESTransportConfig(false)
 			require.NoError(t, err)
 
 			// cmp.Diff can't handle function pointers.
-			transport := res.Transport.(*http.Transport)
-			transport.Proxy = nil
-			if transport.TLSClientConfig != nil {
-				transport.TLSClientConfig.VerifyConnection = nil
+			res.Transport.Proxy = nil
+			if res.Transport.TLSClientConfig != nil {
+				res.Transport.TLSClientConfig.VerifyConnection = nil
 			}
 
 			test.result.Header.Set("X-elastic-product-origin", "fleet")
-			assert.True(t, cmp.Equal(test.result, res, copts...), "mismatch (-want +got)\n%s", cmp.Diff(test.result, res, copts...))
+			assert.True(t, cmp.Equal(test.result, *res, copts...), "mismatch (-want +got)\n%s", cmp.Diff(test.result, *res, copts...))
 		})
 	}
 
@@ -226,10 +223,10 @@ func TestToESConfig(t *testing.T) {
 			MaxConnPerHost:   128,
 			Timeout:          90 * time.Second,
 		}
-		es, err := cfg.ToESConfig(false)
+		res, err := cfg.ToESTransportConfig(false)
 		require.NoError(t, err)
 
-		expect := elasticsearch.Config{
+		expect := ESTransportConfig{
 			Addresses:    []string{"http://localhost:9200"},
 			ServiceToken: "test-token",
 			Header:       http.Header{"X-Elastic-Product-Origin": []string{"fleet"}},
@@ -245,8 +242,8 @@ func TestToESConfig(t *testing.T) {
 			},
 		}
 
-		es.Transport.(*http.Transport).Proxy = nil
-		assert.True(t, cmp.Equal(expect, es, copts...), "mismatch (-want +got)\n%s", cmp.Diff(expect, es, copts...))
+		res.Transport.Proxy = nil
+		assert.True(t, cmp.Equal(expect, *res, copts...), "mismatch (-want +got)\n%s", cmp.Diff(expect, *res, copts...))
 	})
 
 	t.Run("service_token_path is empty", func(t *testing.T) {
@@ -259,10 +256,10 @@ func TestToESConfig(t *testing.T) {
 			MaxConnPerHost:   128,
 			Timeout:          90 * time.Second,
 		}
-		es, err := cfg.ToESConfig(false)
+		res, err := cfg.ToESTransportConfig(false)
 		require.NoError(t, err)
 
-		expect := elasticsearch.Config{
+		expect := ESTransportConfig{
 			Addresses:  []string{"http://localhost:9200"},
 			Header:     http.Header{"X-Elastic-Product-Origin": []string{"fleet"}},
 			MaxRetries: 3,
@@ -277,8 +274,8 @@ func TestToESConfig(t *testing.T) {
 			},
 		}
 
-		es.Transport.(*http.Transport).Proxy = nil
-		assert.True(t, cmp.Equal(expect, es, copts...), "mismatch (-want +got)\n%s", cmp.Diff(expect, es, copts...))
+		res.Transport.Proxy = nil
+		assert.True(t, cmp.Equal(expect, *res, copts...), "mismatch (-want +got)\n%s", cmp.Diff(expect, *res, copts...))
 	})
 
 	t.Run("service_token_path does not exist", func(t *testing.T) {
@@ -290,7 +287,7 @@ func TestToESConfig(t *testing.T) {
 			MaxConnPerHost:   128,
 			Timeout:          90 * time.Second,
 		}
-		_, err := cfg.ToESConfig(false)
+		_, err := cfg.ToESTransportConfig(false)
 		assert.ErrorAs(t, err, &os.ErrNotExist)
 	})
 }
@@ -352,10 +349,10 @@ func TestESProxyConfig(t *testing.T) {
 			_ = testlog.SetLogger(t)
 			setTestEnv(t, test.env)
 
-			res, err := test.cfg.ToESConfig(false)
+			res, err := test.cfg.ToESTransportConfig(false)
 			require.NoError(t, err)
 
-			transport := res.Transport.(*http.Transport) //nolint:errcheck // test case
+			transport := res.Transport
 			if test.want == "" {
 				require.Nil(t, transport.Proxy)
 				return
@@ -419,5 +416,25 @@ func Test_Elasticsearch_DiagRequests(t *testing.T) {
 		p := es.DiagRequests(ctx)
 		require.NotEmpty(t, p)
 		require.Contains(t, string(p), "request 0 successful.")
+	})
+}
+
+func TestElasticsearchValidate(t *testing.T) {
+	t.Run("rejects negative MaxConnPerHost", func(t *testing.T) {
+		cfg := Elasticsearch{}
+		cfg.InitDefaults()
+		cfg.MaxConnPerHost = -1
+		require.Error(t, cfg.Validate())
+	})
+	t.Run("rejects zero MaxConnPerHost", func(t *testing.T) {
+		cfg := Elasticsearch{}
+		cfg.InitDefaults()
+		cfg.MaxConnPerHost = 0
+		require.Error(t, cfg.Validate())
+	})
+	t.Run("accepts positive MaxConnPerHost", func(t *testing.T) {
+		cfg := Elasticsearch{}
+		cfg.InitDefaults()
+		require.NoError(t, cfg.Validate())
 	})
 }

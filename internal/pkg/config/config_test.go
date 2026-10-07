@@ -143,6 +143,15 @@ func TestConfig(t *testing.T) {
 		"bad-output": {
 			err: "can only contain elasticsearch key",
 		},
+		"bad-bulk-flush-max-pending": {
+			err: "bulk.flush_max_pending must be positive, got -1",
+		},
+		"bad-max-conn-per-host": {
+			err: "output.elasticsearch.max_conn_per_host must be positive, got -1",
+		},
+		"bad-limit-max": {
+			err: "checkin_limit.max must not be negative, got -1",
+		},
 	}
 
 	for name, test := range testcases {
@@ -547,7 +556,7 @@ func defaultElastic() Elasticsearch {
 		Protocol:         "http",
 		ServiceToken:     "test-token",
 		Hosts:            []string{"localhost:9200"},
-		MaxRetries:       3,
+		MaxRetries:       5,
 		MaxConnPerHost:   128,
 		MaxContentLength: 104857600,
 		Timeout:          90 * time.Second,

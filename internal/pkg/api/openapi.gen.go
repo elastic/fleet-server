@@ -32,6 +32,7 @@ const (
 	POLICYREASSIGN       ActionType = "POLICY_REASSIGN"
 	PRIVILEGELEVELCHANGE ActionType = "PRIVILEGE_LEVEL_CHANGE"
 	REQUESTDIAGNOSTICS   ActionType = "REQUEST_DIAGNOSTICS"
+	RESTART              ActionType = "RESTART"
 	SETTINGS             ActionType = "SETTINGS"
 	UNENROLL             ActionType = "UNENROLL"
 	UNINSTALL            ActionType = "UNINSTALL"
@@ -273,6 +274,9 @@ type ActionRequestDiagnostics struct {
 
 // ActionRequestDiagnosticsAdditionalMetrics defines model for ActionRequestDiagnostics.AdditionalMetrics.
 type ActionRequestDiagnosticsAdditionalMetrics string
+
+// ActionRestart The RESTART action data.
+type ActionRestart = interface{}
 
 // ActionSettings The SETTINGS action data.
 type ActionSettings struct {
@@ -1751,6 +1755,32 @@ func (t *Action_Data) FromActionUninstall(v ActionUninstall) error {
 
 // MergeActionUninstall performs a merge with any union data inside the Action_Data, using the provided ActionUninstall
 func (t *Action_Data) MergeActionUninstall(v ActionUninstall) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsActionRestart returns the union data inside the Action_Data as a ActionRestart
+func (t Action_Data) AsActionRestart() (ActionRestart, error) {
+	var body ActionRestart
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromActionRestart overwrites any union data inside the Action_Data as the provided ActionRestart
+func (t *Action_Data) FromActionRestart(v ActionRestart) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeActionRestart performs a merge with any union data inside the Action_Data, using the provided ActionRestart
+func (t *Action_Data) MergeActionRestart(v ActionRestart) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
