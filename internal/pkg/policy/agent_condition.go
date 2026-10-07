@@ -20,23 +20,14 @@ const (
 	removed               = -1
 )
 
-// agentIDConditionRE matches the only condition shape pruned server-side:
-// ${agent.id} == '<literal>'. EQL single-quoted literals have no escape
-// sequences, so a literal containing a quote or backslash is never matched and
-// is left for the agent to evaluate.
+// EQL string literals have no escape sequences, so literals containing a quote
+// or backslash are never matched and are left for the agent to evaluate.
 var agentIDConditionRE = regexp.MustCompile(`^\s*\$\{agent\.id\}\s*==\s*'([^'\\\x00-\x1f]*)'\s*$`)
 
-// FilterInputsForAgent removes inputs and streams whose condition pins them to
-// a different agent id, mirroring what Elastic Agent does after receiving the
-// policy (an input left with no streams is removed).
-//
-// secretKeys holds the paths of injected secrets ("inputs.<i>.streams.<j>...").
-// Pruning shifts indexes, so paths of removed entries are dropped and the rest
-// are renumbered to keep pointing at the same values.
-//
-// It never mutates its arguments: input elements are shared between all agents
-// of a policy, so changed inputs are copied. When nothing is pruned both
-// arguments are returned as is.
+// FilterInputsForAgent drops inputs and streams pinned to another agent by an
+// exact `${agent.id} == '<id>'` condition, as Elastic Agent would. Secret key
+// paths are renumbered to follow the shifted indexes. Input elements are shared
+// between agents, so changed inputs are copied, never mutated.
 func FilterInputsForAgent(inputs []map[string]any, secretKeys []string, agentID string) ([]map[string]any, []string) {
 	out := make([]map[string]any, 0, len(inputs))
 	inputIdx := make([]int, len(inputs))
@@ -64,9 +55,8 @@ func FilterInputsForAgent(inputs []map[string]any, secretKeys []string, agentID 
 	return out, remapSecretKeys(secretKeys, inputIdx, streamIdx)
 }
 
-// filterInput returns keep=false when the input must be dropped. A non-nil
-// map is a modified copy, along with the new index of each original stream
-// (or removed); nil means the original input is used as is.
+// filterInput returns a modified copy (plus new stream indexes) when streams
+// were pruned, or nil when the original input is kept as is.
 func filterInput(input map[string]any, agentID string) (map[string]any, []int, bool) {
 	if pinnedToOtherAgent(input[fieldCondition], agentID) {
 		return nil, nil, false
@@ -108,8 +98,6 @@ func pinnedToOtherAgent(condition any, agentID string) bool {
 	return m != nil && m[1] != agentID
 }
 
-// remapSecretKeys rewrites "inputs.<i>[.streams.<j>].<rest>" paths using the
-// old-to-new index maps. Other keys (outputs, fleet, ...) pass through.
 func remapSecretKeys(keys []string, inputIdx []int, streamIdx map[int][]int) []string {
 	out := make([]string, 0, len(keys))
 	for _, key := range keys {
@@ -157,7 +145,6 @@ func remapSecretKey(key string, inputIdx []int, streamIdx map[int][]int) (string
 	return out, true
 }
 
-// cutIndex splits "<n>[.<rest>]" into n and rest.
 func cutIndex(s string) (int, string, bool) {
 	head, rest, _ := strings.Cut(s, ".")
 	n, err := strconv.Atoi(head)
