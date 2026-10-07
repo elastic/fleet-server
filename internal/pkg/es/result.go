@@ -87,22 +87,6 @@ func (b *Bucket) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &members); err != nil {
 		return err
 	}
-<<<<<<< HEAD
-	var aggs map[string]interface{}
-	err = json.Unmarshal(data, &aggs)
-	if err != nil {
-		return err
-	}
-	// remove the json keys that already unmarshalled into the
-	// bucket. this needs to stay in sync with the json tags
-	// from `Bucket`.
-	delete(aggs, "key")
-	delete(aggs, "doc_count")
-	b2.Aggregations = make(map[string]HitsT)
-	for name, value := range aggs {
-		vMap, ok := value.(map[string]interface{})
-		if !ok {
-=======
 	out := Bucket{Aggregations: make(map[string]HitsT)}
 	for name, value := range members {
 		switch name {
@@ -115,7 +99,6 @@ func (b *Bucket) UnmarshalJSON(data []byte) error {
 			if err := json.Unmarshal(value, &out.DocCount); err != nil {
 				return err
 			}
->>>>>>> 4c83e6d (perf(es): keep aggregation hits raw instead of decoding them into `any` (#7983))
 			continue
 		}
 		// Skip anything that is not an object (numbers, strings, arrays, null).
