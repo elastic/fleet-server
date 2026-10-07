@@ -425,6 +425,396 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 	})
 }
 
+func TestPolicyOTLPOutputPrepareNoRole(t *testing.T) {
+	logger := testlog.SetLogger(t)
+	bulker := ftesting.NewMockBulk()
+	po := Output{
+		Type: OutputTypeOTLP,
+		Name: "test output",
+		Role: nil,
+	}
+
+	policyMap := map[string]map[string]any{
+		"test output": {},
+	}
+
+	err := po.Prepare(context.Background(), logger, bulker, &model.Agent{}, policyMap)
+	require.NoError(t, err, "external OTLP output with no role must not error")
+	assert.Empty(t, policyMap["test output"]["api_key"], "outputMap must not be mutated")
+	bulker.AssertExpectations(t)
+}
+
+func TestPolicyOTLPOutputPrepare(t *testing.T) {
+	const (
+		secretID = "test-secret-id"
+		oldKeyID = "old-key-id"
+	)
+	secretRef := "$co.elastic.secret{" + secretID + "}"
+	mintedKey := bulk.APIKey{ID: "new-key-id", Key: "new-key-secret"}
+
+	tests := []struct {
+		name           string
+		roleHash       string
+		existingOutput *model.PolicyOutput
+		setupMocks     func(*ftesting.MockBulk)
+		wantErr        bool
+		wantAPIKey     string
+		wantPermHash   string
+		wantCandidates []OutputSecretCandidate
+	}{
+		{
+			name:     "hash matches — resolves existing secret without minting",
+			roleHash: "abc123",
+			existingOutput: &model.PolicyOutput{
+				APIKey:          secretRef,
+				APIKeyID:        oldKeyID,
+				PermissionsHash: "abc123",
+			},
+			setupMocks:   func(_ *ftesting.MockBulk) {},
+			wantAPIKey:   secretID + "_value",
+			wantPermHash: "abc123",
+		},
+		{
+			name:     "hash changed — updates key permissions",
+			roleHash: "new-hash",
+			existingOutput: &model.PolicyOutput{
+				APIKey:          secretRef,
+				APIKeyID:        oldKeyID,
+				PermissionsHash: "old-hash",
+			},
+			setupMocks: func(b *ftesting.MockBulk) {
+				b.On("APIKeyRead", mock.Anything, oldKeyID).
+					Return(&bulk.APIKeyMetadata{ID: oldKeyID, RoleDescriptors: TestPayload}, nil).Once()
+				b.On("APIKeyUpdate", mock.Anything, oldKeyID).Return(nil).Once()
+				b.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+			},
+			wantAPIKey:   secretID + "_value",
+			wantPermHash: "new-hash",
+		},
+		{
+			name:           "new agent — mints key and writes secret",
+			roleHash:       "new-hash",
+			existingOutput: nil,
+			setupMocks: func(b *ftesting.MockBulk) {
+				b.On("APIKeyCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(&mintedKey, nil).Once()
+				b.On("WriteSecret", mock.Anything, mintedKey.Agent()).Return(secretID, nil).Once()
+				b.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+			},
+			wantAPIKey:   secretID + "_value",
+			wantPermHash: "new-hash",
+		},
+		{
+			name:           "agent doc update fails — secret candidate recorded",
+			roleHash:       "new-hash",
+			existingOutput: nil,
+			setupMocks: func(b *ftesting.MockBulk) {
+				b.On("APIKeyCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(&mintedKey, nil).Once()
+				b.On("WriteSecret", mock.Anything, mintedKey.Agent()).Return(secretID, nil).Once()
+				b.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(errors.New("ES update failed")).Once()
+			},
+			wantErr: true,
+			wantCandidates: []OutputSecretCandidate{{
+				AgentID:    "agent-id",
+				OutputName: "test output",
+				SecretID:   secretID,
+				SecretRef:  secretRef,
+			}},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			logger := testlog.SetLogger(t)
+			bulker := ftesting.NewMockBulk()
+			tc.setupMocks(bulker)
+
+			outputs := map[string]*model.PolicyOutput{}
+			if tc.existingOutput != nil {
+				outputs["test output"] = tc.existingOutput
+			}
+			testAgent := &model.Agent{
+				ESDocument: model.ESDocument{Id: "agent-id"},
+				Outputs:    outputs,
+			}
+			output := Output{
+				Type: OutputTypeOTLP,
+				Name: "test output",
+				Role: &RoleT{Sha2: tc.roleHash, Raw: TestPayload},
+			}
+			policyMap := map[string]map[string]any{"test output": {"type": OutputTypeOTLP}}
+			collector := &recordingOutputSecretCandidateCollector{}
+
+			err := output.Prepare(context.Background(), logger, bulker, testAgent, policyMap,
+				WithOutputSecretCandidateCollector(collector))
+
+			if tc.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tc.wantAPIKey, policyMap[output.Name]["api_key"])
+				assert.Equal(t, tc.wantPermHash, testAgent.Outputs[output.Name].PermissionsHash)
+			}
+			assert.Equal(t, tc.wantCandidates, collector.candidates)
+			bulker.AssertExpectations(t)
+		})
+	}
+}
+
+func TestPolicyOTLPOutputPrepareManagedToExternal(t *testing.T) {
+	const (
+		secretID = "prev-secret-id"
+		oldKeyID = "prev-key-id"
+	)
+	secretRef := "$co.elastic.secret{" + secretID + "}"
+
+	newAgent := func() *model.Agent {
+		return &model.Agent{
+			ESDocument: model.ESDocument{Id: "agent-id"},
+			Outputs: map[string]*model.PolicyOutput{
+				"test output": {
+					Type:            OutputTypeOTLP,
+					APIKey:          secretRef,
+					APIKeyID:        oldKeyID,
+					PermissionsHash: "old-hash",
+				},
+			},
+		}
+	}
+	policyOutput := Output{
+		Type: OutputTypeOTLP,
+		Name: "test output",
+		Role: nil, // no output_permissions → external OTLP
+	}
+	policyMap := map[string]map[string]any{"test output": {"type": OutputTypeOTLP}}
+
+	t.Run("parks retirement record and clears active key fields", func(t *testing.T) {
+		logger := testlog.SetLogger(t)
+		bulker := ftesting.NewMockBulk()
+		bulker.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+
+		agent := newAgent()
+		err := policyOutput.Prepare(context.Background(), logger, bulker, agent, policyMap)
+		require.NoError(t, err)
+		assert.Empty(t, policyMap["test output"]["api_key"], "external OTLP must not inject an api_key")
+		// Entry persists so the ack/checkin gate can retire the key.
+		require.Contains(t, agent.Outputs, "test output", "output entry must be retained for deferred retirement")
+		out := agent.Outputs["test output"]
+		assert.Empty(t, out.APIKeyID, "active key id must be cleared")
+		assert.Empty(t, out.APIKey, "active key secret must be cleared")
+		assert.Empty(t, out.PermissionsHash, "permissions hash must be cleared")
+		require.Len(t, out.ToRetireAPIKeyIds, 1, "one retirement record must be parked")
+		assert.Equal(t, oldKeyID, out.ToRetireAPIKeyIds[0].ID)
+		assert.Equal(t, secretID, out.ToRetireAPIKeyIds[0].SecretID)
+		assert.Equal(t, OutputTypeOTLP, out.ToRetireAPIKeyIds[0].OutputType, "retirement record must carry the previous mOTLP type")
+		bulker.AssertExpectations(t)
+	})
+
+	t.Run("retirement record carries previous type when prior output was not mOTLP", func(t *testing.T) {
+		logger := testlog.SetLogger(t)
+		bulker := ftesting.NewMockBulk()
+		bulker.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+
+		agent := &model.Agent{
+			ESDocument: model.ESDocument{Id: "agent-id"},
+			Outputs: map[string]*model.PolicyOutput{
+				"test output": {
+					Type:            OutputTypeElasticsearch,
+					APIKey:          secretRef,
+					APIKeyID:        oldKeyID,
+					PermissionsHash: "old-hash",
+				},
+			},
+		}
+		err := policyOutput.Prepare(context.Background(), logger, bulker, agent, policyMap)
+		require.NoError(t, err)
+		out := agent.Outputs["test output"]
+		require.Len(t, out.ToRetireAPIKeyIds, 1)
+		assert.Equal(t, OutputTypeElasticsearch, out.ToRetireAPIKeyIds[0].OutputType,
+			"retirement record must carry the previous key type, not the new output type")
+		bulker.AssertExpectations(t)
+	})
+
+	t.Run("no-op when no active key present", func(t *testing.T) {
+		logger := testlog.SetLogger(t)
+		bulker := ftesting.NewMockBulk()
+
+		agent := &model.Agent{
+			ESDocument: model.ESDocument{Id: "agent-id"},
+			Outputs: map[string]*model.PolicyOutput{
+				"test output": {
+					Type:              OutputTypeOTLP,
+					ToRetireAPIKeyIds: []model.ToRetireAPIKeyIdsItems{{ID: oldKeyID}},
+				},
+			},
+		}
+		err := policyOutput.Prepare(context.Background(), logger, bulker, agent, policyMap)
+		require.NoError(t, err, "second call with cleared key must be a no-op")
+		bulker.AssertNotCalled(t, "Update")
+	})
+}
+
+func TestPolicyOTLPOutputPrepareRetiresRemovedOutput(t *testing.T) {
+	const (
+		removedOutputName  = "otlp-managed-removed"
+		incomingOutputName = "otlp-external-incoming"
+
+		removedKeyID    = "removed-output-key-id"
+		removedSecretID = "removed-output-secret-id"
+		pendingKeyID    = "pending-rotation-key-id"
+		pendingSecretID = "pending-rotation-secret-id"
+	)
+	removedSecretRef := "$co.elastic.secret{" + removedSecretID + "}"
+
+	// policyMap contains only the incoming external OTLP output.
+	policyMap := map[string]map[string]any{
+		incomingOutputName: {"type": OutputTypeOTLP},
+	}
+	// incomingOutput describes the new external OTLP output (Role == nil → no key management).
+	incomingOutput := Output{
+		Type: OutputTypeOTLP,
+		Name: incomingOutputName,
+		Role: nil,
+	}
+
+	// parseParkParams decodes an Update body and returns the script params map.
+	parseParkParams := func(t *testing.T, body []byte) map[string]any {
+		t.Helper()
+		var req struct {
+			Script struct {
+				Params map[string]any `json:"params"`
+			} `json:"script"`
+		}
+		require.NoError(t, json.Unmarshal(body, &req))
+		return req.Script.Params
+	}
+
+	// isParkOnto returns a mock.MatchedBy matcher that accepts an Update body that parks a
+	// retirement record onto the named incoming output.
+	isParkOnto := func(incomingName string) any {
+		return mock.MatchedBy(func(body []byte) bool {
+			var req struct {
+				Script struct {
+					Params map[string]any `json:"params"`
+				} `json:"script"`
+			}
+			if json.Unmarshal(body, &req) != nil {
+				return false
+			}
+			return req.Script.Params["output_name"] == incomingName &&
+				req.Script.Params[dl.FieldPolicyOutputToRetireAPIKeyIDs] != nil
+		})
+	}
+
+	// isRemoveOf returns a mock.MatchedBy matcher that accepts an Update body that removes the
+	// named output entry from the agent doc.
+	isRemoveOf := func(outputName string) any {
+		return mock.MatchedBy(func(body []byte) bool {
+			var req struct {
+				Script struct {
+					Source string         `json:"source"`
+					Params map[string]any `json:"params"`
+				} `json:"script"`
+			}
+			if json.Unmarshal(body, &req) != nil {
+				return false
+			}
+			return req.Script.Source == "ctx._source['outputs'].remove(params.output_name)" &&
+				req.Script.Params["output_name"] == outputName
+		})
+	}
+
+	tests := []struct {
+		name           string
+		pendingRecords []model.ToRetireAPIKeyIdsItems
+		wantCalls      int
+	}{
+		{
+			name:      "removed output has active key only",
+			wantCalls: 2,
+		},
+		{
+			name: "removed output has active key and pending rotation record",
+			pendingRecords: []model.ToRetireAPIKeyIdsItems{
+				{ID: pendingKeyID, SecretID: pendingSecretID, Output: removedOutputName, OutputType: OutputTypeOTLP},
+			},
+			wantCalls: 3,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			logger := testlog.SetLogger(t)
+			bulker := ftesting.NewMockBulk()
+
+			agent := &model.Agent{
+				ESDocument: model.ESDocument{Id: "agent-id"},
+				Outputs: map[string]*model.PolicyOutput{
+					removedOutputName: {
+						Type:              OutputTypeOTLP,
+						APIKey:            removedSecretRef,
+						APIKeyID:          removedKeyID,
+						PermissionsHash:   "old-hash",
+						ToRetireAPIKeyIds: tc.pendingRecords,
+					},
+				},
+			}
+
+			// Register expected Update calls in order. Park calls (onto the incoming output) must all
+			// precede the remove call; NotBefore enforces the ordering.
+			var prevCall *mock.Call
+			for range tc.wantCalls - 1 {
+				c := bulker.On("Update", mock.Anything, mock.Anything, mock.Anything, isParkOnto(incomingOutputName), mock.Anything).
+					Return(nil).Once()
+				if prevCall != nil {
+					c.NotBefore(prevCall)
+				}
+				prevCall = c
+			}
+			removeCall := bulker.On("Update", mock.Anything, mock.Anything, mock.Anything, isRemoveOf(removedOutputName), mock.Anything).
+				Return(nil).Once()
+			if prevCall != nil {
+				removeCall.NotBefore(prevCall)
+			}
+
+			err := incomingOutput.Prepare(context.Background(), logger, bulker, agent, policyMap)
+			require.NoError(t, err)
+
+			require.Len(t, bulker.Calls, tc.wantCalls)
+
+			// If there were pending records, verify the first call transferred one of them.
+			if len(tc.pendingRecords) > 0 {
+				transferParams := parseParkParams(t, bulker.Calls[0].Arguments.Get(3).([]byte))
+				transferRecord, ok := transferParams[dl.FieldPolicyOutputToRetireAPIKeyIDs].(map[string]any)
+				require.True(t, ok, "first Update must be a transfer of the pending record")
+				assert.Equal(t, pendingKeyID, transferRecord["id"])
+			}
+
+			// The second-to-last call parks the removed output's active key onto the incoming output.
+			// Requirement (a): this call precedes the remove — enforced by NotBefore above.
+			parkParams := parseParkParams(t, bulker.Calls[tc.wantCalls-2].Arguments.Get(3).([]byte))
+			parkRecord, ok := parkParams[dl.FieldPolicyOutputToRetireAPIKeyIDs].(map[string]any)
+			require.True(t, ok, "park body must contain a retirement record map")
+			assert.Equal(t, removedKeyID, parkRecord["id"])
+			assert.Equal(t, removedOutputName, parkRecord["output"])
+			assert.Equal(t, OutputTypeOTLP, parkRecord["output_type"])
+			assert.Equal(t, removedSecretID, parkRecord["secret_id"])
+			assert.NotEmpty(t, parkRecord["retired_at"])
+
+			// Requirement (b): the removed output is gone; the incoming output is present.
+			assert.NotContains(t, agent.Outputs, removedOutputName, "removed output must be deleted from agent.Outputs")
+			assert.Contains(t, agent.Outputs, incomingOutputName, "incoming output must be present in agent.Outputs")
+
+			// External OTLP: no api_key injected into the policy map.
+			assert.Empty(t, policyMap[incomingOutputName]["api_key"])
+
+			bulker.AssertExpectations(t)
+		})
+	}
+}
+
 func TestPolicyRemoteESOutputPrepareNoRole(t *testing.T) {
 	logger := testlog.SetLogger(t)
 	bulker := ftesting.NewMockBulk()
@@ -570,7 +960,7 @@ func TestPolicyRemoteESOutputPrepare(t *testing.T) {
 		assert.Equal(t, wantAPIKey.Agent(), gotOutput.APIKey)
 		assert.Equal(t, wantAPIKey.ID, gotOutput.APIKeyID)
 		assert.Equal(t, output.Role.Sha2, gotOutput.PermissionsHash)
-		assert.Equal(t, output.Type, gotOutput.Type)
+		assert.Equal(t, OutputTypeElasticsearch, gotOutput.Type) // remote_elasticsearch is normalized to elasticsearch on write
 
 		assert.Equal(t, OutputTypeElasticsearch, policyMap["test output"]["type"])
 		assert.Empty(t, policyMap["test output"]["service_token"])
