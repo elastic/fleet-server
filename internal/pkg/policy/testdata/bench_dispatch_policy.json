@@ -1,0 +1,73 @@
+{
+  "id": "bench-dispatch-policy",
+  "revision": 1,
+  "outputs": {
+    "default": {
+      "type": "elasticsearch",
+      "hosts": ["https://es.example.com:443"]
+    },
+    "remote-monitoring": {
+      "type": "remote_elasticsearch",
+      "hosts": ["https://monitor.example.com:443"],
+      "secrets": {
+        "service_token": {"id": "ST_ID"},
+        "ssl": {"key": {"id": "SSL_KEY_ID"}}
+      }
+    }
+  },
+  "output_permissions": {
+    "default": {
+      "_fallback": {
+        "indices": [
+          {
+            "names": ["logs-*", "metrics-*", "traces-*"],
+            "privileges": ["auto_configure", "create_doc"]
+          }
+        ]
+      }
+    },
+    "remote-monitoring": {
+      "_fallback": {
+        "indices": [
+          {
+            "names": ["logs-*", "metrics-*"],
+            "privileges": ["auto_configure", "create_doc"]
+          }
+        ]
+      }
+    }
+  },
+  "agent": {
+    "monitoring": {
+      "enabled": true,
+      "use_output": "remote-monitoring",
+      "logs": true,
+      "metrics": true
+    },
+    "download": {
+      "sourceURI": "$co.elastic.secret{DOWNLOAD_URI_ID}"
+    }
+  },
+  "inputs": [
+    {
+      "id": "logfile-input-1",
+      "type": "logfile",
+      "use_output": "default",
+      "streams": [
+        {
+          "paths": ["/var/log/app/*.log"],
+          "auth.basic.password": "$co.elastic.secret{INPUT_SECRET_ID}"
+        }
+      ]
+    }
+  ],
+  "secret_references": [
+    {"id": "ST_ID"},
+    {"id": "SSL_KEY_ID"},
+    {"id": "DOWNLOAD_URI_ID"},
+    {"id": "INPUT_SECRET_ID"}
+  ],
+  "fleet": {
+    "hosts": ["https://fleet.example.com:8220"]
+  }
+}
