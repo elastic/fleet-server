@@ -448,6 +448,7 @@ components:
             If specified fleet-server will set its poll timeout to `max(1m, poll_timeout-2m)` and its write timeout to `max(2m, poll_timout-1m)`.
           type: string
           format: duration
+          x-go-type: string
         upgrade_details:
           $ref: "#/components/schemas/upgrade_details"
         agent_policy_id:
