@@ -702,15 +702,7 @@ components:
       # unenroll actions have no `data` attribute
     actionUninstall:
       description: The UNINSTALL action data.
-      type: object
-      properties:
-        uninstall_token:
-          description: |
-            Uninstall token required to uninstall a tamper-protected (Elastic
-            Defend) agent. Passed through to the agent, which forwards it to the
-            uninstall command. Empty when the agent is not tamper-protected.
-          type: string
-          x-go-type-skip-optional-pointer: true
+      # uninstall actions have no `data` attribute
     actionRequestDiagnostics:
       description: The REQUEST_DIAGNOSTICS action data.
       properties:

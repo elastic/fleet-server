@@ -292,12 +292,7 @@ type ActionSignature struct {
 type ActionUnenroll = interface{}
 
 // ActionUninstall The UNINSTALL action data.
-type ActionUninstall struct {
-	// UninstallToken Uninstall token required to uninstall a tamper-protected (Elastic
-	// Defend) agent. Passed through to the agent, which forwards it to the
-	// uninstall command. Empty when the agent is not tamper-protected.
-	UninstallToken string `json:"uninstall_token,omitempty"`
-}
+type ActionUninstall = interface{}
 
 // ActionUpgrade the UPGRADE action data.
 type ActionUpgrade struct {

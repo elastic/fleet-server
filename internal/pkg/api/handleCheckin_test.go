@@ -195,21 +195,14 @@ func TestConvertActionData(t *testing.T) {
 		expect: Action_Data{},
 		hasErr: false,
 	}, {
-		name:   "uninstall action with uninstall token",
+		name:   "uninstall action (no data)",
 		aType:  UNINSTALL,
-		raw:    json.RawMessage(`{"uninstall_token":"secret-token"}`),
-		expect: Action_Data{json.RawMessage(`{"uninstall_token":"secret-token"}`)},
+		expect: Action_Data{},
 		hasErr: false,
 	}, {
-		name:   "uninstall action without data",
+		name:   "uninstall action ignores any data",
 		aType:  UNINSTALL,
-		raw:    json.RawMessage(`{}`),
-		expect: Action_Data{json.RawMessage(`{}`)},
-		hasErr: false,
-	}, {
-		name:   "uninstall action - nil data succeeds (all fields optional)",
-		aType:  UNINSTALL,
-		raw:    nil,
+		raw:    json.RawMessage(`{"ignored":"value"}`),
 		expect: Action_Data{},
 		hasErr: false,
 	}, {

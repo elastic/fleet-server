@@ -1060,23 +1060,11 @@ func convertActionData(aType ActionType, raw json.RawMessage) (ad Action_Data, e
 		}
 		err = ad.FromActionRequestDiagnostics(d)
 		return
-	case UNENROLL: // Action types with no data
+	case UNENROLL, UNINSTALL: // Action types with no data
+		// UNINSTALL carries no data: tamper-protection removal is handled by the
+		// preceding UNENROLL action, and scheduling uses the action's top-level
+		// start_time, not a data field.
 		return ad, nil
-	case UNINSTALL:
-		// The UNINSTALL data field (uninstall_token) is optional, so a missing data
-		// attribute is valid: treat it as empty rather than failing to convert
-		// (which would drop the action from the checkin response). Scheduling is
-		// handled by the action's top-level start_time, not by a data field.
-		if raw == nil {
-			return ad, nil
-		}
-		d := ActionUninstall{}
-		err = json.Unmarshal(raw, &d)
-		if err != nil {
-			return
-		}
-		err = ad.FromActionUninstall(d)
-		return
 	case MIGRATE:
 		d := ActionMigrate{}
 		err = json.Unmarshal(raw, &d)
