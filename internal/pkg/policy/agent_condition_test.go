@@ -62,7 +62,9 @@ func TestFilterInputsForAgent(t *testing.T) {
 			got := FilterInputsForAgent(tc.inputs, self)
 			ids := make([]string, 0, len(got))
 			for _, in := range got {
-				ids = append(ids, in["id"].(string))
+				id, ok := in["id"].(string)
+				require.True(t, ok)
+				ids = append(ids, id)
 			}
 			if len(tc.want) == 0 {
 				assert.Empty(t, ids)
