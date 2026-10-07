@@ -56,54 +56,70 @@ type HitsT struct {
 	MaxScore *float64 `json:"max_score"`
 }
 
+// Bucket is a generic aggregation bucket. Aggregations holds the hits of every
+// top-hits style sub-aggregation found in the bucket, keyed by aggregation name.
 type Bucket struct {
-	// any fields added here with json tags must also be added to the
-	// delete calls in the `UnmarshalJSON` function below
 	Key          string           `json:"key"`
 	DocCount     int64            `json:"doc_count"`
 	Aggregations map[string]HitsT `json:"-"`
 }
 
-type _bucket Bucket
+// Member names of an aggregation bucket handled by Bucket.UnmarshalJSON.
+const (
+	bucketKeyField      = "key"
+	bucketDocCountField = "doc_count"
+	bucketHitsField     = "hits"
+)
 
+// UnmarshalJSON decodes the bucket. The aggregation names are dynamic, so the
+// bucket is first split into raw members. Each member that is an object with a
+// "hits" member is then decoded straight into HitsT. HitT.Source is a
+// json.RawMessage, so the (potentially large) _source documents are only copied
+// and never decoded into an intermediate any tree, which is what the previous
+// implementation did before marshaling the hits back to bytes.
+//
+// Note that Source now holds the bytes exactly as received. The previous
+// implementation returned them re-marshaled: keys sorted, numbers round-tripped
+// through float64 (integers above 2^53 lost precision) and <, > and & escaped.
+// The decoded meaning is the same for any value float64 can represent.
 func (b *Bucket) UnmarshalJSON(data []byte) error {
-	b2 := _bucket{}
-	err := json.Unmarshal(data, &b2)
-	if err != nil {
+	var members map[string]json.RawMessage
+	if err := json.Unmarshal(data, &members); err != nil {
 		return err
 	}
-	var aggs map[string]interface{}
-	err = json.Unmarshal(data, &aggs)
-	if err != nil {
-		return err
-	}
-	// remove the json keys that already unmarshalled into the
-	// bucket. this needs to stay in sync with the json tags
-	// from `Bucket`.
-	delete(aggs, "key")
-	delete(aggs, "doc_count")
-	b2.Aggregations = make(map[string]HitsT)
-	for name, value := range aggs {
-		vMap, ok := value.(map[string]interface{})
-		if !ok {
+	out := Bucket{Aggregations: make(map[string]HitsT)}
+	for name, value := range members {
+		switch name {
+		case bucketKeyField:
+			if err := json.Unmarshal(value, &out.Key); err != nil {
+				return err
+			}
+			continue
+		case bucketDocCountField:
+			if err := json.Unmarshal(value, &out.DocCount); err != nil {
+				return err
+			}
 			continue
 		}
-		hMap, ok := vMap["hits"]
-		if !ok {
+		// Skip anything that is not an object (numbers, strings, arrays, null).
+		if len(value) == 0 || value[0] != '{' {
 			continue
 		}
-		data, err := json.Marshal(hMap)
-		if err != nil {
+		var agg map[string]json.RawMessage
+		if err := json.Unmarshal(value, &agg); err != nil {
 			return err
+		}
+		rawHits, ok := agg[bucketHitsField]
+		if !ok {
+			continue
 		}
 		var hits HitsT
-		err = json.Unmarshal(data, &hits)
-		if err != nil {
+		if err := json.Unmarshal(rawHits, &hits); err != nil {
 			return err
 		}
-		b2.Aggregations[name] = hits
+		out.Aggregations[name] = hits
 	}
-	*b = Bucket(b2)
+	*b = out
 	return nil
 }
 
