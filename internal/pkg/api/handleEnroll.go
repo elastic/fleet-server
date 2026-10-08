@@ -409,7 +409,7 @@ func (et *EnrollerT) _enroll(
 		if req.ReplaceToken != nil && *req.ReplaceToken != "" && prevVer != "" && prevVer != ver {
 			doc[dl.FieldUpgradedAt] = now.UTC().Format(time.RFC3339)
 		}
-		err = updateFleetAgent(ctx, et.bulker, agentID, doc)
+		err = dl.UpdateAgent(ctx, et.bulker, agentID, doc, bulk.WithRefresh())
 		if err != nil {
 			return nil, err
 		}
@@ -662,17 +662,6 @@ func updateLocalMetaAgentID(data []byte, agentID string) ([]byte, error) {
 	}
 
 	return data, nil
-}
-
-func updateFleetAgent(ctx context.Context, bulker bulk.Bulk, id string, doc bulk.UpdateFields) error {
-	span, ctx := apm.StartSpan(ctx, "updateAgent", "update")
-	defer span.End()
-
-	body, err := doc.Marshal()
-	if err != nil {
-		return err
-	}
-	return bulker.Update(ctx, dl.FleetAgents, id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3))
 }
 
 // syncEnrollWriteTimeout bounds the sync enrollment write, including client retries. It stays

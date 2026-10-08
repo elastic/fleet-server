@@ -225,6 +225,9 @@ type Agent struct {
 	// User provided tags for the Elastic Agent
 	Tags []string `json:"tags,omitempty"`
 
+	// Hash of the tags last sent to the Elastic Agent in the agent.tags policy key
+	TagsHash string `json:"tags_hash,omitempty"`
+
 	// Type
 	Type string `json:"type"`
 
@@ -603,6 +606,9 @@ type ToRetireAPIKeyIdsItems struct {
 
 	// Output name where the API Key belongs
 	Output string `json:"output,omitempty"`
+
+	// Output type at the time this key was minted (e.g. elasticsearch, otlp). Used to route invalidation to the correct cluster without relying on current policy state. Empty for records that predate this field.
+	OutputType string `json:"output_type,omitempty"`
 
 	// Date/time the API key was retired
 	RetiredAt string `json:"retired_at,omitempty"`

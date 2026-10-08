@@ -239,8 +239,8 @@ func (b *Bulker) flushUpdateAPIKey(ctx context.Context, queue queueT) error {
 	// Do NOT return a non-nil value or failQueue
 	// up the stack will fail.
 
-	for n := queue.head; n != nil; n = n.next {
-		// 'n' is invalid immediately on channel send
+	for n := queue.head; n != nil; {
+		next := n.next // 'n' is invalid immediately on channel send
 		responseIdx := IDToResponse[idxToID[n.idx]]
 		res := responses[responseIdx]
 		select {
@@ -255,6 +255,7 @@ func (b *Bulker) flushUpdateAPIKey(ctx context.Context, queue queueT) error {
 		default:
 			panic("Unexpected blocked response channel on flushRead")
 		}
+		n = next
 	}
 	return nil
 }

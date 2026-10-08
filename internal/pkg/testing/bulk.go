@@ -112,7 +112,11 @@ func (m *MockBulk) CreateAndGetBulker(ctx context.Context, zlog zerolog.Logger, 
 	args := m.Called(ctx, zlog, outputName, outputMap)
 	v, _ := args.Get(0).(bulk.Bulk)
 	ok, _ := args.Get(1).(bool)
-	return v, ok, nil
+	var err error
+	if len(args) > 2 {
+		err, _ = args.Get(2).(error)
+	}
+	return v, ok, err
 }
 
 func (m *MockBulk) CancelFn() context.CancelFunc {
