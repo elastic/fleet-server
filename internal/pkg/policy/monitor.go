@@ -206,14 +206,16 @@ func (m *monitorT) startTrans(ctx context.Context, name string) (*apm.Transactio
 
 func unmarshalHits(hits []es.HitT) ([]model.Policy, error) {
 	policies := make([]model.Policy, len(hits))
-	// One decoder for all the hits, so that text repeated across the policies is held in memory
-	// only once. See dl.PolicyDecoder.
-	dec := dl.NewPolicyDecoder()
+	// Share equal strings across the policies as each one is decoded, so that text repeated
+	// across the policies is held in memory only once and at most one policy's duplicates exist
+	// at a time. See dl.StringSharer.
+	sharer := dl.NewStringSharer()
 	for i, hit := range hits {
-		err := dec.Decode(hit, &policies[i])
+		err := hit.Unmarshal(&policies[i])
 		if err != nil {
 			return nil, err
 		}
+		sharer.Share(&policies[i])
 	}
 
 	return policies, nil

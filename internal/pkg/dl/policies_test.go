@@ -27,6 +27,12 @@ func (b searchOnlyBulk) Search(context.Context, string, []byte, ...bulk.Opt) (*e
 	return b.res, nil
 }
 
+// policySource returns a policy document whose inputs are the given JSON array.
+func policySource(inputs string) []byte {
+	return fmt.Appendf(nil, `{"policy_id":"p","revision_idx":3,"@timestamp":"2026-01-01T00:00:00Z","namespaces":["a"],`+
+		`"data":{"id":"p","revision":3,"outputs":{"o":{"type":"elasticsearch","hosts":["h"]}},"agent":{"x":{"y":1}},"inputs":%s}}`, inputs)
+}
+
 // TestQueryLatestPoliciesSharesStrings verifies that the policies QueryLatestPolicies returns share
 // the memory of equal long strings, and that they still get their Elasticsearch metadata.
 func TestQueryLatestPoliciesSharesStrings(t *testing.T) {
