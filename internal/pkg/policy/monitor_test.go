@@ -10,6 +10,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"runtime"
 	"sync"
 	"testing"
 	"testing/synctest"
@@ -427,6 +428,164 @@ func Test_Monitor_Limit_Delay(t *testing.T) {
 	})
 }
 
+<<<<<<< HEAD
+=======
+// Test_Monitor_pending_sub_gets_latest_revision ensures that a subscriber waiting in the rate
+// limiter when a new revision arrives receives the new revision, not the one that was current
+// when it was popped from the pending queue.
+func Test_Monitor_pending_sub_gets_latest_revision(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		ctx = testlog.SetLogger(t).WithContext(ctx)
+
+		chHitT := make(chan []es.HitT, 2)
+		defer close(chHitT)
+		ms := mmock.NewMockSubscription()
+		ms.On("Output").Return((<-chan []es.HitT)(chHitT))
+		mm := mmock.NewMockMonitor()
+		mm.On("Subscribe").Return(ms).Once()
+		mm.On("Unsubscribe", mock.Anything).Return().Once()
+
+		// Burst of 1 and a long interval: the first subscriber is dispatched immediately,
+		// the second waits in the rate limiter.
+		monitor := NewMonitor(ftesting.NewMockBulk(), mm, config.ServerLimits{PolicyLimit: config.Limit{Burst: 1, Interval: time.Hour}})
+		pm := monitor.(*monitorT)
+		pm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
+			return []model.Policy{}, nil
+		}
+
+		var mwg sync.WaitGroup
+		mwg.Go(func() { _ = monitor.Run(ctx) })
+		require.NoError(t, pm.waitStart(ctx))
+
+		policyID := uuid.Must(uuid.NewV4()).String()
+		pm.mut.Lock()
+		pm.policies[policyID] = policyT{head: makeHead()}
+		pm.mut.Unlock()
+
+		subs := make([]Subscription, 2)
+		for i := range subs {
+			sub, err := monitor.Subscribe(uuid.Must(uuid.NewV4()).String(), policyID, 0)
+			require.NoError(t, err)
+			defer monitor.Unsubscribe(sub)
+			subs[i] = sub
+		}
+
+		rId := xid.New().String()
+		hit := func(seqNo, revisionIdx int64) []es.HitT {
+			policyData, err := json.Marshal(&model.Policy{
+				ESDocument:     model.ESDocument{Id: rId, Version: 1, SeqNo: seqNo},
+				PolicyID:       policyID,
+				CoordinatorIdx: 1,
+				Data:           policyDataDefault,
+				RevisionIdx:    revisionIdx,
+			})
+			require.NoError(t, err)
+			return []es.HitT{{ID: rId, SeqNo: seqNo, Version: 1, Source: policyData}}
+		}
+
+		// Revision 1 reaches the first subscriber; the second waits in the limiter.
+		chHitT <- hit(1, 1)
+		select {
+		case p := <-subs[0].Output():
+			require.Equal(t, int64(1), p.Policy.RevisionIdx)
+		case <-time.After(time.Minute):
+			require.Fail(t, "first subscriber was not dispatched")
+		}
+		synctest.Wait()
+
+		// Revision 2 arrives while the second subscriber is waiting for the limiter.
+		chHitT <- hit(2, 2)
+
+		select {
+		case p := <-subs[1].Output():
+			require.Equal(t, int64(2), p.Policy.RevisionIdx, "waiting subscriber must receive the latest revision")
+		case <-time.After(2 * time.Hour):
+			require.Fail(t, "second subscriber was never dispatched")
+		}
+		synctest.Wait()
+		require.Empty(t, subs[1].Output(), "second subscriber must receive exactly one revision")
+
+		cancel()
+		mwg.Wait()
+	})
+}
+
+func TestMonitor_LatestRev(t *testing.T) {
+	t.Run("empty policy id", func(t *testing.T) {
+		pm := &monitorT{}
+		idx := pm.LatestRev(t.Context(), "")
+		assert.Equal(t, int64(0), idx)
+	})
+
+	t.Run("policy load error", func(t *testing.T) {
+		bulker := ftesting.NewMockBulk()
+		mm := mmock.NewMockMonitor()
+		monitor := NewMonitor(bulker, mm, config.ServerLimits{})
+		pm := monitor.(*monitorT)
+		pm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
+			return nil, fmt.Errorf("policy fetch error")
+		}
+
+		idx := pm.LatestRev(t.Context(), "test-id")
+		assert.Equal(t, int64(0), idx)
+	})
+
+	t.Run("policy not found", func(t *testing.T) {
+		bulker := ftesting.NewMockBulk()
+		mm := mmock.NewMockMonitor()
+		monitor := NewMonitor(bulker, mm, config.ServerLimits{})
+		pm := monitor.(*monitorT)
+		pm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
+			return []model.Policy{}, nil
+		}
+		idx := pm.LatestRev(t.Context(), "test-id")
+		assert.Equal(t, int64(0), idx)
+	})
+
+	t.Run("policy found after load", func(t *testing.T) {
+		bulker := ftesting.NewMockBulk()
+		mm := mmock.NewMockMonitor()
+		monitor := NewMonitor(bulker, mm, config.ServerLimits{})
+		pm := monitor.(*monitorT)
+		policyId := uuid.Must(uuid.NewV4()).String()
+		rId := xid.New().String()
+		policy := model.Policy{
+			ESDocument: model.ESDocument{
+				Id:      rId,
+				Version: 1,
+				SeqNo:   1,
+			},
+			PolicyID:    policyId,
+			Data:        policyDataDefault,
+			RevisionIdx: 2,
+		}
+		pm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
+			return []model.Policy{policy}, nil
+		}
+		idx := pm.LatestRev(t.Context(), policyId)
+		assert.Equal(t, int64(2), idx)
+	})
+
+	t.Run("policy found", func(t *testing.T) {
+		pm := &monitorT{
+			policies: map[string]policyT{
+				"test-id": policyT{
+					pp: ParsedPolicy{
+						Policy: model.Policy{
+							RevisionIdx: 1,
+						},
+					},
+				},
+			},
+		}
+		idx := pm.LatestRev(t.Context(), "test-id")
+		assert.Equal(t, int64(1), idx)
+	})
+}
+
+>>>>>>> 299db1b (fix(policy monitor): run a single long-lived dispatcher (#7923))
 // TestUpdatePolicy_NewerRevisionIsApplied verifies that updatePolicy stores an
 // incoming document and returns true when its revision_idx is greater than the
 // cached revision.
@@ -513,4 +672,87 @@ func TestMonitor_StaleRevisionSkipsSecretResolution(t *testing.T) {
 	err := pm.processPolicies(ctx, []model.Policy{policyWithSecret})
 	assert.NoError(t, err, "stale revision should be skipped without error, not trigger secret resolution")
 	assert.Equal(t, int64(8), pm.policies[policyID].pp.Policy.RevisionIdx, "cached revision must not change for stale input")
+}
+
+// Test_Monitor_repeated_events_do_not_strand_subscriber_in_rate_limiter sends a burst of events
+// while a subscriber waits in the rate limiter and ensures the subscriber still gets its policy.
+// Events must not start overlapping dispatchers, since each can miss a subscriber the other
+// holds between popping it from pendingQ and sending to it. Overlapping dispatchers show up as a
+// stranded subscriber when the test runs with few CPUs, e.g. -cpu=1.
+func Test_Monitor_repeated_events_do_not_strand_subscriber_in_rate_limiter(t *testing.T) {
+	for range 25 {
+		synctest.Test(t, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			ctx = testlog.SetLogger(t).WithContext(ctx)
+
+			chHitT := make(chan []es.HitT, 1)
+			defer close(chHitT)
+			ms := mmock.NewMockSubscription()
+			ms.On("Output").Return((<-chan []es.HitT)(chHitT))
+			mm := mmock.NewMockMonitor()
+			mm.On("Subscribe").Return(ms).Once()
+			mm.On("Unsubscribe", mock.Anything).Return().Once()
+
+			// Burst of 1 and a long interval: the first subscriber is dispatched immediately,
+			// the second waits in the rate limiter holding the popped subscriber.
+			monitor := NewMonitor(ftesting.NewMockBulk(), mm, config.ServerLimits{PolicyLimit: config.Limit{Burst: 1, Interval: time.Hour}})
+			pm := monitor.(*monitorT)
+			pm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
+				return []model.Policy{}, nil
+			}
+
+			var mwg sync.WaitGroup
+			mwg.Go(func() { _ = monitor.Run(ctx) })
+			require.NoError(t, pm.waitStart(ctx))
+
+			policyID := uuid.Must(uuid.NewV4()).String()
+			pm.mut.Lock()
+			pm.policies[policyID] = policyT{head: makeHead()}
+			pm.mut.Unlock()
+
+			subs := make([]Subscription, 2)
+			for i := range subs {
+				sub, err := monitor.Subscribe(uuid.Must(uuid.NewV4()).String(), policyID, 0)
+				require.NoError(t, err)
+				defer monitor.Unsubscribe(sub)
+				subs[i] = sub
+			}
+
+			rId := xid.New().String()
+			policy := model.Policy{
+				ESDocument:     model.ESDocument{Id: rId, Version: 1, SeqNo: 1},
+				PolicyID:       policyID,
+				CoordinatorIdx: 1,
+				Data:           policyDataDefault,
+				RevisionIdx:    1,
+			}
+			policyData, err := json.Marshal(&policy)
+			require.NoError(t, err)
+			chHitT <- []es.HitT{{ID: rId, SeqNo: 1, Version: 1, Source: policyData}}
+
+			select {
+			case <-subs[0].Output():
+			case <-time.After(time.Minute):
+				require.Fail(t, "first subscriber was not dispatched")
+			}
+			synctest.Wait() // the dispatcher holds subs[1], rate waiting
+
+			// Fire events back to back, without waiting for the run loop to settle between them.
+			for range 50 {
+				pm.kickLoad()
+				runtime.Gosched()
+			}
+
+			select {
+			case p := <-subs[1].Output():
+				require.Equal(t, int64(1), p.Policy.RevisionIdx)
+			case <-time.After(2 * time.Hour):
+				require.Fail(t, "second subscriber was stranded in pendingQ")
+			}
+
+			cancel()
+			mwg.Wait()
+		})
+	}
 }

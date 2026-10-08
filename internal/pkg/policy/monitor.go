@@ -144,17 +144,27 @@ func (m *monitorT) Run(ctx context.Context) error {
 	s := m.monitor.Subscribe()
 	defer m.monitor.Unsubscribe(s)
 
+	dCtx, dCancel := context.WithCancel(ctx)
+	var wg sync.WaitGroup
+	defer wg.Wait()
+	defer dCancel()
+	wg.Go(func() { m.runDispatcher(dCtx) })
+
 	close(m.startCh)
 
+<<<<<<< HEAD
 	var iCtx context.Context
 	var trans *apm.Transaction
 LOOP:
+=======
+>>>>>>> 299db1b (fix(policy monitor): run a single long-lived dispatcher (#7923))
 	for {
 		m.log.Trace().Msg("policy monitor loop start")
 		iCtx = ctx
 		select {
 		case <-m.kickCh:
 			m.log.Trace().Msg("policy monitor kicked")
+<<<<<<< HEAD
 			if m.bulker.HasTracer() {
 				trans = m.bulker.StartTransaction("initial policies", "policy_monitor")
 				iCtx = apm.ContextWithTransaction(ctx, trans)
@@ -188,14 +198,63 @@ LOOP:
 			}
 			m.dispatchPending(iCtx)
 			endTrans(trans)
+=======
+			trans, tCtx := m.startTrans(ctx, "initial policies")
+			err := m.loadPolicies(tCtx)
+			endTrans(trans)
+			if err != nil {
+				return err
+			}
+			m.kickDeploy()
+		case hits := <-s.Output(): // TODO would be nice to attach transaction IDs to hits, but would likely need a bigger refactor.
+			m.log.Trace().Int("hits", len(hits)).Msg("policy monitor hits from sub")
+			trans, tCtx := m.startTrans(ctx, "output policies")
+			err := m.processHits(tCtx, hits)
+			endTrans(trans)
+			if err != nil {
+				return err
+			}
+			m.kickDeploy()
+>>>>>>> 299db1b (fix(policy monitor): run a single long-lived dispatcher (#7923))
 		case <-ctx.Done():
-			break LOOP
+			return nil
 		}
 	}
+<<<<<<< HEAD
 
 	return nil
 }
 
+=======
+}
+
+// runDispatcher drains pendingQ each time deployCh is signalled, until ctx is done.
+// deployCh has a buffer of one: a signal sent while a drain runs causes one more drain,
+// so a subscriber pushed after the last empty pop is not missed.
+func (m *monitorT) runDispatcher(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-m.deployCh:
+			m.log.Trace().Msg("policy monitor deploy ch")
+			trans, tCtx := m.startTrans(ctx, "forced policies")
+			m.dispatchPending(tCtx)
+			endTrans(trans)
+		}
+	}
+}
+
+// startTrans starts an APM transaction, if tracing is enabled, and returns a context carrying it.
+func (m *monitorT) startTrans(ctx context.Context, name string) (*apm.Transaction, context.Context) {
+	if !m.bulker.HasTracer() {
+		return nil, ctx
+	}
+	trans := m.bulker.StartTransaction(name, "policy_monitor")
+	return trans, apm.ContextWithTransaction(ctx, trans)
+}
+
+>>>>>>> 299db1b (fix(policy monitor): run a single long-lived dispatcher (#7923))
 func unmarshalHits(hits []es.HitT) ([]model.Policy, error) {
 	policies := make([]model.Policy, len(hits))
 	for i, hit := range hits {
@@ -258,6 +317,7 @@ func (m *monitorT) dispatchPending(ctx context.Context) {
 		// If too many (checkin) responses are written concurrently memory usage may explode due to allocating gzip writers.
 		err := m.limit.Wait(ctx)
 		if err != nil {
+			// Wait can also fail without ctx being done (e.g. the wait would exceed ctx's deadline).
 			m.mut.Lock()
 			m.pendingQ.pushFront(s) // context cancelled before sub is handled, put it back
 			m.mut.Unlock()
@@ -284,7 +344,7 @@ func (m *monitorT) dispatchPending(ctx context.Context) {
 		// Clone and send without holding m.mut.
 		if err := ctx.Err(); err != nil {
 			m.mut.Lock()
-			m.pendingQ.pushFront(s)
+			m.pendingQ.pushFront(s) // context cancelled before sub is handled, put it back
 			m.mut.Unlock()
 			m.log.Debug().Err(err).Msg("context termination detected in policy dispatch")
 			return
