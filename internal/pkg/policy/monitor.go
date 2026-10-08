@@ -152,53 +152,11 @@ func (m *monitorT) Run(ctx context.Context) error {
 
 	close(m.startCh)
 
-<<<<<<< HEAD
-	var iCtx context.Context
-	var trans *apm.Transaction
-LOOP:
-=======
->>>>>>> 299db1b (fix(policy monitor): run a single long-lived dispatcher (#7923))
 	for {
 		m.log.Trace().Msg("policy monitor loop start")
-		iCtx = ctx
 		select {
 		case <-m.kickCh:
 			m.log.Trace().Msg("policy monitor kicked")
-<<<<<<< HEAD
-			if m.bulker.HasTracer() {
-				trans = m.bulker.StartTransaction("initial policies", "policy_monitor")
-				iCtx = apm.ContextWithTransaction(ctx, trans)
-			}
-
-			if err := m.loadPolicies(iCtx); err != nil {
-				endTrans(trans)
-				return err
-			}
-			m.dispatchPending(iCtx)
-			endTrans(trans)
-		case <-m.deployCh:
-			m.log.Trace().Msg("policy monitor deploy ch")
-			if m.bulker.HasTracer() {
-				trans = m.bulker.StartTransaction("forced policies", "policy_monitor")
-				iCtx = apm.ContextWithTransaction(ctx, trans)
-			}
-
-			m.dispatchPending(iCtx)
-			endTrans(trans)
-		case hits := <-s.Output(): // TODO would be nice to attach transaction IDs to hits, but would likely need a bigger refactor.
-			m.log.Trace().Int("hits", len(hits)).Msg("policy monitor hits from sub")
-			if m.bulker.HasTracer() {
-				trans = m.bulker.StartTransaction("output policies", "policy_monitor")
-				iCtx = apm.ContextWithTransaction(ctx, trans)
-			}
-
-			if err := m.processHits(iCtx, hits); err != nil {
-				endTrans(trans)
-				return err
-			}
-			m.dispatchPending(iCtx)
-			endTrans(trans)
-=======
 			trans, tCtx := m.startTrans(ctx, "initial policies")
 			err := m.loadPolicies(tCtx)
 			endTrans(trans)
@@ -215,17 +173,10 @@ LOOP:
 				return err
 			}
 			m.kickDeploy()
->>>>>>> 299db1b (fix(policy monitor): run a single long-lived dispatcher (#7923))
 		case <-ctx.Done():
 			return nil
 		}
 	}
-<<<<<<< HEAD
-
-	return nil
-}
-
-=======
 }
 
 // runDispatcher drains pendingQ each time deployCh is signalled, until ctx is done.
@@ -254,7 +205,6 @@ func (m *monitorT) startTrans(ctx context.Context, name string) (*apm.Transactio
 	return trans, apm.ContextWithTransaction(ctx, trans)
 }
 
->>>>>>> 299db1b (fix(policy monitor): run a single long-lived dispatcher (#7923))
 func unmarshalHits(hits []es.HitT) ([]model.Policy, error) {
 	policies := make([]model.Policy, len(hits))
 	for i, hit := range hits {
