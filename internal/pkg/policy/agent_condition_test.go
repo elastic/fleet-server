@@ -70,9 +70,10 @@ func TestFilterInputsForAgent(t *testing.T) {
 				"${host.platform} != 'windows'",
 				"(" + condOther + ") and (${host.platform} == 'linux')",
 				"${agent.id} == 'a'b'",
+				"${agent.id} == '${env.OWNER}'",
 				"true",
 			},
-			want: []int{0, 1, 2, 3},
+			want: []int{0, 1, 2, 3, 4},
 		},
 		{
 			name:       "whitespace tolerant",

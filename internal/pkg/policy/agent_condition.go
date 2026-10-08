@@ -21,9 +21,9 @@ const (
 )
 
 // Deliberately a tiny subset of Elastic Agent's EQL grammar (elastic-agent
-// internal/pkg/eql/Eql.g4); keep in sync. Literals containing a quote or
-// backslash are never matched and are left for the agent to evaluate.
-var agentIDConditionRE = regexp.MustCompile(`^\s*\$\{agent\.id\}\s*==\s*'([^'\\\x00-\x1f]*)'\s*$`)
+// internal/pkg/eql/Eql.g4); keep in sync. Literals containing a quote,
+// backslash or `$` are never matched and are left for the agent to evaluate.
+var agentIDConditionRE = regexp.MustCompile(`^\s*\$\{agent\.id\}\s*==\s*'([^'\\$\x00-\x1f]*)'\s*$`)
 
 // FilterInputsForAgent drops inputs and streams pinned to another agent by an
 // exact `${agent.id} == '<id>'` condition, as Elastic Agent would. Secret key
