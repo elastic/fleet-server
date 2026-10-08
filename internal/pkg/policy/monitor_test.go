@@ -439,95 +439,12 @@ func Test_Monitor_pending_sub_gets_latest_revision(t *testing.T) {
 		mm.On("Subscribe").Return(ms).Once()
 		mm.On("Unsubscribe", mock.Anything).Return().Once()
 
-<<<<<<< HEAD
-	monitor := NewMonitor(bulker, mm, config.ServerLimits{})
-	pm := monitor.(*monitorT)
-	pm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
-		return []model.Policy{}, nil
-	}
-	pm.dispatchCh = make(chan struct{}, 1)
-
-	agentId := uuid.Must(uuid.NewV4()).String()
-	policyId := uuid.Must(uuid.NewV4()).String()
-
-	rId := xid.New().String()
-	policy := model.Policy{
-		ESDocument: model.ESDocument{
-			Id:      rId,
-			Version: 1,
-			SeqNo:   1,
-		},
-		PolicyID:    policyId,
-		Data:        policyDataDefault,
-		RevisionIdx: 1,
-	}
-	policyData, err := json.Marshal(&policy)
-	require.NoError(t, err)
-	policy2 := model.Policy{
-		ESDocument: model.ESDocument{
-			Id:      rId,
-			Version: 1,
-			SeqNo:   1,
-		},
-		PolicyID:    policyId,
-		Data:        policyDataDefault,
-		RevisionIdx: 2,
-	}
-	policyData2, err := json.Marshal(&policy2)
-	require.NoError(t, err)
-
-	// Send both revisions to monitor as as seperate hits
-	chHitT <- []es.HitT{{
-		ID:      rId,
-		SeqNo:   1,
-		Version: 1,
-		Source:  policyData,
-	}}
-	chHitT <- []es.HitT{{
-		ID:      rId,
-		SeqNo:   2,
-		Version: 1,
-		Source:  policyData2,
-	}}
-
-	// start monitor
-	var merr error
-	var mwg sync.WaitGroup
-	mwg.Add(1)
-	go func() {
-		defer mwg.Done()
-		merr = monitor.Run(ctx)
-	}()
-	err = monitor.(*monitorT).waitStart(ctx)
-	require.NoError(t, err)
-
-	// subscribe with revision 0
-	s, err := monitor.Subscribe(agentId, policyId, 0)
-	defer monitor.Unsubscribe(s)
-	require.NoError(t, err)
-
-	// This sleep allows the main run to call dispatch
-	// but dispatch will not proceed until there is a signal from the dispatchCh
-	time.Sleep(100 * time.Millisecond)
-	pm.dispatchCh <- struct{}{}
-
-	tm := time.NewTimer(time.Second)
-	policies := make([]*ParsedPolicy, 0, 2)
-LOOP:
-	for {
-		select {
-		case p := <-s.Output():
-			policies = append(policies, p)
-		case <-tm.C:
-			break LOOP
-=======
 		// Burst of 1 and a long interval: the first subscriber is dispatched immediately,
 		// the second waits in the rate limiter.
 		monitor := NewMonitor(ftesting.NewMockBulk(), mm, config.ServerLimits{PolicyLimit: config.Limit{Burst: 1, Interval: time.Hour}})
 		pm := monitor.(*monitorT)
 		pm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
 			return []model.Policy{}, nil
->>>>>>> 299db1b (fix(policy monitor): run a single long-lived dispatcher (#7923))
 		}
 
 		var mwg sync.WaitGroup
