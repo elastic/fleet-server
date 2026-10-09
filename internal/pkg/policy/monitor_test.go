@@ -11,10 +11,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"runtime"
+	"strings"
 	"sync"
 	"testing"
 	"testing/synctest"
 	"time"
+	"unsafe"
 
 	"github.com/gofrs/uuid/v5"
 	"github.com/google/go-cmp/cmp"
@@ -659,6 +661,45 @@ func TestMonitor_StaleRevisionSkipsSecretResolution(t *testing.T) {
 	err := pm.processPolicies(ctx, []model.Policy{policyWithSecret})
 	assert.NoError(t, err, "stale revision should be skipped without error, not trigger secret resolution")
 	assert.Equal(t, int64(8), pm.policies[policyID].pp.Policy.RevisionIdx, "cached revision must not change for stale input")
+}
+
+// TestMonitor_ProcessHitsSharesStrings verifies that policies arriving from the policy index
+// monitor (processHits), which is how every revision after startup reaches the monitor, share
+// equal long strings with each other once stored. This path never goes through a full load.
+func TestMonitor_ProcessHitsSharesStrings(t *testing.T) {
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
+	query := strings.Repeat("SELECT name, path FROM processes WHERE ", 4)
+
+	hit := func(policyID string) es.HitT {
+		src, err := json.Marshal(model.Policy{
+			PolicyID:    policyID,
+			RevisionIdx: 1,
+			Data: &model.PolicyData{
+				Outputs: map[string]map[string]any{"default": {"type": "elasticsearch"}},
+				Inputs:  []map[string]any{{"query": query}},
+			},
+		})
+		require.NoError(t, err)
+		return es.HitT{Source: src}
+	}
+
+	pm := &monitorT{
+		log:      zerolog.Ctx(ctx).With().Logger(),
+		bulker:   ftesting.NewMockBulk(),
+		policies: map[string]policyT{},
+		pendingQ: makeHead(),
+	}
+	require.NoError(t, pm.processHits(ctx, []es.HitT{hit("policy-a"), hit("policy-b")}))
+
+	queryOf := func(policyID string) string {
+		q, ok := pm.policies[policyID].pp.Policy.Data.Inputs[0]["query"].(string)
+		require.True(t, ok)
+		return q
+	}
+	a, b := queryOf("policy-a"), queryOf("policy-b")
+	assert.Equal(t, query, a)
+	assert.Equal(t, query, b)
+	assert.Same(t, unsafe.StringData(a), unsafe.StringData(b), "policies from one set of hits share the query")
 }
 
 // Test_Monitor_repeated_events_do_not_strand_subscriber_in_rate_limiter sends a burst of events
