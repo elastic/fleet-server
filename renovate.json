@@ -24,7 +24,10 @@
   },
   "packageRules": [
     {
-      "description": "Major updates: only on main and the last branch of the previous major (baseBranchPatterns are maintained by the update-renovate-branches workflow, which also rewrites this rule)",
+      "description": [
+        "Major updates: only on main and the last branch of the previous major",
+        "managed-by: update-renovate-branches"
+      ],
       "matchUpdateTypes": [
         "major"
       ],
@@ -34,7 +37,10 @@
       "enabled": false
     },
     {
-      "description": "Codegen updates: only on main and the last branch of the previous major (maintained by the update-renovate-branches workflow, which also rewrites this rule)",
+      "description": [
+        "Codegen updates: only on main and the last branch of the previous major",
+        "managed-by: update-renovate-branches"
+      ],
       "matchManagers": [
         "gomod"
       ],
