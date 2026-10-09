@@ -2016,6 +2016,83 @@ func TestProcessPolicyRemoteESServiceTokenSecretPaths(t *testing.T) {
 	assert.Equal(t, policy.OutputTypeElasticsearch, remotePolicy["type"])
 }
 
+// TestProcessPolicyPrunesAgentPinnedInputsSecretPaths ensures inputs pinned to other
+// agents are not delivered and that secret_paths follow the shifted input/stream indexes.
+func TestProcessPolicyPrunesAgentPinnedInputsSecretPaths(t *testing.T) {
+	logger := testlog.SetLogger(t)
+
+	const policyPayload = `{
+  "id": "pinned-inputs",
+  "revision": 1,
+  "outputs": {"default": {"type": "elasticsearch", "hosts": ["https://local.es.example:443"]}},
+  "output_permissions": {"default": {"_fallback": {"cluster": ["monitor"]}}},
+  "secret_references": [{"id": "P0"}, {"id": "P1"}, {"id": "T0"}, {"id": "T1"}],
+  "inputs": [
+    {
+      "id": "pinned-elsewhere",
+      "condition": "${agent.id} == 'agent2'",
+      "secrets": {"pw": {"id": "P0"}}
+    },
+    {
+      "id": "mixed",
+      "secrets": {"pw": {"id": "P1"}},
+      "streams": [
+        {"id": "s0", "condition": "${agent.id} == 'agent2'", "secrets": {"tok": {"id": "T0"}}},
+        {"id": "s1", "condition": "${agent.id} == 'agent1'", "secrets": {"tok": {"id": "T1"}}}
+      ]
+    }
+  ]
+}`
+
+	var d model.PolicyData
+	require.NoError(t, json.Unmarshal([]byte(policyPayload), &d))
+
+	bulker := ftesting.NewMockBulk()
+	pp, err := policy.NewParsedPolicy(t.Context(), bulker, model.Policy{
+		PolicyID:    "policy1",
+		RevisionIdx: 1,
+		Data:        &d,
+	})
+	require.NoError(t, err)
+
+	outputBulker := ftesting.NewMockBulk()
+	bulker.On("CreateAndGetBulker", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(outputBulker, false, nil)
+
+	defaultOut := pp.Outputs["default"]
+	require.NotNil(t, defaultOut.Role)
+	key := bulk.APIKey{ID: "default-id", Key: "default-key"}
+	agent := &model.Agent{
+		ESDocument: model.ESDocument{Id: "agent1"},
+		Outputs: map[string]*model.PolicyOutput{
+			"default": {
+				APIKey:          key.Agent(),
+				APIKeyID:        key.ID,
+				PermissionsHash: defaultOut.Role.Sha2,
+				Type:            policy.OutputTypeElasticsearch,
+			},
+		},
+	}
+
+	action, _, err := processPolicy(t.Context(), logger, bulker, agent, pp, nil)
+	require.NoError(t, err)
+	pc, err := action.Data.AsActionPolicyChange()
+	require.NoError(t, err)
+
+	require.Len(t, pc.Policy.Inputs, 1)
+	assert.Equal(t, "mixed", pc.Policy.Inputs[0]["id"])
+	assert.ElementsMatch(t, []string{"inputs.0.pw", "inputs.0.streams.0.tok"}, pc.Policy.SecretPaths)
+
+	input := pc.Policy.Inputs[0]
+	assert.Equal(t, "P1_value", input["pw"])
+	streams, ok := input["streams"].([]any)
+	require.True(t, ok)
+	require.Len(t, streams, 1)
+	stream, ok := streams[0].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "T1_value", stream["tok"])
+}
+
 // TestProcessPolicyAgentTags ensures that processPolicy injects the agent tags and records their hash
 // only when agent.features.include_tags_in_events.enabled is true.
 func TestProcessPolicyAgentTags(t *testing.T) {
