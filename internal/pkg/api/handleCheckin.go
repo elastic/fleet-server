@@ -81,6 +81,7 @@ var validActionTypes = map[string]bool{
 	string(UPGRADE):              true,
 	string(MIGRATE):              true,
 	string(PRIVILEGELEVELCHANGE): true,
+	string(UNINSTALL):            true,
 	string(RESTART):              true,
 }
 
@@ -1089,7 +1090,10 @@ func convertActionData(aType ActionType, raw json.RawMessage) (ad Action_Data, e
 		}
 		err = ad.FromActionRequestDiagnostics(d)
 		return
-	case UNENROLL, RESTART: // Action types with no data
+	case UNENROLL, UNINSTALL, RESTART: // Action types with no data
+		// UNINSTALL and RESTART carry no data. For UNINSTALL, tamper-protection
+		// removal is handled by the preceding UNENROLL action; scheduling uses the
+		// action's top-level start_time, not a data field.
 		return ad, nil
 	case MIGRATE:
 		d := ActionMigrate{}

@@ -196,6 +196,17 @@ func TestConvertActionData(t *testing.T) {
 		expect: Action_Data{},
 		hasErr: false,
 	}, {
+		name:   "uninstall action (no data)",
+		aType:  UNINSTALL,
+		expect: Action_Data{},
+		hasErr: false,
+	}, {
+		name:   "uninstall action ignores any data",
+		aType:  UNINSTALL,
+		raw:    json.RawMessage(`{"ignored":"value"}`),
+		expect: Action_Data{},
+		hasErr: false,
+	}, {
 		name:   "restart action",
 		aType:  RESTART,
 		expect: Action_Data{},
@@ -359,6 +370,9 @@ func TestFilterActions(t *testing.T) {
 		}, {
 			ActionID: "9012",
 			Type:     "RESTART",
+		}, {
+			ActionID: "9013",
+			Type:     "UNINSTALL",
 		}},
 		resp: []model.Action{{
 			ActionID: "1234",
@@ -369,6 +383,9 @@ func TestFilterActions(t *testing.T) {
 		}, {
 			ActionID: "9012",
 			Type:     "RESTART",
+		}, {
+			ActionID: "9013",
+			Type:     "UNINSTALL",
 		}},
 	}, {
 		name: "filter POLICY_CHANGE action",
