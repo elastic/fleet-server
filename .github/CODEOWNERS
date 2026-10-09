@@ -6,3 +6,6 @@
 /.github/workflows/release-notes.yml @elastic/ski-docs @elastic/elastic-agent-control-plane
 /docs/release-notes @elastic/ski-docs
 /docs/docset.yml @elastic/ski-docs
+
+# Agentic workflow client triggers (elastic/oblt-aw distribution)
+/.github/workflows/trigger-obs-aw-* @elastic/observablt-ci
