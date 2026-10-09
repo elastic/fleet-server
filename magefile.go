@@ -96,8 +96,8 @@ const (
 	binaryName = "fleet-server"
 	binaryExe  = "fleet-server.exe"
 
-	dockerSuffix      = "main-debian11"
-	dockerArmSuffix   = "base-arm-debian11"
+	dockerSuffix      = "main-debian12"
+	dockerArmSuffix   = "base-arm-debian12"
 	dockerBuilderFile = "Dockerfile.build"
 	dockerBuilderFIPS = "Dockerfile.fips"
 	dockerBuilderName = "fleet-server-builder"

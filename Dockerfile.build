@@ -1,5 +1,5 @@
 ARG GO_VERSION
-ARG SUFFIX # Should be main-debian11 or arm
+ARG SUFFIX # Should be main-debian12 or arm
 FROM docker.elastic.co/beats-dev/golang-crossbuild:${GO_VERSION}-${SUFFIX}
 
 RUN \
