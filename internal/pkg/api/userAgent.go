@@ -47,7 +47,7 @@ func maximizePatch(ver *version.Version) string {
 
 // validateUserAgent validates that the User-Agent of the connecting Elastic Agent is valid and that the version is
 // supported for this Fleet Server.
-func validateUserAgent(ctx context.Context, zlog zerolog.Logger, userAgent string, verConst version.Constraints) (string, error) {
+func validateUserAgent(ctx context.Context, zlog zerolog.Logger, userAgent string, elasticAgentVersion string, verConst version.Constraints) (string, error) {
 	span, _ := apm.StartSpan(ctx, "userAgent", "validate")
 	defer span.End()
 	zlog = zlog.With().Str("userAgent", userAgent).Logger()
@@ -60,6 +60,7 @@ func validateUserAgent(ctx context.Context, zlog zerolog.Logger, userAgent strin
 	}
 
 	userAgent = strings.ToLower(userAgent)
+
 	if !strings.HasPrefix(userAgent, userAgentPrefix) {
 		zlog.Info().
 			Err(ErrInvalidUserAgent).
@@ -77,7 +78,7 @@ func validateUserAgent(ctx context.Context, zlog zerolog.Logger, userAgent strin
 	// Trim leading and traling spaces
 	verStr := strings.TrimSpace(verSep[0])
 
-	ver, err := version.NewVersion(verStr)
+	ver, err := getVersion(verStr, elasticAgentVersion)
 	if err != nil {
 		zlog.Info().
 			Err(err).
@@ -85,14 +86,29 @@ func validateUserAgent(ctx context.Context, zlog zerolog.Logger, userAgent strin
 			Msg("invalid user agent version string")
 		return "", ErrInvalidUserAgent
 	}
+
 	if !verConst.Check(ver) {
 		zlog.Info().
 			Err(ErrUnsupportedVersion).
-			Str("verStr", verStr).
+			Str("verStr", ver.String()).
 			Str("constraints", verConst.String()).
 			Msg("unsuported user agent version")
 		return "", ErrUnsupportedVersion
 	}
 
 	return ver.String(), nil
+}
+
+func getVersion(userAgentVersion string, elasticAgentVersion string) (*version.Version, error) {
+	ver, err := version.NewVersion(userAgentVersion)
+	if err == nil {
+		return ver, nil
+	}
+
+	ver, err = version.NewVersion(elasticAgentVersion)
+	if err == nil {
+		return ver, nil
+	}
+
+	return nil, ErrInvalidUserAgent
 }
