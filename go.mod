@@ -100,3 +100,5 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	howett.net/plist v1.0.1 // indirect
 )
+
+replace github.com/elastic/fleet-server/dev-tools => ./dev-tools
