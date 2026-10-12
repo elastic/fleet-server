@@ -112,12 +112,9 @@ LOOP:
 			cT.Reset(m.checkTime)
 			m.log.Trace().Msg(state.String())
 		case hits := <-s.Output():
-			policies := make([]model.Policy, len(hits))
-			for i, hit := range hits {
-				err := hit.Unmarshal(&policies[i])
-				if err != nil {
-					return err
-				}
+			policies, err := unmarshalHits(hits)
+			if err != nil {
+				return err
 			}
 			state, err := m.processPolicies(ctx, policies)
 			if err != nil {
