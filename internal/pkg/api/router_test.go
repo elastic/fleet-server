@@ -76,12 +76,11 @@ func TestLimiter(t *testing.T) {
 		},
 		status: http.StatusOK,
 	}, {
-		name: "limit reached (negative values)",
+		name: "limit reached",
 		cfg: &config.ServerLimits{
 			StatusLimit: config.Limit{
-				Interval: -1 * time.Second,
-				Burst:    -1,
-				Max:      -1,
+				Interval: time.Second,
+				Burst:    0,
 			},
 		},
 		status: http.StatusTooManyRequests,
@@ -94,7 +93,7 @@ func TestLimiter(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			h := testStatusServer(t, tt.cfg)
 			w := httptest.NewRecorder()
-			r := httptest.NewRequest("GET", "/api/status", nil)
+			r := httptest.NewRequestWithContext(t.Context(), "GET", "/api/status", nil)
 
 			h.ServeHTTP(w, r)
 			resp := w.Result()
