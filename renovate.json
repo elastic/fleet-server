@@ -24,6 +24,35 @@
   },
   "packageRules": [
     {
+      "description": [
+        "Major updates: only on main and the last branch of the previous major",
+        "managed-by: update-renovate-branches"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "matchBaseBranches": [
+        "!/^(main|8\\.19)$/"
+      ],
+      "enabled": false
+    },
+    {
+      "description": [
+        "Codegen updates: only on main and the last branch of the previous major",
+        "managed-by: update-renovate-branches"
+      ],
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchPackageNames": [
+        "/^github\\.com/oapi-codegen//"
+      ],
+      "matchBaseBranches": [
+        "!/^(main|8\\.19)$/"
+      ],
+      "enabled": false
+    },
+    {
       "description": "Go modules: schedule, PR limit, branch prefix, and post-update tidy",
       "matchManagers": [
         "gomod"
