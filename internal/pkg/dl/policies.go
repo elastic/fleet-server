@@ -53,6 +53,10 @@ func QueryLatestPolicies(ctx context.Context, bulker bulk.Bulk, opt ...Option) (
 		return []model.Policy{}, nil
 	}
 	policies := make([]model.Policy, len(policyID.Buckets))
+	// Share equal strings across the policies as each one is decoded, so that text repeated
+	// across the policies is held in memory only once and at most one policy's duplicates exist
+	// at a time. See StringSharer.
+	sharer := NewStringSharer()
 	for i, bucket := range policyID.Buckets {
 		revisionIdx, ok := bucket.Aggregations[FieldRevisionIdx]
 		if !ok || len(revisionIdx.Hits) != 1 {
@@ -63,6 +67,7 @@ func QueryLatestPolicies(ctx context.Context, bulker bulk.Bulk, opt ...Option) (
 		if err != nil {
 			return nil, err
 		}
+		sharer.Share(&policies[i])
 	}
 	return policies, nil
 }
