@@ -75,15 +75,9 @@ func (s *StringSharer) Share(p *model.Policy) {
 	if d == nil {
 		return
 	}
-	// These are the sections of a policy that hold free-form decoded JSON.
-	// The typed fields (IDs, revision numbers and so on) are small and are left alone.
-	for _, section := range []map[string]any{
-		d.Agent, d.Connectors, d.Exporters, d.Extensions, d.Fleet, d.Processors, d.Receivers,
-	} {
-		s.shareMap(section)
-	}
 	// Inputs carry the bulk of a policy's content (integration settings and, for osquery,
-	// the packs of scheduled queries).
+	// the packs of scheduled queries). The other sections of a policy are small, or not decoded
+	// into maps in this version, and are left alone.
 	for _, input := range d.Inputs {
 		s.shareMap(input)
 	}

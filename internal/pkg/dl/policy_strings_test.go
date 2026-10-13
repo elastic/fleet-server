@@ -59,9 +59,6 @@ func testPolicy(query string) model.Policy {
 	return model.Policy{
 		PolicyID: "policy-1",
 		Data: &model.PolicyData{
-			Agent: map[string]any{
-				"download": map[string]any{"sourceURI": strings.Clone("https://artifacts.example.test/downloads/" + strings.Repeat("x", 40))},
-			},
 			Inputs: []map[string]any{{
 				testType: strings.Clone(testOsquery),
 				testOsquery: map[string]any{
@@ -79,7 +76,10 @@ func testPolicy(query string) model.Policy {
 				},
 			}},
 			Outputs: map[string]map[string]any{
-				testOutput: {testType: strings.Clone(testES)},
+				testOutput: {
+					testType:   strings.Clone(testES),
+					"download": map[string]any{"sourceURI": strings.Clone("https://artifacts.example.test/downloads/" + strings.Repeat("x", 40))},
+				},
 			},
 		},
 	}
@@ -127,8 +127,8 @@ func TestStringSharer(t *testing.T) {
 	t.Run("long equal values share memory", func(t *testing.T) {
 		assert.True(t, sameBacking(queryOf(t, policies[0]), queryOf(t, policies[1])))
 
-		a := stringAt(t, policies[0].Data.Agent, "download", "sourceURI")
-		b := stringAt(t, policies[1].Data.Agent, "download", "sourceURI")
+		a := stringAt(t, policies[0].Data.Outputs[testOutput], "download", "sourceURI")
+		b := stringAt(t, policies[1].Data.Outputs[testOutput], "download", "sourceURI")
 		assert.True(t, sameBacking(a, b))
 	})
 
@@ -146,10 +146,10 @@ func TestStringSharer(t *testing.T) {
 	})
 
 	t.Run("maps stay independent", func(t *testing.T) {
-		download, ok := at(t, policies[0].Data.Agent, "download").(map[string]any)
+		download, ok := at(t, policies[0].Data.Outputs[testOutput], "download").(map[string]any)
 		require.True(t, ok)
 		download["sourceURI"] = "changed"
-		assert.NotEqual(t, "changed", stringAt(t, policies[1].Data.Agent, "download", "sourceURI"))
+		assert.NotEqual(t, "changed", stringAt(t, policies[1].Data.Outputs[testOutput], "download", "sourceURI"))
 	})
 
 	t.Run("policy without data is untouched", func(t *testing.T) {
@@ -191,7 +191,6 @@ func TestStringSharerCap(t *testing.T) {
 func TestStringSharerNilSections(t *testing.T) {
 	policies := []model.Policy{{Data: &model.PolicyData{}}}
 	require.NotPanics(t, func() { shareAll(policies) })
-	assert.Nil(t, policies[0].Data.Agent)
 	assert.Nil(t, policies[0].Data.Inputs)
 	assert.Nil(t, policies[0].Data.Outputs)
 }
