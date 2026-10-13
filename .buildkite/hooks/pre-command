@@ -4,7 +4,6 @@ set -euo pipefail
 
 source .buildkite/scripts/common.sh
 
-CI_DRA_ROLE_PATH="kv/ci-shared/release/dra-role"
 JOB_GCS_BUCKET="fleet-server-ci-internal"
 
 export JOB_GCS_BUCKET
@@ -34,14 +33,4 @@ if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server-package-mbp" ]]; then
   _branch="${DRA_BRANCH:="${BUILDKITE_BRANCH:=""}"}"
 
   check_if_branch_available "${_branch}"
-fi
-
-# TODO: use a builkite plugin to handle this
-if [[ "$BUILDKITE_PIPELINE_SLUG" == "fleet-server-package-mbp" ]]; then
-  if [[ "$BUILDKITE_STEP_KEY" == "dra-snapshot" || "$BUILDKITE_STEP_KEY" == "dra-staging" ]]; then
-    DRA_CREDS_SECRET=$(retry 5 vault kv get -field=data -format=json ${CI_DRA_ROLE_PATH})
-    export VAULT_ADDR_SECRET=$(echo ${DRA_CREDS_SECRET} | jq -r '.vault_addr')
-    export VAULT_ROLE_ID_SECRET=$(echo ${DRA_CREDS_SECRET} | jq -r '.role_id')
-    export VAULT_SECRET_ID_SECRET=$(echo ${DRA_CREDS_SECRET} | jq -r '.secret_id')
-  fi
 fi
