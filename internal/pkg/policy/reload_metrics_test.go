@@ -15,9 +15,9 @@ import (
 )
 
 func TestReloadMetrics(t *testing.T) {
-	t.Run("logs duration, phases and memory at debug level", func(t *testing.T) {
+	t.Run("logs duration, phases and memory at info level", func(t *testing.T) {
 		var buf bytes.Buffer
-		log := zerolog.New(&buf).Level(zerolog.DebugLevel)
+		log := zerolog.New(&buf).Level(zerolog.InfoLevel)
 
 		rm := startReloadMetrics(log)
 		require.NotNil(t, rm)
@@ -37,9 +37,9 @@ func TestReloadMetrics(t *testing.T) {
 		require.Len(t, out["phaseDurationsMs"], 2)
 	})
 
-	t.Run("is a no-op when debug is disabled", func(t *testing.T) {
+	t.Run("is a no-op when info is disabled", func(t *testing.T) {
 		var buf bytes.Buffer
-		log := zerolog.New(&buf).Level(zerolog.InfoLevel)
+		log := zerolog.New(&buf).Level(zerolog.WarnLevel)
 
 		rm := startReloadMetrics(log)
 		require.Nil(t, rm)

@@ -29,7 +29,7 @@ func toMB(bytes uint64) float64 {
 // included) and sampled, so the peak is an indication to compare runs with, not an exact
 // allocation of the reload.
 //
-// It is only created when debug logging is enabled. All methods are safe to call on a nil receiver.
+// It is only created when info logging is enabled. All methods are safe to call on a nil receiver.
 type reloadMetrics struct {
 	startedAt   time.Time
 	startHeap   uint64
@@ -42,9 +42,9 @@ type reloadMetrics struct {
 	done        chan struct{}
 }
 
-// startReloadMetrics returns nil when debug logging is not enabled.
+// startReloadMetrics returns nil when info logging is not enabled.
 func startReloadMetrics(log zerolog.Logger) *reloadMetrics {
-	if !log.Debug().Enabled() {
+	if !log.Info().Enabled() {
 		return nil
 	}
 	heap, total := readMemory()
@@ -110,7 +110,7 @@ func (r *reloadMetrics) measure(name string, fn func() error) error {
 	return err
 }
 
-// log stops the measurement and logs the result at debug level.
+// log stops the measurement and logs the result at info level.
 func (r *reloadMetrics) log(log zerolog.Logger, trigger string, nPolicies int) {
 	if r == nil {
 		return
@@ -126,7 +126,7 @@ func (r *reloadMetrics) log(log zerolog.Logger, trigger string, nPolicies int) {
 	for name, d := range r.phases {
 		phases.Int64(name, d.Milliseconds())
 	}
-	log.Debug().
+	log.Info().
 		Str("trigger", trigger).
 		Int("nPolicies", nPolicies).
 		Int64("durationMs", time.Since(r.startedAt).Milliseconds()).
