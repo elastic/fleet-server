@@ -14,12 +14,6 @@ import (
 const (
 	fieldCondition = "condition"
 	fieldStreams   = "streams"
-	fieldType      = "type"
-
-	// Only Synthetics inputs (synthetics/http, synthetics/browser, ...) are
-	// pruned; scalable private locations are the sole producer of these
-	// conditions, and every other input is delivered untouched.
-	syntheticsInputTypePrefix = "synthetics/"
 
 	secretKeyInputsPrefix = "inputs."
 	secretKeyStreamsInfix = fieldStreams + "."
@@ -31,8 +25,8 @@ const (
 // backslash or `$` are never matched and are left for the agent to evaluate.
 var agentIDConditionRE = regexp.MustCompile(`^\s*\$\{agent\.id\}\s*==\s*'([^'\\$\x00-\x1f]*)'\s*$`)
 
-// FilterInputsForAgent drops Synthetics inputs and streams pinned to another
-// agent by an exact `${agent.id} == '<id>'` condition, as Elastic Agent would. Secret key
+// FilterInputsForAgent drops inputs and streams pinned to another agent by an
+// exact `${agent.id} == '<id>'` condition, as Elastic Agent would. Secret key
 // paths are renumbered to follow the shifted indexes. Input elements are shared
 // between agents, so changed inputs are copied, never mutated.
 func FilterInputsForAgent(inputs []map[string]any, secretKeys []string, agentID string) ([]map[string]any, []string) {
@@ -65,9 +59,6 @@ func FilterInputsForAgent(inputs []map[string]any, secretKeys []string, agentID 
 // filterInput returns a modified copy (plus new stream indexes) when streams
 // were pruned, or nil when the original input is kept as is.
 func filterInput(input map[string]any, agentID string) (map[string]any, []int, bool) {
-	if t, _ := input[fieldType].(string); !strings.HasPrefix(t, syntheticsInputTypePrefix) {
-		return nil, nil, true
-	}
 	if pinnedToOtherAgent(input[fieldCondition], agentID) {
 		return nil, nil, false
 	}

@@ -15,14 +15,11 @@ const (
 	testAgentID = "agent-1"
 	condSelf    = "${agent.id} == 'agent-1'"
 	condOther   = "${agent.id} == 'agent-2'"
-
-	inputTypeLogfile    = "logfile"
-	inputTypeFilestream = "filestream"
 )
 
 // testInput builds an input; the "n" field lets tests identify it after filtering.
 func testInput(n int, condition string, streams ...any) map[string]any {
-	in := map[string]any{"n": n, fieldType: "synthetics/http"}
+	in := map[string]any{"n": n}
 	if condition != "" {
 		in[fieldCondition] = condition
 	}
@@ -94,26 +91,6 @@ func TestFilterInputsForAgent(t *testing.T) {
 			assert.ElementsMatch(t, tc.want, remainingInputs(t, got))
 		})
 	}
-}
-
-func TestFilterInputsForAgent_OnlySyntheticsInputs(t *testing.T) {
-	inputs := []map[string]any{
-		testInput(0, condOther),
-		testInput(1, condOther, testStream(condOther)),
-		testInput(2, "", testStream(condOther), testStream(condSelf)),
-		testInput(3, condOther),
-		testInput(4, condOther),
-	}
-	inputs[1][fieldType] = inputTypeLogfile
-	inputs[2][fieldType] = inputTypeFilestream
-	delete(inputs[3], fieldType)
-	inputs[4][fieldType] = "synthetics/browser"
-
-	got, _ := FilterInputsForAgent(inputs, nil, testAgentID)
-
-	assert.Equal(t, []int{1, 2, 3}, remainingInputs(t, got))
-	assert.Equal(t, inputs[1], got[0])
-	assert.Len(t, got[1][fieldStreams], 2, "streams of non-Synthetics inputs are not pruned")
 }
 
 func TestFilterInputsForAgent_Streams(t *testing.T) {
