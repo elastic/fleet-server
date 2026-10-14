@@ -658,7 +658,7 @@ func TestMonitor_StaleRevisionSkipsSecretResolution(t *testing.T) {
 		pendingQ: makeHead(),
 	}
 
-	err := pm.processPolicies(ctx, []model.Policy{policyWithSecret})
+	err := pm.processPolicies(ctx, []model.Policy{policyWithSecret}, nil)
 	assert.NoError(t, err, "stale revision should be skipped without error, not trigger secret resolution")
 	assert.Equal(t, int64(8), pm.policies[policyID].pp.Policy.RevisionIdx, "cached revision must not change for stale input")
 }

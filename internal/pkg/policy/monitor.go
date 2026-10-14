@@ -225,13 +225,20 @@ func (m *monitorT) processHits(ctx context.Context, hits []es.HitT) error {
 	span, ctx := apm.StartSpan(ctx, "process hits", "process")
 	defer span.End()
 
-	policies, err := unmarshalHits(hits)
+	rm := startReloadMetrics(m.log)
+	defer rm.log(m.log, "hits", len(hits))
+
+	var policies []model.Policy
+	err := rm.measure("unmarshal", func() (err error) {
+		policies, err = unmarshalHits(hits)
+		return err
+	})
 	if err != nil {
 		zerolog.Ctx(ctx).Error().Err(err).Msg("fail unmarshal hits")
 		return err
 	}
 
-	return m.processPolicies(ctx, policies)
+	return m.processPolicies(ctx, policies, rm)
 }
 
 // waitStart returns once Run has started
@@ -351,7 +358,14 @@ func (m *monitorT) loadPolicies(ctx context.Context) error {
 		ctx = apm.ContextWithTransaction(ctx, trans)
 		defer trans.End()
 	}
-	policies, err := m.policyF(ctx, m.bulker, dl.WithIndexName(m.policiesIndex))
+	rm := startReloadMetrics(m.log)
+	var policies []model.Policy
+	defer func() { rm.log(m.log, "load", len(policies)) }()
+
+	err := rm.measure("fetch", func() (err error) {
+		policies, err = m.policyF(ctx, m.bulker, dl.WithIndexName(m.policiesIndex))
+		return err
+	})
 	if err != nil {
 		if errors.Is(err, es.ErrIndexNotFound) {
 			m.log.Debug().
@@ -365,10 +379,11 @@ func (m *monitorT) loadPolicies(ctx context.Context) error {
 		m.log.Debug().Msg("no policy to monitor")
 		return nil
 	}
-	return m.processPolicies(ctx, policies)
+	return m.processPolicies(ctx, policies, rm)
 }
 
-func (m *monitorT) processPolicies(ctx context.Context, policies []model.Policy) error {
+// processPolicies parses and applies the policies, recording its phases in rm, which may be nil.
+func (m *monitorT) processPolicies(ctx context.Context, policies []model.Policy, rm *reloadMetrics) error {
 	span, ctx := apm.StartSpan(ctx, "process policies", "process")
 	defer span.End()
 
@@ -388,12 +403,19 @@ func (m *monitorT) processPolicies(ctx context.Context, policies []model.Policy)
 				Msg("skipping stale policy revision; secret resolution and policy parse skipped")
 			continue
 		}
-		pp, err := NewParsedPolicy(ctx, m.bulker, policy)
+		var pp *ParsedPolicy
+		err := rm.measure("parse", func() (err error) {
+			pp, err = NewParsedPolicy(ctx, m.bulker, policy)
+			return err
+		})
 		if err != nil {
 			return err
 		}
 
-		m.updatePolicy(ctx, pp)
+		_ = rm.measure("update", func() error {
+			m.updatePolicy(ctx, pp)
+			return nil
+		})
 	}
 	return nil
 }
