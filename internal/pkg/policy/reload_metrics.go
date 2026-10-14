@@ -115,13 +115,17 @@ func (r *reloadMetrics) log(log zerolog.Logger, trigger string, nPolicies int) {
 	if r == nil {
 		return
 	}
+	// Capture the duration and the end memory first, so that stopping the sampler is not measured.
+	duration := time.Since(r.startedAt)
+	endHeap, endTotal := readMemory()
 	close(r.stopSampler)
 	<-r.done
-	r.sampleMemory()
-	endHeap, endTotal := readMemory()
 
 	r.mut.Lock()
 	defer r.mut.Unlock()
+	// The end sample is also a peak candidate, so an AtEnd value never exceeds its peak.
+	r.peakHeap = max(r.peakHeap, endHeap)
+	r.peakTotal = max(r.peakTotal, endTotal)
 	phases := zerolog.Dict()
 	for name, d := range r.phases {
 		phases.Int64(name, d.Milliseconds())
@@ -129,7 +133,7 @@ func (r *reloadMetrics) log(log zerolog.Logger, trigger string, nPolicies int) {
 	log.Info().
 		Str("trigger", trigger).
 		Int("nPolicies", nPolicies).
-		Int64("durationMs", time.Since(r.startedAt).Milliseconds()).
+		Int64("durationMs", duration.Milliseconds()).
 		Dict("phaseDurationsMs", phases).
 		Float64("heapUsedMbAtStart", toMB(r.startHeap)).
 		Float64("heapUsedMbAtEnd", toMB(endHeap)).
