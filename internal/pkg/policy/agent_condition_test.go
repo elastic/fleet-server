@@ -15,6 +15,9 @@ const (
 	testAgentID = "agent-1"
 	condSelf    = "${agent.id} == 'agent-1'"
 	condOther   = "${agent.id} == 'agent-2'"
+
+	inputTypeLogfile    = "logfile"
+	inputTypeFilestream = "filestream"
 )
 
 // testInput builds an input; the "n" field lets tests identify it after filtering.
@@ -101,8 +104,8 @@ func TestFilterInputsForAgent_OnlySyntheticsInputs(t *testing.T) {
 		testInput(3, condOther),
 		testInput(4, condOther),
 	}
-	inputs[1][fieldType] = "logfile"
-	inputs[2][fieldType] = "filestream"
+	inputs[1][fieldType] = inputTypeLogfile
+	inputs[2][fieldType] = inputTypeFilestream
 	delete(inputs[3], fieldType)
 	inputs[4][fieldType] = "synthetics/browser"
 
