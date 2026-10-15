@@ -152,7 +152,8 @@ type (
 
 		// MaxAgentVersion (config key: feature_flags._max_agent_version) raises the highest Elastic Agent
 		// version accepted on checkin/enroll above this Fleet Server's own MAJOR.MINOR. All patch versions of
-		// the given MAJOR.MINOR are accepted. A value at or below the built-in ceiling is ignored.
+		// the given MAJOR.MINOR are accepted. A value at or below the built-in ceiling is ignored; a value with a
+		// higher MAJOR than this Fleet Server is rejected when the server starts.
 		// The value must be quoted in YAML: an unquoted 9.10 is parsed as a float and read as "9.1".
 		// Hidden escape hatch for specific support cases; agents newer than Fleet Server are not a supported
 		// configuration, and Fleet Server will ignore fields and action types it does not know about.

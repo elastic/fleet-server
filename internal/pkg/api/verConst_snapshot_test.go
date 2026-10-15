@@ -34,7 +34,7 @@ func TestVersionConstraint(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.version, func(t *testing.T) {
-			vc, err := BuildVersionConstraint("8.0.0", "")
+			vc, _, err := BuildVersionConstraint("8.0.0", "")
 			require.NoError(t, err)
 			ver, err := version.NewVersion(tc.version)
 			require.NoError(t, err)
@@ -50,12 +50,14 @@ func TestVersionConstraintOverride(t *testing.T) {
 	tests := []struct {
 		name       string
 		override   string
+		applied    bool
 		constraint string
 		accept     []string
 		reject     []string
 	}{{
 		name:     "minor override",
 		override: "8.3",
+		applied:  true,
 		accept:   []string{"8.1.0", "8.3.0", "8.3.5"},
 		reject:   []string{"8.4.0"},
 	}, {
@@ -63,6 +65,7 @@ func TestVersionConstraintOverride(t *testing.T) {
 		// relaxes the ceiling when it has the same MAJOR.MINOR as the default.
 		name:     "override at default minor accepts all patches",
 		override: "8.1",
+		applied:  true,
 		accept:   []string{"8.1.5"},
 		reject:   []string{"8.2.0"},
 	}, {
@@ -73,8 +76,9 @@ func TestVersionConstraintOverride(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			vc, err := BuildVersionConstraint("8.0.0", tc.override)
+			vc, applied, err := BuildVersionConstraint("8.0.0", tc.override)
 			require.NoError(t, err)
+			require.Equal(t, tc.applied, applied)
 			if tc.constraint != "" {
 				require.Equal(t, tc.constraint, vc.String())
 			}
@@ -88,7 +92,12 @@ func TestVersionConstraintOverride(t *testing.T) {
 	}
 
 	t.Run("invalid override", func(t *testing.T) {
-		_, err := BuildVersionConstraint("8.0.0", "8.six")
+		_, _, err := BuildVersionConstraint("8.0.0", "8.six")
+		require.Error(t, err)
+	})
+
+	t.Run("override with higher major is rejected", func(t *testing.T) {
+		_, _, err := BuildVersionConstraint("8.0.0", "9.0")
 		require.Error(t, err)
 	})
 }

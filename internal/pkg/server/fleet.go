@@ -61,7 +61,7 @@ type Fleet struct {
 // NewFleet creates the actual fleet server service.
 func NewFleet(bi build.Info, reporter state.Reporter, standAlone bool) (*Fleet, error) {
 	// The constraint is built from config in runServer; this only rejects a malformed build version up front.
-	if _, err := api.BuildVersionConstraint(bi.Version, ""); err != nil {
+	if _, _, err := api.BuildVersionConstraint(bi.Version, ""); err != nil {
 		return nil, err
 	}
 
@@ -538,15 +538,23 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 	}))
 
 	maxAgentVersion := cfg.Inputs[0].Server.Features.MaxAgentVersion
-	verCon, err := api.BuildVersionConstraint(f.bi.Version, maxAgentVersion)
+	verCon, overrideApplied, err := api.BuildVersionConstraint(f.bi.Version, maxAgentVersion)
 	if err != nil {
 		return err
 	}
-	if maxAgentVersion != "" {
+	switch {
+	case overrideApplied:
 		zerolog.Ctx(ctx).Warn().
 			Str("feature_flags._max_agent_version", maxAgentVersion).
+			Str("fleet_server_version", f.bi.Version).
 			Str("constraints", verCon.String()).
 			Msg("Elastic Agent version override is active; agents newer than Fleet Server are not a supported configuration")
+	case maxAgentVersion != "":
+		zerolog.Ctx(ctx).Warn().
+			Str("feature_flags._max_agent_version", maxAgentVersion).
+			Str("fleet_server_version", f.bi.Version).
+			Str("constraints", verCon.String()).
+			Msg("feature_flags._max_agent_version is not above the built-in maximum and was ignored")
 	}
 
 	ct, err := api.NewCheckinT(verCon, &cfg.Inputs[0].Server, f.cache, bc, pm, am, ad, bulker,

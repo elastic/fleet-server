@@ -48,33 +48,46 @@ func maximizePatch(ver *version.Version) string {
 
 // BuildVersionConstraint turns the version into a constraint to ensure that the connecting Elastic Agents are
 // a supported version. maxOverride (feature_flags._max_agent_version) may raise, but never lower, the upper bound;
-// all patch versions of its MAJOR.MINOR are accepted.
-func BuildVersionConstraint(verStr, maxOverride string) (version.Constraints, error) {
+// all patch versions of its MAJOR.MINOR are accepted. An override with a higher MAJOR than the Fleet Server
+// version is rejected with an error.
+//
+// The returned bool reports whether the override raised the upper bound. It is false when no override is given
+// and when the override is at or below the default upper bound and was therefore ignored.
+func BuildVersionConstraint(verStr, maxOverride string) (version.Constraints, bool, error) {
 	ver, err := version.NewVersion(verStr)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	upperStr := defaultMaxVersion(ver)
+	applied := false
 	if maxOverride != "" {
 		o, err := version.NewVersion(maxOverride)
 		if err != nil {
-			return nil, fmt.Errorf("invalid feature_flags._max_agent_version %q: %w", maxOverride, err)
+			return nil, false, fmt.Errorf("invalid feature_flags._max_agent_version %q: %w", maxOverride, err)
+		}
+		if o.Segments()[0] > ver.Segments()[0] {
+			return nil, false, fmt.Errorf("feature_flags._max_agent_version %q is a higher major version than Fleet Server %s", maxOverride, verStr)
 		}
 		upper, err := version.NewVersion(upperStr)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		overrideStr := maximizePatch(o)
 		overrideMax, err := version.NewVersion(overrideStr)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		// Only relax the ceiling, so a typo can't lock out agents that work today.
 		if overrideMax.GreaterThan(upper) {
 			upperStr = overrideStr
+			applied = true
 		}
 	}
-	return version.NewConstraint(fmt.Sprintf(">= %s, <= %s", MinVersion, upperStr))
+	con, err := version.NewConstraint(fmt.Sprintf(">= %s, <= %s", MinVersion, upperStr))
+	if err != nil {
+		return nil, false, err
+	}
+	return con, applied, nil
 }
 
 // validateUserAgent validates that the User-Agent of the connecting Elastic Agent is valid and that the version is

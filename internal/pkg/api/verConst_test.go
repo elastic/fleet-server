@@ -19,6 +19,7 @@ func TestBuildVersionConstraint(t *testing.T) {
 	tests := []struct {
 		name     string
 		override string
+		applied  bool
 		accept   []string
 		reject   []string
 		// constraint, when set, pins the exact constraint string.
@@ -32,11 +33,20 @@ func TestBuildVersionConstraint(t *testing.T) {
 	}, {
 		name:     "minor override",
 		override: "9.6",
+		applied:  true,
 		accept:   []string{"9.4.0", "9.5.0", "9.6.0", "9.6.3"},
 		reject:   []string{"9.7.0", "10.0.0", "7.12.0"},
 	}, {
+		// A .0 patch override is equivalent to the MAJOR.MINOR form: every 9.6.x is accepted, 9.7 and 10 are not.
+		name:     "override with zero patch accepts all patches",
+		override: "9.6.0",
+		applied:  true,
+		accept:   []string{"9.6.0", "9.6.3"},
+		reject:   []string{"9.7.0", "10.0.0"},
+	}, {
 		name:     "override with patch accepts all patches",
 		override: "9.6.1",
+		applied:  true,
 		accept:   []string{"9.6.0", "9.6.9"},
 		reject:   []string{"9.7.0"},
 	}, {
@@ -51,8 +61,9 @@ func TestBuildVersionConstraint(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			vc, err := BuildVersionConstraint("9.4.0", tc.override)
+			vc, applied, err := BuildVersionConstraint("9.4.0", tc.override)
 			require.NoError(t, err)
+			require.Equal(t, tc.applied, applied)
 			if tc.constraint != "" {
 				require.Equal(t, tc.constraint, vc.String())
 			}
@@ -66,12 +77,19 @@ func TestBuildVersionConstraint(t *testing.T) {
 	}
 
 	t.Run("invalid override", func(t *testing.T) {
-		_, err := BuildVersionConstraint("9.4.0", "9.six")
+		_, _, err := BuildVersionConstraint("9.4.0", "9.six")
 		require.Error(t, err)
 	})
 
+	t.Run("override with higher major is rejected", func(t *testing.T) {
+		for _, o := range []string{"10.0", "10", "99", "10.0.0"} {
+			_, _, err := BuildVersionConstraint("9.4.0", o)
+			require.Errorf(t, err, "override %q", o)
+		}
+	})
+
 	t.Run("invalid server version", func(t *testing.T) {
-		_, err := BuildVersionConstraint("bad", "")
+		_, _, err := BuildVersionConstraint("bad", "")
 		require.Error(t, err)
 	})
 }
