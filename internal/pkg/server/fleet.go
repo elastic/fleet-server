@@ -537,7 +537,7 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 		return api.RunConnRejectionRateSampler(ctx, api.RejectionRateSampleInterval)
 	}))
 
-	maxAgentVersion := cfg.Inputs[0].Server.Features.MaxAgentVersion
+	maxAgentVersion := string(cfg.Inputs[0].Server.Features.MaxAgentVersion)
 	verCon, overrideApplied, err := api.BuildVersionConstraint(f.bi.Version, maxAgentVersion)
 	if err != nil {
 		return err

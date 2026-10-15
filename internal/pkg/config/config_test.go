@@ -147,7 +147,10 @@ func TestConfig(t *testing.T) {
 			err: "bulk.flush_max_pending must be positive, got -1",
 		},
 		"bad-max-agent-version": {
-			err: `feature_flags._max_agent_version "9.six" is not a valid version: malformed version: 9.six`,
+			err: `"9.six" must be in MAJOR.MINOR format, e.g. "9.10"`,
+		},
+		"bad-max-agent-version-unquoted": {
+			err: `must be a quoted string in MAJOR.MINOR format, got float64 9.1`,
 		},
 		"bad-max-conn-per-host": {
 			err: "output.elasticsearch.max_conn_per_host must be positive, got -1",
