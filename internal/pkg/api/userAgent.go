@@ -7,6 +7,7 @@ package api
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
 	"strconv"
 	"strings"
@@ -43,6 +44,37 @@ func maximizePatch(ver *version.Version) string {
 		segStrs = append(segStrs, strconv.Itoa(segment))
 	}
 	return strings.Join(segStrs, ".")
+}
+
+// BuildVersionConstraint turns the version into a constraint to ensure that the connecting Elastic Agents are
+// a supported version. maxOverride (feature_flags._max_agent_version) may raise, but never lower, the upper bound;
+// all patch versions of its MAJOR.MINOR are accepted.
+func BuildVersionConstraint(verStr, maxOverride string) (version.Constraints, error) {
+	ver, err := version.NewVersion(verStr)
+	if err != nil {
+		return nil, err
+	}
+	upperStr := defaultMaxVersion(ver)
+	if maxOverride != "" {
+		o, err := version.NewVersion(maxOverride)
+		if err != nil {
+			return nil, fmt.Errorf("invalid feature_flags._max_agent_version %q: %w", maxOverride, err)
+		}
+		upper, err := version.NewVersion(upperStr)
+		if err != nil {
+			return nil, err
+		}
+		overrideStr := maximizePatch(o)
+		overrideMax, err := version.NewVersion(overrideStr)
+		if err != nil {
+			return nil, err
+		}
+		// Only relax the ceiling, so a typo can't lock out agents that work today.
+		if overrideMax.GreaterThan(upper) {
+			upperStr = overrideStr
+		}
+	}
+	return version.NewConstraint(fmt.Sprintf(">= %s, <= %s", MinVersion, upperStr))
 }
 
 // validateUserAgent validates that the User-Agent of the connecting Elastic Agent is valid and that the version is

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
+	"github.com/hashicorp/go-version"
 )
 
 const (
@@ -84,6 +85,17 @@ func (c *ServerBulk) Validate() error {
 	return nil
 }
 
+// Validate ensures that the feature flags are valid.
+func (f *FeatureFlags) Validate() error {
+	if f.MaxAgentVersion == "" {
+		return nil
+	}
+	if _, err := version.NewVersion(f.MaxAgentVersion); err != nil {
+		return fmt.Errorf("feature_flags._max_agent_version %q is not a valid version: %w", f.MaxAgentVersion, err)
+	}
+	return nil
+}
+
 // Server is the configuration for the server
 type (
 	Server struct {
@@ -137,6 +149,14 @@ type (
 		// When true, agent documents are written synchronously with refresh=wait_for, making the document
 		// immediately searchable before the enrollment response is sent and eliminating ghost agents.
 		SyncEnrollmentWrite bool `config:"_sync_enrollment_write"`
+
+		// MaxAgentVersion (config key: feature_flags._max_agent_version) raises the highest Elastic Agent
+		// version accepted on checkin/enroll above this Fleet Server's own MAJOR.MINOR. All patch versions of
+		// the given MAJOR.MINOR are accepted. A value at or below the built-in ceiling is ignored.
+		// The value must be quoted in YAML: an unquoted 9.10 is parsed as a float and read as "9.1".
+		// Hidden escape hatch for specific support cases; agents newer than Fleet Server are not a supported
+		// configuration, and Fleet Server will ignore fields and action types it does not know about.
+		MaxAgentVersion string `config:"_max_agent_version"`
 	}
 
 	// GracefulForceUnenrollConfig controls the graceful-force-unenroll feature.

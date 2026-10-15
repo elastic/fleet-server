@@ -146,6 +146,9 @@ func TestConfig(t *testing.T) {
 		"bad-bulk-flush-max-pending": {
 			err: "bulk.flush_max_pending must be positive, got -1",
 		},
+		"bad-max-agent-version": {
+			err: `feature_flags._max_agent_version "9.six" is not a valid version: malformed version: 9.six`,
+		},
 		"bad-max-conn-per-host": {
 			err: "output.elasticsearch.max_conn_per_host must be positive, got -1",
 		},

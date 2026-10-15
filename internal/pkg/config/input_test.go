@@ -11,6 +11,7 @@ import (
 
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 
+	"github.com/elastic/go-ucfg/yaml"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -49,6 +50,41 @@ func TestBindAddress(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestFeatureFlagsValidate(t *testing.T) {
+	t.Run("empty max agent version is valid", func(t *testing.T) {
+		require.NoError(t, (&FeatureFlags{}).Validate())
+	})
+	t.Run("minor max agent version is valid", func(t *testing.T) {
+		require.NoError(t, (&FeatureFlags{MaxAgentVersion: "9.6"}).Validate())
+	})
+	t.Run("full max agent version is valid", func(t *testing.T) {
+		require.NoError(t, (&FeatureFlags{MaxAgentVersion: "9.6.1"}).Validate())
+	})
+	t.Run("malformed max agent version is rejected", func(t *testing.T) {
+		require.Error(t, (&FeatureFlags{MaxAgentVersion: "9.six"}).Validate())
+	})
+}
+
+func TestMaxAgentVersionParse(t *testing.T) {
+	load := func(t *testing.T, value string) string {
+		t.Helper()
+		c, err := yaml.NewConfig([]byte("feature_flags:\n  _max_agent_version: "+value+"\n"), DefaultOptions...)
+		require.NoError(t, err)
+		var srv Server
+		require.NoError(t, c.Unpack(&srv, DefaultOptions...))
+		return srv.Features.MaxAgentVersion
+	}
+
+	t.Run("quoted", func(t *testing.T) {
+		require.Equal(t, "9.10", load(t, `"9.10"`))
+	})
+	// An unquoted YAML float loses its trailing zero when unpacked into the string field, so 9.10 is
+	// read as 9.1. This is why the value must be quoted; the test pins the behavior.
+	t.Run("unquoted float loses trailing zero", func(t *testing.T) {
+		require.Equal(t, "9.1", load(t, `9.10`))
+	})
 }
 
 func TestServerBulkValidate(t *testing.T) {
