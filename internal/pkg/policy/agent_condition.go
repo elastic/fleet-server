@@ -6,9 +6,10 @@ package policy
 
 import (
 	"maps"
-	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/elastic/fleet-server/v7/internal/pkg/policy/eql"
 )
 
 const (
@@ -20,23 +21,23 @@ const (
 	removed               = -1
 )
 
-// Deliberately a tiny subset of Elastic Agent's EQL grammar (elastic-agent
-// internal/pkg/eql/Eql.g4); keep in sync. Literals containing a quote,
-// backslash or `$` are never matched and are left for the agent to evaluate.
-var agentIDConditionRE = regexp.MustCompile(`^\s*\$\{agent\.id\}\s*==\s*'([^'\\$\x00-\x1f]*)'\s*$`)
-
-// FilterInputsForAgent drops inputs and streams pinned to another agent by an
-// exact `${agent.id} == '<id>'` condition, as Elastic Agent would. Secret key
-// paths are renumbered to follow the shifted indexes. Input elements are shared
-// between agents, so changed inputs are copied, never mutated.
-func FilterInputsForAgent(inputs []map[string]any, secretKeys []string, agentID string) ([]map[string]any, []string) {
+// FilterInputsForAgent drops the inputs and streams that Elastic Agent agentID
+// would never run because their condition, which must reference ${agent.id},
+// can never be true for it (see package eql). Anything undecided is left for
+// the agent. Secret key paths are renumbered to follow the shifted indexes.
+// Input elements are shared between agents, so changed inputs are copied,
+// never mutated.
+//
+// Elastic Agent before 8.6.0 keeps an input whose streams were all removed by
+// conditions, as `streams: []`; keepStreamless reproduces that for such agents.
+func FilterInputsForAgent(inputs []map[string]any, secretKeys []string, agentID string, keepStreamless bool) ([]map[string]any, []string) {
 	out := make([]map[string]any, 0, len(inputs))
 	inputIdx := make([]int, len(inputs))
 	streamIdx := make(map[int][]int)
 	changed := false
 
 	for i, input := range inputs {
-		filtered, sIdx, keep := filterInput(input, agentID)
+		filtered, sIdx, keep := filterInput(input, agentID, keepStreamless)
 		if !keep {
 			inputIdx[i] = removed
 			changed = true
@@ -58,8 +59,8 @@ func FilterInputsForAgent(inputs []map[string]any, secretKeys []string, agentID 
 
 // filterInput returns a modified copy (plus new stream indexes) when streams
 // were pruned, or nil when the original input is kept as is.
-func filterInput(input map[string]any, agentID string) (map[string]any, []int, bool) {
-	if pinnedToOtherAgent(input[fieldCondition], agentID) {
+func filterInput(input map[string]any, agentID string, keepStreamless bool) (map[string]any, []int, bool) {
+	if neverTrue(input[fieldCondition], agentID) {
 		return nil, nil, false
 	}
 
@@ -71,17 +72,22 @@ func filterInput(input map[string]any, agentID string) (map[string]any, []int, b
 	kept := make([]any, 0, len(streams))
 	idx := make([]int, len(streams))
 	for j, s := range streams {
-		if stream, ok := s.(map[string]any); ok && pinnedToOtherAgent(stream[fieldCondition], agentID) {
+		if stream, ok := s.(map[string]any); ok && neverTrue(stream[fieldCondition], agentID) {
 			idx[j] = removed
 			continue
 		}
 		idx[j] = len(kept)
 		kept = append(kept, s)
 	}
-	switch len(kept) {
-	case len(streams):
+	switch {
+	case len(kept) == len(streams):
 		return nil, nil, true
-	case 0:
+	case len(kept) == 0 && !keepStreamless:
+		// The agent drops an input left without streams, but only after
+		// evaluating its own condition: keep the input as is if that may fail.
+		if !conditionMayEvaluate(input[fieldCondition], agentID) {
+			return nil, nil, true
+		}
 		return nil, nil, false
 	}
 
@@ -90,13 +96,19 @@ func filterInput(input map[string]any, agentID string) (map[string]any, []int, b
 	return cp, idx, true
 }
 
-func pinnedToOtherAgent(condition any, agentID string) bool {
+func neverTrue(condition any, agentID string) bool {
 	s, ok := condition.(string)
-	if !ok {
-		return false
+	return ok && eql.NeverTrue(s, agentID)
+}
+
+func conditionMayEvaluate(condition any, agentID string) bool {
+	switch c := condition.(type) {
+	case nil, bool:
+		return true
+	case string:
+		return eql.MayEvaluate(c, agentID)
 	}
-	m := agentIDConditionRE.FindStringSubmatch(s)
-	return m != nil && m[1] != agentID
+	return false
 }
 
 func remapSecretKeys(keys []string, inputIdx []int, streamIdx map[int][]int) []string {

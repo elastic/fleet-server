@@ -288,9 +288,11 @@ fleet:
 #
 #        // Input conditions Fleet Server evaluates before sending a policy to an agent.
 #        evaluate_conditions:
-#          // Omit inputs and streams pinned to another agent by an exact
-#          // `${agent.id} == '<id>'` condition, which Elastic Agent discards anyway
-#          // (e.g. scalable Synthetics private locations). Enabled by default.
+#          // Omit inputs and streams whose condition references ${agent.id} and can
+#          // never be true for the requesting agent, which Elastic Agent discards
+#          // anyway (e.g. scalable Synthetics private locations). Conditions are
+#          // evaluated with Elastic Agent's EQL semantics; anything undecided is
+#          // sent unchanged. Enabled by default.
 #          agent_id: true
 #
 #        // Gracefully force-unenroll agents that repeatedly check in with an invalid API key.

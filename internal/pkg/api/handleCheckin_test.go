@@ -2000,7 +2000,7 @@ func TestProcessPolicyRemoteESServiceTokenSecretPaths(t *testing.T) {
 		},
 	}
 
-	action, _, err := processPolicy(t.Context(), logger, bulker, agent, pp, true, nil)
+	action, _, err := processPolicy(t.Context(), logger, bulker, agent, "", pp, true, nil)
 	require.NoError(t, err)
 
 	pc, err := action.Data.AsActionPolicyChange()
@@ -2075,7 +2075,7 @@ func TestProcessPolicyPrunesAgentPinnedInputsSecretPaths(t *testing.T) {
 	}
 
 	t.Run("enabled", func(t *testing.T) {
-		action, _, err := processPolicy(t.Context(), logger, bulker, agent, pp.Clone(), true, nil)
+		action, _, err := processPolicy(t.Context(), logger, bulker, agent, "", pp.Clone(), true, nil)
 		require.NoError(t, err)
 		pc, err := action.Data.AsActionPolicyChange()
 		require.NoError(t, err)
@@ -2096,7 +2096,7 @@ func TestProcessPolicyPrunesAgentPinnedInputsSecretPaths(t *testing.T) {
 
 	// feature_flags.evaluate_conditions.agent_id: false delivers every input.
 	t.Run("disabled", func(t *testing.T) {
-		action, _, err := processPolicy(t.Context(), logger, bulker, agent, pp.Clone(), false, nil)
+		action, _, err := processPolicy(t.Context(), logger, bulker, agent, "", pp.Clone(), false, nil)
 		require.NoError(t, err)
 		pc, err := action.Data.AsActionPolicyChange()
 		require.NoError(t, err)
@@ -2204,7 +2204,7 @@ func TestProcessPolicyAgentTags(t *testing.T) {
 				},
 			}
 
-			action, agentUpdate, err := processPolicy(t.Context(), logger, bulker, agent, pp.Clone(), true, nil)
+			action, agentUpdate, err := processPolicy(t.Context(), logger, bulker, agent, "", pp.Clone(), true, nil)
 			require.NoError(t, err)
 			assert.Equal(t, tc.wantUpdate, agentUpdate)
 			bulker.AssertNotCalled(t, "Update", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything, mock.Anything)
@@ -2289,7 +2289,7 @@ func TestProcessPolicySecretPathsConcurrentDispatch(t *testing.T) {
 			},
 		}
 		wg.Go(func() {
-			action, _, err := processPolicy(t.Context(), logger, bulker, agent, pp.Clone(), true, nil)
+			action, _, err := processPolicy(t.Context(), logger, bulker, agent, "", pp.Clone(), true, nil)
 			if err != nil {
 				errs[a] = err
 				return
@@ -2393,7 +2393,7 @@ func TestProcessPolicyOTLPOutput(t *testing.T) {
 
 			agent := &model.Agent{ESDocument: model.ESDocument{Id: "agent1"}}
 
-			action, _, err := processPolicy(t.Context(), logger, bulker, agent, pp, true, nil)
+			action, _, err := processPolicy(t.Context(), logger, bulker, agent, "", pp, true, nil)
 			require.NoError(t, err)
 
 			pc, err := action.Data.AsActionPolicyChange()
@@ -2533,5 +2533,20 @@ func TestPrepareOTelExporters(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestKeepsStreamlessInputs(t *testing.T) {
+	for ver, want := range map[string]bool{
+		"7.13.0":  true,
+		"7.17.29": true,
+		"8.5.3":   true,
+		"8.6.0":   false,
+		"8.19.0":  false,
+		"9.5.0":   false,
+		"":        false,
+		"bogus":   false,
+	} {
+		assert.Equal(t, want, keepsStreamlessInputs(ver), ver)
 	}
 }
