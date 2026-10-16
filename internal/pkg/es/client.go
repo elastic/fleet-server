@@ -9,6 +9,8 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"math"
+	"math/rand"
 	"net"
 	"net/http"
 	"runtime"
@@ -77,6 +79,36 @@ func defaultRetryOnError(req *http.Request, err error) bool {
 		shouldRetryTimeoutForCreate(req, err)
 }
 
+// exponentialBackoffDelay computes a jittered exponential back-off delay from
+// the attempt counter alone (attempt starts at 1), so it carries no shared
+// mutable state and is safe for concurrent use across in-flight requests. The
+// result is clamped to the representable time.Duration range, mirroring
+// backoff.ExponentialBackOff's overflow handling.
+func exponentialBackoffDelay(attempt int, initial, maxInterval time.Duration, multiplier, randomization float64) time.Duration {
+	interval := float64(initial)
+	for i := 1; i < attempt; i++ {
+		interval *= multiplier
+		if interval > float64(maxInterval) {
+			interval = float64(maxInterval)
+			break
+		}
+	}
+	delta := randomization * interval
+	d := interval - delta + rand.Float64()*2*delta //nolint:gosec // non-cryptographic jitter
+	switch {
+	case d != d || d <= 0: // NaN or non-positive
+		return 0
+	case d >= math.MaxInt64:
+		return time.Duration(math.MaxInt64)
+	}
+	return time.Duration(d)
+}
+
+// exponentialBackoffFromAttempt is the default retry backoff schedule.
+func exponentialBackoffFromAttempt(attempt int) time.Duration {
+	return exponentialBackoffDelay(attempt, initialRetryBackoff, maxRetryBackoff, backoff.DefaultMultiplier, randomizationFactor)
+}
+
 func defaultOptions(disableRetry bool, retryPred func(*http.Request, error) bool, retryStatuses []int, maxRetries int) []elasticsearch.Option {
 	if disableRetry {
 		return []elasticsearch.Option{
@@ -84,21 +116,11 @@ func defaultOptions(disableRetry bool, retryPred func(*http.Request, error) bool
 		}
 	}
 
-	exp := backoff.NewExponentialBackOff()
-	exp.InitialInterval = initialRetryBackoff
-	exp.RandomizationFactor = randomizationFactor
-	exp.MaxInterval = maxRetryBackoff
-
 	return []elasticsearch.Option{
 		elasticsearch.WithTransportOptions(
 			elastictransport.WithRetryOnError(retryPred),
 			elastictransport.WithRetryOnStatus(retryStatuses...),
-			elastictransport.WithRetryBackoff(func(attempt int) time.Duration {
-				if attempt == 1 {
-					exp.Reset()
-				}
-				return exp.NextBackOff()
-			}),
+			elastictransport.WithRetryBackoff(exponentialBackoffFromAttempt),
 			elastictransport.WithMaxRetries(maxRetries),
 		),
 	}
@@ -269,18 +291,22 @@ func WithRetryOnStatus(status int) ConfigOption {
 	return ConfigOption{retryStatuses: []int{status}}
 }
 
-func WithBackoff(exp *backoff.ExponentialBackOff) ConfigOption {
-	if exp == nil {
+func WithBackoff(cfg *backoff.ExponentialBackOff) ConfigOption {
+	if cfg == nil {
 		return newESOption(elasticsearch.WithTransportOptions(
 			elastictransport.WithRetryBackoff(nil),
 		))
 	}
+	// Copy scalar fields from cfg so the closure captures only immutable values.
+	// This avoids sharing cfg's mutable interval state across concurrent requests,
+	// which would cause a data race (ExponentialBackOff is not thread-safe).
+	initialInterval := cfg.InitialInterval
+	maxInterval := cfg.MaxInterval
+	multiplier := cfg.Multiplier
+	randomFactor := cfg.RandomizationFactor
 	return newESOption(elasticsearch.WithTransportOptions(
 		elastictransport.WithRetryBackoff(func(attempt int) time.Duration {
-			if attempt == 1 {
-				exp.Reset()
-			}
-			return exp.NextBackOff()
+			return exponentialBackoffDelay(attempt, initialInterval, maxInterval, multiplier, randomFactor)
 		}),
 	))
 }
