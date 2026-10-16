@@ -9,6 +9,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/elastic/go-elasticsearch/v8/esapi"
@@ -59,6 +60,9 @@ func (b *Bulker) waitBulkAction(ctx context.Context, action actionT, index, id s
 
 	// Serialize request
 	const kSlop = 64
+	if len(body) > math.MaxInt-kSlop {
+		return nil, fmt.Errorf("bulk request body too large")
+	}
 	blk.buf.Grow(len(body) + kSlop)
 
 	if err := b.writeBulkMeta(&blk.buf, action.String(), index, id, opt.RetryOnConflict); err != nil {
