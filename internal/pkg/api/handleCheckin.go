@@ -57,6 +57,7 @@ var (
 
 const (
 	kEncodingGzip  = "gzip"
+	checkinAction  = "checkin"
 	FailedStatus   = "FAILED"
 	DegradedStatus = "DEGRADED"
 
@@ -305,7 +306,7 @@ func (ct *CheckinT) writeEmptyPolicyChangeResponse(zlog zerolog.Logger, w http.R
 		Msg("Returning empty POLICY_CHANGE for agent with invalid API key")
 
 	resp := CheckinResponse{
-		Action:  "checkin",
+		Action:  checkinAction,
 		Actions: []Action{action},
 	}
 
@@ -338,7 +339,7 @@ func (ct *CheckinT) writeUnenrollResponse(zlog zerolog.Logger, w http.ResponseWr
 		Msg("Returning UNENROLL action for agent with invalid API key")
 
 	resp := CheckinResponse{
-		Action:  "checkin",
+		Action:  checkinAction,
 		Actions: []Action{action},
 	}
 
@@ -605,7 +606,7 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 				if errors.Is(ctx.Err(), context.Canceled) {
 					resp := CheckinResponse{
 						AckToken: &ackToken,
-						Action:   "checkin",
+						Action:   checkinAction,
 					}
 					return ct.writeResponse(zlog, w, r, agent, resp)
 				}
@@ -617,7 +618,7 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 				actions = append(actions, acs...)
 				break LOOP
 			case policy := <-sub.Output():
-				actionResp, update, err := processPolicy(ctx, zlog, ct.bulker, agent, policy, ct.outputSecretCandidateCollector)
+				actionResp, update, err := processPolicy(ctx, zlog, ct.bulker, agent, policy, ct.cfg.Features.EvaluateConditions.AgentID, ct.outputSecretCandidateCollector)
 				if err != nil {
 					span.End()
 					return fmt.Errorf("processPolicy: %w", err)
@@ -640,7 +641,7 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 
 	resp := CheckinResponse{
 		AckToken: &ackToken,
-		Action:   "checkin",
+		Action:   checkinAction,
 		Actions:  actions,
 	}
 
@@ -1163,7 +1164,7 @@ func convertActions(zlog zerolog.Logger, agentID string, actions []model.Action)
 //   - Generate and update default ApiKey if roles have changed.
 //   - Rewrite the policy for delivery to the agent injecting the key material.
 //   - Return the agent document fields to write once the policy is sent.
-func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agent *model.Agent, pp *policy.ParsedPolicy, secretCandidateCollector policy.OutputSecretCandidateCollector) (*Action, bulk.UpdateFields, error) {
+func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agent *model.Agent, pp *policy.ParsedPolicy, evalAgentIDConditions bool, secretCandidateCollector policy.OutputSecretCandidateCollector) (*Action, bulk.UpdateFields, error) {
 	var links []apm.SpanLink = nil // set to a nil array to preserve default behaviour if no policy links are found
 	if err := pp.Links.Trace.Validate(); err == nil {
 		links = []apm.SpanLink{pp.Links}
@@ -1240,8 +1241,12 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 		})
 	}
 
-	// Use the secret-substituted inputs, minus those pinned to other agents.
-	pp.Policy.Data.Inputs, pp.SecretKeys = policy.FilterInputsForAgent(pp.Inputs, pp.SecretKeys, agent.Id)
+	// Use the secret-substituted inputs, minus those pinned to other agents
+	// unless disabled by the evaluate_conditions.agent_id feature flag.
+	pp.Policy.Data.Inputs = pp.Inputs
+	if evalAgentIDConditions {
+		pp.Policy.Data.Inputs, pp.SecretKeys = policy.FilterInputsForAgent(pp.Inputs, pp.SecretKeys, agent.Id)
+	}
 
 	// Add the agent tags to the policy.
 	agentUpdate, err := prepareAgentTags(pp.Policy.Data, agent)

@@ -7,6 +7,8 @@ description: |
   agent are no longer sent to the requesting agent, reducing policy size for
   policies that shard inputs across many agents (e.g. scalable Synthetics
   private locations). Elastic Agent already discarded these inputs at runtime.
+  Set `feature_flags.evaluate_conditions.agent_id: false` to send every input
+  unchanged.
 
 component: fleet-server
 
