@@ -146,6 +146,12 @@ func TestConfig(t *testing.T) {
 		"bad-bulk-flush-max-pending": {
 			err: "bulk.flush_max_pending must be positive, got -1",
 		},
+		"bad-max-agent-version": {
+			err: `"9.six" must be in MAJOR.MINOR format, e.g. "9.10"`,
+		},
+		"bad-max-agent-version-unquoted": {
+			err: `must be a quoted string in MAJOR.MINOR format, got float64 9.1`,
+		},
 		"bad-max-conn-per-host": {
 			err: "output.elasticsearch.max_conn_per_host must be positive, got -1",
 		},

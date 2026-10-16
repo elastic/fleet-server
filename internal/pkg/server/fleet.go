@@ -36,7 +36,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/state"
 	"github.com/elastic/fleet-server/v7/internal/pkg/ver"
 
-	"github.com/hashicorp/go-version"
 	"github.com/rs/zerolog"
 	"golang.org/x/sync/errgroup"
 )
@@ -47,7 +46,6 @@ const kUAFleetServer = "Fleet-Server"
 type Fleet struct {
 	standAlone bool
 	bi         build.Info
-	verCon     version.Constraints
 
 	cfgCh    chan *config.Config
 	cache    cache.Cache
@@ -62,15 +60,14 @@ type Fleet struct {
 
 // NewFleet creates the actual fleet server service.
 func NewFleet(bi build.Info, reporter state.Reporter, standAlone bool) (*Fleet, error) {
-	verCon, err := api.BuildVersionConstraint(bi.Version)
-	if err != nil {
+	// The constraint is built from config in runServer; this only rejects a malformed build version up front.
+	if _, _, err := api.BuildVersionConstraint(bi.Version, ""); err != nil {
 		return nil, err
 	}
 
 	return &Fleet{
 		standAlone: standAlone,
 		bi:         bi,
-		verCon:     verCon,
 		cfgCh:      make(chan *config.Config, 1),
 		reporter:   reporter,
 	}, nil
@@ -526,13 +523,52 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 	bc := checkin.NewBulk(bulker)
 	g.Go(loggedRunFunc(ctx, "Bulk checkin", bc.Run))
 
+<<<<<<< HEAD
 	ct, err := api.NewCheckinT(f.verCon, &cfg.Inputs[0].Server, f.cache, bc, pm, am, ad, bulker)
+=======
+	outputSecretReconciler := gc.NewOrphanedOutputSecretReconciler(bulker)
+	g.Go(loggedRunFunc(ctx, "Orphaned output secret reconciler", outputSecretReconciler.Run))
+
+	// Samples the checkin capacity-rejection counter into a rate gauge, exposed via
+	// /stats for use as an autoscaling signal. See api.RunCheckinRejectionRateSampler.
+	g.Go(loggedRunFunc(ctx, "Checkin rejection rate sampler", func(ctx context.Context) error {
+		return api.RunCheckinRejectionRateSampler(ctx, api.RejectionRateSampleInterval)
+	}))
+	// Samples the connection-cap rejection counter into a rate gauge, exposed via
+	// /stats for use as an autoscaling signal. See api.RunConnRejectionRateSampler.
+	g.Go(loggedRunFunc(ctx, "Connection rejection rate sampler", func(ctx context.Context) error {
+		return api.RunConnRejectionRateSampler(ctx, api.RejectionRateSampleInterval)
+	}))
+
+	maxAgentVersion := string(cfg.Inputs[0].Server.Features.MaxAgentVersion)
+	verCon, overrideApplied, err := api.BuildVersionConstraint(f.bi.Version, maxAgentVersion)
+	if err != nil {
+		return err
+	}
+	switch {
+	case overrideApplied:
+		zerolog.Ctx(ctx).Warn().
+			Str("feature_flags._max_agent_version", maxAgentVersion).
+			Str("fleet_server_version", f.bi.Version).
+			Str("constraints", verCon.String()).
+			Msg("Elastic Agent version override is active; agents newer than Fleet Server are not a supported configuration")
+	case maxAgentVersion != "":
+		zerolog.Ctx(ctx).Warn().
+			Str("feature_flags._max_agent_version", maxAgentVersion).
+			Str("fleet_server_version", f.bi.Version).
+			Str("constraints", verCon.String()).
+			Msg("feature_flags._max_agent_version is not above the built-in maximum and was ignored")
+	}
+
+	ct, err := api.NewCheckinT(verCon, &cfg.Inputs[0].Server, f.cache, bc, pm, am, ad, bulker,
+		api.WithOutputSecretCandidateCollector(outputSecretReconciler))
+>>>>>>> 8c75c48 (Add `feature_flags._max_agent_version` (#8048))
 	if err != nil {
 		return err
 	}
 	f.checkinT = ct
 	g.Go(loggedRunFunc(ctx, "Invalid API key state cleaner", ct.RunInvalidKeyStateCleaner))
-	et, err := api.NewEnrollerT(f.verCon, &cfg.Inputs[0].Server, bulker, f.cache)
+	et, err := api.NewEnrollerT(verCon, &cfg.Inputs[0].Server, bulker, f.cache)
 	if err != nil {
 		return err
 	}

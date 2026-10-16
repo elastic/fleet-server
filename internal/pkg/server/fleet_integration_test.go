@@ -721,6 +721,77 @@ func Test_SmokeTest_Agent_Calls(t *testing.T) {
 	require.Falsef(t, ok, "expected response to have no errors attribute, errors are present: %+v", ackObj)
 }
 
+// enrollWithUserAgent POSTs an enrollment request with the given User-Agent and returns the status code
+// and the access API key and agent ID when enrollment succeeded.
+func enrollWithUserAgent(t *testing.T, ctx context.Context, srv *tserver, userAgent string) (int, string, string) {
+	t.Helper()
+	req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/enroll", strings.NewReader(enrollBody))
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "ApiKey "+srv.enrollKey)
+	req.Header.Set("User-Agent", userAgent)
+	req.Header.Set("Content-Type", "application/json")
+
+	res, err := cleanhttp.DefaultClient().Do(req)
+	require.NoError(t, err)
+	defer res.Body.Close()
+	p, err := io.ReadAll(res.Body)
+	require.NoError(t, err)
+	if res.StatusCode != http.StatusOK {
+		return res.StatusCode, "", ""
+	}
+
+	var response api.EnrollResponse
+	require.NoError(t, json.Unmarshal(p, &response))
+	return res.StatusCode, response.Item.AccessApiKey, response.Item.Id
+}
+
+// Test_MaxAgentVersionOverride tests that feature_flags._max_agent_version raises the highest accepted
+// agent version for both enroll and checkin, and that it is not applied when unset.
+func Test_MaxAgentVersionOverride(t *testing.T) {
+	// serverVersion is 8.0.0: 8.2 is above the default ceiling of both release (8.0.x) and snapshot (8.1.0) builds.
+	const (
+		relaxedAgent  = "elastic agent 8.2.1"
+		tooNewAgent   = "elastic agent 8.3.0"
+		overrideValue = "8.2"
+	)
+
+	t.Run("override accepts newer agents", func(t *testing.T) {
+		srv, err := startTestServer(t, t.Context(), policyData, func(cfg *config.Config) error {
+			cfg.Inputs[0].Server.Features.MaxAgentVersion = overrideValue
+			return nil
+		})
+		require.NoError(t, err)
+		ctx := testlog.SetLogger(t).WithContext(t.Context())
+
+		status, key, id := enrollWithUserAgent(t, ctx, srv, relaxedAgent)
+		require.Equal(t, http.StatusOK, status, "agent within the override should enroll")
+		require.NotEmpty(t, key)
+		require.NotEmpty(t, id)
+
+		req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+id+"/checkin", strings.NewReader(checkinBody))
+		require.NoError(t, err)
+		req.Header.Set("Authorization", "ApiKey "+key)
+		req.Header.Set("User-Agent", relaxedAgent)
+		req.Header.Set("Content-Type", "application/json")
+		res, err := cleanhttp.DefaultClient().Do(req)
+		require.NoError(t, err)
+		res.Body.Close()
+		require.Equal(t, http.StatusOK, res.StatusCode, "agent within the override should check in")
+
+		status, _, _ = enrollWithUserAgent(t, ctx, srv, tooNewAgent)
+		require.Equal(t, http.StatusBadRequest, status, "agent above the override should be rejected")
+	})
+
+	t.Run("no override rejects newer agents", func(t *testing.T) {
+		srv, err := startTestServer(t, t.Context(), policyData)
+		require.NoError(t, err)
+		ctx := testlog.SetLogger(t).WithContext(t.Context())
+
+		status, _, _ := enrollWithUserAgent(t, ctx, srv, relaxedAgent)
+		require.Equal(t, http.StatusBadRequest, status)
+	})
+}
+
 func EnrollAgent(t *testing.T, ctx context.Context, srv *tserver, enrollBody string) api.EnrollResponse {
 	req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/enroll", strings.NewReader(enrollBody))
 	require.NoError(t, err)
