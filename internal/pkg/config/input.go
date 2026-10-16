@@ -7,10 +7,13 @@ package config
 import (
 	"compress/flate"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
+	fleetversion "github.com/elastic/fleet-server/v7/version"
+	"github.com/hashicorp/go-version"
 )
 
 const (
@@ -84,6 +87,44 @@ func (c *ServerBulk) Validate() error {
 	return nil
 }
 
+// agentVersionLimitRe matches MAJOR.MINOR with no prefix, suffix or leading zeros.
+var agentVersionLimitRe = regexp.MustCompile(`^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$`)
+
+// AgentVersionLimit is a MAJOR.MINOR Elastic Agent version that must be given as a string in the configuration.
+type AgentVersionLimit string
+
+// Unpack implements ucfg.Unpacker. ucfg passes the raw value, so non-strings can be rejected rather than
+// converted: an unquoted YAML 9.10 arrives as the float 9.1 and would otherwise silently become "9.1".
+// An empty string is accepted and means the limit is unset.
+func (v *AgentVersionLimit) Unpack(raw any) error {
+	s, ok := raw.(string)
+	if !ok {
+		return fmt.Errorf("must be a quoted string in MAJOR.MINOR format, got %T %v", raw, raw)
+	}
+	if s == "" {
+		*v = ""
+		return nil
+	}
+	if !agentVersionLimitRe.MatchString(s) {
+		return fmt.Errorf("%q must be in MAJOR.MINOR format, e.g. \"9.10\"", s)
+	}
+	ver, err := version.NewVersion(s)
+	if err != nil {
+		return fmt.Errorf("%q is not a valid version: %w", s, err)
+	}
+	// This package can only see the default build version. The check against the running Fleet Server's
+	// version is made in api.BuildVersionConstraint.
+	builtin, err := version.NewVersion(fleetversion.DefaultVersion)
+	if err != nil {
+		return err
+	}
+	if ver.Segments()[0] > builtin.Segments()[0] {
+		return fmt.Errorf("%q is a higher major version than Fleet Server %s", s, fleetversion.DefaultVersion)
+	}
+	*v = AgentVersionLimit(s)
+	return nil
+}
+
 // Server is the configuration for the server
 type (
 	Server struct {
@@ -137,6 +178,15 @@ type (
 		// When true, agent documents are written synchronously with refresh=wait_for, making the document
 		// immediately searchable before the enrollment response is sent and eliminating ghost agents.
 		SyncEnrollmentWrite bool `config:"_sync_enrollment_write"`
+
+		// MaxAgentVersion (config key: feature_flags._max_agent_version) raises the highest Elastic Agent
+		// version accepted on checkin/enroll above this Fleet Server's own MAJOR.MINOR. All patch versions of
+		// the given MAJOR.MINOR are accepted. A value at or below the built-in ceiling is ignored; a value with a
+		// higher MAJOR than this Fleet Server is rejected.
+		// The value must be a quoted MAJOR.MINOR string, e.g. "9.10"; any other type or format is rejected.
+		// Hidden escape hatch for specific support cases; agents newer than Fleet Server are not a supported
+		// configuration, and Fleet Server will ignore fields and action types it does not know about.
+		MaxAgentVersion AgentVersionLimit `config:"_max_agent_version"`
 	}
 
 	// GracefulForceUnenrollConfig controls the graceful-force-unenroll feature.
