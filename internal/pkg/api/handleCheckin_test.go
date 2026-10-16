@@ -1059,7 +1059,7 @@ func BenchmarkParallel_CheckinT_writeResponse(b *testing.B) {
 }
 
 func mustBuildConstraints(verStr string) version.Constraints {
-	con, err := BuildVersionConstraint(verStr)
+	con, _, err := BuildVersionConstraint(verStr, "")
 	if err != nil {
 		panic(err)
 	}

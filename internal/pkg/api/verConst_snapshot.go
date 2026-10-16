@@ -7,23 +7,16 @@
 package api
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 
 	"github.com/hashicorp/go-version"
 )
 
-// BuildVersionConstraint turns the version into a constraint to ensure that the connecting Elastic Agent's are
-// a supported version.
+// defaultMaxVersion returns the highest agent version accepted by default.
 // For snapshot builds we allow the minor version to be newer in order to allow automated testing to proceed.
-func BuildVersionConstraint(verStr string) (version.Constraints, error) {
-	ver, err := version.NewVersion(verStr)
-	if err != nil {
-		return nil, err
-	}
-	verStr = bumpMinor(ver)
-	return version.NewConstraint(fmt.Sprintf(">= %s, <= %s", MinVersion, verStr))
+func defaultMaxVersion(ver *version.Version) string {
+	return bumpMinor(ver)
 }
 
 // bumpMinor returns a version string where 1 is added to the minor version
