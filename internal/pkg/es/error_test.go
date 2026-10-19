@@ -8,6 +8,7 @@ package es
 
 import (
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -185,6 +186,25 @@ func TestErrorTranslation(t *testing.T) {
 			indexNotFoundErrorType,
 			"IndexNotFoundException[no such index [.fleet-actions]]",
 		},
+		{
+			409,
+			"shard restoring error",
+			[]byte("this will have shard_restoring_exception included"),
+			true,
+			shardRestoringErrorType,
+			"this will have shard_restoring_exception included",
+		},
+		{
+			409,
+			"detailed shard restoring error",
+			errorTinBytes(ErrorT{
+				Type:   "shard_restoring_exception",
+				Reason: "shard is being restored",
+			}),
+			true,
+			shardRestoringErrorType,
+			"shard is being restored",
+		},
 	}
 
 	for _, tc := range testCases {
@@ -205,6 +225,9 @@ func TestErrorTranslation(t *testing.T) {
 			require.True(t, ok, "elastic error is required")
 			require.Equal(t, tc.ExpectedType, elasticErr.Type)
 			require.Equal(t, tc.ExpectedReason, elasticErr.Reason)
+			if tc.ExpectedType == shardRestoringErrorType {
+				require.True(t, errors.Is(err, ErrShardRestoring))
+			}
 		})
 	}
 }

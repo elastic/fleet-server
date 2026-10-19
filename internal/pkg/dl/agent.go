@@ -14,6 +14,8 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/dsl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
+
+	"go.elastic.co/apm/v2"
 )
 
 const (
@@ -82,4 +84,15 @@ func FindAgent(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, name strin
 	}
 
 	return agent, nil
+}
+
+func UpdateAgent(ctx context.Context, bulker bulk.Bulk, agentID string, fields bulk.UpdateFields, opts ...bulk.Opt) error {
+	span, ctx := apm.StartSpan(ctx, "updateAgent", "update")
+	defer span.End()
+
+	body, err := fields.Marshal()
+	if err != nil {
+		return err
+	}
+	return bulker.Update(ctx, FleetAgents, agentID, body, append(opts, bulk.WithRetryOnConflict(3))...)
 }

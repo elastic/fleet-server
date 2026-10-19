@@ -84,12 +84,7 @@ func (suite *TestSuite) TestFleetServerOK() {
 // TestFleetServerSmoke will use the fleet-server api to enroll an agent, make a checkin, and ack the POLICY_CHANGE action.
 func (suite *TestSuite) TestFleetServerSmoke() {
 	suite.T().Log("Creating test policy...")
-	kClient, err := kibana.NewClientWithConfigDefault(&kibana.ClientConfig{
-		Host:          suite.kibanaURL,
-		Username:      suite.username,
-		Password:      suite.password,
-		IgnoreVersion: false,
-	}, 443, "fleet-server-cloude2e", version.DefaultVersion, "", time.Now().UTC().Format(time.RFC3339))
+	kClient, err := newKibanaClient(suite.kibanaURL, suite.username, suite.password)
 	suite.Require().NoError(err, "unable to create Kibana client")
 
 	policySuffix := uuid.Must(uuid.NewV4()).String()
@@ -179,12 +174,7 @@ func (suite *TestSuite) TestFleetServerSmoke() {
 // TestFleetServerReplaceID will use the fleet-server api to enroll an agent, make a checkin, re-enroll an agent using the same agentID + replacement token, then verifies the orignal API key is inactive.
 func (suite *TestSuite) TestFleetServerReplaceID() {
 	suite.T().Log("Creating test policy...")
-	kClient, err := kibana.NewClientWithConfigDefault(&kibana.ClientConfig{
-		Host:          suite.kibanaURL,
-		Username:      suite.username,
-		Password:      suite.password,
-		IgnoreVersion: false,
-	}, 443, "fleet-server-cloude2e", version.DefaultVersion, "", time.Now().UTC().Format(time.RFC3339))
+	kClient, err := newKibanaClient(suite.kibanaURL, suite.username, suite.password)
 	suite.Require().NoError(err, "unable to create Kibana client")
 
 	policySuffix := uuid.Must(uuid.NewV4()).String()

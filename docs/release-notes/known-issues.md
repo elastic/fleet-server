@@ -23,6 +23,47 @@ Known issues are significant defects or limitations that may impact your impleme
 % Workaround description.
 % :::
 
+:::{dropdown} {{fleet}}-managed agents stay in `Updating` with "Waiting for initial configuration and composable variables"
+
+**Applies to: Fleet Server 9.4.8, 9.5.5**
+
+On October 9, 2026, a known issue was discovered where a race condition in the Fleet Server policy monitor can stop policy delivery to agents. Affected agents check in successfully but stay in the `Updating` state with the check-in message `Waiting for initial configuration and composable variables`.
+
+The issue is most likely to occur after a Fleet Server restart or a stack upgrade, when many agents request policies at the same time.
+
+A fix will be included in Fleet Server 9.4.9 and 9.5.6.
+
+For more information, check [PR #7923](https://github.com/elastic/fleet-server/pull/7923).
+
+**Workaround**
+
+As any policy change will trigger Fleet Server to deliver the queued policies, the simplest method is to create an empty agent policy with no agents assigned. If the issue reoccurs, repeating the workaround should resolve the issue again.
+:::
+
+:::{dropdown} {{agent}} crash-loop when a remote Elasticsearch monitoring output is configured.
+
+**Applies to: {{fleet}} 9.4.6, 9.5.3**
+
+On August 28, 2026, a known issue was discovered where {{agent}} can enter a crash-restart loop immediately after startup
+or after a policy update when the agent policy is configured to use a remote Elasticsearch output for agent monitoring.
+The {{agent}} crashes with:
+
+```shell
+panic: runtime error: index out of range [-1] in diagnostics.addSecretMarkers and exits with status INVALIDARGUMENT
+```
+making {{agent}} unreachable. A fix will be included in {{fleet}} 9.4.7 and 9.5.4.
+
+**Workaround**
+
+In {{fleet}}, navigate to the affected agent policy and change the Output for agent monitoring from the remote 
+Elasticsearch output to the local (default) Elasticsearch output. This prevents the corrupted policy from
+being generated.
+
+For agents already stuck in a crash loop, stop the agent service and delete `state.enc` from the {{agent}} `data` directory,
+then restart. Restarting clears the corrupted state without requiring re-enrollment.
+
+For more information, check [Issue #7739](https://github.com/elastic/fleet-server/issues/7739).
+:::
 
 :::{dropdown} Manual DEB/RPM upgrades of {{fleet}}-managed agents fail when "Agent tamper protection" is enabled
 

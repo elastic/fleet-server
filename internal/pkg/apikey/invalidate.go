@@ -12,11 +12,16 @@ import (
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
+	"github.com/rs/zerolog"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 )
 
-// Invalidate invalidates the provided API keys by ID.
+// Invalidate invalidates the provided API keys by ID. Any key absent from both
+// invalidated_api_keys and previously_invalidated_api_keys in the ES response is
+// logged as a warning (key not found in ES). Previously-invalidated keys are
+// silently accepted — no warning is emitted for them. Returns an error if ES
+// reports a non-zero error_count.
 func Invalidate(ctx context.Context, client *elasticsearch.Client, ids ...string) error {
 
 	payload := struct {
@@ -47,6 +52,33 @@ func Invalidate(ctx context.Context, client *elasticsearch.Client, ids ...string
 
 	if res.IsError() {
 		return fmt.Errorf("fail InvalidateAPIKey: %w", es.TranslateError(res.StatusCode, nil))
+	}
+
+	var result struct {
+		InvalidatedAPIKeys           []string `json:"invalidated_api_keys"`
+		PreviouslyInvalidatedAPIKeys []string `json:"previously_invalidated_api_keys"`
+		ErrorCount                   int      `json:"error_count"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
+		return fmt.Errorf("InvalidateAPIKey decode: %w", err)
+	}
+
+	// Build a set of IDs that ES acted on (newly or previously invalidated).
+	actioned := make(map[string]struct{}, len(result.InvalidatedAPIKeys)+len(result.PreviouslyInvalidatedAPIKeys))
+	for _, id := range result.InvalidatedAPIKeys {
+		actioned[id] = struct{}{}
+	}
+	for _, id := range result.PreviouslyInvalidatedAPIKeys {
+		actioned[id] = struct{}{}
+	}
+	for _, id := range ids {
+		if _, ok := actioned[id]; !ok {
+			zerolog.Ctx(ctx).Warn().Str("api_key.id", id).Msg("API key not found during invalidation; it may have already expired")
+		}
+	}
+
+	if result.ErrorCount > 0 {
+		return fmt.Errorf("InvalidateAPIKey: ES reported %d error(s) invalidating keys", result.ErrorCount)
 	}
 
 	return nil

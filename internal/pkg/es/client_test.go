@@ -5,6 +5,7 @@
 package es
 
 import (
+	"bytes"
 	"context"
 	"crypto/fips140"
 	"crypto/tls"
@@ -12,19 +13,25 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
+	"sync"
+	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
 
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
+	"github.com/elastic/elastic-transport-go/v8/elastictransport"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/testing/certs"
-	"github.com/stretchr/testify/require"
-
 	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v8/esapi"
+	"github.com/stretchr/testify/require"
 )
 
 var enabled bool = true
@@ -315,34 +322,274 @@ func TestIsTLSHandshakeError(t *testing.T) {
 	}
 }
 
-func TestWithRetryOnTLSHandshakeError(t *testing.T) {
+func TestDefaultRetryOnError(t *testing.T) {
 	certErr := &tls.CertificateVerificationError{
 		Err: errors.New("x509: certificate signed by unknown authority"),
 	}
 	wrappedCertErr := &url.Error{Op: "Get", URL: "https://es.example", Err: certErr}
 
-	t.Run("composes with no prior predicate", func(t *testing.T) {
-		var cfg elasticsearch.Config
-		WithRetryOnTLSHandshakeError()(&cfg)
+	// defaultOptions wires the retryOnError predicate that combines ECONNREFUSED,
+	// ECONNRESET, and TLS handshake errors.  Verify each case using an actual client
+	// built with those defaults so the predicate is exercised through the real
+	// elastictransport plumbing.
+	cases := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{"ECONNREFUSED retries", syscall.ECONNREFUSED, true},
+		{"ECONNRESET retries", syscall.ECONNRESET, true},
+		{"TLS cert error retries", wrappedCertErr, true},
+		{"unrelated error does not retry", errors.New("boom"), false},
+		{"nil does not retry", nil, false},
+	}
 
-		require.NotNil(t, cfg.RetryOnError)
-		require.True(t, cfg.RetryOnError(nil, wrappedCertErr), "should retry on TLS cert error")
-		require.False(t, cfg.RetryOnError(nil, errors.New("other")), "should not retry on unrelated error")
-		require.False(t, cfg.RetryOnError(nil, nil), "should not retry on nil error")
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.want, defaultRetryOnError(nil, tc.err))
+		})
+	}
+}
+
+func TestShouldRetryTimeoutForCreate(t *testing.T) {
+	newReq := func(t *testing.T, ctx context.Context, method, rawURL string) *http.Request {
+		t.Helper()
+		req, err := http.NewRequestWithContext(ctx, method, rawURL, nil)
+		require.NoError(t, err)
+		return req
+	}
+	timeoutErr := &net.DNSError{IsTimeout: true}
+	canceledCtx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	tests := []struct {
+		name string
+		req  *http.Request
+		err  error
+		want bool
+	}{
+		{"create timeout", newReq(t, t.Context(), http.MethodPut, "http://es/.fleet-agents/_doc/abc?op_type=create&refresh=wait_for"), timeoutErr, true},
+		{"create deadline exceeded", newReq(t, t.Context(), http.MethodPut, "http://es/.fleet-agents/_doc/abc?op_type=create"), context.DeadlineExceeded, true},
+		{"create non-timeout error", newReq(t, t.Context(), http.MethodPut, "http://es/.fleet-agents/_doc/abc?op_type=create"), errors.New("boom"), false},
+		{"create timeout after caller context done", newReq(t, canceledCtx, http.MethodPut, "http://es/.fleet-agents/_doc/abc?op_type=create"), timeoutErr, false},
+		{"index without op_type", newReq(t, t.Context(), http.MethodPut, "http://es/.fleet-agents/_doc/abc"), timeoutErr, false},
+		{"bulk", newReq(t, t.Context(), http.MethodPost, "http://es/_bulk?op_type=create"), timeoutErr, false},
+		{"search", newReq(t, t.Context(), http.MethodPost, "http://es/.fleet-agents/_search"), timeoutErr, false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.want, shouldRetryTimeoutForCreate(tc.req, tc.err))
+		})
+	}
+}
+
+// TestRetryOnTimeoutForCreate drives a real transport timeout: the first create
+// hangs past ResponseHeaderTimeout, the retry reaches the server again with the
+// same path and body, and a non-create request is not retried.
+func TestRetryOnTimeoutForCreate(t *testing.T) {
+	const index = ".fleet-agents"
+	wantRecorded := "/" + index + "/_doc/abc {\"k\":\"v\"}"
+	var calls atomic.Int32
+	var mu sync.Mutex
+	var bodies []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Elastic-Product", "Elasticsearch")
+		b, _ := io.ReadAll(r.Body)
+		mu.Lock()
+		bodies = append(bodies, r.URL.Path+" "+string(b))
+		mu.Unlock()
+		if calls.Add(1) == 1 {
+			select {
+			case <-time.After(2 * time.Second):
+			case <-r.Context().Done():
+			}
+			return
+		}
+		w.WriteHeader(http.StatusConflict)
+		fmt.Fprint(w, `{}`)
+	}))
+	defer server.Close()
+
+	newClient := func(t *testing.T) *elasticsearch.Client {
+		t.Helper()
+		opts := append([]elasticsearch.Option{
+			elasticsearch.WithAddresses(server.URL),
+			elasticsearch.WithTransportOptions(
+				elastictransport.WithTransport(&http.Transport{ResponseHeaderTimeout: 100 * time.Millisecond}),
+			),
+		}, defaultOptions(false, defaultRetryOnError, nil, 5)...)
+		cli, err := elasticsearch.New(opts...)
+		require.NoError(t, err)
+		return cli
+	}
+
+	t.Run("create is retried with same path and body", func(t *testing.T) {
+		calls.Store(0)
+		bodies = nil
+		res, err := esapi.IndexRequest{
+			Index:      index,
+			DocumentID: "abc",
+			Body:       strings.NewReader(`{"k":"v"}`),
+			OpType:     opTypeCreate,
+		}.Do(t.Context(), newClient(t))
+		require.NoError(t, err)
+		defer res.Body.Close()
+		require.Equal(t, http.StatusConflict, res.StatusCode)
+		require.Equal(t, int32(2), calls.Load())
+		mu.Lock()
+		defer mu.Unlock()
+		require.Equal(t, []string{wantRecorded, wantRecorded}, bodies)
 	})
 
-	t.Run("composes with prior predicate (OR semantics)", func(t *testing.T) {
-		var cfg elasticsearch.Config
-		// Prior predicate retries only on ECONNREFUSED.
-		WithRetryOnErrs(syscall.ECONNREFUSED)(&cfg)
-		WithRetryOnTLSHandshakeError()(&cfg)
-
-		require.NotNil(t, cfg.RetryOnError)
-		// Prior predicate still honored.
-		require.True(t, cfg.RetryOnError(nil, syscall.ECONNREFUSED))
-		// New TLS predicate triggers.
-		require.True(t, cfg.RetryOnError(nil, wrappedCertErr))
-		// Neither matches.
-		require.False(t, cfg.RetryOnError(nil, syscall.ECONNRESET))
+	t.Run("search is not retried on timeout", func(t *testing.T) {
+		calls.Store(0)
+		_, err := esapi.SearchRequest{Index: []string{index}}.Do(t.Context(), newClient(t))
+		require.Error(t, err)
+		require.Equal(t, int32(1), calls.Load())
 	})
+}
+
+// roundTripFunc is a test helper implementing http.RoundTripper.
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+// minimalESCfg returns the smallest valid config.Config that points to a
+// placeholder ES host. Tests use an rtWrap to intercept transport calls before
+// any real network I/O happens.
+func minimalESCfg() *config.Config {
+	return &config.Config{
+		Output: config.Output{
+			Elasticsearch: config.Elasticsearch{
+				Protocol:       "http",
+				Hosts:          []string{"localhost:9200"},
+				Timeout:        90 * time.Second,
+				MaxConnPerHost: 128,
+			},
+		},
+	}
+}
+
+// zeroBackoff overrides the retry backoff to zero so tests complete instantly.
+func zeroBackoff() ConfigOption {
+	return NewConfigOption(elasticsearch.WithTransportOptions(
+		elastictransport.WithRetryBackoff(func(_ int) time.Duration { return 0 }),
+		elastictransport.WithMaxRetries(2),
+	))
+}
+
+// TestNewClientDefaultRetryWiring verifies that NewClient wires the default
+// retry predicate into the real elastictransport layer. A RoundTripper that
+// always returns ECONNREFUSED should cause exactly maxRetries+1 attempts.
+func TestNewClientDefaultRetryWiring(t *testing.T) {
+	var attempts int
+	rt := roundTripFunc(func(_ *http.Request) (*http.Response, error) {
+		attempts++
+		return nil, syscall.ECONNREFUSED
+	})
+
+	client, err := NewClient(t.Context(), minimalESCfg(), false,
+		ConfigOption{rtWrap: func(_ http.RoundTripper) http.RoundTripper { return rt }},
+		zeroBackoff(),
+	)
+	require.NoError(t, err)
+
+	req, _ := http.NewRequestWithContext(t.Context(), "GET", "http://localhost:9200/", nil)
+	_, _ = client.Perform(req) //nolint:bodyclose // error path, no body
+	require.Equal(t, 3, attempts, "expected 1 initial + 2 retries")
+}
+
+// TestNewClientWithRetryOnErrsComposition verifies that WithRetryOnErrs
+// OR-composes with (not replaces) the default retry predicate: a custom
+// sentinel error should trigger retries when passed via WithRetryOnErrs,
+// while the defaults (ECONNREFUSED, etc.) remain active even without it.
+func TestNewClientWithRetryOnErrsComposition(t *testing.T) {
+	sentinelErr := errors.New("custom sentinel")
+	var attempts int
+	rt := roundTripFunc(func(_ *http.Request) (*http.Response, error) {
+		attempts++
+		return nil, sentinelErr
+	})
+
+	client, err := NewClient(t.Context(), minimalESCfg(), false,
+		ConfigOption{rtWrap: func(_ http.RoundTripper) http.RoundTripper { return rt }},
+		WithRetryOnErrs(sentinelErr),
+		zeroBackoff(),
+	)
+	require.NoError(t, err)
+
+	req, _ := http.NewRequestWithContext(t.Context(), "GET", "http://localhost:9200/", nil)
+	_, _ = client.Perform(req) //nolint:bodyclose // error path, no body
+	// WithRetryOnErrs widens the predicate: sentinelErr now retries.
+	require.Equal(t, 3, attempts, "expected 1 initial + 2 retries via WithRetryOnErrs")
+}
+
+// TestInstrumentRoundTripperAppliesWrapping verifies that InstrumentRoundTripper
+// places an APM wrapper in the transport chain without breaking request routing:
+// the inner transport must still be reached for each request.
+func TestInstrumentRoundTripperAppliesWrapping(t *testing.T) {
+	var innerCalled bool
+	trackRT := roundTripFunc(func(_ *http.Request) (*http.Response, error) {
+		innerCalled = true
+		h := make(http.Header)
+		h.Set("X-Elastic-Product", "Elasticsearch")
+		h.Set("Content-Type", "application/json")
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     h,
+			Body:       io.NopCloser(bytes.NewReader(esPingResponse)),
+		}, nil
+	})
+
+	// First opt replaces the base *http.Transport with trackRT so no real network
+	// I/O occurs.  Second opt wraps trackRT with APM instrumentation.
+	// Request path: elastictransport → APM wrapper → trackRT → fake response.
+	client, err := NewClient(t.Context(), minimalESCfg(), false,
+		ConfigOption{rtWrap: func(_ http.RoundTripper) http.RoundTripper { return trackRT }},
+		InstrumentRoundTripper(),
+	)
+	require.NoError(t, err)
+
+	_, err = FetchESVersion(t.Context(), client)
+	require.NoError(t, err)
+	require.True(t, innerCalled, "APM wrapper must call through to inner transport")
+}
+
+// TestNewClientRetryWithMockES is an end-to-end retry test using a real HTTP
+// server: the server returns 503 for the first two requests and 200 on the
+// third.  It verifies that NewClient's default status-based retry wiring retries
+// on 503 and that the eventual success is surfaced to the caller.
+func TestNewClientRetryWithMockES(t *testing.T) {
+	const failUntil = 2
+	var callCount int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		callCount++
+		w.Header().Set("X-Elastic-Product", "Elasticsearch")
+		if callCount <= failUntil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(esPingResponse)
+	}))
+	defer server.Close()
+
+	cfg := &config.Config{Output: config.Output{Elasticsearch: config.Elasticsearch{
+		Protocol:       "http",
+		Hosts:          []string{server.URL},
+		Timeout:        90 * time.Second,
+		MaxConnPerHost: 128,
+		MaxRetries:     5,
+	}}}
+	client, err := NewClient(t.Context(), cfg, false,
+		NewConfigOption(elasticsearch.WithTransportOptions(
+			elastictransport.WithRetryBackoff(func(_ int) time.Duration { return 0 }),
+		)),
+	)
+	require.NoError(t, err)
+
+	_, err = FetchESVersion(t.Context(), client)
+	require.NoError(t, err, "expected eventual success after 503 retries")
+	require.Equal(t, failUntil+1, callCount, "expected 2 failures + 1 success")
 }

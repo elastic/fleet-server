@@ -17,13 +17,13 @@ scms:
   default:
     kind: github
     spec:
-      user: '{{ requiredEnv "GIT_USER" }}'
-      email: '{{ requiredEnv "GIT_EMAIL" }}'
+      user: '{{ requiredEnv "GITHUB_ACTOR" }}'
+      username: '{{ requiredEnv "GITHUB_ACTOR" }}'
       owner: elastic
       repository: fleet-server
       token: '{{ requiredEnv "GITHUB_TOKEN" }}'
-      username: '{{ requiredEnv "GIT_USER" }}'
       branch: '{{ requiredEnv "BRANCH" }}'
+      commitusingapi: true
 
 sources:
   latestVersion:

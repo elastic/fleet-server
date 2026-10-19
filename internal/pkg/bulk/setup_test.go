@@ -25,6 +25,16 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/testing/rnd"
 )
 
+// withBasicAuthOverride overrides service token auth with basic username/password auth.
+// Used in tests that need to connect with a plain username/password credential.
+func withBasicAuthOverride(username, password string) es.ConfigOption {
+	// Override the service token (set from config) with empty, then use basic auth instead.
+	return es.NewConfigOption(
+		elasticsearch.WithServiceToken(""),
+		elasticsearch.WithBasicAuth(username, password),
+	)
+}
+
 var rand = rnd.New()
 
 var defaultCfg config.Config
@@ -134,11 +144,7 @@ func SetupBulk(ctx context.Context, t testing.TB, opts ...BulkOpt) Bulk {
 
 	// Set up the client with username and password since this test is generic for any index and uses it's own index/mapping
 	e := getEnvironment()
-	cli, err := es.NewClient(ctx, &defaultCfg, false, func(config *elasticsearch.Config) {
-		config.ServiceToken = "" // reset service token
-		config.Username = e.Username
-		config.Password = e.Password
-	})
+	cli, err := es.NewClient(ctx, &defaultCfg, false, withBasicAuthOverride(e.Username, e.Password))
 	if err != nil {
 		t.Fatal(err)
 	}

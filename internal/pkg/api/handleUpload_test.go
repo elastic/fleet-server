@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/docker/go-units"
+	"github.com/elastic/elastic-transport-go/v8/elastictransport"
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
@@ -1345,9 +1346,9 @@ func mockESClient(t *testing.T) (*elasticsearch.Client, *MockTransport) {
 	}
 
 	mocktrans.RoundTripFn = func(req *http.Request) (*http.Response, error) { return mocktrans.Response, nil }
-	client, err := elasticsearch.NewClient(elasticsearch.Config{
-		Transport: &mocktrans,
-	})
+	client, err := elasticsearch.New(
+		elasticsearch.WithTransportOptions(elastictransport.WithTransport(&mocktrans)),
+	)
 	require.NoError(t, err)
 	return client, &mocktrans
 }

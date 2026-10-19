@@ -157,11 +157,9 @@ func startTestServer(t *testing.T, ctx context.Context, policyD model.PolicyData
 
 	// In order to create a functional enrollement token we need to use the ES endpoint to create a new api key
 	// then add the key (id/value) to the enrollment index
-	esCfg := elasticsearch.Config{
-		Username: "elastic",
-		Password: "changeme",
-	}
-	es, err := elasticsearch.NewClient(esCfg)
+	es, err := elasticsearch.New(
+		elasticsearch.WithBasicAuth("elastic", "changeme"),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -229,17 +227,34 @@ func startTestServer(t *testing.T, ctx context.Context, policyD model.PolicyData
 		return nil, fmt.Errorf("unable to create server: %w", err)
 	}
 
-	g, ctx := errgroup.WithContext(ctx)
+	// Derive a cancellable context so we can guarantee the fleet server goroutine
+	// exits before testing.T is torn down. Without this, loggedRunFunc can race
+	// with the test cleanup when it logs via the zerolog TestWriter after the test
+	// has already finished.
+	srvCtx, srvCancel := context.WithCancel(ctx)
+	g, srvCtx := errgroup.WithContext(srvCtx)
 
 	g.Go(func() error {
-		return srv.Run(ctx, cfg)
+		return srv.Run(srvCtx, cfg)
 	})
 
 	tsrv := &tserver{cfg: cfg, g: g, srv: srv, enrollKey: key.Token(), bulker: bulker}
-	err = tsrv.waitServerUp(ctx, testWaitServerUp)
+
+	// serverUp gates whether cleanup reports exit errors: if startup failed, the
+	// exit error is a consequence of that failure and should not be reported separately.
+	serverUp := false
+	t.Cleanup(func() {
+		srvCancel()
+		if err := tsrv.waitExit(); err != nil && serverUp {
+			t.Errorf("fleet server exited with unexpected error: %v", err)
+		}
+	})
+
+	err = tsrv.waitServerUp(srvCtx, testWaitServerUp)
 	if err != nil {
 		return nil, fmt.Errorf("unable to start server: %w", err)
 	}
+	serverUp = true
 	return tsrv, nil
 }
 
@@ -338,11 +353,9 @@ func TestServerConfigErrorReload(t *testing.T) {
 
 	// In order to create a functional enrollement token we need to use the ES endpoint to create a new api key
 	// then add the key (id/value) to the enrollment index
-	esCfg := elasticsearch.Config{
-		Username: "elastic",
-		Password: "changeme",
-	}
-	es, err := elasticsearch.NewClient(esCfg)
+	es, err := elasticsearch.New(
+		elasticsearch.WithBasicAuth("elastic", "changeme"),
+	)
 	require.NoError(t, err)
 	key, err := apikey.Create(ctx, es, "default", "", "true", []byte(`{
 	    "fleet-apikey-enroll": {
@@ -719,6 +732,77 @@ func Test_SmokeTest_Agent_Calls(t *testing.T) {
 	// When decoding to a (typed) struct, the default will implicitly be false if it's missing
 	_, ok = ackObj["errors"]
 	require.Falsef(t, ok, "expected response to have no errors attribute, errors are present: %+v", ackObj)
+}
+
+// enrollWithUserAgent POSTs an enrollment request with the given User-Agent and returns the status code
+// and the access API key and agent ID when enrollment succeeded.
+func enrollWithUserAgent(t *testing.T, ctx context.Context, srv *tserver, userAgent string) (int, string, string) {
+	t.Helper()
+	req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/enroll", strings.NewReader(enrollBody))
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "ApiKey "+srv.enrollKey)
+	req.Header.Set("User-Agent", userAgent)
+	req.Header.Set("Content-Type", "application/json")
+
+	res, err := cleanhttp.DefaultClient().Do(req)
+	require.NoError(t, err)
+	defer res.Body.Close()
+	p, err := io.ReadAll(res.Body)
+	require.NoError(t, err)
+	if res.StatusCode != http.StatusOK {
+		return res.StatusCode, "", ""
+	}
+
+	var response api.EnrollResponse
+	require.NoError(t, json.Unmarshal(p, &response))
+	return res.StatusCode, response.Item.AccessApiKey, response.Item.Id
+}
+
+// Test_MaxAgentVersionOverride tests that feature_flags._max_agent_version raises the highest accepted
+// agent version for both enroll and checkin, and that it is not applied when unset.
+func Test_MaxAgentVersionOverride(t *testing.T) {
+	// serverVersion is 8.0.0: 8.2 is above the default ceiling of both release (8.0.x) and snapshot (8.1.0) builds.
+	const (
+		relaxedAgent  = "elastic agent 8.2.1"
+		tooNewAgent   = "elastic agent 8.3.0"
+		overrideValue = "8.2"
+	)
+
+	t.Run("override accepts newer agents", func(t *testing.T) {
+		srv, err := startTestServer(t, t.Context(), policyData, func(cfg *config.Config) error {
+			cfg.Inputs[0].Server.Features.MaxAgentVersion = overrideValue
+			return nil
+		})
+		require.NoError(t, err)
+		ctx := testlog.SetLogger(t).WithContext(t.Context())
+
+		status, key, id := enrollWithUserAgent(t, ctx, srv, relaxedAgent)
+		require.Equal(t, http.StatusOK, status, "agent within the override should enroll")
+		require.NotEmpty(t, key)
+		require.NotEmpty(t, id)
+
+		req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+id+"/checkin", strings.NewReader(checkinBody))
+		require.NoError(t, err)
+		req.Header.Set("Authorization", "ApiKey "+key)
+		req.Header.Set("User-Agent", relaxedAgent)
+		req.Header.Set("Content-Type", "application/json")
+		res, err := cleanhttp.DefaultClient().Do(req)
+		require.NoError(t, err)
+		res.Body.Close()
+		require.Equal(t, http.StatusOK, res.StatusCode, "agent within the override should check in")
+
+		status, _, _ = enrollWithUserAgent(t, ctx, srv, tooNewAgent)
+		require.Equal(t, http.StatusBadRequest, status, "agent above the override should be rejected")
+	})
+
+	t.Run("no override rejects newer agents", func(t *testing.T) {
+		srv, err := startTestServer(t, t.Context(), policyData)
+		require.NoError(t, err)
+		ctx := testlog.SetLogger(t).WithContext(t.Context())
+
+		status, _, _ := enrollWithUserAgent(t, ctx, srv, relaxedAgent)
+		require.Equal(t, http.StatusBadRequest, status)
+	})
 }
 
 func EnrollAgent(t *testing.T, ctx context.Context, srv *tserver, enrollBody string) api.EnrollResponse {
@@ -1942,4 +2026,310 @@ func Test_Checkin_GracefulForceUnenroll(t *testing.T) {
 
 		assert.Equal(t, http.StatusUnauthorized, res.StatusCode)
 	})
+}
+
+// Test_Checkin_AgentTags checks that agents get their tags in the policy and that a tags change
+// reaches them without a new policy revision.
+func Test_Checkin_AgentTags(t *testing.T) {
+	srv, err := startTestServer(t, t.Context(), agentTagsPolicy(true))
+	require.NoError(t, err)
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
+	kibana := NewFakeKibana(srv)
+
+	agent, err := NewFakeAgent(ctx, srv, `{
+	    "type": "PERMANENT",
+	    "shared_id": "",
+	    "metadata": {
+		"user_provided": {},
+		"local": {},
+		"tags": ["b", "a", "a"]
+	    }
+	}`)
+	require.NoError(t, err)
+	rev1 := fmt.Sprintf("policy:%s:1", agent.PolicyID)
+	rev2 := fmt.Sprintf("policy:%s:2", agent.PolicyID)
+	rev3 := fmt.Sprintf("policy:%s:3", agent.PolicyID)
+
+	abHash, err := (&model.Agent{Tags: []string{"a", "b"}}).ComputeTagsHash()
+	require.NoError(t, err)
+	cHash, err := (&model.Agent{Tags: []string{"c"}}).ComputeTagsHash()
+	require.NoError(t, err)
+	dHash, err := (&model.Agent{Tags: []string{"d"}}).ComputeTagsHash()
+	require.NoError(t, err)
+
+	t.Run("agent gets its enrollment tags", func(t *testing.T) {
+		action, policy, err := agent.CheckinPolicyChange(ctx, 0)
+		require.NoError(t, err)
+		assert.Equal(t, rev1, action.Id)
+		assert.Equal(t, []any{"a", "b"}, policy.Agent["tags"])
+		assert.Equal(t, agentTagsPolicy(true).Agent["features"], policy.Agent["features"])
+
+		doc, err := dl.GetAgent(ctx, srv.bulker, agent.ID)
+		require.NoError(t, err)
+		assert.Equal(t, abHash, doc.TagsHash)
+	})
+
+	t.Run("agent gets the new tags", func(t *testing.T) {
+		err := kibana.SetAgentTags(ctx, agent.ID, "c")
+		require.NoError(t, err)
+
+		action, policy, err := agent.CheckinPolicyChange(ctx, 1)
+		require.NoError(t, err)
+		assert.Equal(t, rev1, action.Id)
+		assert.Equal(t, []any{"c"}, policy.Agent["tags"])
+
+		doc, err := dl.GetAgent(ctx, srv.bulker, agent.ID)
+		require.NoError(t, err)
+		assert.Equal(t, cHash, doc.TagsHash)
+	})
+
+	t.Run("no tag change, no new policy", func(t *testing.T) {
+		err := agent.CheckinLongPoll(ctx, 1)
+		require.NoError(t, err)
+	})
+
+	t.Run("agent gets no tags after they are removed", func(t *testing.T) {
+		err := kibana.SetAgentTags(ctx, agent.ID)
+		require.NoError(t, err)
+
+		action, policy, err := agent.CheckinPolicyChange(ctx, 1)
+		require.NoError(t, err)
+		assert.Equal(t, rev1, action.Id)
+		assert.NotContains(t, policy.Agent, "tags")
+
+		doc, err := dl.GetAgent(ctx, srv.bulker, agent.ID)
+		require.NoError(t, err)
+		assert.Empty(t, doc.TagsHash)
+	})
+
+	t.Run("policy update during a check-in still has the old tags", func(t *testing.T) {
+		type checkinResult struct {
+			action api.Action
+			policy api.PolicyData
+			err    error
+		}
+
+		agent.Message = "open check-in"
+		done := make(chan checkinResult, 1)
+		go func() {
+			action, policy, err := agent.CheckinPolicyChange(ctx, 1)
+			done <- checkinResult{action: action, policy: policy, err: err}
+		}()
+
+		// The check-in writes its message to the agent document right after it subscribes.
+		require.Eventually(t, func() bool {
+			doc, err := dl.GetAgent(ctx, srv.bulker, agent.ID)
+			return err == nil && doc.LastCheckinMessage == "open check-in"
+		}, 15*time.Second, 500*time.Millisecond, "the open check-in was not recorded")
+
+		err := kibana.SetAgentTags(ctx, agent.ID, "d")
+		require.NoError(t, err)
+		err = kibana.WritePolicy(ctx, agent.PolicyID, 2, agentTagsPolicy(true))
+		require.NoError(t, err)
+
+		result := <-done
+		agent.Message = "checkin ok"
+		require.NoError(t, result.err)
+		assert.Equal(t, rev2, result.action.Id)
+		assert.NotContains(t, result.policy.Agent, "tags")
+
+		doc, err := dl.GetAgent(ctx, srv.bulker, agent.ID)
+		require.NoError(t, err)
+		assert.Empty(t, doc.TagsHash, "the sent policy had no tags, so the stored hash must stay empty")
+	})
+
+	t.Run("agent gets the new tags on the next check-in", func(t *testing.T) {
+		action, policy, err := agent.CheckinPolicyChange(ctx, 2)
+		require.NoError(t, err)
+		assert.Equal(t, rev2, action.Id)
+		assert.Equal(t, []any{"d"}, policy.Agent["tags"])
+
+		doc, err := dl.GetAgent(ctx, srv.bulker, agent.ID)
+		require.NoError(t, err)
+		assert.Equal(t, dHash, doc.TagsHash)
+	})
+
+	t.Run("feature off, agent still gets the tags with a new policy", func(t *testing.T) {
+		err := kibana.WritePolicy(ctx, agent.PolicyID, 3, agentTagsPolicy(false))
+		require.NoError(t, err)
+
+		action, policy, err := agent.CheckinPolicyChange(ctx, 2)
+		require.NoError(t, err)
+		assert.Equal(t, rev3, action.Id)
+		assert.Equal(t, []any{"d"}, policy.Agent["tags"])
+		assert.Equal(t, agentTagsPolicy(false).Agent["features"], policy.Agent["features"])
+	})
+
+	t.Run("feature off, tag change does not send the policy again", func(t *testing.T) {
+		err := kibana.SetAgentTags(ctx, agent.ID, "e")
+		require.NoError(t, err)
+
+		err = agent.CheckinLongPoll(ctx, 3)
+		require.NoError(t, err)
+
+		doc, err := dl.GetAgent(ctx, srv.bulker, agent.ID)
+		require.NoError(t, err)
+		assert.Equal(t, dHash, doc.TagsHash, "no policy was sent, so the stored hash must not change")
+	})
+}
+
+// FakeAgent plays an enrolled Elastic Agent over the Fleet Server HTTP API.
+type FakeAgent struct {
+	srv      *tserver
+	key      string
+	ID       string
+	PolicyID string
+	Message  string
+}
+
+// NewFakeAgent enrolls an agent with the given enroll request body.
+func NewFakeAgent(ctx context.Context, srv *tserver, enrollBody string) (*FakeAgent, error) {
+	req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/enroll", strings.NewReader(enrollBody))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "ApiKey "+srv.enrollKey)
+	req.Header.Set("User-Agent", "elastic agent "+serverVersion)
+	req.Header.Set("Content-Type", "application/json")
+	res, err := cleanhttp.DefaultClient().Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected enroll status %d", res.StatusCode)
+	}
+	var enrollResp api.EnrollResponse
+	if err := json.NewDecoder(res.Body).Decode(&enrollResp); err != nil {
+		return nil, err
+	}
+	agent, err := dl.GetAgent(ctx, srv.bulker, enrollResp.Item.Id)
+	if err != nil {
+		return nil, err
+	}
+	return &FakeAgent{
+		srv:      srv,
+		key:      enrollResp.Item.AccessApiKey,
+		ID:       enrollResp.Item.Id,
+		PolicyID: agent.PolicyID,
+		Message:  "checkin ok",
+	}, nil
+}
+
+// checkin sends a check-in that reports the policy revision the agent runs.
+func (a *FakeAgent) checkin(ctx context.Context, rev int64) (api.CheckinResponse, error) {
+	var checkinResp api.CheckinResponse
+	body, err := json.Marshal(map[string]any{
+		"status":              "online",
+		"message":             a.Message,
+		"agent_policy_id":     a.PolicyID,
+		"policy_revision_idx": rev,
+	})
+	if err != nil {
+		return checkinResp, err
+	}
+	req, err := http.NewRequestWithContext(ctx, "POST", a.srv.buildURL(a.ID, "checkin"), bytes.NewReader(body))
+	if err != nil {
+		return checkinResp, err
+	}
+	req.Header.Set("Authorization", "ApiKey "+a.key)
+	req.Header.Set("User-Agent", "elastic agent "+serverVersion)
+	req.Header.Set("Content-Type", "application/json")
+	res, err := cleanhttp.DefaultClient().Do(req)
+	if err != nil {
+		return checkinResp, err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		return checkinResp, fmt.Errorf("unexpected checkin status %d", res.StatusCode)
+	}
+	return checkinResp, json.NewDecoder(res.Body).Decode(&checkinResp)
+}
+
+// CheckinPolicyChange sends a check-in that must return a POLICY_CHANGE at once.
+func (a *FakeAgent) CheckinPolicyChange(ctx context.Context, rev int64) (api.Action, api.PolicyData, error) {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	checkinResp, err := a.checkin(ctx, rev)
+	if err != nil {
+		return api.Action{}, api.PolicyData{}, fmt.Errorf("expected a policy change at once: %w", err)
+	}
+	if len(checkinResp.Actions) != 1 {
+		return api.Action{}, api.PolicyData{}, fmt.Errorf("expected exactly one action, got %d", len(checkinResp.Actions))
+	}
+	action := checkinResp.Actions[0]
+	if action.Type != api.POLICYCHANGE {
+		return api.Action{}, api.PolicyData{}, fmt.Errorf("expected a POLICY_CHANGE action, got %s", action.Type)
+	}
+	pc, err := action.Data.AsActionPolicyChange()
+	if err != nil {
+		return api.Action{}, api.PolicyData{}, err
+	}
+	return action, pc.Policy, nil
+}
+
+// CheckinLongPoll sends a check-in that must stay open, because no action is due.
+func (a *FakeAgent) CheckinLongPoll(ctx context.Context, rev int64) error {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	checkinResp, err := a.checkin(ctx, rev)
+	if errors.Is(err, context.DeadlineExceeded) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	return fmt.Errorf("expected the checkin to long poll, got actions: %v", checkinResp.Actions)
+}
+
+// FakeKibana writes to Elasticsearch what Kibana writes for Fleet.
+type FakeKibana struct {
+	bulker bulk.Bulk
+}
+
+// NewFakeKibana returns a FakeKibana that writes through the bulker of the test server.
+func NewFakeKibana(srv *tserver) *FakeKibana {
+	return &FakeKibana{bulker: srv.bulker}
+}
+
+// SetAgentTags writes the agent tags as Kibana does.
+func (k *FakeKibana) SetAgentTags(ctx context.Context, agentID string, tags ...string) error {
+	if tags == nil {
+		tags = []string{}
+	}
+	body, err := bulk.UpdateFields{dl.FieldTags: tags}.Marshal()
+	if err != nil {
+		return err
+	}
+	return k.bulker.Update(ctx, dl.FleetAgents, agentID, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3))
+}
+
+// WritePolicy writes a new revision of the policy.
+func (k *FakeKibana) WritePolicy(ctx context.Context, policyID string, rev int64, data model.PolicyData) error {
+	_, err := dl.CreatePolicy(ctx, k.bulker, model.Policy{
+		PolicyID:           policyID,
+		RevisionIdx:        rev,
+		DefaultFleetServer: true,
+		Data:               &data,
+	})
+	return err
+}
+
+func agentTagsPolicy(includeTagsInEvents bool) model.PolicyData {
+	return model.PolicyData{
+		Outputs: map[string]map[string]any{
+			"default": {
+				"type": "elasticsearch",
+			},
+		},
+		OutputPermissions: json.RawMessage(`{"default": {}}`),
+		Inputs: []map[string]any{{
+			"type": "fleet-server",
+		}},
+		Agent: map[string]any{
+			"features": map[string]any{
+				model.FeatureIncludeTagsInEvents: map[string]any{"enabled": includeTagsInEvents},
+			},
+		},
+	}
 }

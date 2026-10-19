@@ -16,6 +16,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -127,9 +128,51 @@ func TestConvertActionData(t *testing.T) {
 	}, {
 		name:   "upgrade action",
 		aType:  UPGRADE,
-		raw:    json.RawMessage(`{"source_uri":"https://localhost:8080","version":"1.2.3"}`),
-		expect: Action_Data{json.RawMessage(`{"source_uri":"https://localhost:8080","version":"1.2.3"}`)},
+		raw:    json.RawMessage(`{"sources":["https://localhost:8080"],"version":"1.2.3"}`),
+		expect: Action_Data{json.RawMessage(`{"source_uri":"https://localhost:8080","sources":["https://localhost:8080"],"version":"1.2.3"}`)},
 		hasErr: false,
+	}, {
+		name:   "upgrade action populates source uri from sources",
+		aType:  UPGRADE,
+		raw:    json.RawMessage(`{"sources":["https://first.example.com","https://second.example.com"],"version":"1.2.3"}`),
+		expect: Action_Data{json.RawMessage(`{"source_uri":"https://first.example.com","sources":["https://first.example.com","https://second.example.com"],"version":"1.2.3"}`)},
+		hasErr: false,
+	}, {
+		name:   "upgrade action populates sources from source uri",
+		aType:  UPGRADE,
+		raw:    json.RawMessage(`{"source_uri":"https://legacy.example.com","version":"1.2.3"}`),
+		expect: Action_Data{json.RawMessage(`{"source_uri":"https://legacy.example.com","sources":["https://legacy.example.com"],"version":"1.2.3"}`)},
+		hasErr: false,
+	}, {
+		name:   "upgrade action uses sources over source uri",
+		aType:  UPGRADE,
+		raw:    json.RawMessage(`{"source_uri":"https://legacy.example.com","sources":["https://new.example.com"],"version":"1.2.3"}`),
+		expect: Action_Data{json.RawMessage(`{"source_uri":"https://new.example.com","sources":["https://new.example.com"],"version":"1.2.3"}`)},
+		hasErr: false,
+	}, {
+		name:   "upgrade action uses empty sources over source uri",
+		aType:  UPGRADE,
+		raw:    json.RawMessage(`{"source_uri":"https://legacy.example.com","sources":[],"version":"1.2.3"}`),
+		expect: Action_Data{json.RawMessage(`{"sources":[],"version":"1.2.3"}`)},
+		hasErr: false,
+	}, {
+		name:   "upgrade action does not populate sources from empty source uri",
+		aType:  UPGRADE,
+		raw:    json.RawMessage(`{"source_uri":"","version":"1.2.3"}`),
+		expect: Action_Data{json.RawMessage(`{"source_uri":"","sources":[],"version":"1.2.3"}`)},
+		hasErr: false,
+	}, {
+		name:   "upgrade action handles empty source_uri and sources",
+		aType:  UPGRADE,
+		raw:    json.RawMessage(`{"version":"1.2.3"}`),
+		expect: Action_Data{json.RawMessage(`{"version":"1.2.3"}`)},
+		hasErr: false,
+	}, {
+		name:   "upgrade action fails with too many sources",
+		aType:  UPGRADE,
+		raw:    json.RawMessage(`{"sources":["https://s1","https://s2","https://s3","https://s4","https://s5","https://s6","https://s7","https://s8","https://s9","https://s10","https://s11","https://s12","https://s13","https://s14","https://s15","https://s16","https://s17","https://s18","https://s19","https://s20","https://s21"],"version":"1.2.3"}`),
+		expect: Action_Data{},
+		hasErr: true,
 	}, {
 		name:   "request diagnostics action",
 		aType:  REQUESTDIAGNOSTICS,
@@ -150,6 +193,11 @@ func TestConvertActionData(t *testing.T) {
 	}, {
 		name:   "unenroll action",
 		aType:  UNENROLL,
+		expect: Action_Data{},
+		hasErr: false,
+	}, {
+		name:   "restart action",
+		aType:  RESTART,
 		expect: Action_Data{},
 		hasErr: false,
 	}, {
@@ -233,6 +281,16 @@ func TestConvertActions(t *testing.T) {
 			Data:    Action_Data{json.RawMessage(`{}`)},
 		}},
 		token: "",
+	}, {
+		name:    "upgrade action",
+		actions: []model.Action{{ActionID: "1234", Type: "UPGRADE", Data: json.RawMessage(`{"sources":["https://first.example.com","https://second.example.com"],"version":"9.6.0"}`)}},
+		resp: []Action{{
+			AgentId: "agent-id",
+			Id:      "1234",
+			Type:    UPGRADE,
+			Data:    Action_Data{json.RawMessage(`{"source_uri":"https://first.example.com","sources":["https://first.example.com","https://second.example.com"],"version":"9.6.0"}`)},
+		}},
+		token: "",
 	}, {name: "multiple actions",
 		actions: []model.Action{
 			{
@@ -298,6 +356,9 @@ func TestFilterActions(t *testing.T) {
 		}, {
 			ActionID: "5678",
 			Type:     "UNENROLL",
+		}, {
+			ActionID: "9012",
+			Type:     "RESTART",
 		}},
 		resp: []model.Action{{
 			ActionID: "1234",
@@ -305,6 +366,9 @@ func TestFilterActions(t *testing.T) {
 		}, {
 			ActionID: "5678",
 			Type:     "UNENROLL",
+		}, {
+			ActionID: "9012",
+			Type:     "RESTART",
 		}},
 	}, {
 		name: "filter POLICY_CHANGE action",
@@ -403,6 +467,7 @@ func TestProcessUpgradeDetails(t *testing.T) {
 		name    string
 		agent   *model.Agent
 		details *UpgradeDetails
+		ver     string
 		bulk    func() *ftesting.MockBulk
 		cache   func() *testcache.MockCache
 		err     error
@@ -412,6 +477,93 @@ func TestProcessUpgradeDetails(t *testing.T) {
 		details: nil,
 		bulk: func() *ftesting.MockBulk {
 			return ftesting.NewMockBulk()
+		},
+		cache: func() *testcache.MockCache {
+			return testcache.NewMockCache()
+		},
+		err: nil,
+	}, {
+		name:    "agent has upgrade_started_at but no upgrade_details, checkin details are nil (fast upgrade race)",
+		agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent", Version: "8.19.0"}, UpgradeStartedAt: "2024-01-01T00:00:00Z"},
+		details: nil,
+		ver:     "8.20.0", // agent restarted at new version
+		bulk: func() *ftesting.MockBulk {
+			mBulk := ftesting.NewMockBulk()
+			mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.MatchedBy(func(p []byte) bool {
+				doc := struct {
+					Doc map[string]any `json:"doc"`
+				}{}
+				if err := json.Unmarshal(p, &doc); err != nil {
+					t.Logf("bulk match unmarshal error: %v", err)
+					return false
+				}
+				upgradedAt, ok := doc.Doc[dl.FieldUpgradedAt]
+				upgradedAtStr, isStr := upgradedAt.(string)
+				return doc.Doc[dl.FieldUpgradeDetails] == nil && doc.Doc[dl.FieldUpgradeStartedAt] == nil && ok && isStr && upgradedAtStr != ""
+			}), mock.Anything, mock.Anything).Return(nil)
+			return mBulk
+		},
+		cache: func() *testcache.MockCache {
+			return testcache.NewMockCache()
+		},
+		err: nil,
+	}, {
+		name:    "agent has upgrade_started_at but no upgrade_details, first checkin after dispatch (same version, upgrade not yet received)",
+		agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent", Version: "8.19.0"}, UpgradeStartedAt: time.Now().UTC().Format(time.RFC3339)},
+		details: nil,
+		ver:     "", // version unchanged — upgrade action not yet received by agent; upgrade_started_at is fresh so staleness guard applies
+		bulk: func() *ftesting.MockBulk {
+			return ftesting.NewMockBulk() // no Update call expected
+		},
+		cache: func() *testcache.MockCache {
+			return testcache.NewMockCache()
+		},
+		err: nil,
+	}, {
+		name: "agent has stale upgrade_started_at but no upgrade_details, same version (self-heal after rolling fleet-server upgrade)",
+		// upgrade_started_at older than 2× default CheckinMaxPoll (2h); cfg is nil in tests so fallback = 2h
+		agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent", Version: "8.19.0"}, UpgradeStartedAt: time.Now().Add(-3 * time.Hour).UTC().Format(time.RFC3339)},
+		details: nil,
+		ver:     "", // version matches stored — upgrade_started_at is stale so we clear it; upgraded_at NOT set (outcome unknown)
+		bulk: func() *ftesting.MockBulk {
+			mBulk := ftesting.NewMockBulk()
+			mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.MatchedBy(func(p []byte) bool {
+				doc := struct {
+					Doc map[string]any `json:"doc"`
+				}{}
+				if err := json.Unmarshal(p, &doc); err != nil {
+					t.Logf("bulk match unmarshal error: %v", err)
+					return false
+				}
+				_, hasUpgradedAt := doc.Doc[dl.FieldUpgradedAt]
+				return doc.Doc[dl.FieldUpgradeDetails] == nil && doc.Doc[dl.FieldUpgradeStartedAt] == nil && !hasUpgradedAt
+			}), mock.Anything, mock.Anything).Return(nil)
+			return mBulk
+		},
+		cache: func() *testcache.MockCache {
+			return testcache.NewMockCache()
+		},
+		err: nil,
+	}, {
+		name: "agent has stale upgrade_started_at with fractional seconds (RFC3339Nano), same version (self-heal)",
+		// upgrade_started_at uses fractional seconds as Kibana may produce; must still parse and self-heal
+		agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent", Version: "8.19.0"}, UpgradeStartedAt: time.Now().Add(-3 * time.Hour).UTC().Format(time.RFC3339Nano)},
+		details: nil,
+		ver:     "",
+		bulk: func() *ftesting.MockBulk {
+			mBulk := ftesting.NewMockBulk()
+			mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.MatchedBy(func(p []byte) bool {
+				doc := struct {
+					Doc map[string]any `json:"doc"`
+				}{}
+				if err := json.Unmarshal(p, &doc); err != nil {
+					t.Logf("bulk match unmarshal error: %v", err)
+					return false
+				}
+				_, hasUpgradedAt := doc.Doc[dl.FieldUpgradedAt]
+				return doc.Doc[dl.FieldUpgradeDetails] == nil && doc.Doc[dl.FieldUpgradeStartedAt] == nil && !hasUpgradedAt
+			}), mock.Anything, mock.Anything).Return(nil)
+			return mBulk
 		},
 		cache: func() *testcache.MockCache {
 			return testcache.NewMockCache()
@@ -431,7 +583,9 @@ func TestProcessUpgradeDetails(t *testing.T) {
 					t.Logf("bulk match unmarshal error: %v", err)
 					return false
 				}
-				return doc.Doc[dl.FieldUpgradeDetails] == nil && doc.Doc[dl.FieldUpgradeStartedAt] == nil && doc.Doc[dl.FieldUpgradedAt] != ""
+				upgradedAt, ok := doc.Doc[dl.FieldUpgradedAt]
+				upgradedAtStr, isStr := upgradedAt.(string)
+				return doc.Doc[dl.FieldUpgradeDetails] == nil && doc.Doc[dl.FieldUpgradeStartedAt] == nil && ok && isStr && upgradedAtStr != ""
 			}), mock.Anything, mock.Anything).Return(nil)
 			return mBulk
 		},
@@ -793,7 +947,7 @@ func TestProcessUpgradeDetails(t *testing.T) {
 				bulker: mBulk,
 			}
 
-			err := ct.processUpgradeDetails(context.Background(), tc.agent, tc.details)
+			err := ct.processUpgradeDetails(context.Background(), tc.agent, tc.details, tc.ver)
 			if tc.err == nil {
 				assert.NoError(t, err)
 			} else {
@@ -905,7 +1059,7 @@ func BenchmarkParallel_CheckinT_writeResponse(b *testing.B) {
 }
 
 func mustBuildConstraints(verStr string) version.Constraints {
-	con, err := BuildVersionConstraint(verStr)
+	con, _, err := BuildVersionConstraint(verStr, "")
 	if err != nil {
 		panic(err)
 	}
@@ -1846,7 +2000,7 @@ func TestProcessPolicyRemoteESServiceTokenSecretPaths(t *testing.T) {
 		},
 	}
 
-	action, err := processPolicy(t.Context(), logger, bulker, agent, pp, nil)
+	action, _, err := processPolicy(t.Context(), logger, bulker, agent, pp, nil)
 	require.NoError(t, err)
 
 	pc, err := action.Data.AsActionPolicyChange()
@@ -1860,6 +2014,196 @@ func TestProcessPolicyRemoteESServiceTokenSecretPaths(t *testing.T) {
 	_, hasServiceToken := remotePolicy["service_token"]
 	assert.False(t, hasServiceToken, "service_token should be deleted by Prepare before delivery to agents")
 	assert.Equal(t, policy.OutputTypeElasticsearch, remotePolicy["type"])
+}
+
+// TestProcessPolicyPrunesAgentPinnedInputsSecretPaths ensures inputs pinned to other
+// agents are not delivered and that secret_paths follow the shifted input/stream indexes.
+func TestProcessPolicyPrunesAgentPinnedInputsSecretPaths(t *testing.T) {
+	logger := testlog.SetLogger(t)
+
+	const policyPayload = `{
+  "id": "pinned-inputs",
+  "revision": 1,
+  "outputs": {"default": {"type": "elasticsearch", "hosts": ["https://local.es.example:443"]}},
+  "output_permissions": {"default": {"_fallback": {"cluster": ["monitor"]}}},
+  "secret_references": [{"id": "P0"}, {"id": "P1"}, {"id": "T0"}, {"id": "T1"}],
+  "inputs": [
+    {
+      "id": "pinned-elsewhere",
+      "condition": "${agent.id} == 'agent2'",
+      "secrets": {"pw": {"id": "P0"}}
+    },
+    {
+      "id": "mixed",
+      "secrets": {"pw": {"id": "P1"}},
+      "streams": [
+        {"id": "s0", "condition": "${agent.id} == 'agent2'", "secrets": {"tok": {"id": "T0"}}},
+        {"id": "s1", "condition": "${agent.id} == 'agent1'", "secrets": {"tok": {"id": "T1"}}}
+      ]
+    }
+  ]
+}`
+
+	var d model.PolicyData
+	require.NoError(t, json.Unmarshal([]byte(policyPayload), &d))
+
+	bulker := ftesting.NewMockBulk()
+	pp, err := policy.NewParsedPolicy(t.Context(), bulker, model.Policy{
+		PolicyID:    "policy1",
+		RevisionIdx: 1,
+		Data:        &d,
+	})
+	require.NoError(t, err)
+
+	outputBulker := ftesting.NewMockBulk()
+	bulker.On("CreateAndGetBulker", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(outputBulker, false, nil)
+
+	defaultOut := pp.Outputs["default"]
+	require.NotNil(t, defaultOut.Role)
+	key := bulk.APIKey{ID: "default-id", Key: "default-key"}
+	agent := &model.Agent{
+		ESDocument: model.ESDocument{Id: "agent1"},
+		Outputs: map[string]*model.PolicyOutput{
+			"default": {
+				APIKey:          key.Agent(),
+				APIKeyID:        key.ID,
+				PermissionsHash: defaultOut.Role.Sha2,
+				Type:            policy.OutputTypeElasticsearch,
+			},
+		},
+	}
+
+	action, _, err := processPolicy(t.Context(), logger, bulker, agent, pp, nil)
+	require.NoError(t, err)
+	pc, err := action.Data.AsActionPolicyChange()
+	require.NoError(t, err)
+
+	require.Len(t, pc.Policy.Inputs, 1)
+	assert.Equal(t, "mixed", pc.Policy.Inputs[0]["id"])
+	assert.ElementsMatch(t, []string{"inputs.0.pw", "inputs.0.streams.0.tok"}, pc.Policy.SecretPaths)
+
+	input := pc.Policy.Inputs[0]
+	assert.Equal(t, "P1_value", input["pw"])
+	streams, ok := input["streams"].([]any)
+	require.True(t, ok)
+	require.Len(t, streams, 1)
+	stream, ok := streams[0].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "T1_value", stream["tok"])
+}
+
+// TestProcessPolicyAgentTags ensures that processPolicy injects the agent tags and records their hash
+// only when agent.features.include_tags_in_events.enabled is true.
+func TestProcessPolicyAgentTags(t *testing.T) {
+	logger := testlog.SetLogger(t)
+
+	flagOn := func() map[string]any {
+		return map[string]any{"features": map[string]any{"include_tags_in_events": map[string]any{"enabled": true}}}
+	}
+
+	abHash, err := (&model.Agent{Tags: []string{"a", "b"}}).ComputeTagsHash()
+	require.NoError(t, err)
+
+	tests := []struct {
+		name         string
+		agentSection map[string]any
+		tags         []string
+		tagsHash     string
+		wantTags     []any
+		wantUpdate   bulk.UpdateFields
+	}{
+		{
+			name:       "no agent section",
+			tags:       []string{"a", "b"},
+			wantTags:   []any{"a", "b"},
+			wantUpdate: bulk.UpdateFields{dl.FieldTagsHash: abHash},
+		},
+		{
+			name:         "flag off",
+			agentSection: map[string]any{},
+			tags:         []string{"a", "b"},
+			wantTags:     []any{"a", "b"},
+			wantUpdate:   bulk.UpdateFields{dl.FieldTagsHash: abHash},
+		},
+		{
+			name:         "flag on, same hash",
+			agentSection: flagOn(),
+			tags:         []string{"a", "b"},
+			tagsHash:     abHash,
+			wantTags:     []any{"a", "b"},
+		},
+		{
+			name:         "unsorted duplicate tags",
+			agentSection: flagOn(),
+			tags:         []string{"b", "a", "b"},
+			tagsHash:     abHash,
+			wantTags:     []any{"a", "b"},
+		},
+		{
+			name:         "tags removed",
+			agentSection: flagOn(),
+			tagsHash:     abHash,
+			wantUpdate:   bulk.UpdateFields{dl.FieldTagsHash: ""},
+		},
+		{
+			name:         "no tags, no hash",
+			agentSection: flagOn(),
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			d := model.PolicyData{
+				Outputs: map[string]map[string]any{
+					"default": {"type": "elasticsearch", "hosts": []any{"https://local.es.example:443"}},
+				},
+				OutputPermissions: json.RawMessage(`{"default": {"_fallback": {"cluster": ["monitor"]}}}`),
+				Agent:             tc.agentSection,
+			}
+
+			bulker := ftesting.NewMockBulk()
+			pp, err := policy.NewParsedPolicy(t.Context(), bulker, model.Policy{
+				PolicyID:    "policy1",
+				RevisionIdx: 1,
+				Data:        &d,
+			})
+			require.NoError(t, err)
+			defaultOut := pp.Outputs["default"]
+			require.NotNil(t, defaultOut.Role)
+
+			apiKey := bulk.APIKey{ID: "default-id", Key: "default-key"}
+			agent := &model.Agent{
+				ESDocument: model.ESDocument{Id: "agent1"},
+				Tags:       tc.tags,
+				TagsHash:   tc.tagsHash,
+				Outputs: map[string]*model.PolicyOutput{
+					"default": {
+						APIKey:          apiKey.Agent(),
+						APIKeyID:        apiKey.ID,
+						PermissionsHash: defaultOut.Role.Sha2,
+						Type:            policy.OutputTypeElasticsearch,
+					},
+				},
+			}
+
+			action, agentUpdate, err := processPolicy(t.Context(), logger, bulker, agent, pp.Clone(), nil)
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantUpdate, agentUpdate)
+			bulker.AssertNotCalled(t, "Update", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything, mock.Anything)
+			_, cachedHasTags := pp.Policy.Data.Agent["tags"]
+			assert.False(t, cachedHasTags, "processPolicy must not change the agent section of the cached policy")
+
+			pc, err := action.Data.AsActionPolicyChange()
+			require.NoError(t, err)
+			assert.Equal(t, tc.agentSection["features"], pc.Policy.Agent["features"], "agent.features must reach the agent unchanged")
+			tags, hasTags := pc.Policy.Agent["tags"]
+			if tc.wantTags == nil {
+				assert.False(t, hasTags, "agent.tags must be absent, got %v", tags)
+				return
+			}
+			assert.Equal(t, tc.wantTags, tags)
+		})
+	}
 }
 
 // TestProcessPolicySecretPathsConcurrentDispatch ensures processPolicy does not
@@ -1927,7 +2271,7 @@ func TestProcessPolicySecretPathsConcurrentDispatch(t *testing.T) {
 			},
 		}
 		wg.Go(func() {
-			action, err := processPolicy(t.Context(), logger, bulker, agent, pp, nil)
+			action, _, err := processPolicy(t.Context(), logger, bulker, agent, pp.Clone(), nil)
 			if err != nil {
 				errs[a] = err
 				return
@@ -1947,4 +2291,229 @@ func TestProcessPolicySecretPathsConcurrentDispatch(t *testing.T) {
 		assert.Equal(t, []string{"outputs.remote.ssl.key"}, secretPaths[a], "agent %d received incorrect secret paths", a)
 	}
 	assert.Equal(t, baseline, pp.SecretKeys, "shared ParsedPolicy.SecretKeys was mutated")
+}
+
+func TestProcessPolicyOTLPOutput(t *testing.T) {
+	logger := testlog.SetLogger(t)
+
+	const outputName = "my-otlp"
+
+	// secretDocID is returned by MockBulk.WriteSecret; MockBulk.ReadSecrets returns id+"_value".
+	const secretDocID = "otlp-secret-doc-id"
+	wantHeader := "ApiKey " + base64.StdEncoding.EncodeToString([]byte(secretDocID+"_value"))
+
+	tests := []struct {
+		name       string
+		exporterID string // e.g. "otlp/my-otlp" or "otlphttp/my-otlp"
+		managed    bool   // true = include output_permissions, triggering key minting
+		wantHeader string // expected Authorization header; empty = no injection
+	}{
+		{
+			name:       "external OTLP, grpc — exporter unchanged, output dropped",
+			exporterID: policy.OTelExporterTypeOTLP + "/" + outputName,
+		},
+		{
+			name:       "external OTLP, http — exporter unchanged, output dropped",
+			exporterID: policy.OTelExporterTypeOTLPHTTP + "/" + outputName,
+		},
+		{
+			name:       "managed OTLP, grpc — Authorization header injected, output dropped",
+			exporterID: policy.OTelExporterTypeOTLP + "/" + outputName,
+			managed:    true,
+			wantHeader: wantHeader,
+		},
+		{
+			name:       "managed OTLP, http — Authorization header injected, output dropped",
+			exporterID: policy.OTelExporterTypeOTLPHTTP + "/" + outputName,
+			managed:    true,
+			wantHeader: wantHeader,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			outputPermissions := ""
+			if tc.managed {
+				outputPermissions = fmt.Sprintf(`,
+				"output_permissions": {
+					%q: {
+						"_managed_otlp_apm": {
+							"applications": [{"application": "apm", "privileges": ["event:write"], "resources": ["*"]}]
+						}
+					}
+				}`, outputName)
+			}
+
+			policyPayload := fmt.Sprintf(`{
+				"id": "test-policy",
+				"revision": 1,
+				"outputs": {%q: {"type": "otlp"}},
+				"exporters": {%q: {"endpoint": "https://otlp.example:4317"}}
+				%s,
+				"inputs": []
+			}`, outputName, tc.exporterID, outputPermissions)
+
+			var d model.PolicyData
+			require.NoError(t, json.Unmarshal([]byte(policyPayload), &d))
+
+			bulker := ftesting.NewMockBulk()
+			if tc.managed {
+				bulker.On("APIKeyCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(&bulk.APIKey{ID: "otlp-key-id", Key: "otlp-key-secret"}, nil)
+				bulker.On("WriteSecret", mock.Anything, mock.Anything).
+					Return(secretDocID, nil)
+				bulker.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(nil)
+			}
+
+			pp, err := policy.NewParsedPolicy(t.Context(), bulker, model.Policy{
+				PolicyID:    "policy1",
+				RevisionIdx: 1,
+				Data:        &d,
+			})
+			require.NoError(t, err)
+
+			agent := &model.Agent{ESDocument: model.ESDocument{Id: "agent1"}}
+
+			action, _, err := processPolicy(t.Context(), logger, bulker, agent, pp, nil)
+			require.NoError(t, err)
+
+			pc, err := action.Data.AsActionPolicyChange()
+			require.NoError(t, err)
+
+			// The OTLP output must not appear in the delivered policy.
+			_, hasOTLP := pc.Policy.Outputs[outputName]
+			assert.False(t, hasOTLP, "otlp output must not be delivered to the agent")
+
+			// With only an OTLP output the "outputs" key must be absent from the JSON
+			// (api.PolicyData.Outputs is omitempty) — an empty map is a fatal agent error.
+			raw, err := json.Marshal(pc.Policy)
+			require.NoError(t, err)
+			assert.NotContains(t, string(raw), `"outputs":`, "outputs key must be omitted when all outputs are otlp")
+
+			// The otelcol exporter must still be delivered.
+			exporterRaw, ok := pc.Policy.Exporters[tc.exporterID]
+			require.True(t, ok, "exporter %q must be present in delivered policy", tc.exporterID)
+			exporterCfg, ok := exporterRaw.(map[string]any)
+			require.True(t, ok, "exporter config must be a map")
+
+			if tc.wantHeader == "" {
+				assert.Empty(t, exporterCfg["headers"], "no Authorization header for external OTLP output")
+			} else {
+				headers, ok := exporterCfg["headers"].(map[string]any)
+				require.True(t, ok, "headers must be a map")
+				assert.Equal(t, tc.wantHeader, headers["Authorization"])
+			}
+		})
+	}
+}
+
+func TestPrepareOTelExporters(t *testing.T) {
+	esAPIKey := "keyid:secret"
+	esAPIKeyB64 := base64.StdEncoding.EncodeToString([]byte(esAPIKey))
+	otlpAPIKey := "otlpid:otlpsecret"
+	otlpAPIKeyB64 := base64.StdEncoding.EncodeToString([]byte(otlpAPIKey))
+
+	esOutput := map[string]any{"type": policy.OutputTypeElasticsearch, "api_key": esAPIKey}
+	otlpOutput := map[string]any{"type": policy.OutputTypeOTLP, "api_key": otlpAPIKey}
+	otlpExternalOutput := map[string]any{"type": policy.OutputTypeOTLP}
+
+	tests := []struct {
+		name       string
+		outputs    map[string]map[string]any
+		exporters  map[string]any
+		wantErr    string
+		wantAPIKey string
+		wantHeader string
+	}{
+		{
+			name:      "non-map exporter config",
+			outputs:   map[string]map[string]any{"default": esOutput},
+			exporters: map[string]any{"elasticsearch/default": "not-a-map"},
+			wantErr:   "unexpected config type",
+		},
+		{
+			name:      "exporter id missing slash",
+			outputs:   map[string]map[string]any{"default": esOutput},
+			exporters: map[string]any{"elasticsearch": nil},
+			wantErr:   "unexpected exporter id format",
+		},
+		{
+			name:      "output not found for exporter",
+			outputs:   map[string]map[string]any{},
+			exporters: map[string]any{"elasticsearch/missing": nil},
+			wantErr:   "output \"missing\" not found",
+		},
+		{
+			name:      "elasticsearch exporter with wrong output type uses type value in error (not output name)",
+			outputs:   map[string]map[string]any{"myout": {"type": "logstash"}},
+			exporters: map[string]any{"elasticsearch/myout": nil},
+			wantErr:   "\"logstash\"",
+		},
+		{
+			name:      "elasticsearch exporter with missing api_key",
+			outputs:   map[string]map[string]any{"default": {"type": policy.OutputTypeElasticsearch}},
+			exporters: map[string]any{"elasticsearch/default": nil},
+			wantErr:   "api key not found",
+		},
+		{
+			name:      "otlp exporter with wrong output type",
+			outputs:   map[string]map[string]any{"default": esOutput},
+			exporters: map[string]any{policy.OTelExporterTypeOTLP + "/default": nil},
+			wantErr:   "unexpected output type",
+		},
+		{
+			name:      "unknown exporter type",
+			outputs:   map[string]map[string]any{"default": esOutput},
+			exporters: map[string]any{"kafka/default": nil},
+			wantErr:   "not supported",
+		},
+		{
+			name:       "elasticsearch exporter injects base64 api_key",
+			outputs:    map[string]map[string]any{"default": esOutput},
+			exporters:  map[string]any{"elasticsearch/default": nil},
+			wantAPIKey: esAPIKeyB64,
+		},
+		{
+			name:      "otlp exporter with external output — no header injected",
+			outputs:   map[string]map[string]any{"myotlp": otlpExternalOutput},
+			exporters: map[string]any{policy.OTelExporterTypeOTLP + "/myotlp": nil},
+		},
+		{
+			name:       "managed otlp exporter injects Authorization header",
+			outputs:    map[string]map[string]any{"myotlp": otlpOutput},
+			exporters:  map[string]any{policy.OTelExporterTypeOTLP + "/myotlp": nil},
+			wantHeader: "ApiKey " + otlpAPIKeyB64,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			exporters := make(map[string]any, len(tc.exporters))
+			maps.Copy(exporters, tc.exporters)
+			err := prepareOTelExporters(tc.outputs, exporters)
+			if tc.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			if tc.wantAPIKey != "" {
+				for _, v := range exporters {
+					cfg, ok := v.(map[string]any)
+					require.True(t, ok)
+					assert.Equal(t, tc.wantAPIKey, cfg["api_key"])
+				}
+			}
+			if tc.wantHeader != "" {
+				for _, v := range exporters {
+					cfg, ok := v.(map[string]any)
+					require.True(t, ok)
+					headers, ok := cfg["headers"].(map[string]any)
+					require.True(t, ok, "headers must be present")
+					assert.Equal(t, tc.wantHeader, headers["Authorization"])
+				}
+			}
+		})
+	}
 }

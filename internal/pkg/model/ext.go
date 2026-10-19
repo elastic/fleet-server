@@ -5,9 +5,14 @@
 package model
 
 import (
+	"bytes"
 	"maps"
 	"slices"
 	"time"
+
+	"github.com/elastic/elastic-agent-libs/str"
+
+	"github.com/elastic/fleet-server/v7/internal/pkg/smap"
 )
 
 // Time returns the time for the current leader.
@@ -65,9 +70,10 @@ func (a *Agent) APIKeyIDs() []ToRetireAPIKeyIdsItems {
 				name = outputName
 			}
 			keys = append(keys, ToRetireAPIKeyIdsItems{
-				ID:        output.APIKeyID,
-				Output:    name,
-				RetiredAt: "",
+				ID:         output.APIKeyID,
+				Output:     name,
+				RetiredAt:  "",
+				OutputType: output.Type,
 			})
 		}
 		for _, key := range output.ToRetireAPIKeyIds {
@@ -81,29 +87,47 @@ func (a *Agent) APIKeyIDs() []ToRetireAPIKeyIdsItems {
 
 }
 
+// FeatureIncludeTagsInEvents is the policy feature that adds the agent tags to the events.
+const FeatureIncludeTagsInEvents = "include_tags_in_events"
+
+// FeatureEnabled reports whether agent.features.<name>.enabled is true in the policy.
+func (d *PolicyData) FeatureEnabled(name string) bool {
+	if d == nil {
+		return false
+	}
+	features, _ := d.Agent["features"].(map[string]any)
+	feature, _ := features[name].(map[string]any)
+	enabled, _ := feature["enabled"].(bool)
+	return enabled
+}
+
 func ClonePolicyData(d *PolicyData) *PolicyData {
 	if d == nil {
 		return nil
 	}
 	res := &PolicyData{
-		Agent:             d.Agent,
-		Fleet:             d.Fleet,
+		Agent:             maps.Clone(d.Agent),
+		Fleet:             maps.Clone(d.Fleet),
 		ID:                d.ID,
-		Inputs:            make([]map[string]any, 0, len(d.Inputs)),
-		OutputPermissions: d.OutputPermissions,
+		Inputs:            nil, // populated below; stays nil when d.Inputs is nil
+		OutputPermissions: bytes.Clone(d.OutputPermissions),
 		Outputs:           cloneMap(d.Outputs),
 		Revision:          d.Revision,
 		SecretReferences:  slices.Clone(d.SecretReferences),
 
-		// OTel config.
-		Connectors: maps.Clone(d.Connectors),
-		Exporters:  maps.Clone(d.Exporters),
-		Extensions: maps.Clone(d.Extensions),
-		Processors: maps.Clone(d.Processors),
-		Receivers:  maps.Clone(d.Receivers),
+		// OTel config: deep-clone so prepareOTelExporters can mutate per-component
+		// maps in-place without racing across concurrent processPolicy calls.
+		Connectors: cloneOTelSection(d.Connectors),
+		Exporters:  cloneOTelSection(d.Exporters),
+		Extensions: cloneOTelSection(d.Extensions),
+		Processors: cloneOTelSection(d.Processors),
+		Receivers:  cloneOTelSection(d.Receivers),
 	}
-	for _, m := range d.Inputs {
-		res.Inputs = append(res.Inputs, maps.Clone(m))
+	if len(d.Inputs) > 0 {
+		res.Inputs = make([]map[string]any, len(d.Inputs))
+		for i, m := range d.Inputs {
+			res.Inputs[i] = maps.Clone(m)
+		}
 	}
 	if d.Signed != nil {
 		res.Signed = &Signed{
@@ -115,6 +139,14 @@ func ClonePolicyData(d *PolicyData) *PolicyData {
 		res.Service = cloneOTelService(d.Service)
 	}
 	return res
+}
+
+func (a *Agent) ComputeTagsHash() (string, error) {
+	tags := str.MakeSet(a.Tags...).ToSlice()
+	if len(tags) == 0 {
+		return "", nil
+	}
+	return smap.Map{"tags": tags}.Hash()
 }
 
 func cloneOTelService(s *Service) *Service {
@@ -133,6 +165,45 @@ func cloneOTelService(s *Service) *Service {
 	return &clone
 }
 
+// deepCloneMapAny recursively deep-clones a map[string]any. This is required
+// for output and OTel configs because secret.ProcessOutputSecret/setSecretPath
+// and prepareOTelExporters mutate nested map entries in-place.
+func deepCloneMapAny(m map[string]any) map[string]any {
+	if m == nil {
+		return nil
+	}
+	r := make(map[string]any, len(m))
+	for k, v := range m {
+		switch vt := v.(type) {
+		case map[string]any:
+			r[k] = deepCloneMapAny(vt)
+		case []any:
+			r[k] = deepCloneSliceAny(vt)
+		default:
+			r[k] = v
+		}
+	}
+	return r
+}
+
+func deepCloneSliceAny(s []any) []any {
+	if s == nil {
+		return nil
+	}
+	r := make([]any, len(s))
+	for i, v := range s {
+		switch vt := v.(type) {
+		case map[string]any:
+			r[i] = deepCloneMapAny(vt)
+		case []any:
+			r[i] = deepCloneSliceAny(vt)
+		default:
+			r[i] = v
+		}
+	}
+	return r
+}
+
 // cloneMap does a deep copy on a map of objects
 // TODO generics?
 func cloneMap(m map[string]map[string]any) map[string]map[string]any {
@@ -141,7 +212,25 @@ func cloneMap(m map[string]map[string]any) map[string]map[string]any {
 	}
 	r := make(map[string]map[string]any)
 	for k, v := range m {
-		r[k] = maps.Clone(v)
+		r[k] = deepCloneMapAny(v)
+	}
+	return r
+}
+
+// cloneOTelSection deep-clones a map[string]any where values are map[string]any
+// component configs. prepareOTelExporters mutates these inner maps in-place, so a
+// shallow clone of the outer map is not enough for concurrent safety.
+func cloneOTelSection(m map[string]any) map[string]any {
+	if m == nil {
+		return nil
+	}
+	r := make(map[string]any, len(m))
+	for k, v := range m {
+		if vmap, ok := v.(map[string]any); ok {
+			r[k] = deepCloneMapAny(vmap)
+		} else {
+			r[k] = v
+		}
 	}
 	return r
 }

@@ -52,6 +52,7 @@ var (
 	ErrNoPolicyOutput         = errors.New("output section not found")
 	ErrFailInjectAPIKey       = errors.New("failure to inject api key")
 	ErrInvalidUpgradeMetadata = errors.New("invalid upgrade metadata")
+	ErrTooManyUpgradeSources  = errors.New("too many upgrade sources")
 )
 
 const (
@@ -63,6 +64,8 @@ const (
 	invalidKeyStateCleanInterval = 5 * time.Minute
 
 	invalidKeyLRUEntryBytes = 250
+
+	maxUpgradeSources = 20
 )
 
 // validActionTypes is a map of action.type and if they are valid
@@ -78,6 +81,7 @@ var validActionTypes = map[string]bool{
 	string(UPGRADE):              true,
 	string(MIGRATE):              true,
 	string(PRIVILEGELEVELCHANGE): true,
+	string(RESTART):              true,
 }
 
 // invalidKeyState tracks how many times an agent has checked in with an invalid API key
@@ -412,7 +416,7 @@ func (ct *CheckinT) validateRequest(zlog zerolog.Logger, w http.ResponseWriter, 
 	// sets timeout is set to max(1m, min(pDur-2m, max poll time))
 	// sets the response write timeout to max(2m, timeout+1m)
 	if pDur != time.Duration(0) {
-		pollDuration = max(min(pDur-(2*time.Minute), ct.cfg.Timeouts.CheckinMaxPoll), time.Minute)
+		pollDuration = max(min(pDur-(2*time.Minute), ct.cfg.Timeouts.CheckinMaxPoll), config.CheckinMaxPollFloor)
 
 		wTime := pollDuration + time.Minute
 		rc := http.NewResponseController(w)
@@ -475,7 +479,7 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 
 	// Handle upgrade details for agents using the new 8.11 upgrade details field of the checkin.
 	// Older agents will communicate any issues with upgrades via the Ack endpoint.
-	if err := ct.processUpgradeDetails(r.Context(), agent, req.UpgradeDetails); err != nil {
+	if err := ct.processUpgradeDetails(r.Context(), agent, req.UpgradeDetails, ver); err != nil {
 		return fmt.Errorf("failed to update upgrade_details: %w", err)
 	}
 
@@ -508,11 +512,29 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	actCh := aSub.Ch()
 
 	for _, output := range agent.Outputs {
-		if output.APIKey == "" {
+		if output.APIKey == "" && output.PermissionsHash != "" {
+			// A non-empty PermissionsHash means a key was previously minted for this
+			// output. If APIKey is now empty something cleared it.
+
 			// use revision_idx=0 if the agent has a single output where no API key is defined
-			// This will force the policy monitor to emit a new policy to regerate API keys
-			revID = 0
+			// This will force the policy monitor to emit a new policy to regenerate API keys
+			revID = policy.RevisionForce
 			break
+		}
+	}
+
+	// Send the policy again if the feature is on and the agent tags changed since the last sent policy
+	p, err := ct.pm.GetPolicy(r.Context(), agent.PolicyID)
+	if err != nil || p == nil {
+		zlog.Debug().Err(err).Str(ecs.PolicyID, agent.PolicyID).Msg("unable to get policy to check agent tags")
+	} else if p.Data.FeatureEnabled(model.FeatureIncludeTagsInEvents) {
+		tagsHash, err := agent.ComputeTagsHash()
+		if err != nil {
+			return fmt.Errorf("hash agent tags: %w", err)
+		}
+		if tagsHash != agent.TagsHash {
+			zlog.Debug().Msg("agent tags changed, forcing policy resend")
+			revID = policy.RevisionForce
 		}
 	}
 
@@ -571,6 +593,7 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 
 	span, ctx := apm.StartSpan(r.Context(), "longPoll", "process")
 
+	var agentUpdate bulk.UpdateFields
 	if len(actions) == 0 {
 	LOOP:
 		for {
@@ -594,12 +617,13 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 				actions = append(actions, acs...)
 				break LOOP
 			case policy := <-sub.Output():
-				actionResp, err := processPolicy(ctx, zlog, ct.bulker, agent, policy, ct.outputSecretCandidateCollector)
+				actionResp, update, err := processPolicy(ctx, zlog, ct.bulker, agent, policy, ct.outputSecretCandidateCollector)
 				if err != nil {
 					span.End()
 					return fmt.Errorf("processPolicy: %w", err)
 				}
 				actions = append(actions, *actionResp)
+				agentUpdate = update
 				break LOOP
 			case <-longPoll.C:
 				zlog.Trace().Msg("fire long poll")
@@ -620,7 +644,16 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 		Actions:  actions,
 	}
 
-	return ct.writeResponse(zlog, w, r, agent, resp)
+	if err := ct.writeResponse(zlog, w, r, agent, resp); err != nil {
+		return err
+	}
+
+	if len(agentUpdate) > 0 {
+		if err := dl.UpdateAgent(r.Context(), ct.bulker, agent.Id, agentUpdate); err != nil {
+			zlog.Warn().Err(err).Msg("unable to update the agent after the policy was sent")
+		}
+	}
+	return nil
 }
 
 func (ct *CheckinT) verifyActionExists(vCtx context.Context, vSpan *apm.Span, agent *model.Agent, details *UpgradeDetails) (*model.Action, error) {
@@ -644,12 +677,20 @@ func (ct *CheckinT) verifyActionExists(vCtx context.Context, vSpan *apm.Span, ag
 }
 
 // processUpgradeDetails will verify and set the upgrade_details section of an agent document based on checkin value.
-// if the agent doc and checkin details are both nil the method is a nop
-// if the checkin upgrade_details is nil but there was a previous value in the agent doc, fleet-server treats it as a successful upgrade
-// otherwise the details are validated; action_id is checked and upgrade_details.metadata is validated based on upgrade_details.state and the agent doc is updated.
-func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agent, details *UpgradeDetails) error {
+// When the checkin upgrade_details is nil, markUpgradeComplete is called, which handles three cases:
+//   - NOP if there is no upgrade in progress (upgrade_started_at empty and no stored upgrade_details).
+//   - NOP if an upgrade was dispatched (upgrade_started_at set) but the agent has not yet changed version
+//     or reported any upgrade_details — the upgrade action has not been received/completed yet. This guard
+//     is bypassed for stale upgrade_started_at values (older than upgradeStartedAtStalenessThreshold).
+//   - Mark complete if the agent had stored upgrade_details (normal upgrade path) or changed version
+//     without any intermediate details (fast upgrade race: upgrade completed in < 1 checkin interval).
+//
+// When the checkin upgrade_details is non-nil, the details are validated: action_id is checked and
+// upgrade_details.metadata is validated based on upgrade_details.state, then the agent doc is updated.
+// ver is the agent's new version string if it differs from the stored version, or empty if unchanged.
+func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agent, details *UpgradeDetails, ver string) error {
 	if details == nil {
-		err := ct.markUpgradeComplete(ctx, agent)
+		err := ct.markUpgradeComplete(ctx, agent, ver)
 		if err != nil {
 			return err
 		}
@@ -754,15 +795,48 @@ func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agen
 	return ct.bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3))
 }
 
-func (ct *CheckinT) markUpgradeComplete(ctx context.Context, agent *model.Agent) error {
-	// nop if there are no checkin details, and the agent has no details
-	if agent.UpgradeDetails == nil {
+func (ct *CheckinT) markUpgradeComplete(ctx context.Context, agent *model.Agent, ver string) error {
+	// NOP: no upgrade in progress and no stored upgrade state to clear.
+	if agent.UpgradeDetails == nil && agent.UpgradeStartedAt == "" {
 		return nil
+	}
+	// NOP: upgrade was dispatched (upgrade_started_at is set) but the agent has not yet changed
+	// version and has sent no upgrade_details — it has not yet received or completed the upgrade
+	// action. Do not prematurely clear upgrade_started_at on the first checkin after dispatch.
+	// ver is non-empty only when the agent's reported version differs from its stored version.
+	//
+	// Exception: if upgrade_started_at is clearly stale (older than 2× CheckinMaxPoll), clear it
+	// to self-heal agents stuck in the updating state after a rolling fleet-server upgrade where
+	// the version was already updated by an older instance. The threshold uses 2× CheckinMaxPoll
+	// so a legitimately long-running poll (up to CheckinMaxPoll) cannot be mistaken for staleness.
+	// In the stale case upgraded_at is NOT set because the upgrade outcome is unknown.
+	if agent.UpgradeDetails == nil && agent.UpgradeStartedAt != "" && ver == "" {
+		t, err := time.Parse(time.RFC3339, agent.UpgradeStartedAt)
+		if err != nil {
+			t, err = time.Parse(time.RFC3339Nano, agent.UpgradeStartedAt)
+		}
+		if err != nil || time.Since(t) < ct.stalenessThreshold() {
+			return nil
+		}
+		// Stale: clear upgrade_started_at without setting upgraded_at (outcome unknown).
+		span, ctx := apm.StartSpan(ctx, "Clear stale upgrade", "update")
+		span.Context.SetLabel("agent_id", agent.Agent.ID)
+		defer span.End()
+		doc := bulk.UpdateFields{
+			dl.FieldUpgradeDetails:   nil,
+			dl.FieldUpgradeStartedAt: nil,
+		}
+		body, err := doc.Marshal()
+		if err != nil {
+			return err
+		}
+		return ct.bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3))
 	}
 	span, ctx := apm.StartSpan(ctx, "Mark update complete", "update")
 	span.Context.SetLabel("agent_id", agent.Agent.ID)
 	defer span.End()
-	// if the checkin had no details, but agent has details treat like a successful upgrade
+	// Checkin had no upgrade_details but agent either had stored details (normal upgrade path) or
+	// changed version without intermediate details (fast upgrade race). Treat as successful upgrade.
 	doc := bulk.UpdateFields{
 		dl.FieldUpgradeDetails:   nil,
 		dl.FieldUpgradeStartedAt: nil,
@@ -773,6 +847,17 @@ func (ct *CheckinT) markUpgradeComplete(ctx context.Context, agent *model.Agent)
 		return err
 	}
 	return ct.bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3))
+}
+
+// stalenessThreshold returns the age beyond which an upgrade_started_at value with no associated
+// upgrade_details is treated as stale and cleared. It is set to 2× the effective CheckinMaxPoll
+// so that a legitimately long-running poll (up to CheckinMaxPoll) cannot be mistaken for a stuck
+// upgrade. The effective minimum of 1m matches the same floor used by the long-poll logic.
+func (ct *CheckinT) stalenessThreshold() time.Duration {
+	if ct.cfg == nil {
+		return 2 * config.DefaultCheckinMaxPoll
+	}
+	return 2 * max(ct.cfg.Timeouts.CheckinMaxPoll, config.CheckinMaxPollFloor)
 }
 
 func (ct *CheckinT) writeResponse(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, agent *model.Agent, resp CheckinResponse) error {
@@ -971,6 +1056,24 @@ func convertActionData(aType ActionType, raw json.RawMessage) (ad Action_Data, e
 		if err != nil {
 			return
 		}
+		if d.Sources != nil {
+			if len(*d.Sources) > maxUpgradeSources {
+				err = fmt.Errorf("%w: %d exceeds limit of %d", ErrTooManyUpgradeSources, len(*d.Sources), maxUpgradeSources)
+				return
+			}
+			if len(*d.Sources) > 0 {
+				sourceURI := (*d.Sources)[0]
+				d.SourceUri = &sourceURI
+			} else {
+				d.SourceUri = nil
+			}
+		} else if d.SourceUri != nil {
+			sources := []string{}
+			if *d.SourceUri != "" {
+				sources = append(sources, *d.SourceUri)
+			}
+			d.Sources = &sources
+		}
 		err = ad.FromActionUpgrade(d)
 		return
 	case REQUESTDIAGNOSTICS:
@@ -986,7 +1089,7 @@ func convertActionData(aType ActionType, raw json.RawMessage) (ad Action_Data, e
 		}
 		err = ad.FromActionRequestDiagnostics(d)
 		return
-	case UNENROLL: // Action types with no data
+	case UNENROLL, RESTART: // Action types with no data
 		return ad, nil
 	case MIGRATE:
 		d := ActionMigrate{}
@@ -1059,7 +1162,8 @@ func convertActions(zlog zerolog.Logger, agentID string, actions []model.Action)
 // A new policy exists for this agent.  Perform the following:
 //   - Generate and update default ApiKey if roles have changed.
 //   - Rewrite the policy for delivery to the agent injecting the key material.
-func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agent *model.Agent, pp *policy.ParsedPolicy, secretCandidateCollector policy.OutputSecretCandidateCollector) (*Action, error) {
+//   - Return the agent document fields to write once the policy is sent.
+func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, agent *model.Agent, pp *policy.ParsedPolicy, secretCandidateCollector policy.OutputSecretCandidateCollector) (*Action, bulk.UpdateFields, error) {
 	var links []apm.SpanLink = nil // set to a nil array to preserve default behaviour if no policy links are found
 	if err := pp.Links.Trace.Validate(); err == nil {
 		links = []apm.SpanLink{pp.Links}
@@ -1073,76 +1177,96 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 		Logger()
 
 	if len(pp.Policy.Data.Outputs) == 0 {
-		return nil, ErrNoPolicyOutput
+		return nil, nil, ErrNoPolicyOutput
 	}
 
 	// Get secret values so secret references in outputs and inputs can be replaced
 	// with their corresponding values.
 	secretValues, err := secret.GetSecretValues(ctx, pp.Policy.Data.SecretReferences, bulker)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get secret values: %w", err)
+		return nil, nil, fmt.Errorf("failed to get secret values: %w", err)
 	}
 
-	data := model.ClonePolicyData(pp.Policy.Data)
-	secretKeys := slices.Clone(pp.SecretKeys)
-	for name, policyOutput := range data.Outputs {
+	for name, policyOutput := range pp.Policy.Data.Outputs {
 		// NOTE: Not sure if output secret keys collected here include new entries, but they are collected for completeness
 		ks, err := secret.ProcessOutputSecret(policyOutput, secretValues)
 		if err != nil {
-			return nil, fmt.Errorf("failed to process output secret for output %q: %w", name, err)
+			return nil, nil, fmt.Errorf("failed to process output secret for output %q: %w", name, err)
 		}
 		for _, key := range ks {
-			secretKeys = append(secretKeys, "outputs."+name+"."+key)
+			pp.SecretKeys = append(pp.SecretKeys, "outputs."+name+"."+key)
 		}
 	}
 	// Iterate through the policy outputs and prepare them
 	for _, policyOutput := range pp.Outputs {
-		if err := policyOutput.Prepare(ctx, zlog, bulker, agent, data.Outputs, policy.WithOutputSecretCandidateCollector(secretCandidateCollector)); err != nil {
-			return nil, fmt.Errorf("failed to prepare output %q: %w",
+		if err := policyOutput.Prepare(ctx, zlog, bulker, agent, pp.Policy.Data.Outputs, policy.WithOutputSecretCandidateCollector(secretCandidateCollector)); err != nil {
+			return nil, nil, fmt.Errorf("failed to prepare output %q: %w",
 				policyOutput.Name, err)
 		}
 	}
 
 	// Do not advertise remote ES service_token in secret_paths once Prepare(...) has
 	// deleted it from the policy sent to agents. Use pp.Outputs for type because
-	// Prepare rewrites data.Outputs type to elasticsearch.
+	// Prepare rewrites pp.Policy.Data.Outputs type to elasticsearch.
 	for name, out := range pp.Outputs {
 		if out.Type != policy.OutputTypeRemoteElasticsearch {
 			continue
 		}
-		if _, ok := data.Outputs[name][policy.FieldOutputServiceToken]; !ok {
+		if _, ok := pp.Policy.Data.Outputs[name][policy.FieldOutputServiceToken]; !ok {
 			prefixed := "outputs." + name + "." + policy.FieldOutputServiceToken
-			secretKeys = slices.DeleteFunc(secretKeys, func(key string) bool {
+			pp.SecretKeys = slices.DeleteFunc(pp.SecretKeys, func(key string) bool {
 				return key == prefixed
 			})
 		}
 	}
 	// Prepare OTel exporters from the information in outputs.
-	if err := prepareOTelExporters(data.Outputs, data.Exporters); err != nil {
-		return nil, fmt.Errorf("failed to prepare OTel exporters: %w", err)
+	if err := prepareOTelExporters(pp.Policy.Data.Outputs, pp.Policy.Data.Exporters); err != nil {
+		return nil, nil, fmt.Errorf("failed to prepare OTel exporters: %w", err)
 	}
 
-	// Add replace inputs with agent prepared version.
-	data.Inputs = pp.Inputs
+	// Remove otlp outputs from the delivered policy. Elastic Agent has no OTLP output
+	// implementation — OTLP delivery is configured entirely through the otelcol exporters
+	// block, which prepareOTelExporters has already populated from these outputs.
+	// Also prune the corresponding secret_paths entries collected above: the agent never
+	// receives the OTLP output block, so its secret paths must not appear in secret_paths.
+	for name, out := range pp.Outputs {
+		if out.Type != policy.OutputTypeOTLP {
+			continue
+		}
+		delete(pp.Policy.Data.Outputs, name)
+		prefix := "outputs." + name + "."
+		pp.SecretKeys = slices.DeleteFunc(pp.SecretKeys, func(key string) bool {
+			return strings.HasPrefix(key, prefix)
+		})
+	}
+
+	// Use the secret-substituted inputs, minus those pinned to other agents.
+	pp.Policy.Data.Inputs, pp.SecretKeys = policy.FilterInputsForAgent(pp.Inputs, pp.SecretKeys, agent.Id)
+
+	// Add the agent tags to the policy.
+	agentUpdate, err := prepareAgentTags(pp.Policy.Data, agent)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to prepare agent tags: %w", err)
+	}
 
 	// JSON transformations to turn a model.PolicyData into an Action.data
-	p, err := json.Marshal(data)
+	p, err := json.Marshal(pp.Policy.Data)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	d := PolicyData{}
 	err = json.Unmarshal(p, &d)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	// remove duplicates from secretkeys
-	slices.Sort(secretKeys)
-	keys := slices.Compact(secretKeys)
+	slices.Sort(pp.SecretKeys)
+	keys := slices.Compact(pp.SecretKeys)
 	d.SecretPaths = keys
 	ad := Action_Data{}
 	err = ad.FromActionPolicyChange(ActionPolicyChange{d})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	r := policy.RevisionFromPolicy(pp.Policy)
@@ -1154,7 +1278,7 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 		Type:      POLICYCHANGE,
 	}
 
-	return &resp, nil
+	return &resp, agentUpdate, nil
 }
 
 // prepareOTelExporters prepares OTel exporters by copying credentials and potentially other
@@ -1184,13 +1308,37 @@ func prepareOTelExporters(outputs map[string]map[string]any, exporters map[strin
 		case policy.OTelExporterTypeElasticsearch:
 			ot, ok := output["type"].(string)
 			if !ok || (ot != policy.OutputTypeElasticsearch && ot != policy.OutputTypeRemoteElasticsearch) {
-				return fmt.Errorf("unexpected output type %q found for exporter %q", name, id)
+				return fmt.Errorf("unexpected output type %q found for exporter %q", ot, id)
 			}
 			apiKey, ok := output["api_key"].(string)
 			if !ok || apiKey == "" {
 				return fmt.Errorf("api key not found in output %q for exporter %q", name, id)
 			}
 			config["api_key"] = base64.StdEncoding.EncodeToString([]byte(apiKey))
+		case policy.OTelExporterTypeOTLP, policy.OTelExporterTypeOTLPHTTP:
+			ot, ok := output["type"].(string)
+			if !ok || ot != policy.OutputTypeOTLP {
+				return fmt.Errorf("unexpected output type %q found for exporter %q", ot, id)
+			}
+			apiKey, _ := output["api_key"].(string)
+			if apiKey == "" {
+				// External OTLP output — auth is already embedded in the exporter config by Kibana.
+				break
+			}
+			headers, _ := config["headers"].(map[string]any)
+			if headers == nil {
+				headers = make(map[string]any)
+			}
+			// Remove any existing authorization header regardless of case. HTTP headers are
+			// case-insensitive; a user-supplied `authorization` entry would otherwise sit
+			// alongside `Authorization` with no defined winner. The mOTLP key takes precedence.
+			for k := range headers {
+				if strings.EqualFold(k, "Authorization") {
+					delete(headers, k)
+				}
+			}
+			headers["Authorization"] = "ApiKey " + base64.StdEncoding.EncodeToString([]byte(apiKey))
+			config["headers"] = headers
 		default:
 			return fmt.Errorf("OTel exporter %q not supported", exporterType)
 		}
@@ -1198,6 +1346,24 @@ func prepareOTelExporters(outputs map[string]map[string]any, exporters map[strin
 		exporters[id] = config
 	}
 	return nil
+}
+
+// prepareAgentTags adds the agent tags to the policy and returns the agent fields to update.
+func prepareAgentTags(data *model.PolicyData, agent *model.Agent) (bulk.UpdateFields, error) {
+	tagsHash, err := agent.ComputeTagsHash()
+	if err != nil {
+		return nil, fmt.Errorf("hash agent tags: %w", err)
+	}
+	if tagsHash != "" {
+		if data.Agent == nil {
+			data.Agent = map[string]any{}
+		}
+		data.Agent["tags"] = removeDuplicateStr(agent.Tags)
+	}
+	if tagsHash == agent.TagsHash {
+		return nil, nil
+	}
+	return bulk.UpdateFields{dl.FieldTagsHash: tagsHash}, nil
 }
 
 func getAgentAndVerifyAPIKeyID(ctx context.Context, bulker bulk.Bulk, agentID string, apiKeyID string) (*model.Agent, error) {
@@ -1484,19 +1650,19 @@ func (ct *CheckinT) processPolicyDetails(ctx context.Context, zlog zerolog.Logge
 	// Policy reassign, subscribe to policy with revision 0
 	if policyID != agent.PolicyID {
 		zlog.Debug().Str(dl.FieldAgentPolicyID, policyID).Str("new_policy_id", agent.PolicyID).Msg("Policy ID mismatch detected, reassigning agent.")
-		return 0, opts, nil
+		return policy.RevisionForce, opts, nil
 	}
 
 	// Check if the checkin revision_idx is greater than the latest available
 	latestRev := ct.pm.LatestRev(ctx, agent.PolicyID)
 	if latestRev != 0 && revisionIDX > latestRev {
-		revisionIDX = 0 // set return val to 0 so the agent gets latest available revision.
+		revisionIDX = policy.RevisionForce
 	}
 
 	// Update API keys if the policy has changed, or if the revision differs.
 	if policyID != agent.AgentPolicyID || revisionIDX != agent.PolicyRevisionIdx {
 		for outputName, output := range agent.Outputs {
-			if output.Type != policy.OutputTypeElasticsearch {
+			if output.APIKeyID == "" && len(output.ToRetireAPIKeyIds) == 0 {
 				continue
 			}
 			if err := updateAPIKey(ctx, zlog, ct.bulker, agent.Id, output.APIKeyID, output.PermissionsHash, output.ToRetireAPIKeyIds, outputName); err != nil {

@@ -22,7 +22,6 @@ import (
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger/zap"
 
-	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/rs/zerolog"
 )
 
@@ -62,13 +61,16 @@ func (c *Elasticsearch) InitDefaults() {
 	c.Protocol = schemeHTTP
 	c.Hosts = []string{"localhost:9200"}
 	c.Timeout = 90 * time.Second
-	c.MaxRetries = 3
+	c.MaxRetries = 5
 	c.MaxConnPerHost = 128
 	c.MaxContentLength = 100 * 1024 * 1024
 }
 
 // Validate ensures that the configuration is valid.
 func (c *Elasticsearch) Validate() error {
+	if c.MaxConnPerHost <= 0 {
+		return fmt.Errorf("output.elasticsearch.max_conn_per_host must be positive, got %d", c.MaxConnPerHost)
+	}
 	if c.ProxyURL != "" && !c.ProxyDisable {
 		if _, err := urlutil.ParseURL(c.ProxyURL); err != nil {
 			return err
@@ -83,14 +85,27 @@ func (c *Elasticsearch) Validate() error {
 	return nil
 }
 
-// ToESConfig converts the configuration object into the config for the elasticsearch client.
-func (c *Elasticsearch) ToESConfig(longPoll bool) (elasticsearch.Config, error) {
+// ESTransportConfig holds the configuration needed to build an Elasticsearch client.
+// It is separate from the go-elasticsearch types so that the config package does
+// not need to import the client library.
+type ESTransportConfig struct {
+	Addresses    []string
+	ServiceToken string
+	Header       http.Header
+	Transport    *http.Transport
+	MaxRetries   int
+	DisableRetry bool
+}
+
+// ToESTransportConfig converts the Elasticsearch configuration into an ESTransportConfig
+// that can be used to build an Elasticsearch client.
+func (c *Elasticsearch) ToESTransportConfig(longPoll bool) (*ESTransportConfig, error) {
 	// build the addresses
 	addrs := make([]string, len(c.Hosts))
 	for i, host := range c.Hosts {
 		addr, err := makeURL(c.Protocol, c.Path, host, 9200)
 		if err != nil {
-			return elasticsearch.Config{}, err
+			return nil, err
 		}
 		addrs[i] = addr
 	}
@@ -125,7 +140,7 @@ func (c *Elasticsearch) ToESConfig(longPoll bool) (elasticsearch.Config, error) 
 	if c.TLS != nil && c.TLS.IsEnabled() {
 		tls, err := tlscommon.LoadTLSConfig(c.TLS, zap.NewStub("elasticsearch-output"))
 		if err != nil {
-			return elasticsearch.Config{}, err
+			return nil, err
 		}
 		httpTransport.TLSClientConfig = tls.ToConfig()
 	}
@@ -134,7 +149,7 @@ func (c *Elasticsearch) ToESConfig(longPoll bool) (elasticsearch.Config, error) 
 		if c.ProxyURL != "" {
 			proxyURL, err := urlutil.ParseURL(c.ProxyURL)
 			if err != nil {
-				return elasticsearch.Config{}, err
+				return nil, err
 			}
 			httpTransport.Proxy = http.ProxyURL(proxyURL)
 		} else {
@@ -164,12 +179,12 @@ func (c *Elasticsearch) ToESConfig(longPoll bool) (elasticsearch.Config, error) 
 	if c.ServiceToken == "" && c.ServiceTokenPath != "" {
 		p, err := os.ReadFile(c.ServiceTokenPath)
 		if err != nil {
-			return elasticsearch.Config{}, fmt.Errorf("unable to read service_token_path: %w", err)
+			return nil, fmt.Errorf("unable to read service_token_path: %w", err)
 		}
 		serviceToken = string(p)
 	}
 
-	return elasticsearch.Config{
+	return &ESTransportConfig{
 		Addresses:    addrs,
 		ServiceToken: serviceToken,
 		Header:       h,
@@ -261,13 +276,13 @@ func (c *Elasticsearch) DiagRequests(ctx context.Context) []byte {
 		hostURL, err := makeURL(c.Protocol, "", host, 9200)
 		if err != nil {
 			zerolog.Ctx(ctx).Warn().Err(err).Str("host", host).Msg("Unable to transform host to url.URL")
-			res.WriteString(fmt.Sprintf("Unable to transform host %q to url.URL: %v\n", host, err))
+			fmt.Fprintf(&res, "Unable to transform host %q to url.URL: %v\n", host, err)
 			continue
 		}
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, hostURL, nil)
 		if err != nil {
 			zerolog.Ctx(ctx).Warn().Err(err).Str("host", host).Msg("Unable to create request to host")
-			res.WriteString(fmt.Sprintf("Unable to create request to host %q: %v\n", host, err))
+			fmt.Fprintf(&res, "Unable to create request to host %q: %v\n", host, err)
 			continue
 		}
 		req.Header = headers.Clone()

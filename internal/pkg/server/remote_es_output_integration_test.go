@@ -8,7 +8,6 @@ package server
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -17,12 +16,12 @@ import (
 	"os"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
+	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 	"github.com/gofrs/uuid/v5"
 	"github.com/hashicorp/go-cleanhttp"
 	"github.com/stretchr/testify/require"
@@ -264,33 +263,9 @@ func Test_Agent_Remote_ES_Output(t *testing.T) {
 }
 
 func verifyRemoteAPIKey(t *testing.T, ctx context.Context, apiKeyID string, invalidated bool) {
-	// need to wait a bit before querying the api key
-	time.Sleep(time.Second)
-
-	requestURL := fmt.Sprintf("https://elastic:changeme@%s/_security/api_key?id=%s", remoteESHost, apiKeyID)
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, requestURL, nil)
-	// Skip SSL verify as ES use self-signed certificate
-	tr := &http.Transport{
-		// #nosec G402
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	client := &http.Client{Transport: tr}
-	if err != nil {
-		t.Fatal("error creating request for remote api key")
-	}
-	res, err := client.Do(req)
-	if err != nil {
-		t.Fatal("error querying remote api key")
-	}
-
-	require.Equal(t, 200, res.StatusCode)
-
-	defer res.Body.Close()
-	respString, err := io.ReadAll(res.Body)
-	require.NoError(t, err, "did not expect error when parsing api key response")
-
-	require.Contains(t, string(respString), fmt.Sprintf("\"invalidated\":%t", invalidated))
+	t.Helper()
+	// The remote cluster uses a self-signed certificate; VerifyAPIKeyInvalidated skips TLS verify.
+	ftesting.VerifyAPIKeyInvalidated(t, ctx, "https://elastic:changeme@"+remoteESHost, apiKeyID, invalidated)
 }
 
 func Test_Agent_Remote_ES_Output_ForceUnenroll(t *testing.T) {

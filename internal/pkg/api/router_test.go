@@ -79,12 +79,11 @@ func TestLimiter(t *testing.T) {
 		},
 		status: http.StatusOK,
 	}, {
-		name: "limit reached (negative values)",
+		name: "limit reached",
 		cfg: &config.ServerLimits{
 			StatusLimit: config.Limit{
-				Interval: -1 * time.Second,
-				Burst:    -1,
-				Max:      -1,
+				Interval: time.Second,
+				Burst:    0,
 			},
 		},
 		status: http.StatusTooManyRequests,

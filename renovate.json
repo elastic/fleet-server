@@ -24,6 +24,35 @@
   },
   "packageRules": [
     {
+      "description": [
+        "Major updates: only on main and the last branch of the previous major",
+        "managed-by: update-renovate-branches"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "matchBaseBranches": [
+        "!/^(main|8\\.19)$/"
+      ],
+      "enabled": false
+    },
+    {
+      "description": [
+        "Codegen updates: only on main and the last branch of the previous major",
+        "managed-by: update-renovate-branches"
+      ],
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchPackageNames": [
+        "/^github\\.com/oapi-codegen//"
+      ],
+      "matchBaseBranches": [
+        "!/^(main|8\\.19)$/"
+      ],
+      "enabled": false
+    },
+    {
       "description": "Go modules: schedule, PR limit, branch prefix, and post-update tidy",
       "matchManagers": [
         "gomod"
@@ -43,6 +72,16 @@
         "gomod"
       ],
       "groupName": "go-dependencies"
+    },
+    {
+      "description": "codegen: oapi-codegen packages that require running 'mage generate' after update",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchPackageNames": [
+        "/^github\\.com/oapi-codegen//"
+      ],
+      "groupName": "codegen"
     },
     {
       "description": "elastic: all Elastic org packages",
@@ -87,6 +126,16 @@
       ],
       "matchPackageNames": [
         "/^github\\.com/elastic/fleet-server/"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "Keep go-json-schema-generate updates manual",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchPackageNames": [
+        "github.com/elastic/go-json-schema-generate"
       ],
       "enabled": false
     },
