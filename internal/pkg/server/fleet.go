@@ -523,23 +523,6 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 	bc := checkin.NewBulk(bulker)
 	g.Go(loggedRunFunc(ctx, "Bulk checkin", bc.Run))
 
-<<<<<<< HEAD
-	ct, err := api.NewCheckinT(f.verCon, &cfg.Inputs[0].Server, f.cache, bc, pm, am, ad, bulker)
-=======
-	outputSecretReconciler := gc.NewOrphanedOutputSecretReconciler(bulker)
-	g.Go(loggedRunFunc(ctx, "Orphaned output secret reconciler", outputSecretReconciler.Run))
-
-	// Samples the checkin capacity-rejection counter into a rate gauge, exposed via
-	// /stats for use as an autoscaling signal. See api.RunCheckinRejectionRateSampler.
-	g.Go(loggedRunFunc(ctx, "Checkin rejection rate sampler", func(ctx context.Context) error {
-		return api.RunCheckinRejectionRateSampler(ctx, api.RejectionRateSampleInterval)
-	}))
-	// Samples the connection-cap rejection counter into a rate gauge, exposed via
-	// /stats for use as an autoscaling signal. See api.RunConnRejectionRateSampler.
-	g.Go(loggedRunFunc(ctx, "Connection rejection rate sampler", func(ctx context.Context) error {
-		return api.RunConnRejectionRateSampler(ctx, api.RejectionRateSampleInterval)
-	}))
-
 	maxAgentVersion := string(cfg.Inputs[0].Server.Features.MaxAgentVersion)
 	verCon, overrideApplied, err := api.BuildVersionConstraint(f.bi.Version, maxAgentVersion)
 	if err != nil {
@@ -560,9 +543,7 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 			Msg("feature_flags._max_agent_version is not above the built-in maximum and was ignored")
 	}
 
-	ct, err := api.NewCheckinT(verCon, &cfg.Inputs[0].Server, f.cache, bc, pm, am, ad, bulker,
-		api.WithOutputSecretCandidateCollector(outputSecretReconciler))
->>>>>>> 8c75c48 (Add `feature_flags._max_agent_version` (#8048))
+	ct, err := api.NewCheckinT(verCon, &cfg.Inputs[0].Server, f.cache, bc, pm, am, ad, bulker)
 	if err != nil {
 		return err
 	}
