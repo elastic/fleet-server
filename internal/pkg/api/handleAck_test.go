@@ -358,6 +358,75 @@ func TestHandleAckEvents(t *testing.T) {
 			},
 		},
 		{
+			// handleActionResult fails (CreateActionResult errors), so the UNENROLL
+			// must not be queued for invalidation: no Update call and no API key
+			// invalidation may happen. An unexpected Update would fail this test.
+			name: "unenroll action result create error does not invalidate api key",
+			events: []AckRequest_Events_Item{{
+				json.RawMessage(`{
+				"action_id": "2b12dcd8-bde0-4045-92dc-c4b27668d733"
+			    }`), // an UNENROLL action
+			}},
+			res: newAckResponse(true, []AckResponseItem{newAckResponseItem(http.StatusInternalServerError)}),
+			bulker: func(t *testing.T) *ftesting.MockBulk {
+				m := ftesting.NewMockBulk()
+				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "2b12dcd8-bde0-4045-92dc-c4b27668d733")), mock.Anything).Return(&es.ResultT{HitsT: es.HitsT{
+					Hits: []es.HitT{{
+						Source: []byte(`{"action_id":"2b12dcd8-bde0-4045-92dc-c4b27668d733","type":"UNENROLL"}`),
+					}},
+				}}, nil)
+				m.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", errors.New("network error"))
+				return m
+			},
+			err: &HTTPError{Status: http.StatusInternalServerError},
+		},
+		{
+			// handleActionResult fails (CreateActionResult errors), so the MIGRATE
+			// must not be queued for invalidation: no Update call and no API key
+			// invalidation may happen. An unexpected Update would fail this test.
+			name: "migrate action result create error does not invalidate api key",
+			events: []AckRequest_Events_Item{{
+				json.RawMessage(`{
+				"action_id": "2b12dcd8-bde0-4045-92dc-c4b27668d733"
+			    }`), // a MIGRATE action
+			}},
+			res: newAckResponse(true, []AckResponseItem{newAckResponseItem(http.StatusInternalServerError)}),
+			bulker: func(t *testing.T) *ftesting.MockBulk {
+				m := ftesting.NewMockBulk()
+				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "2b12dcd8-bde0-4045-92dc-c4b27668d733")), mock.Anything).Return(&es.ResultT{HitsT: es.HitsT{
+					Hits: []es.HitT{{
+						Source: []byte(`{"action_id":"2b12dcd8-bde0-4045-92dc-c4b27668d733","type":"MIGRATE"}`),
+					}},
+				}}, nil)
+				m.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", errors.New("network error"))
+				return m
+			},
+			err: &HTTPError{Status: http.StatusInternalServerError},
+		},
+		{
+			// handleActionResult fails (CreateActionResult errors), so the UNINSTALL
+			// must not be queued for invalidation: no Update call and no API key
+			// invalidation may happen. An unexpected Update would fail this test.
+			name: "uninstall action result create error does not invalidate api key",
+			events: []AckRequest_Events_Item{{
+				json.RawMessage(`{
+				"action_id": "2b12dcd8-bde0-4045-92dc-c4b27668d733"
+			    }`), // an UNINSTALL action
+			}},
+			res: newAckResponse(true, []AckResponseItem{newAckResponseItem(http.StatusInternalServerError)}),
+			bulker: func(t *testing.T) *ftesting.MockBulk {
+				m := ftesting.NewMockBulk()
+				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "2b12dcd8-bde0-4045-92dc-c4b27668d733")), mock.Anything).Return(&es.ResultT{HitsT: es.HitsT{
+					Hits: []es.HitT{{
+						Source: []byte(`{"action_id":"2b12dcd8-bde0-4045-92dc-c4b27668d733","type":"UNINSTALL"}`),
+					}},
+				}}, nil)
+				m.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", errors.New("network error"))
+				return m
+			},
+			err: &HTTPError{Status: http.StatusInternalServerError},
+		},
+		{
 			name: "action found, create result general error",
 			events: []AckRequest_Events_Item{{
 				json.RawMessage(`{
