@@ -359,16 +359,23 @@ func (m *monitorT) loadPolicy(ctx context.Context, policyID string) error {
 // yet do not each decode their own copy of the policies in parallel.
 func (m *monitorT) load(ctx context.Context, policyID string) error {
 	for {
-		_, err, shared := m.loadGroup.Do(policyID, func() (any, error) {
+		ch := m.loadGroup.DoChan(policyID, func() (any, error) {
 			return nil, m.fetchAndProcess(ctx, policyID)
 		})
+		var res singleflight.Result
+		select {
+		case <-ctx.Done():
+			// Stop waiting for a load that is slow. It goes on for the callers that still wait for it.
+			return ctx.Err()
+		case res = <-ch:
+		}
 		// The load runs with the context of the caller that started it. If that caller gave up,
 		// the callers that joined its load must not fail with its error: they try again.
-		if err != nil && shared && ctx.Err() == nil &&
-			(errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)) {
+		if res.Err != nil && res.Shared && ctx.Err() == nil &&
+			(errors.Is(res.Err, context.Canceled) || errors.Is(res.Err, context.DeadlineExceeded)) {
 			continue
 		}
-		return err
+		return res.Err
 	}
 }
 

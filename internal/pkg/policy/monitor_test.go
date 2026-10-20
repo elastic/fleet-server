@@ -967,3 +967,39 @@ func TestMonitor_CallersDoNotFailWithTheCancellationOfTheCallerThatStartedTheLoa
 		assert.Equal(t, int32(2), calls.Load())
 	})
 }
+
+func TestMonitor_CallerStopsWaitingForASharedLoadWhenItsContextEnds(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		p := newTestPolicy(3)
+		release := make(chan struct{})
+		pm := NewMonitor(ftesting.NewMockBulk(), mmock.NewMockMonitor(), config.ServerLimits{}).(*monitorT)
+		pm.policyF = func(context.Context, bulk.Bulk, ...dl.Option) ([]model.Policy, error) {
+			// A slow load that does not observe the context of the callers.
+			<-release
+			return []model.Policy{p}, nil
+		}
+
+		var wg sync.WaitGroup
+		var leaderRev int64
+		wg.Go(func() { leaderRev = pm.LatestRev(t.Context(), p.PolicyID) })
+		synctest.Wait()
+
+		followerCtx, cancelFollower := context.WithCancel(t.Context())
+		followerDone := make(chan int64, 1)
+		wg.Go(func() { followerDone <- pm.LatestRev(followerCtx, p.PolicyID) })
+		synctest.Wait() // the follower waits for the load started by the leader
+
+		cancelFollower()
+		synctest.Wait()
+		select {
+		case rev := <-followerDone:
+			assert.Equal(t, int64(0), rev, "the follower stops waiting without a revision")
+		default:
+			assert.Fail(t, "the follower is still waiting for the load although its context ended")
+		}
+
+		close(release)
+		wg.Wait()
+		assert.Equal(t, int64(3), leaderRev, "the load goes on for the caller that still waits for it")
+	})
+}
