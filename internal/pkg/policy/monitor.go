@@ -13,6 +13,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"go.elastic.co/apm/v2"
+	"golang.org/x/sync/singleflight"
 	"golang.org/x/time/rate"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
@@ -70,7 +71,7 @@ type Monitor interface {
 	LatestRev(ctx context.Context, policyID string) int64
 
 	// GetPolicy returns the cached policy for the given policy ID.
-	// If the policy is not in the cache, it forces a reload from Elasticsearch.
+	// If the policy is not in the cache, it is loaded from Elasticsearch.
 	GetPolicy(ctx context.Context, policyID string) (*model.Policy, error)
 }
 
@@ -97,6 +98,9 @@ type monitorT struct {
 	policyF       policyFetcher
 	policiesIndex string
 	limit         *rate.Limiter
+
+	// loadGroup coalesces concurrent loads of the same policy, or of all policies, into one.
+	loadGroup singleflight.Group
 
 	startCh chan struct{}
 }
@@ -338,7 +342,39 @@ func (m *monitorT) dispatchPending(ctx context.Context) {
 		Msg("policy monitor dispatch complete")
 }
 
+// loadPolicies loads the latest revision of every policy from Elasticsearch and processes them.
 func (m *monitorT) loadPolicies(ctx context.Context) error {
+	return m.load(ctx, "")
+}
+
+// loadPolicy loads the latest revision of a single policy from Elasticsearch and processes it.
+func (m *monitorT) loadPolicy(ctx context.Context, policyID string) error {
+	return m.load(ctx, policyID)
+}
+
+// load loads the policy with the given ID, or every policy if the ID is empty.
+//
+// Callers that ask for the same policy while it is being loaded wait for that load instead of
+// starting their own, so that many agents checking in at once for policies that are not cached
+// yet do not each decode their own copy of the policies in parallel.
+func (m *monitorT) load(ctx context.Context, policyID string) error {
+	for {
+		_, err, shared := m.loadGroup.Do(policyID, func() (any, error) {
+			return nil, m.fetchAndProcess(ctx, policyID)
+		})
+		// The load runs with the context of the caller that started it. If that caller gave up,
+		// the callers that joined its load must not fail with its error: they try again.
+		if err != nil && shared && ctx.Err() == nil &&
+			(errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)) {
+			continue
+		}
+		return err
+	}
+}
+
+// fetchAndProcess fetches the latest revision of the policy with the given ID, or of every policy
+// if the ID is empty, and processes them.
+func (m *monitorT) fetchAndProcess(ctx context.Context, policyID string) error {
 	span, ctx := apm.StartSpan(ctx, "Load policies", "load")
 	defer span.End()
 
@@ -351,7 +387,11 @@ func (m *monitorT) loadPolicies(ctx context.Context) error {
 		ctx = apm.ContextWithTransaction(ctx, trans)
 		defer trans.End()
 	}
-	policies, err := m.policyF(ctx, m.bulker, dl.WithIndexName(m.policiesIndex))
+	opts := []dl.Option{dl.WithIndexName(m.policiesIndex)}
+	if policyID != "" {
+		opts = append(opts, dl.WithPolicyID(policyID))
+	}
+	policies, err := m.policyF(ctx, m.bulker, opts...)
 	if err != nil {
 		if errors.Is(err, es.ErrIndexNotFound) {
 			m.log.Debug().
@@ -589,8 +629,8 @@ func (m *monitorT) Unsubscribe(sub Subscription) error {
 }
 
 // LatestRev returns the revision_idx for the passed policy ID.
-// If the policy does not exist in the map, then all policies are foribly reloaded.
-// On an error with the reload, or if the policy does not exist a 0 is returned.
+// If the policy does not exist in the map, then it is loaded from Elasticsearch.
+// On an error with the load, or if the policy does not exist a 0 is returned.
 func (m *monitorT) LatestRev(ctx context.Context, id string) int64 {
 	if id == "" {
 		return 0
@@ -601,8 +641,8 @@ func (m *monitorT) LatestRev(ctx context.Context, id string) int64 {
 	m.mut.Unlock()
 
 	if !ok {
-		// We've not seen this policy before, force load.
-		err := m.loadPolicies(ctx)
+		// We've not seen this policy before, load it.
+		err := m.loadPolicy(ctx, id)
 		if err != nil {
 			m.log.Error().Err(err).Str(ecs.PolicyID, id).Msg("Unable to load policies.")
 			return 0
@@ -620,7 +660,7 @@ func (m *monitorT) LatestRev(ctx context.Context, id string) int64 {
 }
 
 // GetPolicy returns the policy for the given policy ID from the in-memory cache.
-// If the policy is not found in cache, all policies are reloaded from Elasticsearch.
+// If the policy is not found in cache, it is loaded from Elasticsearch.
 func (m *monitorT) GetPolicy(ctx context.Context, policyID string) (*model.Policy, error) {
 	if policyID == "" {
 		return nil, errors.New("policy ID is empty")
@@ -634,7 +674,7 @@ func (m *monitorT) GetPolicy(ctx context.Context, policyID string) (*model.Polic
 		return &p.pp.Policy, nil
 	}
 
-	if err := m.loadPolicies(ctx); err != nil {
+	if err := m.loadPolicy(ctx, policyID); err != nil {
 		return nil, fmt.Errorf("loading policies: %w", err)
 	}
 
