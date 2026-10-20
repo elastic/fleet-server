@@ -23,6 +23,23 @@ Known issues are significant defects or limitations that may impact your impleme
 % Workaround description.
 % :::
 
+:::{dropdown} {{fleet}}-managed agents stay in `Updating` with "Waiting for initial configuration and composable variables"
+
+**Applies to: Fleet Server 9.4.8, 9.5.5**
+
+On October 9, 2026, a known issue was discovered where a race condition in the Fleet Server policy monitor can stop policy delivery to agents. Affected agents check in successfully but stay in the `Updating` state with the check-in message `Waiting for initial configuration and composable variables`.
+
+The issue is most likely to occur after a Fleet Server restart or a stack upgrade, when many agents request policies at the same time.
+
+A fix will be included in Fleet Server 9.4.9 and 9.5.6.
+
+For more information, check [PR #7923](https://github.com/elastic/fleet-server/pull/7923).
+
+**Workaround**
+
+As any policy change will trigger Fleet Server to deliver the queued policies, the simplest method is to create an empty agent policy with no agents assigned. If the issue reoccurs, repeating the workaround should resolve the issue again.
+:::
+
 :::{dropdown} {{agent}} crash-loop when a remote Elasticsearch monitoring output is configured.
 
 **Applies to: {{fleet}} 9.4.6, 9.5.3**
