@@ -1003,3 +1003,34 @@ func TestMonitor_CallerStopsWaitingForASharedLoadWhenItsContextEnds(t *testing.T
 		assert.Equal(t, int64(3), leaderRev, "the load goes on for the caller that still waits for it")
 	})
 }
+
+func TestMonitor_SharedLoadFailureIsReturnedToAllCallersWhileTheirContextsAreAlive(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		p := newTestPolicy(3)
+		release := make(chan struct{})
+		var calls atomic.Int32
+		pm := NewMonitor(ftesting.NewMockBulk(), mmock.NewMockMonitor(), config.ServerLimits{}).(*monitorT)
+		pm.policyF = func(context.Context, bulk.Bulk, ...dl.Option) ([]model.Policy, error) {
+			calls.Add(1)
+			<-release
+			// A timeout of the request to Elasticsearch: the contexts of the callers are not done.
+			return nil, fmt.Errorf("search: %w", context.DeadlineExceeded)
+		}
+
+		const callers = 3
+		revs := make([]int64, callers)
+		var wg sync.WaitGroup
+		wg.Go(func() { revs[0] = pm.LatestRev(t.Context(), p.PolicyID) })
+		synctest.Wait()
+		for i := 1; i < callers; i++ {
+			wg.Go(func() { revs[i] = pm.LatestRev(t.Context(), p.PolicyID) })
+		}
+		synctest.Wait() // all callers wait for the same load
+
+		close(release)
+		wg.Wait()
+
+		assert.Equal(t, int32(1), calls.Load(), "a failure that is not a caller giving up is not retried")
+		assert.Equal(t, make([]int64, callers), revs, "no caller gets a revision")
+	})
+}

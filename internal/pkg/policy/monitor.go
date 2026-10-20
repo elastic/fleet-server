@@ -360,7 +360,10 @@ func (m *monitorT) loadPolicy(ctx context.Context, policyID string) error {
 func (m *monitorT) load(ctx context.Context, policyID string) error {
 	for {
 		ch := m.loadGroup.DoChan(policyID, func() (any, error) {
-			return nil, m.fetchAndProcess(ctx, policyID)
+			err := m.fetchAndProcess(ctx, policyID)
+			// Tell the callers that joined this load whether the caller that started it gave up
+			// while it ran.
+			return ctx.Err() != nil, err
 		})
 		var res singleflight.Result
 		select {
@@ -370,9 +373,10 @@ func (m *monitorT) load(ctx context.Context, policyID string) error {
 		case res = <-ch:
 		}
 		// The load runs with the context of the caller that started it. If that caller gave up,
-		// the callers that joined its load must not fail with its error: they try again.
-		if res.Err != nil && res.Shared && ctx.Err() == nil &&
-			(errors.Is(res.Err, context.Canceled) || errors.Is(res.Err, context.DeadlineExceeded)) {
+		// the callers that joined its load must not fail with its error: they try again. Any
+		// other failure, such as a timeout of the request to Elasticsearch, is returned to all of
+		// them: trying again would only repeat it.
+		if initiatorGaveUp, _ := res.Val.(bool); res.Err != nil && initiatorGaveUp && ctx.Err() == nil {
 			continue
 		}
 		return res.Err
