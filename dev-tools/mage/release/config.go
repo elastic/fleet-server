@@ -93,7 +93,7 @@ func getEnvOrDefault(key, defaultValue string) string {
 }
 
 // inferLatestRelease calculates the previous release version (patch - 1).
-// For minor releases (patch == 0), returns empty string; callers may use EnsureLatestRelease.
+// For minor releases (patch == 0), returns an empty string.
 func inferLatestRelease(currentRelease string) (string, error) {
 	parts := strings.Split(currentRelease, ".")
 	if len(parts) < 3 {
@@ -160,31 +160,6 @@ func inferNextProjectMinorBranch(currentRelease string) string {
 	}
 
 	return fmt.Sprintf("%s.%d", parts[0], minor+1)
-}
-
-// fetchLatestReleaseBefore looks up the previous published release from GitHub.
-// Tests may replace this to avoid network calls.
-var fetchLatestReleaseBefore = func(token, owner, repo, current string) (string, error) {
-	return NewGitHubClient(token).LatestReleaseBefore(owner, repo, current)
-}
-
-// EnsureLatestRelease sets LatestRelease when unset by querying elastic/fleet-server
-// GitHub Releases, falling back to git tags when no releases are published.
-func (c *ReleaseConfig) EnsureLatestRelease() error {
-	if c.LatestRelease != "" {
-		return nil
-	}
-	if c.CurrentRelease == "" {
-		return fmt.Errorf("CurrentRelease is required to resolve LatestRelease")
-	}
-
-	latest, err := fetchLatestReleaseBefore(c.GitHubToken, releasesLookupOwner, releasesLookupRepo, c.CurrentRelease)
-	if err != nil {
-		return fmt.Errorf("failed to resolve LatestRelease from GitHub: %w", err)
-	}
-	c.LatestRelease = latest
-	fmt.Printf("Resolved LatestRelease from %s/%s: %s\n", releasesLookupOwner, releasesLookupRepo, latest)
-	return nil
 }
 
 // Validate checks if the configuration is valid.

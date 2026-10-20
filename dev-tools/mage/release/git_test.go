@@ -11,10 +11,34 @@ import (
 	"testing"
 
 	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 )
+
+// convertLocalBranchToRemoteOnly moves a local branch tip to origin/<name> and
+// deletes the local ref (no git CLI / PlainClone required).
+func convertLocalBranchToRemoteOnly(t *testing.T, g *GitRepo, branchName string) {
+	t.Helper()
+
+	if err := g.CheckoutBranch("master"); err != nil {
+		t.Fatalf("CheckoutBranch(master) failed: %v", err)
+	}
+
+	localRef, err := g.repo.Reference(plumbing.NewBranchReferenceName(branchName), true)
+	if err != nil {
+		t.Fatalf("Reference(%s) failed: %v", branchName, err)
+	}
+	remoteRef := plumbing.NewHashReference(
+		plumbing.NewRemoteReferenceName("origin", branchName),
+		localRef.Hash(),
+	)
+	if err := g.repo.Storer.SetReference(remoteRef); err != nil {
+		t.Fatalf("SetReference(origin/%s) failed: %v", branchName, err)
+	}
+	if err := g.repo.Storer.RemoveReference(plumbing.NewBranchReferenceName(branchName)); err != nil {
+		t.Fatalf("RemoveReference(%s) failed: %v", branchName, err)
+	}
+}
 
 func createTestGitRepo(t *testing.T) (*GitRepo, string) {
 	t.Helper()
@@ -84,49 +108,18 @@ func TestEnsureBranchFrom(t *testing.T) {
 }
 
 func TestEnsureBranchFromRemoteOnlyBase(t *testing.T) {
-	upstream, _ := createTestGitRepo(t)
-	if err := upstream.CreateBranch("9.5"); err != nil {
+	gitRepo, _ := createTestGitRepo(t)
+	if err := gitRepo.CreateBranch("9.5"); err != nil {
 		t.Fatalf("CreateBranch(9.5) failed: %v", err)
 	}
+	convertLocalBranchToRemoteOnly(t, gitRepo, "9.5")
 
-	bareDir := t.TempDir()
-	_, err := git.PlainInit(bareDir, true)
-	if err != nil {
-		t.Fatalf("failed to init bare repo: %v", err)
-	}
-	if err := upstream.SetRemoteURL("origin", bareDir); err != nil {
-		t.Fatalf("SetRemoteURL failed: %v", err)
-	}
-
-	// Local file remotes need no auth; GitRepo.Push requires GITHUB_TOKEN.
-	err = upstream.repo.Push(&git.PushOptions{
-		RemoteName: "origin",
-		RefSpecs: []config.RefSpec{
-			"refs/heads/master:refs/heads/master",
-			"refs/heads/9.5:refs/heads/9.5",
-		},
-	})
-	if err != nil {
-		t.Fatalf("push to bare remote failed: %v", err)
-	}
-
-	cloneDir := t.TempDir()
-	cloned, err := git.PlainClone(cloneDir, false, &git.CloneOptions{
-		URL:           bareDir,
-		ReferenceName: plumbing.NewBranchReferenceName("master"),
-		SingleBranch:  false,
-	})
-	if err != nil {
-		t.Fatalf("PlainClone failed: %v", err)
-	}
-
-	gitRepo := &GitRepo{repo: cloned, path: cloneDir}
 	exists, err := gitRepo.BranchExists("9.5")
 	if err != nil {
 		t.Fatalf("BranchExists failed: %v", err)
 	}
 	if exists {
-		t.Fatal("expected 9.5 to exist only as a remote-tracking branch after clone")
+		t.Fatal("expected 9.5 to exist only as a remote-tracking branch")
 	}
 
 	if err := gitRepo.EnsureBranchFrom("9.5", "patch-release-9.5.1"); err != nil {
@@ -138,6 +131,63 @@ func TestEnsureBranchFromRemoteOnlyBase(t *testing.T) {
 	}
 	if branch != "patch-release-9.5.1" {
 		t.Fatalf("expected branch patch-release-9.5.1, got %s", branch)
+	}
+}
+
+func TestEnsureBranchFromRemoteOnlyTarget(t *testing.T) {
+	gitRepo, tmpDir := createTestGitRepo(t)
+	if err := gitRepo.CreateBranch("prep-branch"); err != nil {
+		t.Fatalf("CreateBranch(prep-branch) failed: %v", err)
+	}
+	if err := gitRepo.CheckoutBranch("prep-branch"); err != nil {
+		t.Fatalf("CheckoutBranch(prep-branch) failed: %v", err)
+	}
+
+	w, err := gitRepo.repo.Worktree()
+	if err != nil {
+		t.Fatalf("Worktree failed: %v", err)
+	}
+	marker := filepath.Join(tmpDir, "prep.txt")
+	if err := os.WriteFile(marker, []byte("prep tip"), 0o644); err != nil {
+		t.Fatalf("WriteFile failed: %v", err)
+	}
+	if _, err := w.Add("prep.txt"); err != nil {
+		t.Fatalf("Add failed: %v", err)
+	}
+	prepHash, err := w.Commit("prep tip commit", &git.CommitOptions{
+		Author: &object.Signature{Name: "Test User", Email: "test@example.com"},
+	})
+	if err != nil {
+		t.Fatalf("Commit failed: %v", err)
+	}
+
+	convertLocalBranchToRemoteOnly(t, gitRepo, "prep-branch")
+
+	exists, err := gitRepo.BranchExists("prep-branch")
+	if err != nil {
+		t.Fatalf("BranchExists failed: %v", err)
+	}
+	if exists {
+		t.Fatal("expected prep-branch to exist only as a remote-tracking branch")
+	}
+
+	if err := gitRepo.EnsureBranchFrom("master", "prep-branch"); err != nil {
+		t.Fatalf("EnsureBranchFrom() with remote-only target failed: %v", err)
+	}
+	branch, err := gitRepo.GetCurrentBranch()
+	if err != nil {
+		t.Fatalf("GetCurrentBranch() failed: %v", err)
+	}
+	if branch != "prep-branch" {
+		t.Fatalf("expected branch prep-branch, got %s", branch)
+	}
+
+	head, err := gitRepo.repo.Head()
+	if err != nil {
+		t.Fatalf("Head() failed: %v", err)
+	}
+	if head.Hash() != prepHash {
+		t.Fatalf("expected HEAD %s (remote prep tip), got %s", prepHash, head.Hash())
 	}
 }
 

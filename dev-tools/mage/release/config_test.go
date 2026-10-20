@@ -136,13 +136,3 @@ func TestLoadConfigFromEnv(t *testing.T) {
 		})
 	}
 }
-
-func TestEnsureLatestReleaseNoopWhenSet(t *testing.T) {
-	cfg := &ReleaseConfig{CurrentRelease: "9.6.1", LatestRelease: "9.6.0"}
-	if err := cfg.EnsureLatestRelease(); err != nil {
-		t.Fatalf("EnsureLatestRelease() unexpected error: %v", err)
-	}
-	if cfg.LatestRelease != "9.6.0" {
-		t.Fatalf("LatestRelease = %q, want 9.6.0", cfg.LatestRelease)
-	}
-}

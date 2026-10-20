@@ -6,7 +6,6 @@ package release
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/google/go-github/v68/github"
 )
@@ -52,19 +51,13 @@ func patchBeforeBuildPRLabels() []string {
 }
 
 func checkRequirements(cfg *ReleaseConfig) error {
-	parts := strings.Split(cfg.CurrentRelease, ".")
-	if len(parts) < 2 {
-		return fmt.Errorf("invalid version format: %s", cfg.CurrentRelease)
+	parsed, err := parseSemver(cfg.CurrentRelease)
+	if err != nil {
+		return err
 	}
 
-	major := parts[0]
-	patch := ""
-	if len(parts) >= 3 {
-		patch = parts[2]
-	}
-
-	if (major == "6" || major == "7" || major == "8") && patch == "0" {
-		return fmt.Errorf("minor releases for version %s.x are deprecated and blocked", major)
+	if (parsed.major == 6 || parsed.major == 7 || parsed.major == 8) && parsed.patch == 0 {
+		return fmt.Errorf("minor releases for version %d.x are deprecated and blocked", parsed.major)
 	}
 
 	repo, err := OpenRepo(".")
@@ -104,10 +97,6 @@ type workflowPRResult struct {
 // version updates in the former fleet-server.mak process.
 func RunMajorMinorRelease(cfg *ReleaseConfig) error {
 	fmt.Println("=== Starting Major/Minor Release Workflow ===")
-
-	if err := cfg.EnsureLatestRelease(); err != nil {
-		return err
-	}
 
 	if err := cfg.Validate(); err != nil {
 		return err
@@ -339,10 +328,6 @@ func ensureMajorMinorCurrentReleaseMatchesBase(repo *GitRepo, cfg *ReleaseConfig
 // 2. Opens PR-B (next patch version — after release)
 func RunPatchRelease(cfg *ReleaseConfig) error {
 	fmt.Println("=== Starting Patch Release Workflow ===")
-
-	if err := cfg.EnsureLatestRelease(); err != nil {
-		return err
-	}
 
 	if err := cfg.Validate(); err != nil {
 		return err

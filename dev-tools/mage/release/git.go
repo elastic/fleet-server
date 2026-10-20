@@ -77,24 +77,13 @@ func (g *GitRepo) CreateBranch(branchName string) error {
 }
 
 // EnsureBranchFrom checks out baseBranch (creating a local branch from origin when
-// needed) and creates or checks out branchName from that point.
+// needed), then ensures branchName exists — reusing a local or origin/<branchName>
+// tip when present, otherwise creating it from the current base tip.
 func (g *GitRepo) EnsureBranchFrom(baseBranch, branchName string) error {
 	if err := g.EnsureBranch(baseBranch); err != nil {
 		return fmt.Errorf("failed to checkout base branch %s: %w", baseBranch, err)
 	}
-
-	exists, err := g.BranchExists(branchName)
-	if err != nil {
-		return err
-	}
-	if exists {
-		return g.CheckoutBranch(branchName)
-	}
-
-	if err := g.CreateBranch(branchName); err != nil {
-		return err
-	}
-	return g.CheckoutBranch(branchName)
+	return g.EnsureBranch(branchName)
 }
 
 // EnsureBranch checks out an existing local or remote branch, or creates it from HEAD.

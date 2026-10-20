@@ -33,6 +33,31 @@ func TestUpdateVersion(t *testing.T) {
 			wantErr:     false,
 			wantContent: `const  DefaultVersion  =  "9.5.0"`,
 		},
+		{
+			name:        "canonicalize v-prefix",
+			initial:     `const DefaultVersion = "9.4.0"`,
+			newVersion:  "v9.5.0",
+			wantErr:     false,
+			wantContent: `const DefaultVersion = "9.5.0"`,
+		},
+		{
+			name:       "reject X.Y",
+			initial:    `const DefaultVersion = "9.4.0"`,
+			newVersion: "9.5",
+			wantErr:    true,
+		},
+		{
+			name:       "reject quote injection",
+			initial:    `const DefaultVersion = "9.4.0"`,
+			newVersion: `9.5.0"; evil := "x`,
+			wantErr:    true,
+		},
+		{
+			name:       "reject empty",
+			initial:    `const DefaultVersion = "9.4.0"`,
+			newVersion: "",
+			wantErr:    true,
+		},
 	}
 
 	for _, tt := range tests {

@@ -463,13 +463,6 @@ func (gh *GitHubClient) BranchExists(owner, repo, branch string) (bool, error) {
 	return true, nil
 }
 
-// releasesLookupOwner and releasesLookupRepo are the canonical repo for published releases.
-// Forks typically lack release history, so workflows always resolve LatestRelease from here.
-const (
-	releasesLookupOwner = "elastic"
-	releasesLookupRepo  = "fleet-server"
-)
-
 // LatestReleaseBefore returns the highest published release version with the same major
 // that is strictly less than currentVersion (e.g. current 9.5.0 → 9.4.3).
 // When the repo has no GitHub Releases, it falls back to git tags (fleet-server's usual case).

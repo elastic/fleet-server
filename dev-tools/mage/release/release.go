@@ -69,6 +69,12 @@ func writeRepoFile(relPath string, content []byte) error {
 
 // UpdateVersion updates the version in version/version.go.
 func UpdateVersion(newVersion string) error {
+	parsed, err := parseSemver(newVersion)
+	if err != nil {
+		return err
+	}
+	newVersion = parsed.String()
+
 	versionFile, err := validateRepoRelativePath(versionGoPath)
 	if err != nil {
 		return err
