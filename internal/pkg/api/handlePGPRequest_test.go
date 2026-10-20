@@ -7,6 +7,7 @@ package api
 import (
 	"cmp"
 	"context"
+	"encoding/json"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -121,12 +122,32 @@ func Test_PGPRetrieverT_getPGPKey(t *testing.T) {
 		content:        []byte(`test`),
 		err:            nil,
 	}, {
+		name: "custom upstream key on disk",
+		cache: func() *cache.MockCache {
+			m := cache.NewMockCache()
+			m.On("GetPGPKey", mock.Anything).Return([]byte{}, false).Once()
+			m.On("SetPGPKey", mock.Anything, []byte("disk key")).Once()
+			return m
+		},
+		dirSetup: func(t *testing.T) string {
+			dir := t.TempDir()
+			stored, err := json.Marshal(customKey{URL: customURL, Key: []byte("disk key")})
+			require.NoError(t, err)
+			require.NoError(t, os.WriteFile(filepath.Join(dir, customKeyName), stored, defaultKeyPermissions))
+			return dir
+		},
+		upstreamURL:    customURL,
+		upstreamStatus: 200,
+		content:        []byte("disk key"),
+		err:            nil,
+	}, {
 		name:  "custom upstream url changed",
 		cache: customCache,
 		dirSetup: func(t *testing.T) string {
 			dir := t.TempDir()
-			require.NoError(t, os.WriteFile(filepath.Join(dir, customKeyName), []byte("old"), defaultKeyPermissions))
-			require.NoError(t, os.WriteFile(filepath.Join(dir, customKeyMetadataName), []byte("https://old.example.com/pgp-key"), defaultKeyPermissions))
+			stored, err := json.Marshal(customKey{URL: "https://old.example.com/pgp-key", Key: []byte("old")})
+			require.NoError(t, err)
+			require.NoError(t, os.WriteFile(filepath.Join(dir, customKeyName), stored, defaultKeyPermissions))
 			return dir
 		},
 		upstreamURL:    customURL,
@@ -142,8 +163,9 @@ func Test_PGPRetrieverT_getPGPKey(t *testing.T) {
 		},
 		dirSetup: func(t *testing.T) string {
 			dir := t.TempDir()
-			require.NoError(t, os.WriteFile(filepath.Join(dir, customKeyName), []byte("old"), defaultKeyPermissions))
-			require.NoError(t, os.WriteFile(filepath.Join(dir, customKeyMetadataName), []byte("https://old.example.com/pgp-key"), defaultKeyPermissions))
+			stored, err := json.Marshal(customKey{URL: "https://old.example.com/pgp-key", Key: []byte("old")})
+			require.NoError(t, err)
+			require.NoError(t, os.WriteFile(filepath.Join(dir, customKeyName), stored, defaultKeyPermissions))
 			return dir
 		},
 		upstreamURL:    customURL,

@@ -7,6 +7,7 @@ package api
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -26,8 +27,7 @@ import (
 
 const (
 	defaultKeyName        = "default.pgp"
-	customKeyName         = "custom.pgp"
-	customKeyMetadataName = "custom.url"
+	customKeyName         = "custom.json"
 	upstreamFetchTimeout  = 30 * time.Second
 	defaultKeyPermissions = 0o0600
 )
@@ -37,6 +37,11 @@ var (
 	ErrPGPPermissions = fmt.Errorf("pgp key permissions are not %#o", defaultKeyPermissions)
 	ErrUpstreamStatus = errors.New("upstream http server status error")
 )
+
+type customKey struct {
+	URL string `json:"url"`
+	Key []byte `json:"key"`
+}
 
 type PGPRetrieverT struct {
 	bulker bulk.Bulk
@@ -51,8 +56,7 @@ func NewPGPRetrieverT(ctx context.Context, cfg *config.Server, bulker bulk.Bulk,
 		cfg:    cfg.PGP,
 	}
 	if cfg.PGP.UpstreamURL != config.DefaultPGPUpstreamURL {
-		metadata, err := os.ReadFile(filepath.Join(pt.cfg.Dir, customKeyMetadataName))
-		if err != nil || string(metadata) != pt.cfg.UpstreamURL {
+		if _, err := pt.getPGPFromDir(ctx, customKeyName); err != nil {
 			if _, err := pt.FetchCustomKey(ctx); err != nil {
 				zlog := zerolog.Ctx(ctx)
 				zlog.Error().Err(err).Str("url", pt.cfg.UpstreamURL).Msg("Failed to fetch custom PGP key")
@@ -143,10 +147,11 @@ func (pt *PGPRetrieverT) FetchCustomKey(ctx context.Context) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	key := filepath.Join(pt.cfg.Dir, customKeyName)
-	if pt.writeKeyToDir(ctx, *zlog, key, p) {
-		pt.writeKeyToDir(ctx, *zlog, filepath.Join(pt.cfg.Dir, customKeyMetadataName), []byte(pt.cfg.UpstreamURL))
+	stored, err := json.Marshal(customKey{URL: pt.cfg.UpstreamURL, Key: p})
+	if err != nil {
+		return nil, err
 	}
+	pt.writeKeyToDir(ctx, *zlog, filepath.Join(pt.cfg.Dir, customKeyName), stored)
 	pt.cache.SetPGPKey(pt.cfg.UpstreamURL, p)
 	return p, nil
 }
@@ -154,18 +159,11 @@ func (pt *PGPRetrieverT) FetchCustomKey(ctx context.Context) ([]byte, error) {
 // getPGPFromDir will return the PGP contents if found in the directory
 //
 // Key contents are only returned if the key has valid permission bits.
-// For the custom key, the metadata file is checked first and a URL mismatch
+// For the custom key, a stored URL that does not match the configured URL
 // returns fs.ErrNotExist.
 func (pt *PGPRetrieverT) getPGPFromDir(ctx context.Context, keyName string) ([]byte, error) {
 	span, _ := apm.StartSpan(ctx, "getPGPFromDir", "process")
 	defer span.End()
-
-	if keyName == customKeyName {
-		metadata, err := os.ReadFile(filepath.Join(pt.cfg.Dir, customKeyMetadataName))
-		if err != nil || string(metadata) != pt.cfg.UpstreamURL {
-			return nil, fs.ErrNotExist
-		}
-	}
 
 	key := filepath.Join(pt.cfg.Dir, keyName)
 	stat, err := os.Stat(key)
@@ -175,7 +173,15 @@ func (pt *PGPRetrieverT) getPGPFromDir(ctx context.Context, keyName string) ([]b
 	if stat.Mode().Perm() != defaultKeyPermissions { // TODO determine what permission bits we want to check
 		return nil, ErrPGPPermissions
 	}
-	return os.ReadFile(key)
+	p, err := os.ReadFile(key)
+	if err != nil || keyName != customKeyName {
+		return p, err
+	}
+	var stored customKey
+	if err := json.Unmarshal(p, &stored); err != nil || stored.URL != pt.cfg.UpstreamURL {
+		return nil, fs.ErrNotExist
+	}
+	return stored.Key, nil
 }
 
 // getPGPFromUpstream returns the PGP key contentents from the key specified in the upstream URL.
@@ -208,7 +214,7 @@ func (pt *PGPRetrieverT) getPGPFromUpstream(ctx context.Context) ([]byte, error)
 //
 // If the directory does not exist it will create it
 // Otherwise it is treated as a best-effort attempt
-func (pt *PGPRetrieverT) writeKeyToDir(ctx context.Context, zlog zerolog.Logger, fullPath string, p []byte) bool {
+func (pt *PGPRetrieverT) writeKeyToDir(ctx context.Context, zlog zerolog.Logger, fullPath string, p []byte) {
 	span, _ := apm.StartSpan(ctx, "writeKeyToDir", "process")
 	defer span.End()
 
@@ -217,19 +223,39 @@ func (pt *PGPRetrieverT) writeKeyToDir(ctx context.Context, zlog zerolog.Logger,
 		if errors.Is(err, fs.ErrNotExist) {
 			if err := os.Mkdir(pt.cfg.Dir, 0700); err != nil {
 				zlog.Error().Err(err).Str("path", pt.cfg.Dir).Msgf("Unable to create directory")
-				return false
+				return
 			}
 		} else {
 			zlog.Error().Err(err).Str("path", pt.cfg.Dir).Msgf("Unable to verify if directory exists")
-			return false
+			return
 		}
 	}
 
-	err = os.WriteFile(fullPath, p, defaultKeyPermissions)
+	err = writeFileAtomic(fullPath, p, defaultKeyPermissions)
 	if err != nil {
 		zlog.Error().Err(err).Str("path", fullPath).Msg("Unable to write file.")
-		return false
+		return
 	}
 	zlog.Info().Str("path", fullPath).Msg("Key written to storage.")
-	return true
+
+}
+
+func writeFileAtomic(path string, p []byte, perm os.FileMode) error {
+	tmp, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".tmp-*")
+	if err != nil {
+		return err
+	}
+	defer func() { _ = os.Remove(tmp.Name()) }()
+	if err := tmp.Chmod(perm); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if _, err := tmp.Write(p); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmp.Name(), path)
 }
