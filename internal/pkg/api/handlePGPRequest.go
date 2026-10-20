@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/rs/zerolog"
 	"go.elastic.co/apm/v2"
@@ -27,6 +28,7 @@ const (
 	defaultKeyName        = "default.pgp"
 	customKeyName         = "custom.pgp"
 	customKeyMetadataName = "custom.url"
+	upstreamFetchTimeout  = 30 * time.Second
 	defaultKeyPermissions = 0o0600
 )
 
@@ -181,8 +183,11 @@ func (pt *PGPRetrieverT) getPGPFromUpstream(ctx context.Context) ([]byte, error)
 	span, ctx := apm.StartSpan(ctx, "getPGPFromUpstream", "process")
 	defer span.End()
 
+	fetchCtx, cancel := context.WithTimeout(ctx, upstreamFetchTimeout)
+	defer cancel()
+
 	// NOTE: If we are concerned about this making too many requests we can add a lock, or use something like sync.Once
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, pt.cfg.UpstreamURL, nil)
+	req, err := http.NewRequestWithContext(fetchCtx, http.MethodGet, pt.cfg.UpstreamURL, nil)
 	if err != nil {
 		return nil, err
 	}
