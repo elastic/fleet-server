@@ -243,6 +243,9 @@ type Agent struct {
 	// Unhealthy reason: input/output/other
 	UnhealthyReason []string `json:"unhealthy_reason,omitempty"`
 
+	// True when the agent has been unenrolled as the first step of a Fleet UNINSTALL flow. Its credentials are kept and only UNINSTALL and CANCEL actions are delivered on checkin until the UNINSTALL is acknowledged, at which point the agent is fully invalidated.
+	UninstallPending bool `json:"uninstall_pending,omitempty"`
+
 	// Date/time the Elastic Agent was last updated
 	UpdatedAt string `json:"updated_at,omitempty"`
 

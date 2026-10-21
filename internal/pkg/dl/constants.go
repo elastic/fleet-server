@@ -57,6 +57,7 @@ const (
 	FieldTagsHash           = "tags_hash"
 	FieldUpdatedAt          = "updated_at"
 	FieldUnenrolledAt       = "unenrolled_at"
+	FieldUninstallPending   = "uninstall_pending"
 	FieldUpgradedAt         = "upgraded_at"
 	FieldUpgradeStartedAt   = "upgrade_started_at"
 	FieldUpgradeDetails     = "upgrade_details"
