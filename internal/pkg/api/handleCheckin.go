@@ -540,17 +540,28 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 		}
 	}
 
-	// Subscribe to policy manager for changes on PolicyId > policyRev
-	sub, err := ct.pm.Subscribe(agent.Id, agent.PolicyID, revID)
-	if err != nil {
-		return fmt.Errorf("subscribe policy monitor: %w", err)
-	}
-	defer func() {
-		err := ct.pm.Unsubscribe(sub)
+	// Subscribe to policy manager for changes on PolicyId > policyRev.
+	//
+	// Pending-uninstall agents only ever receive UNINSTALL/CANCEL, so any policy
+	// change would be withheld below anyway. Skip the subscription entirely for
+	// them: subscribing would consume a shared policy rollout rate-limit token and
+	// clone a policy that is immediately discarded, which at scale could delay
+	// policy updates for enrolled agents. policyCh stays nil, disabling the
+	// policy select case for these agents.
+	var policyCh <-chan *policy.ParsedPolicy
+	if !agent.UninstallPending {
+		sub, err := ct.pm.Subscribe(agent.Id, agent.PolicyID, revID)
 		if err != nil {
-			zlog.Error().Err(err).Str(ecs.PolicyID, agent.PolicyID).Msg("unable to unsubscribe from policy")
+			return fmt.Errorf("subscribe policy monitor: %w", err)
 		}
-	}()
+		defer func() {
+			err := ct.pm.Unsubscribe(sub)
+			if err != nil {
+				zlog.Error().Err(err).Str(ecs.PolicyID, agent.PolicyID).Msg("unable to unsubscribe from policy")
+			}
+		}()
+		policyCh = sub.Output()
+	}
 
 	// Update check-in timestamp on timeout
 	tick := time.NewTicker(ct.cfg.Timeouts.CheckinTimestamp)
@@ -586,11 +597,16 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 	)
 
 	// Check agent pending actions first
-	pendingActions, err := ct.fetchAgentPendingActions(r.Context(), seqno, agent.Id)
+	pendingActions, err := ct.fetchAgentPendingActions(r.Context(), seqno, agent.Id, agent.UninstallPending)
 	if err != nil {
 		return err
 	}
-	pendingActions = filterActions(zlog, agent.Id, pendingActions)
+	pendingActions, rejectedUninstalls := filterActions(zlog, agent.Id, pendingActions, agent.UninstallPending)
+	// Persist the rejections before converting/advancing the cursor; on failure
+	// return so the agent retries and does not advance past the rejected action.
+	if err := ct.rejectUninstallActions(r.Context(), zlog, agent.Id, rejectedUninstalls); err != nil {
+		return err
+	}
 	actions, ackToken = convertActions(zlog, agent.Id, pendingActions)
 
 	span, ctx := apm.StartSpan(r.Context(), "longPoll", "process")
@@ -614,11 +630,19 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 				return ctx.Err()
 			case acdocs := <-actCh:
 				var acs []Action
-				acdocs = filterActions(zlog, agent.Id, acdocs)
+				acdocs, rejectedUninstalls := filterActions(zlog, agent.Id, acdocs, agent.UninstallPending)
+				// Persist the rejections before advancing the cursor; on failure
+				// return so the agent retries instead of skipping the rejection.
+				if err := ct.rejectUninstallActions(ctx, zlog, agent.Id, rejectedUninstalls); err != nil {
+					span.End()
+					return err
+				}
 				acs, ackToken = convertActions(zlog, agent.Id, acdocs)
 				actions = append(actions, acs...)
 				break LOOP
-			case policy := <-sub.Output():
+			// policyCh is nil for pending-uninstall agents (no subscription), so
+			// this case never fires for them and policy changes are not delivered.
+			case policy := <-policyCh:
 				actionResp, update, err := processPolicy(ctx, zlog, ct.bulker, agent, policy, ct.cfg.Features.EvaluateConditions.AgentID, ct.outputSecretCandidateCollector)
 				if err != nil {
 					span.End()
@@ -986,29 +1010,93 @@ func (ct *CheckinT) resolveSeqNo(ctx context.Context, zlog zerolog.Logger, req C
 	return seqno, err
 }
 
-func (ct *CheckinT) fetchAgentPendingActions(ctx context.Context, seqno sqn.SeqNo, agentID string) ([]model.Action, error) {
+func (ct *CheckinT) fetchAgentPendingActions(ctx context.Context, seqno sqn.SeqNo, agentID string, uninstallPending bool) ([]model.Action, error) {
+	if uninstallPending {
+		// A pending-uninstall agent may only receive UNINSTALL/CANCEL. Filter by
+		// type in the query so withheld actions don't consume the bounded fetch
+		// window and starve UNINSTALL delivery.
+		actions, err := dl.FindAgentActionsForUninstall(ctx, ct.bulker, seqno, ct.gcp.GetCheckpoint(), agentID, []string{string(UNINSTALL), string(CANCEL)})
+		if err != nil {
+			return nil, fmt.Errorf("fetchAgentPendingActions (uninstall): %w", err)
+		}
+		return actions, nil
+	}
+
 	actions, err := dl.FindAgentActions(ctx, ct.bulker, seqno, ct.gcp.GetCheckpoint(), agentID)
 	if err != nil {
 		return nil, fmt.Errorf("fetchAgentPendingActions: %w", err)
 	}
 
-	return actions, err
+	return actions, nil
 }
 
 // filterActions removes the POLICY_CHANGE, UPDATE_TAGS, FORCE_UNENROLL action from the passed list as well as any unknown action types.
 // The source of this list are documents from the fleet actions index.
 // The POLICY_CHANGE action that the agent receives are generated by the fleet-server when it detects a different policy in processRequest()
 // The UPDATE_TAGS, FORCE_UNENROLL actions are UI only actions, should not be delivered to agents
-func filterActions(zlog zerolog.Logger, agentID string, actions []model.Action) []model.Action {
-	resp := make([]model.Action, 0, len(actions))
+//
+// When uninstallPending is true the agent has been unenrolled as the first step
+// of a remote uninstall: only UNINSTALL and CANCEL actions are delivered (the
+// CANCEL lets the operator cancel the scheduled UNINSTALL; the agent scopes it to
+// the queued action). Everything else is withheld until the UNINSTALL completes.
+//
+// UNINSTALL is only valid once the agent has been unenrolled. Any UNINSTALL found
+// for an agent that is not pending-uninstall is returned separately in rejected;
+// the caller records a failed action result for those so the failure is explicit.
+func filterActions(zlog zerolog.Logger, agentID string, actions []model.Action, uninstallPending bool) (resp []model.Action, rejected []model.Action) {
+	resp = make([]model.Action, 0, len(actions))
 	for _, action := range actions {
-		if valid := validActionTypes[action.Type]; !valid {
-			zlog.Info().Str(ecs.AgentID, agentID).Str(ecs.ActionID, action.ActionID).Str(ecs.ActionType, action.Type).Msg("Removing action found in index from check in response")
-			continue
+		if uninstallPending {
+			// A pending-uninstall agent may only receive UNINSTALL and CANCEL.
+			if action.Type != string(UNINSTALL) && action.Type != string(CANCEL) {
+				zlog.Info().Str(ecs.AgentID, agentID).Str(ecs.ActionID, action.ActionID).Str(ecs.ActionType, action.Type).Msg("Withholding non-uninstall action from pending-uninstall agent")
+				continue
+			}
+		} else {
+			// UNINSTALL requires the agent to be unenrolled first; reject it.
+			if action.Type == string(UNINSTALL) {
+				zlog.Warn().Str(ecs.AgentID, agentID).Str(ecs.ActionID, action.ActionID).Str(ecs.ActionType, action.Type).Msg("Rejecting UNINSTALL for agent that has not been unenrolled")
+				rejected = append(rejected, action)
+				continue
+			}
+			if valid := validActionTypes[action.Type]; !valid {
+				zlog.Info().Str(ecs.AgentID, agentID).Str(ecs.ActionID, action.ActionID).Str(ecs.ActionType, action.Type).Msg("Removing action found in index from check in response")
+				continue
+			}
 		}
 		resp = append(resp, action)
 	}
-	return resp
+	return resp, rejected
+}
+
+// errUninstallNotUnenrolled is the action-result error recorded when a Fleet
+// UNINSTALL targets an agent that has not been unenrolled first.
+const errUninstallNotUnenrolled = "UNINSTALL action rejected: the agent must be unenrolled before it can be uninstalled"
+
+// rejectUninstallActions records a failed action result for each UNINSTALL that
+// was rejected because the agent is not unenrolled. The result doc id is derived
+// from the action and agent ids, so repeated rejections on later check-ins are
+// idempotent (the duplicate create is a no-op).
+//
+// It returns an error if any rejection could not be persisted. The caller must
+// propagate it and not advance the agent's action cursor, so the rejection is
+// retried on the next check-in instead of being silently skipped when a later
+// action in the same batch supplies the ack token.
+func (ct *CheckinT) rejectUninstallActions(ctx context.Context, zlog zerolog.Logger, agentID string, actions []model.Action) error {
+	var errs []error
+	for _, action := range actions {
+		acr := model.ActionResult{
+			ActionID:   action.ActionID,
+			AgentID:    agentID,
+			Namespaces: action.Namespaces,
+			Error:      errUninstallNotUnenrolled,
+		}
+		if err := dl.CreateActionResult(ctx, ct.bulker, acr); err != nil {
+			zlog.Error().Err(err).Str(ecs.AgentID, agentID).Str(ecs.ActionID, action.ActionID).Msg("failed to write rejected UNINSTALL action result")
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
 }
 
 // convertActionData converts the passed raw message data to Action_Data using aType as a discriminator.

@@ -438,6 +438,76 @@ func TestEnrollWithAgentIDExistingActive(t *testing.T) {
 	assert.NotContains(t, doc, dl.FieldUpgradedAt)
 }
 
+// TestEnrollWithAgentIDExistingPendingUninstallResetsOutputs verifies that
+// re-enrolling a pending-uninstall agent clears the stale output credential
+// state (api_key/api_key_id/permissions_hash), since those keys were invalidated
+// and their secrets deleted on UNENROLL. Otherwise policy preparation would
+// reuse a revoked key or a deleted secret reference.
+func TestEnrollWithAgentIDExistingPendingUninstallResetsOutputs(t *testing.T) {
+	ctx := t.Context()
+	rb := &rollback.Rollback{}
+	zlog := zerolog.Logger{}
+	agentID := "1234"
+	replaceToken := "replace_token"
+	var pbkdf2Cfg config.PBKDF2
+	pbkdf2Cfg.InitDefaults()
+	replaceHash, err := hashReplaceToken(replaceToken, pbkdf2Cfg)
+	if err != nil {
+		t.Fatalf("error generating bcrypt hash: %v", err)
+	}
+	req := &EnrollRequest{
+		Type: "PERMANENT",
+		Id:   &agentID,
+		Metadata: EnrollMetadata{
+			UserProvided: []byte("{}"),
+			Local:        []byte("{}"),
+		},
+		ReplaceToken: &replaceToken,
+	}
+	verCon := mustBuildConstraints("8.9.0")
+	cfg := &config.Server{}
+	cfg.InitDefaults()
+	c, _ := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
+	bulker := ftesting.NewMockBulk()
+	et, _ := NewEnrollerT(verCon, cfg, bulker, c)
+
+	policyID := "my-policy"
+	// Existing pending-uninstall agent with a default output whose key was revoked.
+	source := fmt.Sprintf(`{"active":true,"uninstall_pending":true,"agent":{"id":"1234","version":"8.9.0"},"type":"PERMANENT","policy_id":"%s","replace_token":"%s",`+
+		`"outputs":{"default":{"type":"elasticsearch","api_key":"revoked","api_key_id":"revoked-id","permissions_hash":"oldhash","to_retire_api_key_ids":[{"id":"retire-1"}]}}}`, policyID, replaceHash)
+	bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{
+		HitsT: es.HitsT{
+			Hits: []es.HitT{{
+				ID:     "1234",
+				Index:  dl.FleetAgents,
+				Source: []byte(source),
+			}},
+		},
+	}, nil)
+	bulker.On("APIKeyRead", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(
+		&apikey.APIKeyMetadata{ID: "1234"}, nil)
+	bulker.On("APIKeyInvalidate", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	bulker.On("APIKeyCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(
+		&apikey.APIKey{ID: "1234", Key: "1234"}, nil)
+	bulker.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+	resp, _ := et._enroll(ctx, rb, zlog, req, policyID, []string{}, "8.9.0")
+	require.Equal(t, "created", resp.Action, "enroll failed")
+
+	doc := replaceUpdateDoc(t, bulker)
+	// uninstall_pending must be cleared.
+	assert.Equal(t, false, doc[dl.FieldUninstallPending])
+	// outputs must be written with cleared credentials but retained retire list.
+	outputs, ok := doc[dl.FieldOutputs].(map[string]any)
+	require.True(t, ok, "expected outputs in update doc")
+	def, ok := outputs["default"].(map[string]any)
+	require.True(t, ok, "expected default output in update doc")
+	assert.Equal(t, "", def["api_key"], "api_key must be cleared so a fresh key is generated")
+	assert.Equal(t, "", def["api_key_id"], "api_key_id must be cleared")
+	assert.Equal(t, "", def["permissions_hash"], "permissions_hash must be cleared")
+	assert.Contains(t, def, "to_retire_api_key_ids", "retirement bookkeeping must be preserved")
+}
+
 // TestEnrollWithAgentIDExistingActive_VersionedPolicy covers replace-enrollment of an
 // agent that has been reassigned to a version-specific policy variant (e.g. "my-policy#9.6")
 // by Kibana's version-specific policy assignment task. Enrollment API keys are only ever
