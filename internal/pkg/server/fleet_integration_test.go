@@ -572,7 +572,7 @@ func TestServerInstrumentation(t *testing.T) {
 				}
 				return
 			}
-			Err = err //nolint:ineffassign,staticcheck // ugly work around for error checking
+			Err = err //nolint:ineffassign // ugly work around for error checking
 			// retry after wait or cancel
 			select {
 			case <-ctx.Done():

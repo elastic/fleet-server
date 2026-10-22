@@ -53,12 +53,12 @@ func Test_Agent_OTLP_Output(t *testing.T) {
 	policyID := uuid.Must(uuid.NewV4()).String()
 	policyDataWithOTLP := model.PolicyData{
 		Outputs: map[string]map[string]any{
-			"default":      {"type": "elasticsearch"},
-			otlpOutputName: {"type": "otlp"},
+			tDefault:       {tType: kElasticsearch},
+			otlpOutputName: {tType: tOTLP},
 		},
 		// output_permissions for myOTLP gives it the _managed_otlp_apm role.
 		OutputPermissions: json.RawMessage(`{
-			"default": {},
+			tDefault: {},
 			"myOTLP": {
 				"_managed_otlp_apm": {
 					"applications": [{"application":"apm","privileges":["event:write"],"resources":["*"]}]
@@ -66,7 +66,7 @@ func Test_Agent_OTLP_Output(t *testing.T) {
 			}
 		}`),
 		Exporters: map[string]any{
-			"otlp/" + otlpOutputName: map[string]any{"endpoint": "https://otlp.example:4317"},
+			"otlp/" + otlpOutputName: map[string]any{tEndpoint: "https://otlp.example:4317"},
 		},
 		Inputs: []map[string]any{},
 	}
@@ -80,20 +80,19 @@ func Test_Agent_OTLP_Output(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create an enrollment API key scoped to the OTLP test policy.
-	esCfg := elasticsearch.Config{Username: "elastic", Password: "changeme"}
-	esClient, err := elasticsearch.NewClient(esCfg)
+	esClient, err := elasticsearch.New(elasticsearch.WithBasicAuth("elastic", "changeme"))
 	require.NoError(t, err)
-	enrollKey, err := apikey.Create(ctx, esClient, "default", "", "true", []byte(`{
+	enrollKey, err := apikey.Create(ctx, esClient, tDefault, "", "true", []byte(`{
 		"fleet-apikey-enroll": {
 			"cluster": [],
 			"index": [],
-			"applications": [{"application": "fleet", "privileges": ["no-privileges"], "resources": ["*"]}]
+			"applications": [{"application": tFleet, "privileges": ["no-privileges"], "resources": ["*"]}]
 		}
 	}`), map[string]any{
-		"managed_by": "fleet",
-		"managed":    true,
-		"type":       "enroll",
-		"policy_id":  policyID,
+		tManagedBy: tFleet,
+		tManaged:   true,
+		tType:      tEnroll,
+		tPolicyID:  policyID,
 	})
 	require.NoError(t, err)
 
@@ -154,9 +153,9 @@ func Test_Agent_OTLP_Output(t *testing.T) {
 	// Rev-2 policy removes the OTLP output, keeping only the default ES output.
 	policyDataWithoutOTLP := model.PolicyData{
 		Outputs: map[string]map[string]any{
-			"default": {"type": "elasticsearch"},
+			tDefault: {tType: kElasticsearch},
 		},
-		OutputPermissions: json.RawMessage(`{"default": {}}`),
+		OutputPermissions: json.RawMessage(`{tDefault: {}}`),
 		Inputs:            []map[string]any{},
 	}
 	_, err = dl.CreatePolicy(ctx, srv.bulker, model.Policy{
@@ -177,7 +176,7 @@ func Test_Agent_OTLP_Output(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		defaultOut, ok := got.Outputs["default"]
+		defaultOut, ok := got.Outputs[tDefault]
 		if !ok {
 			return fmt.Errorf("default output not found on agent doc")
 		}
@@ -190,7 +189,7 @@ func Test_Agent_OTLP_Output(t *testing.T) {
 	got, err := dl.FindAgent(ctx, srv.bulker, dl.QueryAgentByID, dl.FieldID, resp.Item.Id)
 	require.NoError(t, err)
 
-	defaultOut, ok := got.Outputs["default"]
+	defaultOut, ok := got.Outputs[tDefault]
 	require.True(t, ok, "default output must be present on agent doc")
 	require.Len(t, defaultOut.ToRetireAPIKeyIds, 1, "exactly one retirement record expected")
 	assert.Equal(t, otlpKeyID, defaultOut.ToRetireAPIKeyIds[0].ID, "retired key ID")

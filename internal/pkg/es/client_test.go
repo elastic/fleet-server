@@ -34,6 +34,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	testHTTP  = "http"
+	testHTTPS = "https"
+	testOpGet = "Get"
+	testESURL = "https://es.example"
+)
+
 var enabled bool = true
 
 func TestClientCerts(t *testing.T) {
@@ -60,7 +67,7 @@ func TestClientCerts(t *testing.T) {
 		client, err := NewClient(t.Context(), &config.Config{
 			Output: config.Output{
 				Elasticsearch: config.Elasticsearch{
-					Protocol: "https",
+					Protocol: testHTTPS,
 					Hosts:    []string{server.URL},
 					TLS: &tlscommon.Config{
 						Enabled: &enabled,
@@ -105,7 +112,7 @@ func TestClientCerts(t *testing.T) {
 		client, err := NewClient(t.Context(), &config.Config{
 			Output: config.Output{
 				Elasticsearch: config.Elasticsearch{
-					Protocol: "https",
+					Protocol: testHTTPS,
 					Hosts:    []string{server.URL},
 					TLS: &tlscommon.Config{
 						Enabled: &enabled,
@@ -155,7 +162,7 @@ func TestClientCerts(t *testing.T) {
 		client, err := NewClient(t.Context(), &config.Config{
 			Output: config.Output{
 				Elasticsearch: config.Elasticsearch{
-					Protocol: "https",
+					Protocol: testHTTPS,
 					Hosts:    []string{server.URL},
 					TLS: &tlscommon.Config{
 						Enabled: &enabled,
@@ -193,7 +200,7 @@ func TestConnectionTLS(t *testing.T) {
 	cfg := &config.Config{
 		Output: config.Output{
 			Elasticsearch: config.Elasticsearch{
-				Protocol: "https",
+				Protocol: testHTTPS,
 				Hosts:    []string{server.URL},
 				TLS: &tlscommon.Config{
 					Enabled: &enabled,
@@ -298,8 +305,8 @@ func TestIsTLSHandshakeError(t *testing.T) {
 		{
 			name: "wrapped via *url.Error (mirrors net/http transport)",
 			err: &url.Error{
-				Op:  "Get",
-				URL: "https://es.example",
+				Op:  testOpGet,
+				URL: testESURL,
 				Err: certErr,
 			},
 			want: true,
@@ -307,8 +314,8 @@ func TestIsTLSHandshakeError(t *testing.T) {
 		{
 			name: "doubly wrapped (fmt.Errorf around *url.Error)",
 			err: fmt.Errorf("retry: %w", &url.Error{
-				Op:  "Get",
-				URL: "https://es.example",
+				Op:  testOpGet,
+				URL: testESURL,
 				Err: certErr,
 			}),
 			want: true,
@@ -326,7 +333,7 @@ func TestDefaultRetryOnError(t *testing.T) {
 	certErr := &tls.CertificateVerificationError{
 		Err: errors.New("x509: certificate signed by unknown authority"),
 	}
-	wrappedCertErr := &url.Error{Op: "Get", URL: "https://es.example", Err: certErr}
+	wrappedCertErr := &url.Error{Op: testOpGet, URL: testESURL, Err: certErr}
 
 	// defaultOptions wires the retryOnError predicate that combines ECONNREFUSED,
 	// ECONNRESET, and TLS handshake errors.  Verify each case using an actual client
@@ -461,7 +468,7 @@ func minimalESCfg() *config.Config {
 	return &config.Config{
 		Output: config.Output{
 			Elasticsearch: config.Elasticsearch{
-				Protocol:       "http",
+				Protocol:       testHTTP,
 				Hosts:          []string{"localhost:9200"},
 				Timeout:        90 * time.Second,
 				MaxConnPerHost: 128,
@@ -576,7 +583,7 @@ func TestNewClientRetryWithMockES(t *testing.T) {
 	defer server.Close()
 
 	cfg := &config.Config{Output: config.Output{Elasticsearch: config.Elasticsearch{
-		Protocol:       "http",
+		Protocol:       testHTTP,
 		Hosts:          []string{server.URL},
 		Timeout:        90 * time.Second,
 		MaxConnPerHost: 128,

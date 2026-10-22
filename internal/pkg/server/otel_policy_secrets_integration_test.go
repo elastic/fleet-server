@@ -37,27 +37,27 @@ import (
 func createAgentPolicyWithOtelSecrets(t *testing.T, ctx context.Context, bulker bulk.Bulk) string {
 	t.Helper()
 
-	inlineSecretID := createSecret(t, ctx, bulker, "inline_secret_value")
+	inlineSecretID := createSecret(t, ctx, bulker, tInlineSecretValue)
 	inlineSecretRef := fmt.Sprintf("$co.elastic.secret{%s}", inlineSecretID)
-	pathSecretID := createSecret(t, ctx, bulker, "path_secret_value")
+	pathSecretID := createSecret(t, ctx, bulker, tPathSecretValue)
 
 	policyID := uuid.Must(uuid.NewV4()).String()
 	var otelPolicyData = model.PolicyData{
 		Outputs: map[string]map[string]any{
-			"default": {
-				"type": "elasticsearch",
+			tDefault: {
+				tType: kElasticsearch,
 			},
 		},
-		OutputPermissions: json.RawMessage(`{"default":{}}`),
+		OutputPermissions: json.RawMessage(`{tDefault:{}}`),
 		Receivers: map[string]any{
-			"otlp": map[string]any{
+			tOTLP: map[string]any{
 				"auth": inlineSecretRef,
 			},
 		},
-		// Exporter IDs must be "type/outputName"; only "elasticsearch" is supported.
+		// Exporter IDs must be "type/outputName"; only kElasticsearch is supported.
 		Exporters: map[string]any{
-			"elasticsearch/default": map[string]any{
-				"secrets": map[string]any{
+			tOutputESDefault: map[string]any{
+				tSecrets: map[string]any{
 					"headers": map[string]any{
 						"authorization": map[string]any{"id": pathSecretID},
 					},
@@ -66,19 +66,19 @@ func createAgentPolicyWithOtelSecrets(t *testing.T, ctx context.Context, bulker 
 		},
 		Processors: map[string]any{
 			"batch": map[string]any{
-				"api_key": inlineSecretRef,
+				tAPIKey: inlineSecretRef,
 			},
 		},
 		Extensions: map[string]any{
 			"basicauth": map[string]any{
-				"secrets": map[string]any{
+				tSecrets: map[string]any{
 					"password": map[string]any{"id": pathSecretID},
 				},
 			},
 		},
 		Connectors: map[string]any{
 			"spanmetrics": map[string]any{
-				"token": inlineSecretRef,
+				tToken: inlineSecretRef,
 			},
 		},
 		SecretReferences: []model.SecretReferencesItems{
@@ -103,28 +103,28 @@ func createAgentPolicyWithOtelSecrets(t *testing.T, ctx context.Context, bulker 
 	if err != nil {
 		t.Fatal(err)
 	}
-	key, err := apikey.Create(ctx, es, "default", "", "true", []byte(`{
+	key, err := apikey.Create(ctx, es, tDefault, "", "true", []byte(`{
 	    "fleet-apikey-enroll": {
 		"cluster": [],
 		"index": [],
 		"applications": [{
-		    "application": "fleet",
+		    "application": tFleet,
 		    "privileges": ["no-privileges"],
 		    "resources": ["*"]
 		}]
 	    }
 	}`), map[string]any{
-		"managed_by": "fleet",
-		"managed":    true,
-		"type":       "enroll",
-		"policy_id":  policyID,
+		tManagedBy: tFleet,
+		tManaged:   true,
+		tType:      tEnroll,
+		tPolicyID:  policyID,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	_, err = dl.CreateEnrollmentAPIKey(ctx, bulker, model.EnrollmentAPIKey{
-		Name:     "Default",
+		Name:     tDefaultTitle,
 		APIKey:   key.Key,
 		APIKeyID: key.ID,
 		PolicyID: policyID,
@@ -201,41 +201,41 @@ func Test_Agent_OtelPolicy_Secrets(t *testing.T) {
 	require.NoError(t, err)
 
 	// Assert receivers.otlp.auth was replaced with inline secret value
-	require.Contains(t, actionData.Policy.Receivers, "otlp")
-	otlpMap, ok := actionData.Policy.Receivers["otlp"].(map[string]any)
+	require.Contains(t, actionData.Policy.Receivers, tOTLP)
+	otlpMap, ok := actionData.Policy.Receivers[tOTLP].(map[string]any)
 	require.True(t, ok, "expected receivers.otlp to be a map")
-	assert.Equal(t, "inline_secret_value", otlpMap["auth"])
+	assert.Equal(t, tInlineSecretValue, otlpMap["auth"])
 
 	// Assert exporters.elasticsearch/default.headers.authorization was replaced with
 	// path secret value and the 'secrets' wrapper key removed.
 	// prepareOTelExporters also injects api_key from the prepared output.
-	require.Contains(t, actionData.Policy.Exporters, "elasticsearch/default")
-	esExporterMap, ok := actionData.Policy.Exporters["elasticsearch/default"].(map[string]any)
+	require.Contains(t, actionData.Policy.Exporters, tOutputESDefault)
+	esExporterMap, ok := actionData.Policy.Exporters[tOutputESDefault].(map[string]any)
 	require.True(t, ok, "expected exporters.elasticsearch/default to be a map")
-	assert.NotContains(t, esExporterMap, "secrets", "expected 'secrets' key to be removed from exporters.elasticsearch/default")
+	assert.NotContains(t, esExporterMap, tSecrets, "expected 'secrets' key to be removed from exporters.elasticsearch/default")
 	require.Contains(t, esExporterMap, "headers")
 	headersMap, ok := esExporterMap["headers"].(map[string]any)
 	require.True(t, ok, "expected exporters.elasticsearch/default.headers to be a map")
-	assert.Equal(t, "path_secret_value", headersMap["authorization"])
+	assert.Equal(t, tPathSecretValue, headersMap["authorization"])
 
 	// Assert processors.batch.api_key was replaced with inline secret value
 	require.Contains(t, actionData.Policy.Processors, "batch")
 	batchMap, ok := actionData.Policy.Processors["batch"].(map[string]any)
 	require.True(t, ok, "expected processors.batch to be a map")
-	assert.Equal(t, "inline_secret_value", batchMap["api_key"])
+	assert.Equal(t, tInlineSecretValue, batchMap[tAPIKey])
 
 	// Assert extensions.basicauth.password was replaced with path secret value
 	require.Contains(t, actionData.Policy.Extensions, "basicauth")
 	basicauthMap, ok := actionData.Policy.Extensions["basicauth"].(map[string]any)
 	require.True(t, ok, "expected extensions.basicauth to be a map")
-	assert.NotContains(t, basicauthMap, "secrets", "expected 'secrets' key to be removed from extensions.basicauth")
-	assert.Equal(t, "path_secret_value", basicauthMap["password"])
+	assert.NotContains(t, basicauthMap, tSecrets, "expected 'secrets' key to be removed from extensions.basicauth")
+	assert.Equal(t, tPathSecretValue, basicauthMap["password"])
 
 	// Assert connectors.spanmetrics.token was replaced with inline secret value
 	require.Contains(t, actionData.Policy.Connectors, "spanmetrics")
 	spanmetricsMap, ok := actionData.Policy.Connectors["spanmetrics"].(map[string]any)
 	require.True(t, ok, "expected connectors.spanmetrics to be a map")
-	assert.Equal(t, "inline_secret_value", spanmetricsMap["token"])
+	assert.Equal(t, tInlineSecretValue, spanmetricsMap[tToken])
 
 	// Assert secret_paths contains the expected OTEL keys
 	assert.ElementsMatch(t,
@@ -268,14 +268,14 @@ func Test_Agent_OtelPolicy_OTLPExporterTLSSecrets(t *testing.T) {
 	policyID := uuid.Must(uuid.NewV4()).String()
 	otlpPolicyData := model.PolicyData{
 		Outputs: map[string]map[string]any{
-			otlpOutputName: {"type": "otlp"},
+			otlpOutputName: {tType: tOTLP},
 		},
 		OutputPermissions: json.RawMessage(`{"my-otlp":{}}`),
 		Exporters: map[string]any{
 			exporterKey: map[string]any{
-				"endpoint": "otel.example.com:4317",
-				"secrets": map[string]any{
-					"tls": map[string]any{
+				tEndpoint: "otel.example.com:4317",
+				tSecrets: map[string]any{
+					tTLS: map[string]any{
 						"cert_pem": map[string]any{"id": certSecretID},
 						"key_pem":  map[string]any{"id": keySecretID},
 					},
@@ -300,20 +300,19 @@ func Test_Agent_OtelPolicy_OTLPExporterTLSSecrets(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	esCfg := elasticsearch.Config{Username: "elastic", Password: "changeme"}
-	esClient, err := elasticsearch.NewClient(esCfg)
+	esClient, err := elasticsearch.New(elasticsearch.WithBasicAuth("elastic", "changeme"))
 	require.NoError(t, err)
-	key, err := apikey.Create(ctx, esClient, "default", "", "true", []byte(`{
+	key, err := apikey.Create(ctx, esClient, tDefault, "", "true", []byte(`{
 		"fleet-apikey-enroll": {
 			"cluster": [],
 			"index": [],
-			"applications": [{"application":"fleet","privileges":["no-privileges"],"resources":["*"]}]
+			"applications": [{"application":tFleet,"privileges":["no-privileges"],"resources":["*"]}]
 		}
 	}`), map[string]any{
-		"managed_by": "fleet",
-		"managed":    true,
-		"type":       "enroll",
-		"policy_id":  policyID,
+		tManagedBy: tFleet,
+		tManaged:   true,
+		tType:      tEnroll,
+		tPolicyID:  policyID,
 	})
 	require.NoError(t, err)
 
@@ -363,9 +362,9 @@ func Test_Agent_OtelPolicy_OTLPExporterTLSSecrets(t *testing.T) {
 	require.Contains(t, policyAction.Policy.Exporters, exporterKey)
 	exporterMap, ok := policyAction.Policy.Exporters[exporterKey].(map[string]any)
 	require.True(t, ok, "exporter %q must be a map", exporterKey)
-	assert.NotContains(t, exporterMap, "secrets", "'secrets' wrapper must be stripped from exporter")
+	assert.NotContains(t, exporterMap, tSecrets, "'secrets' wrapper must be stripped from exporter")
 
-	tlsRaw, hasTLS := exporterMap["tls"]
+	tlsRaw, hasTLS := exporterMap[tTLS]
 	require.True(t, hasTLS, "resolved tls block must be present on exporter")
 	tlsMap, ok := tlsRaw.(map[string]any)
 	require.True(t, ok, "tls block must be a map")
