@@ -48,7 +48,7 @@ func createAgentPolicyWithOtelSecrets(t *testing.T, ctx context.Context, bulker 
 				tType: kElasticsearch,
 			},
 		},
-		OutputPermissions: json.RawMessage(`{tDefault:{}}`),
+		OutputPermissions: json.RawMessage(`{"default":{}}`),
 		Receivers: map[string]any{
 			tOTLP: map[string]any{
 				"auth": inlineSecretRef,
@@ -108,7 +108,7 @@ func createAgentPolicyWithOtelSecrets(t *testing.T, ctx context.Context, bulker 
 		"cluster": [],
 		"index": [],
 		"applications": [{
-		    "application": tFleet,
+		    "application": "fleet",
 		    "privileges": ["no-privileges"],
 		    "resources": ["*"]
 		}]
@@ -306,7 +306,7 @@ func Test_Agent_OtelPolicy_OTLPExporterTLSSecrets(t *testing.T) {
 		"fleet-apikey-enroll": {
 			"cluster": [],
 			"index": [],
-			"applications": [{"application":tFleet,"privileges":["no-privileges"],"resources":["*"]}]
+			"applications": [{"application":"fleet","privileges":["no-privileges"],"resources":["*"]}]
 		}
 	}`), map[string]any{
 		tManagedBy: tFleet,

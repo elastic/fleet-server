@@ -93,7 +93,7 @@ func createAgentPolicyWithSecrets(t *testing.T, ctx context.Context, bulker bulk
 				},
 			},
 		},
-		OutputPermissions: json.RawMessage(`{tDefault:{}}`),
+		OutputPermissions: json.RawMessage(`{"default":{}}`),
 		Inputs: []map[string]any{{
 			tType:             kFleetServer,
 			tPackageVarSecret: inlineSecretRef,
@@ -149,7 +149,7 @@ func createAgentPolicyWithSecrets(t *testing.T, ctx context.Context, bulker bulk
 		"cluster": [],
 		"index": [],
 		"applications": [{
-		    "application": tFleet,
+		    "application": "fleet",
 		    "privileges": ["no-privileges"],
 		    "resources": ["*"]
 		}]

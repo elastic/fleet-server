@@ -58,7 +58,7 @@ func Test_Agent_OTLP_Output(t *testing.T) {
 		},
 		// output_permissions for myOTLP gives it the _managed_otlp_apm role.
 		OutputPermissions: json.RawMessage(`{
-			tDefault: {},
+			"default": {},
 			"myOTLP": {
 				"_managed_otlp_apm": {
 					"applications": [{"application":"apm","privileges":["event:write"],"resources":["*"]}]
@@ -86,7 +86,7 @@ func Test_Agent_OTLP_Output(t *testing.T) {
 		"fleet-apikey-enroll": {
 			"cluster": [],
 			"index": [],
-			"applications": [{"application": tFleet, "privileges": ["no-privileges"], "resources": ["*"]}]
+			"applications": [{"application": "fleet", "privileges": ["no-privileges"], "resources": ["*"]}]
 		}
 	}`), map[string]any{
 		tManagedBy: tFleet,
@@ -155,7 +155,7 @@ func Test_Agent_OTLP_Output(t *testing.T) {
 		Outputs: map[string]map[string]any{
 			tDefault: {tType: kElasticsearch},
 		},
-		OutputPermissions: json.RawMessage(`{tDefault: {}}`),
+		OutputPermissions: json.RawMessage(`{"default": {}}`),
 		Inputs:            []map[string]any{},
 	}
 	_, err = dl.CreatePolicy(ctx, srv.bulker, model.Policy{
