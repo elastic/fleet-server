@@ -22,7 +22,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v9"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/api"
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
@@ -86,24 +86,24 @@ func createAgentPolicyWithSecrets(t *testing.T, ctx context.Context, bulker bulk
 	policyID := uuid.Must(uuid.NewV4()).String()
 	var policyData = model.PolicyData{
 		Outputs: map[string]map[string]any{
-			"default": {
-				"type": "elasticsearch",
-				"secrets": map[string]any{
+			tDefault: {
+				tType: kElasticsearch,
+				tSecrets: map[string]any{
 					"secret-key": map[string]any{"id": pathSecretID},
 				},
 			},
 		},
 		OutputPermissions: json.RawMessage(`{"default":{}}`),
 		Inputs: []map[string]any{{
-			"type":               "fleet-server",
-			"package_var_secret": inlineSecretRef,
+			tType:             kFleetServer,
+			tPackageVarSecret: inlineSecretRef,
 		}},
 		Agent: map[string]any{
 			"download": map[string]any{
-				"sourceURI": inlineSecretRef,
-				"secrets": map[string]any{
-					"ssl": map[string]any{
-						"key": map[string]any{
+				tSourceURI: inlineSecretRef,
+				tSecrets: map[string]any{
+					tSSL: map[string]any{
+						tKey: map[string]any{
 							"id": pathSecretID,
 						},
 					},
@@ -111,10 +111,10 @@ func createAgentPolicyWithSecrets(t *testing.T, ctx context.Context, bulker bulk
 			},
 		},
 		Fleet: map[string]any{
-			"hosts": []string{inlineSecretRef},
-			"secrets": map[string]any{
-				"ssl": map[string]any{
-					"key": map[string]any{
+			tHosts: []string{inlineSecretRef},
+			tSecrets: map[string]any{
+				tSSL: map[string]any{
+					tKey: map[string]any{
 						"id": pathSecretID,
 					},
 				},
@@ -144,7 +144,7 @@ func createAgentPolicyWithSecrets(t *testing.T, ctx context.Context, bulker bulk
 	if err != nil {
 		t.Fatal(err)
 	}
-	key, err := apikey.Create(ctx, es, "default", "", "true", []byte(`{
+	key, err := apikey.Create(ctx, es, tDefault, "", "true", []byte(`{
 	    "fleet-apikey-enroll": {
 		"cluster": [],
 		"index": [],
@@ -155,17 +155,17 @@ func createAgentPolicyWithSecrets(t *testing.T, ctx context.Context, bulker bulk
 		}]
 	    }
 	}`), map[string]any{
-		"managed_by": "fleet",
-		"managed":    true,
-		"type":       "enroll",
-		"policy_id":  policyID,
+		tManagedBy: tFleet,
+		tManaged:   true,
+		tType:      tEnroll,
+		tPolicyID:  policyID,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	_, err = dl.CreateEnrollmentAPIKey(ctx, bulker, model.EnrollmentAPIKey{
-		Name:     "Default",
+		Name:     tDefaultTitle,
 		APIKey:   key.Key,
 		APIKeyID: key.ID,
 		PolicyID: policyID,
@@ -187,9 +187,9 @@ func Test_Agent_Policy_Secrets(t *testing.T) {
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	// create path secret for use with output and agent.download.sourceURI
-	pathSecretID := createSecret(t, ctx, srv.bulker, "path_secret_value")
+	pathSecretID := createSecret(t, ctx, srv.bulker, tPathSecretValue)
 	// create inline secret for use with input and agent.download.ssl.key
-	inlineSecretID := createSecret(t, ctx, srv.bulker, "inline_secret_value")
+	inlineSecretID := createSecret(t, ctx, srv.bulker, tInlineSecretValue)
 	inlineSecretRef := fmt.Sprintf("$co.elastic.secret{%s}", inlineSecretID)
 
 	// create agent policy with secret reference
@@ -254,12 +254,12 @@ func Test_Agent_Policy_Secrets(t *testing.T) {
 	input := actionData.Policy.Inputs[0]
 	// expect secret reference replaced with secret value
 	assert.Equal(t, map[string]any{
-		"package_var_secret": "inline_secret_value",
-		"type":               "fleet-server",
+		tPackageVarSecret: tInlineSecretValue,
+		tType:             kFleetServer,
 	}, input)
 
 	// expect output secret to be replaced
-	output := actionData.Policy.Outputs["default"]
+	output := actionData.Policy.Outputs[tDefault]
 	assert.Conditionf(t, func() bool {
 		mp, ok := output.(map[string]any)
 		if !ok {
@@ -273,26 +273,26 @@ func Test_Agent_Policy_Secrets(t *testing.T) {
 		if !ok {
 			return false
 		}
-		return s == "path_secret_value"
+		return s == tPathSecretValue
 	}, "expected output to contain secret-key: output_secret_value, got %v", output)
 
 	// expect agent.download secrets to be replaced
 	assert.Equal(t, map[string]any{
-		"sourceURI": "inline_secret_value",
-		"ssl": map[string]any{
-			"key": "path_secret_value",
+		tSourceURI: tInlineSecretValue,
+		tSSL: map[string]any{
+			tKey: tPathSecretValue,
 		},
 	}, actionData.Policy.Agent["download"])
 
 	// expect fleet secrets to be replaced
 	assert.Equal(t, map[string]any{
-		"hosts": []any{"inline_secret_value"},
-		"ssl": map[string]any{
-			"key": "path_secret_value",
+		tHosts: []any{tInlineSecretValue},
+		tSSL: map[string]any{
+			tKey: tPathSecretValue,
 		},
 	}, actionData.Policy.Fleet)
 
-	assert.NotContains(t, output, "secrets")
+	assert.NotContains(t, output, tSecrets)
 	// expect that secret_paths lists the key
 	assert.ElementsMatch(
 		t,

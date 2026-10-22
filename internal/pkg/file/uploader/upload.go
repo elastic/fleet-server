@@ -15,10 +15,12 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/file"
-	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v9"
 	"github.com/gofrs/uuid/v5"
 	"go.elastic.co/apm/v2"
 )
+
+const fileKey = "file"
 
 var (
 	ErrInvalidUploadID  = errors.New("active upload not found with this ID, it may be expired")
@@ -79,7 +81,7 @@ func (u *Uploader) Begin(ctx context.Context, namespaces []string, data JSDict) 
 		return file.Info{}, err
 	}
 
-	size, _ := data.Int64("file", "size")
+	size, _ := data.Int64(fileKey, "size")
 	if u.sizeLimit != nil && uint64(size) > *u.sizeLimit { //nolint:gosec // disable G115 - negatives are checked for in payload validation
 		vSpan.End()
 		return file.Info{}, ErrFileSizeTooLarge
@@ -120,10 +122,10 @@ func (u *Uploader) Begin(ctx context.Context, namespaces []string, data JSDict) 
 		Enrich document with additional server-side fields
 	*/
 
-	if err := data.Put(info.ChunkSize, "file", "ChunkSize"); err != nil {
+	if err := data.Put(info.ChunkSize, fileKey, "ChunkSize"); err != nil {
 		return file.Info{}, err
 	}
-	if err := data.Put(info.Status, "file", "Status"); err != nil {
+	if err := data.Put(info.Status, fileKey, "Status"); err != nil {
 		return file.Info{}, err
 	}
 	if err := data.Put(id, "upload_id"); err != nil {
@@ -187,8 +189,8 @@ func (u *Uploader) Chunk(ctx context.Context, uplID string, chunkNum int, chunkH
 func validateUploadPayload(info JSDict) error {
 
 	required := [][]string{
-		{"file", "name"},
-		{"file", "mime_type"},
+		{fileKey, "name"},
+		{fileKey, "mime_type"},
 		{"action_id"},
 		{"agent_id"},
 		{"src"},
@@ -200,7 +202,7 @@ func validateUploadPayload(info JSDict) error {
 		}
 	}
 
-	if size, ok := info.Int64("file", "size"); !ok {
+	if size, ok := info.Int64(fileKey, "size"); !ok {
 		return ErrFileSizeRequired
 	} else if size <= 0 {
 		return fmt.Errorf("file.size: %d: %w", size, ErrInvalidFileSize)
