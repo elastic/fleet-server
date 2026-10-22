@@ -1,13 +1,14 @@
 kind: enhancement
 
-summary: Omit inputs pinned to other agents from the per-agent policy
+summary: Omit Synthetics inputs pinned to other agents from the per-agent policy
 
 description: |
-  Inputs and streams whose condition is `${agent.id} == '<id>'` for a different
-  agent are no longer sent to the requesting agent, reducing policy size for
-  policies that shard inputs across many agents (e.g. scalable Synthetics
-  private locations). Elastic Agent already discarded these inputs at runtime.
-  Set `feature_flags.evaluate_conditions.agent_id: false` to send every input
+  Synthetics inputs and streams whose condition is `${agent.id} == '<id>'` for a
+  different agent are no longer sent to the requesting agent, reducing policy
+  size for scalable Synthetics private locations that shard monitors across
+  many agents. Elastic Agent already discarded these inputs at runtime. Inputs
+  of any other type are delivered unchanged. Set
+  `feature_flags.evaluate_conditions.agent_id: false` to send every input
   unchanged.
 
 component: fleet-server

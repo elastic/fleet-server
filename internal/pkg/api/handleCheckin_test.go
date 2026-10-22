@@ -2030,11 +2030,13 @@ func TestProcessPolicyPrunesAgentPinnedInputsSecretPaths(t *testing.T) {
   "inputs": [
     {
       "id": "pinned-elsewhere",
+      "type": "synthetics/http",
       "condition": "${agent.id} == 'agent2'",
       "secrets": {"pw": {"id": "P0"}}
     },
     {
       "id": "mixed",
+      "type": "synthetics/browser",
       "secrets": {"pw": {"id": "P1"}},
       "streams": [
         {"id": "s0", "condition": "${agent.id} == 'agent2'", "secrets": {"tok": {"id": "T0"}}},

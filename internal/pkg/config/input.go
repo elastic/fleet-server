@@ -145,8 +145,9 @@ type (
 
 	// EvaluateConditionsConfig selects the input conditions Fleet Server evaluates.
 	EvaluateConditionsConfig struct {
-		// AgentID omits inputs and streams pinned to another agent by an exact
-		// `${agent.id} == '<id>'` condition from the policy sent to an agent.
+		// AgentID omits Synthetics inputs and streams pinned to another agent by
+		// an exact `${agent.id} == '<id>'` condition from the policy sent to an
+		// agent; inputs of any other type are sent unchanged.
 		// Elastic Agent discards them anyway; this only reduces the policy size.
 		// Defaults to true.
 		AgentID bool `config:"agent_id"`
