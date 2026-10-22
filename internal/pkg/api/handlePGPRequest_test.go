@@ -24,6 +24,7 @@ import (
 
 func Test_PGPRetrieverT_getPGPKey(t *testing.T) {
 	customURL := "https://custom.example.com/pgp-key"
+	oldURL := "https://old.example.com/pgp-key"
 	customCache := func() *cache.MockCache {
 		m := cache.NewMockCache()
 		m.On("GetPGPKey", mock.Anything).Return([]byte{}, false).Once()
@@ -145,7 +146,7 @@ func Test_PGPRetrieverT_getPGPKey(t *testing.T) {
 		cache: customCache,
 		dirSetup: func(t *testing.T) string {
 			dir := t.TempDir()
-			stored, err := json.Marshal(customKey{URL: "https://old.example.com/pgp-key", Key: []byte("old")})
+			stored, err := json.Marshal(customKey{URL: oldURL, Key: []byte("old")})
 			require.NoError(t, err)
 			require.NoError(t, os.WriteFile(filepath.Join(dir, customKeyName), stored, defaultKeyPermissions))
 			return dir
@@ -163,7 +164,7 @@ func Test_PGPRetrieverT_getPGPKey(t *testing.T) {
 		},
 		dirSetup: func(t *testing.T) string {
 			dir := t.TempDir()
-			stored, err := json.Marshal(customKey{URL: "https://old.example.com/pgp-key", Key: []byte("old")})
+			stored, err := json.Marshal(customKey{URL: oldURL, Key: []byte("old")})
 			require.NoError(t, err)
 			require.NoError(t, os.WriteFile(filepath.Join(dir, customKeyName), stored, defaultKeyPermissions))
 			return dir
