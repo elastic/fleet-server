@@ -556,91 +556,6 @@ func TestMonitor_ProcessHitsSharesStrings(t *testing.T) {
 	assert.Equal(t, query, b)
 	assert.Same(t, unsafe.StringData(a), unsafe.StringData(b), "policies from one set of hits share the query")
 }
-<<<<<<< HEAD
-=======
-
-// Test_Monitor_repeated_events_do_not_strand_subscriber_in_rate_limiter sends a burst of events
-// while a subscriber waits in the rate limiter and ensures the subscriber still gets its policy.
-// Events must not start overlapping dispatchers, since each can miss a subscriber the other
-// holds between popping it from pendingQ and sending to it. Overlapping dispatchers show up as a
-// stranded subscriber when the test runs with few CPUs, e.g. -cpu=1.
-func Test_Monitor_repeated_events_do_not_strand_subscriber_in_rate_limiter(t *testing.T) {
-	for range 25 {
-		synctest.Test(t, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-			ctx = testlog.SetLogger(t).WithContext(ctx)
-
-			chHitT := make(chan []es.HitT, 1)
-			defer close(chHitT)
-			ms := mmock.NewMockSubscription()
-			ms.On("Output").Return((<-chan []es.HitT)(chHitT))
-			mm := mmock.NewMockMonitor()
-			mm.On("Subscribe").Return(ms).Once()
-			mm.On("Unsubscribe", mock.Anything).Return().Once()
-
-			// Burst of 1 and a long interval: the first subscriber is dispatched immediately,
-			// the second waits in the rate limiter holding the popped subscriber.
-			monitor := NewMonitor(ftesting.NewMockBulk(), mm, config.ServerLimits{PolicyLimit: config.Limit{Burst: 1, Interval: time.Hour}})
-			pm := monitor.(*monitorT)
-			pm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
-				return []model.Policy{}, nil
-			}
-
-			var mwg sync.WaitGroup
-			mwg.Go(func() { _ = monitor.Run(ctx) })
-			require.NoError(t, pm.waitStart(ctx))
-
-			policyID := uuid.Must(uuid.NewV4()).String()
-			pm.mut.Lock()
-			pm.policies[policyID] = policyT{head: makeHead()}
-			pm.mut.Unlock()
-
-			subs := make([]Subscription, 2)
-			for i := range subs {
-				sub, err := monitor.Subscribe(uuid.Must(uuid.NewV4()).String(), policyID, 0)
-				require.NoError(t, err)
-				defer monitor.Unsubscribe(sub)
-				subs[i] = sub
-			}
-
-			rId := xid.New().String()
-			policy := model.Policy{
-				ESDocument:     model.ESDocument{Id: rId, Version: 1, SeqNo: 1},
-				PolicyID:       policyID,
-				CoordinatorIdx: 1,
-				Data:           policyDataDefault,
-				RevisionIdx:    1,
-			}
-			policyData, err := json.Marshal(&policy)
-			require.NoError(t, err)
-			chHitT <- []es.HitT{{ID: rId, SeqNo: 1, Version: 1, Source: policyData}}
-
-			select {
-			case <-subs[0].Output():
-			case <-time.After(time.Minute):
-				require.Fail(t, "first subscriber was not dispatched")
-			}
-			synctest.Wait() // the dispatcher holds subs[1], rate waiting
-
-			// Fire events back to back, without waiting for the run loop to settle between them.
-			for range 50 {
-				pm.kickLoad()
-				runtime.Gosched()
-			}
-
-			select {
-			case p := <-subs[1].Output():
-				require.Equal(t, int64(1), p.Policy.RevisionIdx)
-			case <-time.After(2 * time.Hour):
-				require.Fail(t, "second subscriber was stranded in pendingQ")
-			}
-
-			cancel()
-			mwg.Wait()
-		})
-	}
-}
 
 // policySearchResult builds the Elasticsearch result of the latest policies query for the given policies.
 func policySearchResult(t *testing.T, policies ...model.Policy) *es.ResultT {
@@ -689,17 +604,20 @@ func newTestPolicy(revisionIdx int64) model.Policy {
 	}
 }
 
+// revisionOf returns the revision of the policy as the monitor reports it, or 0 if it cannot be loaded.
+func revisionOf(ctx context.Context, pm *monitorT, policyID string) int64 {
+	p, err := pm.GetPolicy(ctx, policyID)
+	if err != nil {
+		return 0
+	}
+	return p.RevisionIdx
+}
+
 func TestMonitor_CacheMissLoadsOnlyTheRequestedPolicy(t *testing.T) {
 	tests := []struct {
 		name string
 		get  func(t *testing.T, pm *monitorT, policyID string) int64
 	}{
-		{
-			name: "LatestRev",
-			get: func(t *testing.T, pm *monitorT, policyID string) int64 {
-				return pm.LatestRev(t.Context(), policyID)
-			},
-		},
 		{
 			name: "GetPolicy",
 			get: func(t *testing.T, pm *monitorT, policyID string) int64 {
@@ -770,10 +688,10 @@ func TestMonitor_ConcurrentCacheMissesShareLoads(t *testing.T) {
 		revsB := make([]int64, callersB)
 		var wg sync.WaitGroup
 		for i := range revsA {
-			wg.Go(func() { revsA[i] = pm.LatestRev(t.Context(), a.PolicyID) })
+			wg.Go(func() { revsA[i] = revisionOf(t.Context(), pm, a.PolicyID) })
 		}
 		for i := range revsB {
-			wg.Go(func() { revsB[i] = pm.LatestRev(t.Context(), b.PolicyID) })
+			wg.Go(func() { revsB[i] = revisionOf(t.Context(), pm, b.PolicyID) })
 		}
 		// Every caller is now waiting for a load to finish.
 		synctest.Wait()
@@ -810,9 +728,9 @@ func TestMonitor_CallersDoNotFailWithTheCancellationOfTheCallerThatStartedTheLoa
 		leaderCtx, cancelLeader := context.WithCancel(t.Context())
 		var wg sync.WaitGroup
 		var leaderRev, followerRev int64
-		wg.Go(func() { leaderRev = pm.LatestRev(leaderCtx, p.PolicyID) })
+		wg.Go(func() { leaderRev = revisionOf(leaderCtx, pm, p.PolicyID) })
 		synctest.Wait()
-		wg.Go(func() { followerRev = pm.LatestRev(t.Context(), p.PolicyID) })
+		wg.Go(func() { followerRev = revisionOf(t.Context(), pm, p.PolicyID) })
 		synctest.Wait() // the follower waits for the load started by the leader
 
 		cancelLeader()
@@ -837,12 +755,12 @@ func TestMonitor_CallerStopsWaitingForASharedLoadWhenItsContextEnds(t *testing.T
 
 		var wg sync.WaitGroup
 		var leaderRev int64
-		wg.Go(func() { leaderRev = pm.LatestRev(t.Context(), p.PolicyID) })
+		wg.Go(func() { leaderRev = revisionOf(t.Context(), pm, p.PolicyID) })
 		synctest.Wait()
 
 		followerCtx, cancelFollower := context.WithCancel(t.Context())
 		followerDone := make(chan int64, 1)
-		wg.Go(func() { followerDone <- pm.LatestRev(followerCtx, p.PolicyID) })
+		wg.Go(func() { followerDone <- revisionOf(followerCtx, pm, p.PolicyID) })
 		synctest.Wait() // the follower waits for the load started by the leader
 
 		cancelFollower()
@@ -876,10 +794,10 @@ func TestMonitor_SharedLoadFailureIsReturnedToAllCallersWhileTheirContextsAreAli
 		const callers = 3
 		revs := make([]int64, callers)
 		var wg sync.WaitGroup
-		wg.Go(func() { revs[0] = pm.LatestRev(t.Context(), p.PolicyID) })
+		wg.Go(func() { revs[0] = revisionOf(t.Context(), pm, p.PolicyID) })
 		synctest.Wait()
 		for i := 1; i < callers; i++ {
-			wg.Go(func() { revs[i] = pm.LatestRev(t.Context(), p.PolicyID) })
+			wg.Go(func() { revs[i] = revisionOf(t.Context(), pm, p.PolicyID) })
 		}
 		synctest.Wait() // all callers wait for the same load
 
@@ -890,4 +808,3 @@ func TestMonitor_SharedLoadFailureIsReturnedToAllCallersWhileTheirContextsAreAli
 		assert.Equal(t, make([]int64, callers), revs, "no caller gets a revision")
 	})
 }
->>>>>>> a6335aa (fix(policy): load only the requested policy on a cache miss (#8083))

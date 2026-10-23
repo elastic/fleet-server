@@ -630,40 +630,6 @@ func (m *monitorT) Unsubscribe(sub Subscription) error {
 	return nil
 }
 
-<<<<<<< HEAD
-=======
-// LatestRev returns the revision_idx for the passed policy ID.
-// If the policy does not exist in the map, then it is loaded from Elasticsearch.
-// On an error with the load, or if the policy does not exist a 0 is returned.
-func (m *monitorT) LatestRev(ctx context.Context, id string) int64 {
-	if id == "" {
-		return 0
-	}
-
-	m.mut.Lock()
-	p, ok := m.policies[id]
-	m.mut.Unlock()
-
-	if !ok {
-		// We've not seen this policy before, load it.
-		err := m.loadPolicy(ctx, id)
-		if err != nil {
-			m.log.Error().Err(err).Str(ecs.PolicyID, id).Msg("Unable to load policies.")
-			return 0
-		}
-
-		m.mut.Lock()
-		p, ok = m.policies[id]
-		m.mut.Unlock()
-		if !ok {
-			m.log.Warn().Str(ecs.PolicyID, id).Msg("Unable to find policy after load.")
-			return 0
-		}
-	}
-	return p.pp.Policy.RevisionIdx
-}
-
->>>>>>> a6335aa (fix(policy): load only the requested policy on a cache miss (#8083))
 // GetPolicy returns the policy for the given policy ID from the in-memory cache.
 // If the policy is not found in cache, it is loaded from Elasticsearch.
 func (m *monitorT) GetPolicy(ctx context.Context, policyID string) (*model.Policy, error) {
