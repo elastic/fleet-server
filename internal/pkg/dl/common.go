@@ -9,6 +9,7 @@ import "github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 type queryOption struct {
 	indexName string
 	bulkOpts  []bulk.Opt
+	policyID  string
 }
 
 // Option for the operation being made
@@ -20,6 +21,15 @@ type Option func(opt *queryOption)
 func WithIndexName(name string) Option {
 	return func(opt *queryOption) {
 		opt.indexName = name
+	}
+}
+
+// WithPolicyID restricts QueryLatestPolicies to the policy with the given ID.
+//
+// Without it, QueryLatestPolicies returns the latest revision of every policy.
+func WithPolicyID(policyID string) Option {
+	return func(opt *queryOption) {
+		opt.policyID = policyID
 	}
 }
 
