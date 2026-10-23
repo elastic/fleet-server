@@ -352,9 +352,11 @@ func TestConvertActions(t *testing.T) {
 
 func TestFilterActions(t *testing.T) {
 	tests := []struct {
-		name    string
-		actions []model.Action
-		resp    []model.Action
+		name             string
+		actions          []model.Action
+		resp             []model.Action
+		rejected         []model.Action
+		uninstallPending bool
 	}{{
 		name:    "empty list",
 		actions: []model.Action{},
@@ -370,9 +372,6 @@ func TestFilterActions(t *testing.T) {
 		}, {
 			ActionID: "9012",
 			Type:     "RESTART",
-		}, {
-			ActionID: "9013",
-			Type:     "UNINSTALL",
 		}},
 		resp: []model.Action{{
 			ActionID: "1234",
@@ -383,8 +382,22 @@ func TestFilterActions(t *testing.T) {
 		}, {
 			ActionID: "9012",
 			Type:     "RESTART",
+		}},
+	}, {
+		name: "UNINSTALL rejected for agent that is not pending uninstall",
+		actions: []model.Action{{
+			ActionID: "1234",
+			Type:     "UNINSTALL",
 		}, {
-			ActionID: "9013",
+			ActionID: "5678",
+			Type:     "UPGRADE",
+		}},
+		resp: []model.Action{{
+			ActionID: "5678",
+			Type:     "UPGRADE",
+		}},
+		rejected: []model.Action{{
+			ActionID: "1234",
 			Type:     "UNINSTALL",
 		}},
 	}, {
@@ -420,14 +433,61 @@ func TestFilterActions(t *testing.T) {
 			ActionID: "1234",
 		}},
 		resp: []model.Action{},
+	}, {
+		name: "pending uninstall keeps only UNINSTALL and CANCEL",
+		actions: []model.Action{{
+			ActionID: "1234",
+			Type:     "UPGRADE",
+		}, {
+			ActionID: "5678",
+			Type:     "UNINSTALL",
+		}, {
+			ActionID: "9012",
+			Type:     "CANCEL",
+		}, {
+			ActionID: "3456",
+			Type:     "POLICY_CHANGE",
+		}, {
+			ActionID: "7890",
+			Type:     "UNENROLL",
+		}},
+		resp: []model.Action{{
+			ActionID: "5678",
+			Type:     "UNINSTALL",
+		}, {
+			ActionID: "9012",
+			Type:     "CANCEL",
+		}},
+		uninstallPending: true,
 	}}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			logger := testlog.SetLogger(t)
-			resp := filterActions(logger, "agent-id", tc.actions)
+			resp, rejected := filterActions(logger, "agent-id", tc.actions, tc.uninstallPending)
 			assert.Equal(t, tc.resp, resp)
+			assert.Equal(t, tc.rejected, rejected)
 		})
 	}
+}
+
+func TestRejectUninstallActions(t *testing.T) {
+	logger := testlog.SetLogger(t)
+	mBulk := ftesting.NewMockBulk()
+	// CreateActionResult writes to .fleet-actions-results with a deterministic
+	// "<actionID>:<agentID>" doc id and the rejection error.
+	mBulk.On("Create", mock.Anything, dl.FleetActionsResults, "act-1:agent-1",
+		mock.MatchedBy(func(body []byte) bool {
+			s := string(body)
+			return strings.Contains(s, "act-1") && strings.Contains(s, "unenrolled")
+		}), mock.Anything).Return("", nil).Once()
+
+	ct := &CheckinT{bulker: mBulk}
+	ct.rejectUninstallActions(context.Background(), logger, "agent-1", []model.Action{{
+		ActionID:   "act-1",
+		Type:       string(UNINSTALL),
+		Namespaces: []string{"default"},
+	}})
+	mBulk.AssertExpectations(t)
 }
 
 func TestResolveSeqNo(t *testing.T) {
