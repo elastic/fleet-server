@@ -20,26 +20,54 @@ import (
 
 var (
 	tmplQueryLatestPolicies = prepareQueryLatestPolicies()
+	tmplQueryLatestPolicy   = prepareQueryLatestPolicy()
 	ErrMissingAggregations  = errors.New("missing expected aggregation result")
 	tmplQueryPolicies       = prepareQueryPolicies()
 )
 
-func prepareQueryLatestPolicies() []byte {
-	root := dsl.NewRoot()
-	root.Size(0)
+// addLatestRevisionAggs adds the aggregation that returns the latest revision of each policy
+// matched by the query.
+func addLatestRevisionAggs(root *dsl.Node) {
 	policyID := root.Aggs().Agg(FieldPolicyID)
 	policyID.Terms("field", FieldPolicyID, nil).Size(10000)
 	revisionIdx := policyID.Aggs().Agg(FieldRevisionIdx).TopHits()
 	revisionIdx.Size(1)
 	rSort := revisionIdx.Sort()
 	rSort.SortOrder(FieldRevisionIdx, dsl.SortDescend)
+}
+
+func prepareQueryLatestPolicies() []byte {
+	root := dsl.NewRoot()
+	root.Size(0)
+	addLatestRevisionAggs(root)
 	return root.MustMarshalJSON()
 }
 
-// QueryLatestPolicies gets the latest revision for a policy
+// prepareQueryLatestPolicy prepares the same query as prepareQueryLatestPolicies, restricted to
+// the policy bound to FieldPolicyID.
+func prepareQueryLatestPolicy() *dsl.Tmpl {
+	tmpl := dsl.NewTmpl()
+	root := dsl.NewRoot()
+	root.Size(0)
+	root.Query().Bool().Filter().Term(FieldPolicyID, tmpl.Bind(FieldPolicyID), nil)
+	addLatestRevisionAggs(root)
+	tmpl.MustResolve(root)
+	return tmpl
+}
+
+// QueryLatestPolicies gets the latest revision of every policy, or only of the policy given with
+// WithPolicyID.
 func QueryLatestPolicies(ctx context.Context, bulker bulk.Bulk, opt ...Option) ([]model.Policy, error) {
 	o := newOption(FleetPolicies, opt...)
-	res, err := bulker.Search(ctx, o.indexName, tmplQueryLatestPolicies, bulk.WithIgnoreUnavailble())
+	query := tmplQueryLatestPolicies
+	if o.policyID != "" {
+		var err error
+		query, err = tmplQueryLatestPolicy.RenderOne(FieldPolicyID, o.policyID)
+		if err != nil {
+			return nil, err
+		}
+	}
+	res, err := bulker.Search(ctx, o.indexName, query, bulk.WithIgnoreUnavailble())
 	if err != nil {
 		return nil, err
 	}

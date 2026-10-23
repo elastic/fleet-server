@@ -6,6 +6,7 @@ package dl
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -67,4 +68,71 @@ func TestQueryLatestPoliciesSharesStrings(t *testing.T) {
 	assert.True(t, sameBacking(queryOf(0), queryOf(1)), "the policies share the query")
 	assert.Equal(t, "doc-1", policies[1].Id, "Elasticsearch metadata is set as hit.Unmarshal does")
 	assert.Equal(t, int64(11), policies[1].SeqNo)
+}
+
+// recordingBulk records the query it is asked to run and answers Search with a canned result.
+type recordingBulk struct {
+	bulk.Bulk
+	res   *es.ResultT
+	query []byte
+}
+
+func (b *recordingBulk) Search(_ context.Context, _ string, query []byte, _ ...bulk.Opt) (*es.ResultT, error) {
+	b.query = query
+	return b.res, nil
+}
+
+func TestQueryLatestPoliciesQuery(t *testing.T) {
+	t.Run("all policies", func(t *testing.T) {
+		bulker := &recordingBulk{res: &es.ResultT{}}
+		_, err := QueryLatestPolicies(context.Background(), bulker)
+		require.NoError(t, err)
+		assert.JSONEq(t, `{
+			"size": 0,
+			"aggs": {"policy_id": {
+				"terms": {"field": "policy_id", "size": 10000},
+				"aggs": {"revision_idx": {"top_hits": {"size": 1, "sort": [{"revision_idx": "desc"}]}}}
+			}}
+		}`, string(bulker.query))
+	})
+
+	t.Run("one policy", func(t *testing.T) {
+		bulker := &recordingBulk{res: &es.ResultT{}}
+		_, err := QueryLatestPolicies(context.Background(), bulker, WithPolicyID("policy-1"))
+		require.NoError(t, err)
+
+		var got, all map[string]any
+		require.NoError(t, json.Unmarshal(bulker.query, &got))
+		require.NoError(t, json.Unmarshal(tmplQueryLatestPolicies, &all))
+
+		query, err := json.Marshal(got["query"])
+		require.NoError(t, err)
+		assert.JSONEq(t, `{"bool": {"filter": [{"term": {"policy_id": "policy-1"}}]}}`, string(query))
+
+		// Apart from the filter, it is the query for all policies, so both take the same code path.
+		delete(got, "query")
+		assert.Equal(t, all, got)
+	})
+
+	t.Run("policy id is a value, not part of the query syntax", func(t *testing.T) {
+		const id = `a"}]}} , "x": "y`
+		bulker := &recordingBulk{res: &es.ResultT{}}
+		_, err := QueryLatestPolicies(context.Background(), bulker, WithPolicyID(id))
+		require.NoError(t, err)
+
+		var got struct {
+			Query struct {
+				Bool struct {
+					Filter []struct {
+						Term struct {
+							PolicyID string `json:"policy_id"`
+						} `json:"term"`
+					} `json:"filter"`
+				} `json:"bool"`
+			} `json:"query"`
+		}
+		require.NoError(t, json.Unmarshal(bulker.query, &got))
+		require.Len(t, got.Query.Bool.Filter, 1)
+		assert.Equal(t, id, got.Query.Bool.Filter[0].Term.PolicyID)
+	})
 }
