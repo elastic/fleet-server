@@ -136,7 +136,7 @@ func TestConfig(t *testing.T) {
 							Bulk:              defaultServerBulk(),
 							GC:                defaultServerGC(),
 							PGP: PGP{
-								UpstreamURL: defaultPGPUpstreamURL,
+								UpstreamURL: DefaultPGPUpstreamURL,
 								Dir:         filepath.Join(retrieveExecutableDir(), defaultPGPDirectoryName),
 							},
 							PDKDF2: defaultPBKDF2(),
