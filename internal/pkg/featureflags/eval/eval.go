@@ -8,8 +8,9 @@
 // evaluates its nested rules, so nesting combines conditions with AND. A match rule whose nested
 // rules all fail to match falls back to its own return, if any, and otherwise does not match.
 // Percentage rules split traffic across variations by hashing an attribute of the context.
-// Prerequisites are evaluated with the same environment and context; when one is not met the
-// environment default is served.
+// Prerequisites are evaluated with the same environment and context. When one is not met the flag
+// is not served, so the caller keeps its own fallback instead of this flag's default variation.
+// The default variation is served only after every prerequisite is met and no rule matches.
 package eval
 
 import (
@@ -107,14 +108,13 @@ func (e *evaluator) evaluate(flag *Flag, depth int) Result {
 
 	for _, p := range envDef.prerequisites {
 		res := e.evaluate(e.lookup(p.flag), depth+1)
-		if res.ErrorCode == ErrorFlagNotFound {
-			return flag.result(envDef.defaultIdx, ReasonDefault)
-		}
-		if res.Failed() {
+		// A broken prerequisite is reported as-is. A missing flag or a different variation means
+		// this flag's rules do not apply, and neither does its default variation.
+		if res.Failed() && res.ErrorCode != ErrorFlagNotFound {
 			return res
 		}
-		if definitions.ValueKey(res.Value) != p.valueKey {
-			return flag.result(envDef.defaultIdx, ReasonDefault)
+		if res.Failed() || definitions.ValueKey(res.Value) != p.valueKey {
+			return failure(ErrorGeneral, "prerequisite %q of flag %q is not met", p.flag, flag.Key)
 		}
 	}
 

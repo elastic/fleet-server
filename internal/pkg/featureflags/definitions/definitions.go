@@ -80,8 +80,6 @@ type Flag struct {
 	ValueType    string                       `json:"value_type"`
 	Variations   []any                        `json:"variations"`
 	Apps         []string                     `json:"apps"`
-	TeamOwner    string                       `json:"team_owner,omitempty"`
-	DeprecateBy  string                       `json:"deprecate_by,omitempty"`
 	Tags         []string                     `json:"tags,omitempty"`
 	Environments map[string]*EnvironmentRules `json:"environments"`
 }

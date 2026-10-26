@@ -79,7 +79,7 @@ feature flags plugin is enabled.
 ```json
 { "type": "flag", "created_at": "...", "updated_at": "...", "flag": {
   "key": "discover.cascadeLayoutEnabled", "value_type": "boolean", "variations": [true, false],
-  "apps": ["kibana"], "team_owner": "@elastic/kibana-core", "deprecate_by": "unknown", "tags": [],
+  "apps": ["kibana"], "tags": [], "created_by": { "username": "alice" },
   "environments": { "qa": { "default": false,
     "prerequisites": [{ "flag": "other.flag", "value": true }],
     "rules": [
@@ -87,6 +87,9 @@ feature flags plugin is enabled.
         "rules": [{ "type": "percentage", "per_attribute": "organization.key", "percentages": { "true": 10, "false": 90 } }] },
       { "type": "match", "attribute": "kibana.version", "operator": "semver_lt", "values": ["9.3.2"], "return": false } ] } } } }
 ```
+
+`created_by` is optional metadata that Kibana records when a flag is created. Fleet Server does not
+use it when evaluating the flag.
 
 ### Evaluation
 
@@ -104,8 +107,10 @@ feature flags plugin is enabled.
   missing, the rule does not apply, except for `targetingKey`, which fails with `TARGETING_KEY_MISSING`.
   Percentage rules can be nested in match rules.
 - `prerequisites` are evaluated for the same environment and context, before the rules. When a
-  prerequisite doesn't evaluate to its `value`, or doesn't exist, the default is served. Prerequisite
-  cycles and chains deeper than 10 fail with `GENERAL`.
+  prerequisite doesn't evaluate to its `value`, or doesn't exist, the flag is not served (`GENERAL`),
+  and the caller uses its own fallback instead of this flag's default variation. The default variation
+  is served only when every prerequisite is met and no rule matches. Prerequisite cycles and chains
+  deeper than 10 also fail with `GENERAL`.
 - An invalid flag (for example, percentages that don't sum to 100) fails with `PARSE_ERROR`.
 
 Context attributes are dotted keys. Both flat keys (`{"kibana.version": "9.3.0"}`) and nested objects

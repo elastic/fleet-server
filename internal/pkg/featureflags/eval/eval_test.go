@@ -177,13 +177,16 @@ func TestPrerequisites(t *testing.T) {
 	assert.Equal(t, "new", res.Value)
 	assert.Equal(t, ReasonTargetingMatch, res.Reason)
 
+	// The rule would return "new", but the prerequisite is not met, so the flag is not served.
 	res = Evaluate(child, "e", Context{"tier": "silver"}, lookup)
-	assert.Equal(t, "old", res.Value)
-	assert.Equal(t, ReasonDefault, res.Reason)
+	assert.Equal(t, ErrorGeneral, res.ErrorCode)
+	assert.Empty(t, res.Value)
+	assert.Contains(t, res.ErrorDetails, "parent")
 
 	res = Evaluate(missing, "e", Context{"tier": "gold"}, lookup)
-	assert.Equal(t, false, res.Value)
-	assert.Equal(t, ReasonDefault, res.Reason)
+	assert.Equal(t, ErrorGeneral, res.ErrorCode)
+	assert.Empty(t, res.Value)
+	assert.Contains(t, res.ErrorDetails, "nope")
 }
 
 func TestPrerequisiteCycle(t *testing.T) {
