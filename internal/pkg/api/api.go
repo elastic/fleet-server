@@ -76,6 +76,13 @@ func WithAudit(audit *AuditT) APIOpt {
 	}
 }
 
+// WithFeatureFlags mounts the feature flags (OFREP) handler, which serves the /ofrep/ paths.
+func WithFeatureFlags(h http.Handler) APIOpt {
+	return func(a *apiServer) {
+		a.ff = h
+	}
+}
+
 func WithTracer(tracer *apm.Tracer) APIOpt {
 	return func(a *apiServer) {
 		a.tracer = tracer
@@ -95,6 +102,7 @@ type apiServer struct {
 	ft    *FileDeliveryT
 	pt    *PGPRetrieverT
 	audit *AuditT
+	ff    http.Handler
 
 	// tracer is used by the wrapping server to instrument the API server
 	tracer *apm.Tracer

@@ -49,6 +49,7 @@ type limiter struct {
 	ack            *limit.Limiter
 	status         *limit.Limiter
 	opAMP          *limit.Limiter
+	ofrep          *limit.Limiter
 	uploadBegin    *limit.Limiter
 	uploadChunk    *limit.Limiter
 	uploadComplete *limit.Limiter
@@ -65,6 +66,7 @@ func Limiter(cfg *config.ServerLimits) *limiter {
 		ack:            limit.NewLimiter(&cfg.AckLimit),
 		status:         limit.NewLimiter(&cfg.StatusLimit),
 		opAMP:          limit.NewLimiter(&cfg.OpAMPLimit),
+		ofrep:          limit.NewLimiter(&cfg.OFREPLimit),
 		uploadBegin:    limit.NewLimiter(&cfg.UploadStartLimit),
 		uploadChunk:    limit.NewLimiter(&cfg.UploadChunkLimit),
 		uploadComplete: limit.NewLimiter(&cfg.UploadEndLimit),
@@ -137,6 +139,10 @@ func pathToOperation(path string) string {
 		return "opamp"
 	}
 
+	if strings.HasPrefix(path, "/ofrep/") {
+		return "ofrep"
+	}
+
 	if strings.HasPrefix(path, "/api/fleet/") {
 		pp := strings.Split(strings.TrimPrefix(path, "/"), "/")
 		if len(pp) == 4 {
@@ -193,6 +199,8 @@ func (l *limiter) middleware(next http.Handler) http.Handler {
 			l.auditUnenroll.Wrap("audit-unenroll", &cntAuditUnenroll, zerolog.DebugLevel)(next).ServeHTTP(w, r)
 		case "opamp":
 			l.opAMP.Wrap("opamp", &cntOpAMP, zerolog.DebugLevel)(next).ServeHTTP(w, r)
+		case "ofrep":
+			l.ofrep.Wrap("ofrep", &cntOFREP, zerolog.DebugLevel)(next).ServeHTTP(w, r)
 		default:
 			// no tracking or limits
 			next.ServeHTTP(w, r)
