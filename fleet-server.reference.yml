@@ -229,6 +229,12 @@ fleet:
 #         burst: 100
 #         max: 50
 #         max_body_byte_size: 1024
+#       # OFREP endpoints of the feature flags service (inputs[].feature_flags_service)
+#       ofrep_limit:
+#         interval: 1ms
+#         burst: 1000
+#         max: 0
+#         max_body_byte_size: 65536 # 64KiB
 #
 #     # go runtime limits
 #     runtime:
@@ -306,6 +312,36 @@ fleet:
 #      fetch_size: 1000 # The number of documents that each monitor may fetch at once
 #      poll_timeout: 4m # The poll timeout for each monitor's wait_for_advancement request
 #      policy_debounce_time: 1s # The debounce duration for the policy index monitor on successfull document retrievals.
+#
+#    # Experimental feature flags evaluation service, serving OFREP under /ofrep/v1/evaluate/flags.
+#    # Unrelated to server.feature_flags, which holds Fleet Server's own internal toggles.
+#    # See docs/feature-flags.md. Its rate limit is server.limits.ofrep_limit.
+#    feature_flags_service:
+#      enabled: false
+#      # How often the definitions index is polled for changes (minimum 1s).
+#      poll_interval: 10s
+#      # Each poll fetches documents updated since the start of the last successful poll minus this overlap,
+#      # absorbing refresh delay and clock skew between Kibana instances.
+#      poll_overlap: 60s
+#      # How often all the definitions are reloaded, regardless of changes.
+#      resync_interval: 1h
+#      definitions_index: .feature-flags-definitions
+#      observed_contexts_index: .feature-flags-observed-contexts
+#      # CORS origins allowed to call the OFREP endpoints (needed by browser SDKs). "*" allows any origin.
+#      cors:
+#        allowed_origins: []
+#      # Record the evaluation contexts seen, to suggest attributes and values in Kibana's rule editor.
+#      # Contexts may contain personal data: use exclude_attributes to drop sensitive attributes.
+#      observed_contexts:
+#        enabled: false
+#        # How often the collected contexts are written.
+#        flush_interval: 60s
+#        # Maximum number of previously unseen contexts written per app and environment on each flush.
+#        max_new_contexts_per_flush: 1000
+#        # A known context is written again only when its last_seen moves by more than this.
+#        last_seen_resolution: 1h
+#        # Context attributes (dotted keys) that are never stored.
+#        exclude_attributes: []
 
 ##############################
 # Logging configuration
