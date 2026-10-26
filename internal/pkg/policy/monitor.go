@@ -13,6 +13,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"go.elastic.co/apm/v2"
+	"golang.org/x/sync/singleflight"
 	"golang.org/x/time/rate"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
@@ -70,7 +71,7 @@ type Monitor interface {
 	LatestRev(ctx context.Context, policyID string) int64
 
 	// GetPolicy returns the cached policy for the given policy ID.
-	// If the policy is not in the cache, it forces a reload from Elasticsearch.
+	// If the policy is not in the cache, it is loaded from Elasticsearch.
 	GetPolicy(ctx context.Context, policyID string) (*model.Policy, error)
 }
 
@@ -98,8 +99,10 @@ type monitorT struct {
 	policiesIndex string
 	limit         *rate.Limiter
 
-	startCh    chan struct{}
-	dispatchCh chan struct{}
+	// loadGroup coalesces concurrent loads of the same policy, or of all policies, into one.
+	loadGroup singleflight.Group
+
+	startCh chan struct{}
 }
 
 // NewMonitor creates the policy monitor for subscribing agents.
@@ -144,94 +147,79 @@ func (m *monitorT) Run(ctx context.Context) error {
 	s := m.monitor.Subscribe()
 	defer m.monitor.Unsubscribe(s)
 
+	dCtx, dCancel := context.WithCancel(ctx)
+	var wg sync.WaitGroup
+	defer wg.Wait()
+	defer dCancel()
+	wg.Go(func() { m.runDispatcher(dCtx) })
+
 	close(m.startCh)
 
-	// use a cancellable context so we can stop dispatching changes if a new hit is received.
-	// the cancel func is manually called before return, or after policies have been dispatched.
-	iCtx, iCancel := context.WithCancel(ctx)
-	var trans *apm.Transaction
-LOOP:
 	for {
 		m.log.Trace().Msg("policy monitor loop start")
 		select {
 		case <-m.kickCh:
-			cancelOnce(iCtx, iCancel)
-			iCtx, iCancel = context.WithCancel(ctx)
 			m.log.Trace().Msg("policy monitor kicked")
-			if m.bulker.HasTracer() {
-				trans = m.bulker.StartTransaction("initial policies", "policy_monitor")
-				iCtx = apm.ContextWithTransaction(ctx, trans)
-			}
-
-			if err := m.loadPolicies(iCtx); err != nil {
-				endTrans(trans)
-				cancelOnce(iCtx, iCancel)
+			trans, tCtx := m.startTrans(ctx, "initial policies")
+			err := m.loadPolicies(tCtx)
+			endTrans(trans)
+			if err != nil {
 				return err
 			}
-			go func(ctx context.Context, cancel context.CancelFunc, trans *apm.Transaction) {
-				m.dispatchPending(ctx)
-				endTrans(trans)
-				cancelOnce(ctx, cancel)
-			}(iCtx, iCancel, trans)
-		case <-m.deployCh:
-			cancelOnce(iCtx, iCancel)
-			iCtx, iCancel = context.WithCancel(ctx)
-			m.log.Trace().Msg("policy monitor deploy ch")
-			if m.bulker.HasTracer() {
-				trans = m.bulker.StartTransaction("forced policies", "policy_monitor")
-				iCtx = apm.ContextWithTransaction(ctx, trans)
-			}
-
-			go func(ctx context.Context, cancel context.CancelFunc, trans *apm.Transaction) {
-				m.dispatchPending(ctx)
-				endTrans(trans)
-				cancelOnce(ctx, cancel)
-			}(iCtx, iCancel, trans)
+			m.kickDeploy()
 		case hits := <-s.Output(): // TODO would be nice to attach transaction IDs to hits, but would likely need a bigger refactor.
-			cancelOnce(iCtx, iCancel)
-			iCtx, iCancel = context.WithCancel(ctx)
 			m.log.Trace().Int("hits", len(hits)).Msg("policy monitor hits from sub")
-			if m.bulker.HasTracer() {
-				trans = m.bulker.StartTransaction("output policies", "policy_monitor")
-				iCtx = apm.ContextWithTransaction(ctx, trans)
-			}
-
-			if err := m.processHits(iCtx, hits); err != nil {
-				endTrans(trans)
-				cancelOnce(iCtx, iCancel)
+			trans, tCtx := m.startTrans(ctx, "output policies")
+			err := m.processHits(tCtx, hits)
+			endTrans(trans)
+			if err != nil {
 				return err
 			}
-			go func(ctx context.Context, cancel context.CancelFunc, trans *apm.Transaction) {
-				m.dispatchPending(ctx)
-				endTrans(trans)
-				cancelOnce(ctx, cancel)
-			}(iCtx, iCancel, trans)
+			m.kickDeploy()
 		case <-ctx.Done():
-			break LOOP
+			return nil
 		}
 	}
-
-	iCancel()
-	return nil
 }
 
-// cancelOnce calls cancel if the context is not done.
-func cancelOnce(ctx context.Context, cancel context.CancelFunc) {
-	select {
-	case <-ctx.Done():
-		return
-	default:
-		cancel()
+// runDispatcher drains pendingQ each time deployCh is signalled, until ctx is done.
+// deployCh has a buffer of one: a signal sent while a drain runs causes one more drain,
+// so a subscriber pushed after the last empty pop is not missed.
+func (m *monitorT) runDispatcher(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-m.deployCh:
+			m.log.Trace().Msg("policy monitor deploy ch")
+			trans, tCtx := m.startTrans(ctx, "forced policies")
+			m.dispatchPending(tCtx)
+			endTrans(trans)
+		}
 	}
+}
+
+// startTrans starts an APM transaction, if tracing is enabled, and returns a context carrying it.
+func (m *monitorT) startTrans(ctx context.Context, name string) (*apm.Transaction, context.Context) {
+	if !m.bulker.HasTracer() {
+		return nil, ctx
+	}
+	trans := m.bulker.StartTransaction(name, "policy_monitor")
+	return trans, apm.ContextWithTransaction(ctx, trans)
 }
 
 func unmarshalHits(hits []es.HitT) ([]model.Policy, error) {
 	policies := make([]model.Policy, len(hits))
+	// Share equal strings across the policies as each one is decoded, so that text repeated
+	// across the policies is held in memory only once and at most one policy's duplicates exist
+	// at a time. See dl.StringSharer.
+	sharer := dl.NewStringSharer()
 	for i, hit := range hits {
 		err := hit.Unmarshal(&policies[i])
 		if err != nil {
 			return nil, err
 		}
+		sharer.Share(&policies[i])
 	}
 
 	return policies, nil
@@ -264,14 +252,6 @@ func (m *monitorT) waitStart(ctx context.Context) error {
 // dispatchPending will dispatch all pending policy changes to the subscriptions in the queue.
 // dispatches are rate limited by the monitor's limiter.
 func (m *monitorT) dispatchPending(ctx context.Context) {
-	// dispatchCh is used in tests to be able to control when a dispatch execution proceeds
-	if m.dispatchCh != nil {
-		select {
-		case <-m.dispatchCh:
-		case <-ctx.Done():
-			return
-		}
-	}
 	span, ctx := apm.StartSpan(ctx, "dispatch pending", "dispatch")
 	defer span.End()
 
@@ -295,6 +275,7 @@ func (m *monitorT) dispatchPending(ctx context.Context) {
 		// If too many (checkin) responses are written concurrently memory usage may explode due to allocating gzip writers.
 		err := m.limit.Wait(ctx)
 		if err != nil {
+			// Wait can also fail without ctx being done (e.g. the wait would exceed ctx's deadline).
 			m.mut.Lock()
 			m.pendingQ.pushFront(s) // context cancelled before sub is handled, put it back
 			m.mut.Unlock()
@@ -321,7 +302,7 @@ func (m *monitorT) dispatchPending(ctx context.Context) {
 		// Clone and send without holding m.mut.
 		if err := ctx.Err(); err != nil {
 			m.mut.Lock()
-			m.pendingQ.pushFront(s)
+			m.pendingQ.pushFront(s) // context cancelled before sub is handled, put it back
 			m.mut.Unlock()
 			m.log.Debug().Err(err).Msg("context termination detected in policy dispatch")
 			return
@@ -361,7 +342,50 @@ func (m *monitorT) dispatchPending(ctx context.Context) {
 		Msg("policy monitor dispatch complete")
 }
 
+// loadPolicies loads the latest revision of every policy from Elasticsearch and processes them.
 func (m *monitorT) loadPolicies(ctx context.Context) error {
+	return m.load(ctx, "")
+}
+
+// loadPolicy loads the latest revision of a single policy from Elasticsearch and processes it.
+func (m *monitorT) loadPolicy(ctx context.Context, policyID string) error {
+	return m.load(ctx, policyID)
+}
+
+// load loads the policy with the given ID, or every policy if the ID is empty.
+//
+// Callers that ask for the same policy while it is being loaded wait for that load instead of
+// starting their own, so that many agents checking in at once for policies that are not cached
+// yet do not each decode their own copy of the policies in parallel.
+func (m *monitorT) load(ctx context.Context, policyID string) error {
+	for {
+		ch := m.loadGroup.DoChan(policyID, func() (any, error) {
+			err := m.fetchAndProcess(ctx, policyID)
+			// Tell the callers that joined this load whether the caller that started it gave up
+			// while it ran.
+			return ctx.Err() != nil, err
+		})
+		var res singleflight.Result
+		select {
+		case <-ctx.Done():
+			// Stop waiting for a load that is slow. It goes on for the callers that still wait for it.
+			return ctx.Err()
+		case res = <-ch:
+		}
+		// The load runs with the context of the caller that started it. If that caller gave up,
+		// the callers that joined its load must not fail with its error: they try again. Any
+		// other failure, such as a timeout of the request to Elasticsearch, is returned to all of
+		// them: trying again would only repeat it.
+		if initiatorGaveUp, _ := res.Val.(bool); res.Err != nil && initiatorGaveUp && ctx.Err() == nil {
+			continue
+		}
+		return res.Err
+	}
+}
+
+// fetchAndProcess fetches the latest revision of the policy with the given ID, or of every policy
+// if the ID is empty, and processes them.
+func (m *monitorT) fetchAndProcess(ctx context.Context, policyID string) error {
 	span, ctx := apm.StartSpan(ctx, "Load policies", "load")
 	defer span.End()
 
@@ -374,7 +398,11 @@ func (m *monitorT) loadPolicies(ctx context.Context) error {
 		ctx = apm.ContextWithTransaction(ctx, trans)
 		defer trans.End()
 	}
-	policies, err := m.policyF(ctx, m.bulker, dl.WithIndexName(m.policiesIndex))
+	opts := []dl.Option{dl.WithIndexName(m.policiesIndex)}
+	if policyID != "" {
+		opts = append(opts, dl.WithPolicyID(policyID))
+	}
+	policies, err := m.policyF(ctx, m.bulker, opts...)
 	if err != nil {
 		if errors.Is(err, es.ErrIndexNotFound) {
 			m.log.Debug().
@@ -612,8 +640,8 @@ func (m *monitorT) Unsubscribe(sub Subscription) error {
 }
 
 // LatestRev returns the revision_idx for the passed policy ID.
-// If the policy does not exist in the map, then all policies are foribly reloaded.
-// On an error with the reload, or if the policy does not exist a 0 is returned.
+// If the policy does not exist in the map, then it is loaded from Elasticsearch.
+// On an error with the load, or if the policy does not exist a 0 is returned.
 func (m *monitorT) LatestRev(ctx context.Context, id string) int64 {
 	if id == "" {
 		return 0
@@ -624,8 +652,8 @@ func (m *monitorT) LatestRev(ctx context.Context, id string) int64 {
 	m.mut.Unlock()
 
 	if !ok {
-		// We've not seen this policy before, force load.
-		err := m.loadPolicies(ctx)
+		// We've not seen this policy before, load it.
+		err := m.loadPolicy(ctx, id)
 		if err != nil {
 			m.log.Error().Err(err).Str(ecs.PolicyID, id).Msg("Unable to load policies.")
 			return 0
@@ -643,7 +671,7 @@ func (m *monitorT) LatestRev(ctx context.Context, id string) int64 {
 }
 
 // GetPolicy returns the policy for the given policy ID from the in-memory cache.
-// If the policy is not found in cache, all policies are reloaded from Elasticsearch.
+// If the policy is not found in cache, it is loaded from Elasticsearch.
 func (m *monitorT) GetPolicy(ctx context.Context, policyID string) (*model.Policy, error) {
 	if policyID == "" {
 		return nil, errors.New("policy ID is empty")
@@ -657,7 +685,7 @@ func (m *monitorT) GetPolicy(ctx context.Context, policyID string) (*model.Polic
 		return &p.pp.Policy, nil
 	}
 
-	if err := m.loadPolicies(ctx); err != nil {
+	if err := m.loadPolicy(ctx, policyID); err != nil {
 		return nil, fmt.Errorf("loading policies: %w", err)
 	}
 
