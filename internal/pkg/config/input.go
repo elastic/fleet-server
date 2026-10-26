@@ -260,11 +260,12 @@ func bindAddress(host string, port uint16) string {
 
 // Input is the input defined by Agent to run Fleet Server.
 type Input struct {
-	Type    string  `config:"type"`
-	Policy  Policy  `config:"policy"`
-	Server  Server  `config:"server"`
-	Cache   Cache   `config:"cache"`
-	Monitor Monitor `config:"monitor"`
+	Type                string              `config:"type"`
+	Policy              Policy              `config:"policy"`
+	Server              Server              `config:"server"`
+	Cache               Cache               `config:"cache"`
+	Monitor             Monitor             `config:"monitor"`
+	FeatureFlagsService FeatureFlagsService `config:"feature_flags_service"`
 }
 
 // InitDefaults initializes the defaults for the configuration.
@@ -273,6 +274,7 @@ func (c *Input) InitDefaults() {
 	c.Server.InitDefaults()
 	c.Cache.InitDefaults()
 	c.Monitor.InitDefaults()
+	c.FeatureFlagsService.InitDefaults()
 }
 
 // Validate ensures that the configuration is valid.
