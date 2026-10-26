@@ -6,13 +6,13 @@ Operator reference for `dev-tools/mage/release/`. Release managers should start 
 
 | Target | CLI command | Purpose |
 |---|---|---|
-| `mage release:runMajorMinor` | `run-major-minor` | Feature freeze: release branch + PR-A/B/D |
+| `mage release:runMajorMinor` | `run-major-minor` | Feature freeze: release branch + PR-A/B (no next-patch) |
 | `mage release:runPatch` | `run-patch` | Patch: PR-A (often skipped) + next-patch PR-B |
 | `mage release:updateVersion` | `update-version` | Update `version/version.go` only |
 | `mage release:updateMergify` | `update-mergify` | Append backport rule |
 | `mage release:ensureIssueTracker` | `ensure-issue-tracker` | Create/update release checklist issue |
 
-There is **no** `runNextRelease` target; next-patch prep is PR-D inside `runMajorMinor` / PR-B inside `runPatch`.
+There is **no** `runNextRelease` target; next-patch prep is PR-B inside `runPatch` only (not `runMajorMinor`).
 
 ## Architecture
 

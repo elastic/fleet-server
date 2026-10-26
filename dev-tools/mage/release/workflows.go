@@ -91,10 +91,11 @@ type workflowPRResult struct {
 // 1. Creates the release branch from BASE_BRANCH
 // 2. Opens PR-A on main (backport rule + next minor version)
 // 3. Opens PR-B on release branch (ensure CURRENT version)
-// 4. Opens PR-D on release branch (next patch prep)
 //
 // PR-C (main docs / test-env) is omitted: fleet-server has no docs or test-env
 // version updates in the former fleet-server.mak process.
+// Next-patch bumps are intentionally omitted here; they are created only by
+// RunPatchRelease so patch and minor/FF stay independent.
 func RunMajorMinorRelease(cfg *ReleaseConfig) error {
 	fmt.Println("=== Starting Major/Minor Release Workflow ===")
 
@@ -130,12 +131,8 @@ func RunMajorMinorRelease(cfg *ReleaseConfig) error {
 	if err != nil {
 		return err
 	}
-	prD, err := prepNextPatchOnReleaseBranch(repo, cfg)
-	if err != nil {
-		return err
-	}
 
-	branchesToFinalize := []workflowPR{prA, prB, prD}
+	branchesToFinalize := []workflowPR{prA, prB}
 
 	if cfg.DryRun {
 		fmt.Println("\nDRY RUN: Skipping push and PR creation")
@@ -235,9 +232,11 @@ func prepFFRelease(repo *GitRepo, cfg *ReleaseConfig) (workflowPR, error) {
 	}, nil
 }
 
+// prepNextPatchOnReleaseBranch prepares the next-patch version bump.
+// Used only by RunPatchRelease (not by RunMajorMinorRelease).
 func prepNextPatchOnReleaseBranch(repo *GitRepo, cfg *ReleaseConfig) (workflowPR, error) {
 	branch := fmt.Sprintf("ff-prep-next-patch-%s", cfg.NextRelease)
-	fmt.Printf("\n--- Preparing PR-D: next patch %s on %s ---\n", cfg.NextRelease, cfg.ReleaseBranch)
+	fmt.Printf("\n--- Preparing next-patch prep: %s on %s ---\n", cfg.NextRelease, cfg.ReleaseBranch)
 
 	if err := repo.EnsureBranchFrom(cfg.ReleaseBranch, branch); err != nil {
 		return workflowPR{}, err

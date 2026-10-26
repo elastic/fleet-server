@@ -26,7 +26,7 @@ func TestLabelHelpers(t *testing.T) {
 		t.Fatal("PR-B missing merge:2-after-branch")
 	}
 	if !contains(prDNextPatchLabels(), mergeLabelAfterRelease) {
-		t.Fatal("PR-D missing merge:4-after-release")
+		t.Fatal("next-patch labels missing merge:4-after-release")
 	}
 	if !contains(patchBeforeBuildPRLabels(), mergeLabelBeforeBuild) {
 		t.Fatal("patch PR-A missing merge:1-before-build")
@@ -49,7 +49,7 @@ func TestPRBodiesMentionFleetScope(t *testing.T) {
 		t.Fatal("PR-B body should note missing docs/test-env")
 	}
 	if !strings.Contains(prDNextPatchBody(cfg), "9.6.1") {
-		t.Fatal("PR-D body missing next patch")
+		t.Fatal("next-patch body missing next patch version")
 	}
 	if !strings.Contains(patchBeforeBuildPRBody("9.6.1"), "often empty") {
 		t.Fatal("patch PR-A body should note often-empty PR")

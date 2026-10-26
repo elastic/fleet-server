@@ -227,6 +227,7 @@ func TestSetRemoteURLIdempotent(t *testing.T) {
 }
 
 func TestWorkflowBranchNames(t *testing.T) {
+	// ff-prep-next-patch is created by runPatch only (not runMajorMinor).
 	names := []string{
 		"ff-prep-main-9.6.0",
 		"ff-release-9.6.0",

@@ -36,7 +36,8 @@ Use plain `X.Y.Z` semver for `CURRENT_RELEASE` (no `-test` or `-SNAPSHOT` suffix
 | **PR-A** | `ff-prep-main-{CURRENT}` → `main` | Mergify backport + bump to next minor | `merge:1-ff-day` |
 | **PR-B** | `ff-release-{CURRENT}` → `X.Y` | ensure `version.go` = CURRENT (often no-op) | `merge:2-after-branch` |
 | **PR-C** | — | **omitted** (no docs/test-env) | — |
-| **PR-D** | `ff-prep-next-patch-{NEXT}` → `X.Y` | bump to next patch | `merge:4-after-release` |
+
+Next-patch bumps are **not** opened here; use `mage release:runPatch`.
 
 ## Patch (`mage release:runPatch`)
 
