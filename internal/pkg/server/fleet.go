@@ -603,7 +603,7 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 	if ffCfg := cfg.Inputs[0].FeatureFlagsService; ffCfg.Enabled {
 		ff := featureflags.New(ffCfg, esclient.New(esCli), *zerolog.Ctx(ctx))
 		g.Go(loggedRunFunc(ctx, "Feature flags service", ff.Run))
-		apiOpts = append(apiOpts, api.WithFeatureFlags(ff.Handler()))
+		apiOpts = append(apiOpts, api.WithFeatureFlags(ff.Handler(), ffCfg.CORS.AllowedOrigins))
 	}
 
 	for _, endpoint := range (&cfg.Inputs[0].Server).BindEndpoints() {

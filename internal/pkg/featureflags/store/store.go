@@ -7,6 +7,7 @@
 package store
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -19,7 +20,9 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/featureflags/eval"
 )
 
-// DocVersion identifies a revision of a document.
+// DocVersion identifies a revision of a document within one index.
+// A recreated index can reuse _seq_no and _primary_term for a different _source,
+// so a version matches only together with Snapshot.IndexUUID.
 type DocVersion struct {
 	SeqNo       int64
 	PrimaryTerm int64
@@ -35,9 +38,12 @@ type docEntry struct {
 
 // Snapshot is an immutable view of the definitions index. It must not be modified once published.
 type Snapshot struct {
-	// Version identifies the content of the snapshot. Snapshots with the same documents and
-	// document versions have the same Version, also across Fleet Server instances.
+	// Version identifies the content of the snapshot. Snapshots with the same documents,
+	// document versions and index UUID have the same Version, also across Fleet Server instances.
 	Version string
+	// IndexUUID is the Elasticsearch index the documents were read from.
+	// An empty value means the snapshot was not loaded from an index.
+	IndexUUID string
 
 	flags                 map[string]*eval.Flag
 	flagsByApp            map[string][]*eval.Flag
@@ -123,8 +129,11 @@ type RawDoc struct {
 // parseDoc parses a raw document, compiling flags. Invalid sources yield an entry without document.
 func parseDoc(raw RawDoc) docEntry {
 	entry := docEntry{version: raw.Version}
+	// UseNumber keeps integers larger than 2^53 exact. The default decoder turns them into float64.
+	dec := json.NewDecoder(bytes.NewReader(raw.Source))
+	dec.UseNumber()
 	var doc definitions.Document
-	if err := json.Unmarshal(raw.Source, &doc); err != nil {
+	if err := dec.Decode(&doc); err != nil {
 		return entry
 	}
 	entry.doc = &doc
@@ -140,12 +149,12 @@ func NewSnapshot(raws ...RawDoc) *Snapshot {
 	for _, raw := range raws {
 		docs[raw.ID] = parseDoc(raw)
 	}
-	return buildSnapshot(docs)
+	return buildSnapshot(docs, "")
 }
 
 // buildSnapshot derives the lookup maps from docs. Documents are visited in _id order so that
 // duplicate keys, which Kibana prevents, resolve deterministically.
-func buildSnapshot(docs map[string]docEntry) *Snapshot {
+func buildSnapshot(docs map[string]docEntry, indexUUID string) *Snapshot {
 	s := &Snapshot{
 		flags:                 map[string]*eval.Flag{},
 		flagsByApp:            map[string][]*eval.Flag{},
@@ -162,6 +171,8 @@ func buildSnapshot(docs map[string]docEntry) *Snapshot {
 	slices.Sort(ids)
 
 	h := sha256.New()
+	h.Write([]byte(indexUUID))
+	h.Write([]byte{0})
 	for _, id := range ids {
 		e := docs[id]
 		h.Write([]byte(id))
@@ -211,6 +222,7 @@ func buildSnapshot(docs map[string]docEntry) *Snapshot {
 		}
 	}
 	s.Version = hex.EncodeToString(h.Sum(nil))[:32]
+	s.IndexUUID = indexUUID
 
 	for _, f := range s.flags {
 		for app := range uniqueStrings(f.Def.Apps) {

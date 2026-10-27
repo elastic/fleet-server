@@ -118,10 +118,12 @@ Context attributes are dotted keys. Both flat keys (`{"kibana.version": "9.3.0"}
 
 ### Sync
 
-- On start, all documents are loaded with `search_after` pages. The endpoints answer `503` until then.
+- On start, all documents are loaded from a point in time, paged with `search_after` on `_shard_doc`.
+  The endpoints answer `503` until then. A timed-out search, or one with failed shards, is discarded.
 - Every `poll_interval`, one search fetches the documents with `updated_at` greater than or equal to the
   start of the last successful poll minus `poll_overlap`. A `global` aggregation in the same request
-  counts all the documents of the index. Documents with unchanged `_seq_no` and `_primary_term` are skipped.
+  counts all the documents of the index. Documents with unchanged `_seq_no` and `_primary_term` are skipped
+  while the index UUID is the same. A recreated index, which can reuse those version numbers, is fully reloaded.
   A failed poll keeps the lower bound, so the window widens until a poll succeeds.
 - Deletes are detected by comparing the number of documents in memory, after applying the changes, with
   the index count. A difference triggers a full reload. A deleted document is therefore removed on the
@@ -145,7 +147,10 @@ Context attributes are dotted keys. Both flat keys (`{"kibana.version": "9.3.0"}
 
 - Collection never blocks requests: contexts are buffered in memory and dropped when the buffers are full.
 - `exclude_attributes` are dropped before anything is stored. Values are truncated to 256 characters.
-  Lists are stored as their JSON string.
+  The document identity uses the original targeting key, before that truncation. Lists are stored as
+  their JSON string.
+- An update moves `last_seen` forward only. A delayed write from another Fleet Server instance does not
+  overwrite a newer observation.
 - Every `flush_interval`, contexts are upserted with a single `_bulk` request. New ones are created with
   `first_seen`; known ones only update `context`, `attributes`, `attribute_types` and `last_seen`.
 - The flush is skipped when the index doesn't exist, so Fleet Server never creates it.

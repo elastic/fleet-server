@@ -9,6 +9,7 @@ package eval
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -224,6 +225,30 @@ func TestPrerequisiteDepth(t *testing.T) {
 	assert.False(t, res.Failed(), res.ErrorDetails)
 }
 
+func TestSharedPrerequisitesStayBounded(t *testing.T) {
+	// Each flag depends on every flag of the next level. Without memoization this is
+	// (4^8-1)/3 evaluations, past the per-request work limit.
+	const levels, width = 8, 4
+	flags := make([]*Flag, 0, levels*width)
+	for level := range levels {
+		prereq := ""
+		if level+1 < levels {
+			parts := make([]string, width)
+			for i := range width {
+				parts[i] = fmt.Sprintf(`{"flag": "f%d-%d", "value": true}`, level+1, i)
+			}
+			prereq = `, "prerequisites": [` + strings.Join(parts, ",") + `]`
+		}
+		for i := range width {
+			flags = append(flags, Compile(parseFlag(t, fmt.Sprintf(`{"key": "f%d-%d", "variations": [true, false], "apps": ["x"],
+			  "environments": {"e": {"default": true%s}}}`, level, i, prereq))))
+		}
+	}
+	res := Evaluate(flags[0], "e", Context{}, lookupOf(flags...))
+	assert.False(t, res.Failed(), res.ErrorDetails)
+	assert.Equal(t, true, res.Value)
+}
+
 func TestTargetingKeyMissing(t *testing.T) {
 	flag := Compile(parseFlag(t, `{"key": "f", "variations": ["a", "b"], "apps": ["x"],
 	  "environments": {"e": {"default": "a", "rules": [
@@ -293,6 +318,16 @@ func TestFlattenContext(t *testing.T) {
 
 	_, err = FlattenContext(map[string]any{"list": []any{map[string]any{"a": 1}}})
 	require.ErrorContains(t, err, "list of scalar")
+
+	nested := map[string]any{"v": "x"}
+	for range maxContextDepth + 2 {
+		nested = map[string]any{"n": nested}
+	}
+	_, err = FlattenContext(nested)
+	require.ErrorContains(t, err, "nested deeper")
+
+	_, err = FlattenContext(map[string]any{strings.Repeat("k", maxContextPath+1): "x"})
+	require.ErrorContains(t, err, "attribute path")
 }
 
 func TestListAttributes(t *testing.T) {

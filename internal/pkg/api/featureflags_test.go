@@ -50,7 +50,7 @@ func TestAddFeatureFlagsRouteHandler(t *testing.T) {
 		w.WriteHeader(http.StatusTeapot)
 	})
 	limits := &config.ServerLimits{OFREPLimit: config.Limit{MaxBody: 1024}}
-	h := addFeatureFlagsRouteHandler(existing, testOFREPHandler(t), limits)
+	h := addFeatureFlagsRouteHandler(existing, testOFREPHandler(t), nil, limits)
 
 	post := func(path, body string) *httptest.ResponseRecorder {
 		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, path, strings.NewReader(body))
@@ -78,15 +78,43 @@ func TestAddFeatureFlagsRouteHandler(t *testing.T) {
 
 func TestAddFeatureFlagsRouteHandlerRateLimit(t *testing.T) {
 	limits := &config.ServerLimits{OFREPLimit: config.Limit{Interval: time.Hour, Burst: 1}}
-	h := addFeatureFlagsRouteHandler(http.NotFoundHandler(), testOFREPHandler(t), limits)
+	h := addFeatureFlagsRouteHandler(http.NotFoundHandler(), testOFREPHandler(t), []string{"http://localhost:5601"}, limits)
 
 	codes := make([]int, 0, 2)
 	for range 2 {
 		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/ofrep/v1/evaluate/flags", strings.NewReader(`{"context": {}}`))
 		req.Header.Set("Authorization", "Bearer sdk-key")
+		req.Header.Set("Origin", "http://localhost:5601")
 		rec := httptest.NewRecorder()
 		h.ServeHTTP(rec, req)
 		codes = append(codes, rec.Code)
+		assert.Equal(t, "http://localhost:5601", rec.Header().Get("Access-Control-Allow-Origin"))
 	}
 	assert.Equal(t, []int{http.StatusOK, http.StatusTooManyRequests}, codes)
+}
+
+func TestMaxConnectionsCoversOFREP(t *testing.T) {
+	cfg := &config.Server{}
+	cfg.Limits.MaxConnections = 1
+	started := make(chan struct{})
+	release := make(chan struct{})
+	srv := NewServer("127.0.0.1:0", cfg, WithFeatureFlags(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		close(started)
+		<-release
+	}), nil))
+
+	requestDone := make(chan struct{})
+	go func() {
+		defer close(requestDone)
+		srv.handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/ofrep/v1/evaluate/flags", nil))
+	}()
+	t.Cleanup(func() {
+		close(release)
+		<-requestDone
+	})
+	<-started
+
+	rec := httptest.NewRecorder()
+	srv.handler.ServeHTTP(rec, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/status", nil))
+	assert.Equal(t, http.StatusTooManyRequests, rec.Code)
 }

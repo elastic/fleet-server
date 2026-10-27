@@ -35,7 +35,8 @@ func (f *fakeClient) Search(_ context.Context, index string, _ []byte) ([]byte, 
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	hits := []map[string]any{}
-	if index == ".feature-flags-definitions" {
+	// A full reload searches a point in time and does not name the index.
+	if index == ".feature-flags-definitions" || index == "" {
 		for i, d := range f.docs {
 			hits = append(hits, map[string]any{"_id": d["id"], "_seq_no": i, "_primary_term": 1, "_source": d["source"], "sort": []int{i}})
 		}
@@ -45,6 +46,14 @@ func (f *fakeClient) Search(_ context.Context, index string, _ []byte) ([]byte, 
 		"aggregations": map[string]any{"index_doc_count": map[string]any{"doc_count": len(hits)}},
 	})
 }
+
+func (f *fakeClient) OpenPointInTime(context.Context, string, time.Duration) (string, error) {
+	return "pit", nil
+}
+
+func (f *fakeClient) ClosePointInTime(context.Context, string) error { return nil }
+
+func (f *fakeClient) IndexUUID(context.Context, string) (string, error) { return "idx-1", nil }
 
 func (f *fakeClient) Bulk(context.Context, []byte) ([]byte, error) {
 	f.mu.Lock()

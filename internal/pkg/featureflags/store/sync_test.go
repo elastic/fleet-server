@@ -21,6 +21,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/featureflags/esclient"
+	"github.com/elastic/fleet-server/v7/internal/pkg/featureflags/eval"
 )
 
 type fakeDoc struct {
@@ -33,17 +34,21 @@ type fakeDoc struct {
 
 // fakeES implements the subset of the search API used by the Syncer.
 type fakeES struct {
-	mu       sync.Mutex
-	docs     map[string]*fakeDoc
-	seqNo    int64
-	order    int
-	missing  bool
-	fail     error
-	searches []map[string]any
+	mu         sync.Mutex
+	docs       map[string]*fakeDoc
+	seqNo      int64
+	order      int
+	uuid       string
+	missing    bool
+	partial    bool
+	fail       error
+	searches   []map[string]any
+	pitsOpened int
+	pitsClosed int
 }
 
 func newFakeES() *fakeES {
-	return &fakeES{docs: map[string]*fakeDoc{}}
+	return &fakeES{docs: map[string]*fakeDoc{}, uuid: "idx-1"}
 }
 
 func (f *fakeES) put(t *testing.T, id string, updatedAt time.Time, doc map[string]any) {
@@ -91,19 +96,82 @@ func (f *fakeES) setMissing(missing bool) {
 	f.missing = missing
 }
 
+func (f *fakeES) setPartial(partial bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.partial = partial
+}
+
+func (f *fakeES) setUUID(uuid string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.uuid = uuid
+}
+
+// replaceSource changes a document without moving its _seq_no, as a recreated index can.
+func (f *fakeES) replaceSource(t *testing.T, id string, doc map[string]any) {
+	t.Helper()
+	src, err := json.Marshal(doc)
+	require.NoError(t, err)
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	existing, ok := f.docs[id]
+	require.True(t, ok, id)
+	existing.source = src
+}
+
+func (f *fakeES) pitBalance() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.pitsOpened - f.pitsClosed
+}
+
 func (f *fakeES) recorded() []map[string]any {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return slices.Clone(f.searches)
 }
 
-func (f *fakeES) Search(_ context.Context, _ string, body []byte) ([]byte, error) {
+func (f *fakeES) OpenPointInTime(context.Context, string, time.Duration) (string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.fail != nil {
+		return "", f.fail
+	}
+	if f.missing {
+		return "", &esclient.ResponseError{Status: 404, Type: "index_not_found_exception"}
+	}
+	f.pitsOpened++
+	return "pit", nil
+}
+
+func (f *fakeES) ClosePointInTime(context.Context, string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.pitsClosed++
+	return nil
+}
+
+func (f *fakeES) IndexUUID(context.Context, string) (string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.fail != nil {
+		return "", f.fail
+	}
+	if f.missing {
+		return "", &esclient.ResponseError{Status: 404, Type: "index_not_found_exception"}
+	}
+	return f.uuid, nil
+}
+
+func (f *fakeES) Search(_ context.Context, index string, body []byte) ([]byte, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	var req map[string]any
 	if err := json.Unmarshal(body, &req); err != nil {
 		return nil, err
 	}
+	req["index"] = index
 	f.searches = append(f.searches, req)
 	if f.fail != nil {
 		return nil, f.fail
@@ -158,6 +226,10 @@ func (f *fakeES) Search(_ context.Context, _ string, body []byte) ([]byte, error
 	}
 	resp := map[string]any{
 		"hits": map[string]any{"total": map[string]any{"value": len(matched)}, "hits": hits},
+	}
+	if f.partial {
+		resp["timed_out"] = true
+		resp["_shards"] = map[string]any{"failed": 1}
 	}
 	if _, ok := req["aggs"]; ok {
 		resp["aggregations"] = map[string]any{"index_doc_count": map[string]any{"doc_count": len(all)}}
@@ -259,6 +331,10 @@ func TestFullLoadPages(t *testing.T) {
 	assert.NotNil(t, snap.CredentialBySDKKeyHash("abc"))
 	assert.NotNil(t, snap.CredentialByClientID("client-1"))
 	assert.Len(t, es.recorded(), 4, "7 documents in pages of 2")
+	assert.Equal(t, "", es.recorded()[0]["index"], "a point-in-time search does not name the index")
+	assert.Equal(t, []any{"_shard_doc"}, es.recorded()[0]["sort"])
+	assert.NotNil(t, es.recorded()[0]["pit"])
+	assert.Equal(t, 0, es.pitBalance())
 
 	// The version depends only on the content.
 	require.NoError(t, s.fullReload(t.Context()))
@@ -349,6 +425,41 @@ func TestFailedPollWidensWindow(t *testing.T) {
 	assert.NotNil(t, st.Load().Flag("a"))
 }
 
+func TestPartialSearchIsRejected(t *testing.T) {
+	es := newFakeES()
+	s, st, clock := newTestSyncer(es, 100)
+	es.put(t, "a", clock.Now(), flagDoc("a", false))
+	es.setPartial(true)
+
+	require.ErrorIs(t, s.fullReload(t.Context()), errPartialSearch)
+	require.False(t, st.Ready(), "a partial page is not published")
+	assert.Equal(t, 0, es.pitBalance())
+}
+
+func TestIndexRecreationReloadsReusedVersions(t *testing.T) {
+	es := newFakeES()
+	s, st, clock := newTestSyncer(es, 100)
+	es.put(t, "a", clock.Now(), flagDoc("a", false))
+	require.NoError(t, s.fullReload(t.Context()))
+	before := st.Load()
+
+	// Same _seq_no and _primary_term, different source, because the index was recreated.
+	es.setUUID("idx-2")
+	es.replaceSource(t, "a", flagDoc("a", true))
+	require.NoError(t, s.fullReload(t.Context()))
+
+	after := st.Load()
+	assert.Equal(t, "idx-2", after.IndexUUID)
+	assert.NotEqual(t, before.Version, after.Version)
+	assert.Equal(t, true, defaultOf(t, after, "a"))
+
+	es.setUUID("idx-3")
+	es.replaceSource(t, "a", flagDoc("a", false))
+	clock.Advance(10 * time.Second)
+	require.NoError(t, s.poll(t.Context()))
+	assert.Equal(t, false, defaultOf(t, st.Load(), "a"), "a poll also reloads when the index uuid changes")
+}
+
 func TestMissingIndex(t *testing.T) {
 	es := newFakeES()
 	es.setMissing(true)
@@ -385,6 +496,18 @@ func TestPollLargeDeltaReloads(t *testing.T) {
 	clock.Advance(10 * time.Second)
 	require.NoError(t, s.poll(t.Context()))
 	assert.Equal(t, 3, st.Load().DocCount())
+}
+
+func TestParseDocPreservesLargeIntegers(t *testing.T) {
+	snap := NewSnapshot(RawDoc{ID: "f", Source: json.RawMessage(
+		`{"type":"flag","flag":{"key":"n","variations":[9007199254740993],"environments":{"production":{"default":9007199254740993}}}}`,
+	)})
+	f := snap.Flag("n")
+	require.NotNil(t, f)
+	res := eval.Evaluate(f, "production", eval.Context{}, func(string) *eval.Flag { return f })
+	num, ok := res.Value.(json.Number)
+	require.True(t, ok)
+	assert.Equal(t, "9007199254740993", num.String())
 }
 
 func TestRunRetriesInitialLoadAndResyncs(t *testing.T) {

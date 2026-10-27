@@ -22,6 +22,7 @@ import (
 	zlog "github.com/rs/zerolog/log"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
+	"github.com/elastic/fleet-server/v7/internal/pkg/featureflags/ofrep"
 	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger/ecs"
@@ -65,7 +66,13 @@ func NewServer(addr string, cfg *config.Server, opts ...APIOpt) *server {
 	}
 	if a.ff != nil {
 		zlog.Info().Msg("enabling feature flags (OFREP) endpoints")
-		handler = addFeatureFlagsRouteHandler(handler, a.ff, &cfg.Limits)
+		handler = addFeatureFlagsRouteHandler(handler, a.ff, a.ffOrigins, &cfg.Limits)
+	}
+	if cfg.Limits.MaxConnections > 0 {
+		// One in-flight cap for every request route. Applying it inside the generated router
+		// would leave OpAMP and OFREP, which are mounted in front of that router, uncapped,
+		// and applying it in both places would count Fleet requests twice.
+		handler = throttleWithCount(cfg.Limits.MaxConnections)(handler)
 	}
 
 	s.handler = handler
@@ -173,13 +180,16 @@ func addOpAMPRouteHandler(existingHandler http.Handler, oa *OpAMPT, cfg *config.
 }
 
 // addFeatureFlagsRouteHandler serves the /ofrep/ paths with ff, in front of the existing routes.
-func addFeatureFlagsRouteHandler(existingHandler http.Handler, ff http.Handler, cfg *config.ServerLimits) http.Handler {
+// CORS wraps the rate limiter so a 429, and a preflight that would otherwise be throttled,
+// still includes Access-Control-Allow-Origin.
+func addFeatureFlagsRouteHandler(existingHandler http.Handler, ff http.Handler, allowedOrigins []string, cfg *config.ServerLimits) http.Handler {
 	if cfg.OFREPLimit.MaxBody > 0 {
 		ff = http.MaxBytesHandler(ff, cfg.OFREPLimit.MaxBody)
 	}
+	ff = ofrep.Middleware(allowedOrigins)(Limiter(cfg).middleware(ff))
 
 	r := chi.NewRouter()
-	r.With(logger.Middleware, middleware.Recoverer, Limiter(cfg).middleware).Handle("/ofrep/*", ff)
+	r.With(logger.Middleware, middleware.Recoverer).Handle("/ofrep/*", ff)
 
 	// Handle existing routes
 	r.Mount("/", existingHandler)

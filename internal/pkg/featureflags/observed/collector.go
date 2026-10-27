@@ -42,12 +42,17 @@ const (
 	TypeBoolean = "boolean"
 )
 
-// updateScript replaces the mutable fields of a known context. A partial "doc" update can't be
-// used: it would merge the old and new context objects instead of replacing them.
-const updateScript = "ctx._source.context = params.context; " +
+// updateScript replaces the mutable fields of a known context when the incoming observation is
+// newer. A partial "doc" update can't be used: it would merge the old and new context objects
+// instead of replacing them. last_seen is compared as epoch millis; RFC3339Nano strings do not
+// order lexicographically (".10Z" is less than ".9Z").
+const updateScript = "if (ctx._source.last_seen == null || " +
+	"ZonedDateTime.parse(ctx._source.last_seen.toString()).toInstant().toEpochMilli() < params.last_seen_ms) { " +
+	"ctx._source.context = params.context; " +
 	"ctx._source.attributes = params.attributes; " +
 	"ctx._source.attribute_types = params.attribute_types; " +
-	"ctx._source.last_seen = params.last_seen;"
+	"ctx._source.last_seen = params.last_seen; " +
+	"}"
 
 // Options configures the Collector.
 type Options struct {
@@ -185,18 +190,30 @@ func (c *Collector) toEntry(o observation) *entry {
 		AttributeTypes: make(map[string]string, len(o.ctx)),
 		lastSeen:       o.at,
 	}
+	// Identity is taken from the original values. Stored attribute values are truncated afterwards,
+	// so two targeting keys that share a 256-character prefix stay distinct documents.
+	identity := make(map[string]any, len(o.ctx))
+	var contextKey string
+	if tk, ok := o.ctx[eval.TargetingKey].(string); ok && tk != "" {
+		if _, skip := c.exclude[eval.TargetingKey]; !skip {
+			contextKey = tk
+		}
+	}
 	for k, v := range o.ctx {
 		if _, skip := c.exclude[k]; skip {
 			continue
 		}
 		switch t := v.(type) {
 		case string:
+			identity[k] = t
 			e.Context[k] = truncate(t)
 			e.AttributeTypes[k] = TypeString
 		case bool:
+			identity[k] = t
 			e.Context[k] = t
 			e.AttributeTypes[k] = TypeBoolean
 		case float64, json.Number:
+			identity[k] = t
 			e.Context[k] = t
 			e.AttributeTypes[k] = TypeNumber
 		default:
@@ -205,6 +222,7 @@ func (c *Collector) toEntry(o observation) *entry {
 			if err != nil {
 				continue
 			}
+			identity[k] = string(b)
 			e.Context[k] = truncate(string(b))
 			e.AttributeTypes[k] = TypeString
 		}
@@ -215,11 +233,11 @@ func (c *Collector) toEntry(o observation) *entry {
 		e.Attributes = []string{}
 	}
 
-	if tk, ok := e.Context[eval.TargetingKey].(string); ok && tk != "" {
-		e.ContextKey = tk
+	if contextKey != "" {
+		e.ContextKey = contextKey
 	} else {
-		// encoding/json sorts map keys, so this is a canonical form of the context.
-		canonical, _ := json.Marshal(e.Context)
+		// encoding/json sorts map keys, so this is a canonical form of the untruncated context.
+		canonical, _ := json.Marshal(identity)
 		sum := sha256.Sum256(canonical)
 		e.ContextKey = hex.EncodeToString(sum[:])
 	}
@@ -278,6 +296,7 @@ func (c *Collector) flush(ctx context.Context) {
 			"attributes":      e.Attributes,
 			"attribute_types": e.AttributeTypes,
 			"last_seen":       e.LastSeen,
+			"last_seen_ms":    e.lastSeen.UnixMilli(),
 		}
 		body := map[string]any{"script": map[string]any{"lang": "painless", "source": updateScript, "params": params}}
 

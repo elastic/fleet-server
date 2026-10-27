@@ -47,6 +47,12 @@ func (c *cors) allowed(origin string) bool {
 	return ok
 }
 
+// Middleware adds CORS headers for allowed origins and answers preflight requests before next runs,
+// so responses written by next (including 429) stay readable by browsers.
+func Middleware(allowedOrigins []string) func(http.Handler) http.Handler {
+	return newCORS(allowedOrigins).middleware
+}
+
 // middleware adds CORS headers for allowed origins and answers preflight requests before
 // authentication, as browsers send them without credentials.
 func (c *cors) middleware(next http.Handler) http.Handler {

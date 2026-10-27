@@ -14,15 +14,23 @@ import (
 // TargetingKey is the OpenFeature targeting key attribute.
 const TargetingKey = "targetingKey"
 
+// Limits on a flattened context. They are checked before a nested key is concatenated onto its
+// prefix, so a deeply nested body cannot spend quadratic time copying prefixes.
+const (
+	maxContextDepth      = 32
+	maxContextPath       = 512
+	maxContextAttributes = 1024
+)
+
 // Context is a flattened evaluation context: dotted attribute names mapped to scalar values
-// (string, float64, bool) or lists of scalars.
+// (string, float64, bool, json.Number) or lists of scalars.
 type Context map[string]any
 
 // FlattenContext flattens an OpenFeature evaluation context. Both flat dotted keys
 // ({"kibana.version": "9.3.0"}) and nested objects ({"kibana": {"version": "9.3.0"}}) are accepted.
 func FlattenContext(raw map[string]any) (Context, error) {
 	out := make(Context, len(raw))
-	if err := flattenInto(out, "", raw); err != nil {
+	if err := flattenInto(out, "", raw, 1); err != nil {
 		return nil, err
 	}
 	if tk, ok := out[TargetingKey]; ok {
@@ -33,10 +41,22 @@ func FlattenContext(raw map[string]any) (Context, error) {
 	return out, nil
 }
 
-func flattenInto(out Context, prefix string, obj map[string]any) error {
+func flattenInto(out Context, prefix string, obj map[string]any, depth int) error {
+	if depth > maxContextDepth {
+		return fmt.Errorf("context is nested deeper than %d levels", maxContextDepth)
+	}
 	for k, v := range obj {
 		if k == "" {
 			return fmt.Errorf("empty attribute name under %q", prefix)
+		}
+		// Bound the path before concatenating. A nest of single-character keys otherwise
+		// copies the whole prefix at every level.
+		n := len(k)
+		if prefix != "" {
+			n += len(prefix) + 1
+		}
+		if n > maxContextPath {
+			return fmt.Errorf("attribute path exceeds %d bytes", maxContextPath)
 		}
 		key := k
 		if prefix != "" {
@@ -44,7 +64,7 @@ func flattenInto(out Context, prefix string, obj map[string]any) error {
 		}
 		switch t := v.(type) {
 		case map[string]any:
-			if err := flattenInto(out, key, t); err != nil {
+			if err := flattenInto(out, key, t, depth+1); err != nil {
 				return err
 			}
 			continue
@@ -64,6 +84,9 @@ func flattenInto(out Context, prefix string, obj map[string]any) error {
 		}
 		if _, dup := out[key]; dup {
 			return fmt.Errorf("attribute %q is defined more than once", key)
+		}
+		if len(out) >= maxContextAttributes {
+			return fmt.Errorf("context has more than %d attributes", maxContextAttributes)
 		}
 		out[key] = v
 	}

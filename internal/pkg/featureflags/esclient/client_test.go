@@ -10,7 +10,9 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/elastic/go-elasticsearch/v9"
 	"github.com/stretchr/testify/assert"
@@ -43,6 +45,40 @@ func TestSearch(t *testing.T) {
 	assert.JSONEq(t, `{"hits":{"hits":[]}}`, string(data))
 	assert.Equal(t, "/.feature-flags-definitions/_search", gotPath)
 	assert.JSONEq(t, `{"size":0}`, gotBody)
+}
+
+func TestSearchPointInTimeOmitsIndex(t *testing.T) {
+	var gotPath string
+	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.RequestURI()
+		_, _ = w.Write([]byte(`{"hits":{"hits":[]}}`))
+	})
+	_, err := c.Search(t.Context(), "", []byte(`{"pit":{"id":"abc"}}`))
+	require.NoError(t, err)
+	assert.NotContains(t, gotPath, "feature-flags")
+	assert.Contains(t, gotPath, "/_search")
+}
+
+func TestPointInTimeAndIndexUUID(t *testing.T) {
+	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.Contains(r.URL.Path, "_pit"):
+			if r.Method == http.MethodDelete || strings.HasSuffix(r.URL.Path, "/_close") || r.URL.Path == "/_pit/close" {
+				_, _ = w.Write([]byte(`{"succeeded":true,"num_freed":1}`))
+				return
+			}
+			_, _ = w.Write([]byte(`{"id":"pit-1"}`))
+		default:
+			_, _ = w.Write([]byte(`{".feature-flags-definitions":{"settings":{"index":{"uuid":"abc"}}}}`))
+		}
+	})
+	id, err := c.OpenPointInTime(t.Context(), ".feature-flags-definitions", time.Minute)
+	require.NoError(t, err)
+	assert.Equal(t, "pit-1", id)
+	require.NoError(t, c.ClosePointInTime(t.Context(), id))
+	uuid, err := c.IndexUUID(t.Context(), ".feature-flags-definitions")
+	require.NoError(t, err)
+	assert.Equal(t, "abc", uuid)
 }
 
 func TestSearchIndexNotFound(t *testing.T) {

@@ -15,6 +15,7 @@ package eval
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/hashicorp/go-version"
 
@@ -48,6 +49,10 @@ const (
 // MaxPrerequisiteDepth bounds how deep prerequisite chains are followed.
 const MaxPrerequisiteDepth = 10
 
+// maxEvaluationsPerRequest stops a prerequisite graph that would otherwise be re-evaluated
+// exponentially. Results are memoized, so this only trips when the graph is still too large.
+const maxEvaluationsPerRequest = 10_000
+
 // Result is the outcome of evaluating a flag.
 type Result struct {
 	Value        any
@@ -67,8 +72,22 @@ type Lookup func(key string) *Flag
 
 // Evaluate evaluates flag in env for the given context. lookup resolves prerequisite flags.
 func Evaluate(flag *Flag, env string, ctx Context, lookup Lookup) Result {
-	e := evaluator{env: env, ctx: ctx, lookup: lookup, visiting: map[string]struct{}{}}
+	e := evaluator{
+		env:      env,
+		ctx:      ctx,
+		lookup:   lookup,
+		visiting: map[string]struct{}{},
+		memo:     map[string]memoEntry{},
+	}
 	return e.evaluate(flag, 0)
+}
+
+// memoEntry is a result computed at depth. It may be reused at depth d only when d <= depth,
+// which is an equal or larger remaining prerequisite budget. A success near the depth limit
+// must not be reused further down, where the same chain would exceed the limit.
+type memoEntry struct {
+	depth int
+	res   Result
 }
 
 type evaluator struct {
@@ -76,6 +95,8 @@ type evaluator struct {
 	ctx      Context
 	lookup   Lookup
 	visiting map[string]struct{}
+	memo     map[string]memoEntry
+	evals    int
 }
 
 func failure(code ErrorCode, format string, args ...any) Result {
@@ -83,6 +104,10 @@ func failure(code ErrorCode, format string, args ...any) Result {
 }
 
 func (e *evaluator) evaluate(flag *Flag, depth int) Result {
+	e.evals++
+	if e.evals > maxEvaluationsPerRequest {
+		return failure(ErrorGeneral, "evaluation work limit exceeded")
+	}
 	if flag == nil {
 		return failure(ErrorFlagNotFound, "flag not found")
 	}
@@ -93,15 +118,37 @@ func (e *evaluator) evaluate(flag *Flag, depth int) Result {
 	if flag.Err != nil {
 		return failure(ErrorParse, "flag %q is invalid: %s", flag.Key, flag.Err)
 	}
+	// Depth and cycles depend on the path, so they are not memoized. A cached result is reused
+	// only when this call has at least as much depth budget as the call that produced it.
 	if depth > MaxPrerequisiteDepth {
 		return failure(ErrorGeneral, "prerequisites of flag %q are nested deeper than %d", flag.Key, MaxPrerequisiteDepth)
 	}
 	if _, cycle := e.visiting[flag.Key]; cycle {
 		return failure(ErrorGeneral, "prerequisite cycle detected at flag %q", flag.Key)
 	}
+	if cached, ok := e.memo[flag.Key]; ok && depth <= cached.depth {
+		return cached.res
+	}
 	e.visiting[flag.Key] = struct{}{}
 	defer delete(e.visiting, flag.Key)
 
+	res := e.evaluateResolved(flag, envDef, depth)
+	if cacheable(res) {
+		e.memo[flag.Key] = memoEntry{depth: depth, res: res}
+	}
+	return res
+}
+
+func cacheable(res Result) bool {
+	if res.ErrorCode != ErrorGeneral {
+		return true
+	}
+	return !strings.Contains(res.ErrorDetails, "nested deeper than") &&
+		!strings.Contains(res.ErrorDetails, "prerequisite cycle") &&
+		!strings.Contains(res.ErrorDetails, "evaluation work limit")
+}
+
+func (e *evaluator) evaluateResolved(flag *Flag, envDef *envRules, depth int) Result {
 	if len(envDef.prerequisites) == 0 && len(envDef.rules) == 0 {
 		return flag.result(envDef.defaultIdx, ReasonStatic)
 	}

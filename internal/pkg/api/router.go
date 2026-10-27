@@ -27,9 +27,8 @@ func newRouter(cfg *config.ServerLimits, si ServerInterface, tracer *apm.Tracer)
 	}
 	r.Use(logger.Middleware) // Attach middlewares to router directly so the occur before any request parsing/validation
 	r.Use(middleware.Recoverer)
-	if cfg.MaxConnections > 0 {
-		r.Use(throttleWithCount(cfg.MaxConnections))
-	}
+	// MaxConnections is applied once in NewServer, around the combined route tree.
+	// OpAMP and OFREP are mounted in front of this router, so a throttle here would not cover them.
 	r.Use(Limiter(cfg).middleware)
 	return HandlerWithOptions(si, ChiServerOptions{
 		BaseRouter:       r,

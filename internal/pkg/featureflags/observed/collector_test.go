@@ -37,6 +37,14 @@ type fakeClient struct {
 	bulks       [][]bulkOp
 }
 
+func (f *fakeClient) OpenPointInTime(context.Context, string, time.Duration) (string, error) {
+	return "", nil
+}
+
+func (f *fakeClient) ClosePointInTime(context.Context, string) error { return nil }
+
+func (f *fakeClient) IndexUUID(context.Context, string) (string, error) { return "idx-1", nil }
+
 func (f *fakeClient) Search(context.Context, string, []byte) ([]byte, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -158,6 +166,28 @@ func TestCollectorWritesNewContext(t *testing.T) {
 	params := script["params"].(map[string]any)
 	assert.Equal(t, upsert["context"], params["context"])
 	assert.NotContains(t, params, "first_seen", "first_seen is only set on creation")
+}
+
+func TestCollectorIdentityUsesFullTargetingKey(t *testing.T) {
+	client := &fakeClient{}
+	c, _ := newTestCollector(client, Options{})
+
+	prefix := strings.Repeat("a", MaxValueLength)
+	c.observeSync("kibana", "production", eval.Context{"targetingKey": prefix + "1"})
+	c.observeSync("kibana", "production", eval.Context{"targetingKey": prefix + "2"})
+	c.flush(t.Context())
+
+	ops := client.lastBulk()
+	require.Len(t, ops, 2, "keys that share a truncated prefix are different contexts")
+	assert.NotEqual(t, ops[0].ID, ops[1].ID)
+	for _, op := range ops {
+		upsert := op.Body["upsert"].(map[string]any)
+		key := upsert["context_key"].(string)
+		assert.Greater(t, len(key), MaxValueLength)
+		stored := upsert["context"].(map[string]any)["targetingKey"].(string)
+		assert.Equal(t, prefix, stored)
+		assert.Equal(t, DocID("kibana", "production", key), op.ID)
+	}
 }
 
 func TestCollectorContextKeyWithoutTargetingKey(t *testing.T) {
