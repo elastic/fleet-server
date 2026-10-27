@@ -34,7 +34,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/rollback"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
-	"github.com/elastic/go-elasticsearch/v8/esapi"
+	"github.com/elastic/go-elasticsearch/v9/esapi"
 
 	"github.com/gofrs/uuid/v5"
 	"github.com/hashicorp/go-version"

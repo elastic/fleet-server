@@ -13,7 +13,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v9"
 	"github.com/elastic/go-ucfg/yaml"
 	"github.com/rs/xid"
 
@@ -109,9 +109,9 @@ func CleanIndex(ctx context.Context, t *testing.T, bulker bulk.Bulk, index strin
 
 	cli := bulker.Client()
 
-	res, err := cli.API.DeleteByQuery([]string{index}, bytes.NewReader(query),
-		cli.API.DeleteByQuery.WithContext(ctx),
-		cli.API.DeleteByQuery.WithRefresh(true),
+	res, err := cli.DeleteByQuery([]string{index}, bytes.NewReader(query),
+		cli.DeleteByQuery.WithContext(ctx),
+		cli.DeleteByQuery.WithRefresh(true),
 	)
 	if err != nil {
 		t.Fatalf("could not clean index %s, DeleteByQuery failed: %v",

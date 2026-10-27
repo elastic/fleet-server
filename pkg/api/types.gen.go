@@ -59,6 +59,8 @@ func (e ActionType) Valid() bool {
 		return true
 	case UNENROLL:
 		return true
+	case UNINSTALL:
+		return true
 	case UPGRADE:
 		return true
 	default:
