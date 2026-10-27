@@ -177,6 +177,18 @@ curl -X POST https://fleet-server:8220/ofrep/v1/evaluate/flags/discover.cascadeL
 - Reasons are `STATIC` (no rules or prerequisites), `TARGETING_MATCH`, `SPLIT` and `DEFAULT`.
 - Missing or unknown tokens return `401`. Variants are the string form of the variation values.
 
+## Benchmarks
+
+`BenchmarkOFREPBulk` times a full bulk evaluation of this catalog through the OFREP handler, and
+`BenchmarkOFREPBulkNotModified` times the same request when the client sends the previous `ETag`.
+The definitions are `internal/pkg/featureflags/ofrep/testdata/catalog_flags.json`: the Kibana
+feature-flag catalog assigned to the `kibana` app, evaluated for a production credential.
+The benchmark does not include the `ofrep_limit` rate limiter or observed-context writes.
+
+```bash
+BENCHMARK_FILTER=OFREP BENCHMARK_ARGS='-count=1 -benchtime=1s -benchmem' mage test:benchmark
+```
+
 ## Limitations
 
 - Elasticsearch must allow access to the indices. They are registered as a `.feature-flags*` system
