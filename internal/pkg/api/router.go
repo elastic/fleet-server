@@ -5,6 +5,8 @@
 package api
 
 import (
+	"bufio"
+	"net"
 	"net/http"
 	"regexp"
 	"strings"
@@ -114,6 +116,18 @@ func (s *statusRecorder) WriteHeader(code int) {
 
 func (s *statusRecorder) Unwrap() http.ResponseWriter {
 	return s.ResponseWriter
+}
+
+// Hijack preserves http.Hijacker. gorilla/websocket type-asserts the writer it is given;
+// Unwrap is not enough, so OpAMP upgrades fail when this recorder is the outermost writer.
+func (s *statusRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	return http.NewResponseController(s.ResponseWriter).Hijack()
+}
+
+// Flush preserves http.Flusher for handlers that stream.
+func (s *statusRecorder) Flush() {
+	// The inner writer may not flush. Callers that only need Hijack are unaffected.
+	_ = http.NewResponseController(s.ResponseWriter).Flush()
 }
 
 var pgpReg = regexp.MustCompile(`\/api\/agents\/upgrades\/[0-9]+\.[0-9]+\.[0-9]+\/pgp-public-key`)

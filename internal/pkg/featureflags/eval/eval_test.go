@@ -379,6 +379,46 @@ func TestPercentageDistribution(t *testing.T) {
 	assert.InDelta(t, 0.50, float64(counts["green"])/n, tolerance)
 }
 
+func TestEquivalentJSONNumbersMatch(t *testing.T) {
+	var flag definitions.Flag
+	decodeUseNumber(t, `{
+	  "key": "org.plan", "value_type": "number",
+	  "variations": [123, 9007199254740993],
+	  "apps": ["kibana"],
+	  "environments": {"production": {
+	    "default": 9007199254740993,
+	    "rules": [{"type": "match", "attribute": "org.id", "operator": "in", "values": [123], "return": 123}]
+	  }}
+	}`, &flag)
+	compiled := Compile(&flag)
+	require.NoError(t, compiled.Err)
+
+	for _, raw := range []string{`{"org.id": 123}`, `{"org.id": 123.0}`, `{"org.id": 1.23e2}`} {
+		var m map[string]any
+		decodeUseNumber(t, raw, &m)
+		ctx, err := FlattenContext(m)
+		require.NoError(t, err)
+		res := Evaluate(compiled, "production", ctx, nil)
+		require.False(t, res.Failed(), raw)
+		assert.Equal(t, "123", definitions.ValueKey(res.Value), raw)
+	}
+
+	var none map[string]any
+	decodeUseNumber(t, `{}`, &none)
+	ctx, err := FlattenContext(none)
+	require.NoError(t, err)
+	res := Evaluate(compiled, "production", ctx, nil)
+	require.False(t, res.Failed())
+	assert.Equal(t, "9007199254740993", definitions.ValueKey(res.Value))
+}
+
+func decodeUseNumber(t *testing.T, raw string, dest any) {
+	t.Helper()
+	dec := json.NewDecoder(strings.NewReader(raw))
+	dec.UseNumber()
+	require.NoError(t, dec.Decode(dest))
+}
+
 func TestPercentageIsStablePerKeyAndVariesPerFlag(t *testing.T) {
 	differs := false
 	for i := range 100 {

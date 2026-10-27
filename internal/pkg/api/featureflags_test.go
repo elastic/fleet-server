@@ -16,6 +16,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gorilla/websocket"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -117,4 +119,66 @@ func TestMaxConnectionsCoversOFREP(t *testing.T) {
 	rec := httptest.NewRecorder()
 	srv.handler.ServeHTTP(rec, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/status", nil))
 	assert.Equal(t, http.StatusTooManyRequests, rec.Code)
+}
+
+func TestMaxConnectionsOFREPKeepsCORS(t *testing.T) {
+	cfg := &config.Server{}
+	cfg.Limits.MaxConnections = 1
+	started := make(chan struct{})
+	release := make(chan struct{})
+	srv := NewServer("127.0.0.1:0", cfg, WithFeatureFlags(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		close(started)
+		<-release
+	}), []string{"http://localhost:5601"}))
+
+	requestDone := make(chan struct{})
+	go func() {
+		defer close(requestDone)
+		srv.handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/ofrep/v1/evaluate/flags", nil))
+	}()
+	t.Cleanup(func() {
+		close(release)
+		<-requestDone
+	})
+	<-started
+
+	preflight := httptest.NewRequestWithContext(t.Context(), http.MethodOptions, "/ofrep/v1/evaluate/flags", nil)
+	preflight.Header.Set("Origin", "http://localhost:5601")
+	preflightRec := httptest.NewRecorder()
+	srv.handler.ServeHTTP(preflightRec, preflight)
+	assert.Equal(t, http.StatusNoContent, preflightRec.Code)
+	assert.Equal(t, "http://localhost:5601", preflightRec.Header().Get("Access-Control-Allow-Origin"))
+
+	blocked := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/ofrep/v1/evaluate/flags", nil)
+	blocked.Header.Set("Origin", "http://localhost:5601")
+	blockedRec := httptest.NewRecorder()
+	srv.handler.ServeHTTP(blockedRec, blocked)
+	assert.Equal(t, http.StatusTooManyRequests, blockedRec.Code)
+	assert.Equal(t, "http://localhost:5601", blockedRec.Header().Get("Access-Control-Allow-Origin"))
+}
+
+func TestMaxConnectionsPreservesOpAMPUpgrade(t *testing.T) {
+	cfg := &config.Server{}
+	cfg.Limits.MaxConnections = 1
+	cfg.Features.EnableOpAMP = true
+	oa := &OpAMPT{cfg: cfg}
+	oa.handler = func(w http.ResponseWriter, r *http.Request) {
+		upgrader := websocket.Upgrader{CheckOrigin: func(*http.Request) bool { return true }}
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		_ = conn.Close()
+	}
+	srv := NewServer("127.0.0.1:0", cfg, WithOpAMP(oa))
+	ts := httptest.NewServer(srv.handler)
+	t.Cleanup(ts.Close)
+
+	conn, resp, err := websocket.DefaultDialer.Dial(strings.Replace(ts.URL, "http", "ws", 1)+"/v1/opamp", nil)
+	require.NoError(t, err)
+	if resp != nil && resp.Body != nil {
+		resp.Body.Close()
+	}
+	conn.Close()
 }

@@ -59,7 +59,7 @@ func NewHandler(src SnapshotSource, opts Options) http.Handler {
 
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
-	r.Use(newCORS(opts.AllowedOrigins).middleware)
+	r.Use(Middleware(opts.AllowedOrigins))
 	r.Use(h.requireReady)
 	r.Use(h.authenticate)
 	r.Post(PathBulk, h.evaluateBulk)
@@ -164,17 +164,31 @@ func readContext(r *http.Request) (eval.Context, int, string) {
 	// Keep numbers as written, so large integer IDs keep their precision.
 	dec.UseNumber()
 	if err := dec.Decode(&req); err != nil && !errors.Is(err, io.EOF) {
-		var tooLarge *http.MaxBytesError
-		if errors.As(err, &tooLarge) {
-			return nil, http.StatusRequestEntityTooLarge, "request body too large"
-		}
-		return nil, http.StatusBadRequest, "invalid request body: " + err.Error()
+		status, details := bodyStatus(err)
+		return nil, status, details
+	}
+	// A second value, or trailing data past the body limit, must not be ignored.
+	// Decode reports io.EOF only once the input is fully consumed.
+	if err := dec.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		status, details := bodyStatus(err)
+		return nil, status, details
 	}
 	ctx, err := eval.FlattenContext(req.Context)
 	if err != nil {
 		return nil, http.StatusBadRequest, err.Error()
 	}
 	return ctx, http.StatusOK, ""
+}
+
+func bodyStatus(err error) (int, string) {
+	if err == nil {
+		return http.StatusBadRequest, "invalid request body: trailing data"
+	}
+	var tooLarge *http.MaxBytesError
+	if errors.As(err, &tooLarge) {
+		return http.StatusRequestEntityTooLarge, "request body too large"
+	}
+	return http.StatusBadRequest, "invalid request body: " + err.Error()
 }
 
 func (h *handler) observe(c caller, ctx eval.Context) {

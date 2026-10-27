@@ -10,6 +10,7 @@ package definitions
 
 import (
 	"encoding/json"
+	"math/big"
 	"strconv"
 )
 
@@ -132,7 +133,7 @@ func ValueKey(v any) string {
 	case int64:
 		return strconv.FormatInt(t, 10)
 	case json.Number:
-		return t.String()
+		return canonicalNumber(t)
 	default:
 		b, err := json.Marshal(t)
 		if err != nil {
@@ -140,4 +141,18 @@ func ValueKey(v any) string {
 		}
 		return string(b)
 	}
+}
+
+// canonicalNumber gives equivalent JSON numbers the same key.
+// 123, 123.0 and 1.23e2 match, and integers above 2^53 keep every digit.
+func canonicalNumber(n json.Number) string {
+	r, ok := new(big.Rat).SetString(n.String())
+	if !ok {
+		return n.String()
+	}
+	if r.IsInt() {
+		return r.Num().String()
+	}
+	f, _ := r.Float64()
+	return strconv.FormatFloat(f, 'f', -1, 64)
 }

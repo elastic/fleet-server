@@ -316,3 +316,17 @@ func TestBodyTooLarge(t *testing.T) {
 	res := do(t, limited, http.MethodPost, "/ofrep/v1/evaluate/flags/a.static", `{"context": {"targetingKey": "a very long key"}}`, bearer(sdkKey))
 	assert.Equal(t, http.StatusRequestEntityTooLarge, res.status)
 }
+
+func TestTrailingRequestBody(t *testing.T) {
+	h, _ := newTestHandler(t, Options{})
+	res := do(t, h, http.MethodPost, "/ofrep/v1/evaluate/flags/a.static", `{"context":{}}   `, bearer(sdkKey))
+	assert.Equal(t, http.StatusOK, res.status, "whitespace after the JSON value is consumed")
+
+	res = do(t, h, http.MethodPost, "/ofrep/v1/evaluate/flags/a.static", `{"context":{}}{"context":{}}`, bearer(sdkKey))
+	assert.Equal(t, http.StatusBadRequest, res.status)
+
+	limited := http.MaxBytesHandler(h, 64)
+	padded := `{"context":{}}` + strings.Repeat(" ", 128)
+	res = do(t, limited, http.MethodPost, "/ofrep/v1/evaluate/flags/a.static", padded, bearer(sdkKey))
+	assert.Equal(t, http.StatusRequestEntityTooLarge, res.status)
+}

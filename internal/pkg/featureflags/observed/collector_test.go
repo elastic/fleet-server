@@ -310,6 +310,32 @@ func TestCollectorMaxPending(t *testing.T) {
 	assert.Equal(t, uint64(1), c.dropped.Load())
 }
 
+func TestCollectorPendingByteBudget(t *testing.T) {
+	c, _ := newTestCollector(&fakeClient{}, Options{MaxPendingBytes: 64})
+	c.observeSync("app", "env", eval.Context{"targetingKey": "short"})
+	c.observeSync("app", "env", eval.Context{"targetingKey": strings.Repeat("k", 10_000)})
+	assert.Len(t, c.pending, 1)
+	assert.Equal(t, uint64(1), c.dropped.Load())
+	assert.Equal(t, "short", c.pending[DocID("app", "env", "short")].ContextKey)
+}
+
+func TestCollectorQueueByteBudget(t *testing.T) {
+	c, _ := newTestCollector(&fakeClient{}, Options{MaxPendingBytes: 32, BufferSize: 8})
+	c.Observe("app", "env", eval.Context{"targetingKey": strings.Repeat("k", 10_000)})
+	assert.Equal(t, uint64(1), c.dropped.Load())
+	assert.Empty(t, c.in)
+}
+
+func TestCollectorSplitsBulkBySize(t *testing.T) {
+	client := &fakeClient{}
+	c, _ := newTestCollector(client, Options{MaxBulkBytes: 1, MaxNewContextsPerFlush: 10})
+	for _, k := range []string{"a", "b", "c", "d", "e"} {
+		c.observeSync("app", "env", eval.Context{"targetingKey": k, "pad": strings.Repeat("x", 40)})
+	}
+	c.flush(t.Context())
+	assert.Equal(t, 5, client.bulkCount())
+}
+
 func TestCollectorRun(t *testing.T) {
 	client := &fakeClient{}
 	c := New(client, Options{

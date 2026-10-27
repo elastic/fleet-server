@@ -90,12 +90,6 @@ func (s *Snapshot) Environment(key string) *definitions.Environment {
 	return s.environments[key]
 }
 
-// docVersion returns the version of the document with id.
-func (s *Snapshot) docVersion(id string) (DocVersion, bool) {
-	e, ok := s.docs[id]
-	return e.version, ok
-}
-
 // Store holds the current snapshot. It is safe for concurrent use.
 type Store struct {
 	current atomic.Pointer[Snapshot]

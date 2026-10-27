@@ -33,6 +33,10 @@ const (
 	defaultBufferSize = 4096
 	defaultMaxPending = 50_000
 	defaultMaxKnown   = 100_000
+	// Ordinary contexts stay under the count cap. A burst of large targeting keys does not.
+	defaultMaxPendingBytes = 64 << 20
+	// Elasticsearch rejects a bulk body above http.max_content_length, which defaults to 100 MiB.
+	defaultMaxBulkBytes = 8 << 20
 )
 
 // Attribute types recorded in attribute_types.
@@ -68,12 +72,19 @@ type Options struct {
 	MaxPending int
 	// MaxKnown bounds the contexts remembered as written. Defaults to 100000.
 	MaxKnown int
+	// MaxPendingBytes bounds the bytes retained by queued and pending observations.
+	// The full targeting key is counted, not only the truncated stored value. Defaults to 64 MiB.
+	MaxPendingBytes int
+	// MaxBulkBytes bounds each bulk request. A larger flush is sent as several requests. Defaults to 8 MiB.
+	MaxBulkBytes int
 }
 
 type observation struct {
 	app, env string
 	ctx      eval.Context
 	at       time.Time
+	// bytes is the memory already charged to the collector for this observation.
+	bytes int
 }
 
 type entry struct {
@@ -87,6 +98,7 @@ type entry struct {
 	LastSeen       string            `json:"last_seen"`
 
 	lastSeen time.Time
+	size     int
 }
 
 // Collector buffers observed contexts and periodically upserts them.
@@ -98,8 +110,9 @@ type Collector struct {
 	log     zerolog.Logger
 	now     func() time.Time
 
-	in      chan observation
-	dropped atomic.Uint64
+	in       chan observation
+	dropped  atomic.Uint64
+	retained atomic.Int64
 
 	// Only accessed by the Run goroutine.
 	pending map[string]*entry
@@ -116,6 +129,12 @@ func New(client esclient.Client, opts Options, log zerolog.Logger) *Collector {
 	}
 	if opts.MaxKnown <= 0 {
 		opts.MaxKnown = defaultMaxKnown
+	}
+	if opts.MaxPendingBytes <= 0 {
+		opts.MaxPendingBytes = defaultMaxPendingBytes
+	}
+	if opts.MaxBulkBytes <= 0 {
+		opts.MaxBulkBytes = defaultMaxBulkBytes
 	}
 	exclude := make(map[string]struct{}, len(opts.ExcludeAttributes))
 	for _, a := range opts.ExcludeAttributes {
@@ -135,9 +154,15 @@ func New(client esclient.Client, opts Options, log zerolog.Logger) *Collector {
 
 // Observe records that ctx was evaluated for app and env. ctx must not be modified afterwards.
 func (c *Collector) Observe(app, env string, ctx eval.Context) {
+	size := contextBytes(ctx)
+	if !c.reserve(size) {
+		c.dropped.Add(1)
+		return
+	}
 	select {
-	case c.in <- observation{app: app, env: env, ctx: ctx, at: c.now()}:
+	case c.in <- observation{app: app, env: env, ctx: ctx, at: c.now(), bytes: size}:
 	default:
+		c.release(size)
 		c.dropped.Add(1)
 	}
 }
@@ -165,13 +190,108 @@ func DocID(app, env, contextKey string) string {
 }
 
 func (c *Collector) add(o observation) {
+	if o.bytes == 0 {
+		o.bytes = contextBytes(o.ctx)
+		if !c.reserve(o.bytes) {
+			c.dropped.Add(1)
+			return
+		}
+	}
 	e := c.toEntry(o)
+	e.size = entryBytes(e)
 	id := DocID(e.App, e.Environment, e.ContextKey)
-	if _, ok := c.pending[id]; !ok && len(c.pending) >= c.opts.MaxPending {
+	if prev, ok := c.pending[id]; ok {
+		delta := e.size - prev.size - o.bytes
+		if delta > 0 && !c.reserve(delta) {
+			c.release(o.bytes)
+			c.dropped.Add(1)
+			return
+		}
+		if delta < 0 {
+			c.release(-delta)
+		}
+		c.pending[id] = e
+		return
+	}
+	if len(c.pending) >= c.opts.MaxPending || (e.size > o.bytes && !c.reserve(e.size-o.bytes)) {
+		c.release(o.bytes)
 		c.dropped.Add(1)
 		return
 	}
+	if e.size < o.bytes {
+		c.release(o.bytes - e.size)
+	}
 	c.pending[id] = e
+}
+
+func (c *Collector) reserve(n int) bool {
+	if n < 0 {
+		n = 0
+	}
+	limit := int64(c.opts.MaxPendingBytes)
+	for {
+		cur := c.retained.Load()
+		next := cur + int64(n)
+		if next > limit {
+			return false
+		}
+		if c.retained.CompareAndSwap(cur, next) {
+			return true
+		}
+	}
+}
+
+func (c *Collector) release(n int) {
+	if n <= 0 {
+		return
+	}
+	for {
+		cur := c.retained.Load()
+		next := cur - int64(n)
+		if next < 0 {
+			next = 0
+		}
+		if c.retained.CompareAndSwap(cur, next) {
+			return
+		}
+	}
+}
+
+func contextBytes(ctx eval.Context) int {
+	n := 0
+	for k, v := range ctx {
+		n += len(k) + valueBytes(v)
+	}
+	return n
+}
+
+func entryBytes(e *entry) int {
+	n := len(e.App) + len(e.Environment) + len(e.ContextKey)
+	for k, v := range e.Context {
+		n += len(k) + valueBytes(v)
+	}
+	for k, v := range e.AttributeTypes {
+		n += len(k) + len(v)
+	}
+	for _, a := range e.Attributes {
+		n += len(a)
+	}
+	return n
+}
+
+func valueBytes(v any) int {
+	switch t := v.(type) {
+	case string:
+		return len(t)
+	case json.Number:
+		return len(t.String())
+	default:
+		b, err := json.Marshal(t)
+		if err != nil {
+			return 0
+		}
+		return len(b)
+	}
 }
 
 func truncate(s string) string {
@@ -273,6 +393,11 @@ func (c *Collector) flush(ctx context.Context) {
 	}
 	entries := c.pending
 	c.pending = make(map[string]*entry, len(entries))
+	defer func() {
+		for _, e := range entries {
+			c.release(e.size)
+		}
+	}()
 
 	// Fleet Server never creates the index: an upsert would create it with dynamic mappings.
 	exists, err := c.indexExists(ctx)
@@ -286,9 +411,21 @@ func (c *Collector) flush(ctx context.Context) {
 	}
 
 	var buf bytes.Buffer
-	written := make(map[string]time.Time, len(entries))
+	batch := map[string]time.Time{}
 	newPerScope := map[string]int{}
 	sampledOut := 0
+	written := 0
+	failed := 0
+	send := func() {
+		if len(batch) == 0 {
+			return
+		}
+		ok, bad := c.sendBulk(ctx, buf.Bytes(), batch)
+		written += ok
+		failed += bad
+		buf.Reset()
+		batch = map[string]time.Time{}
+	}
 	for id, e := range entries {
 		e.LastSeen = e.lastSeen.UTC().Format(time.RFC3339Nano)
 		params := map[string]any{
@@ -314,28 +451,40 @@ func (c *Collector) flush(ctx context.Context) {
 			e.FirstSeen = e.LastSeen
 			body["upsert"] = e
 		}
-		if err := writeBulkUpdate(&buf, c.opts.Index, id, body); err != nil {
+		var op bytes.Buffer
+		if err := writeBulkUpdate(&op, c.opts.Index, id, body); err != nil {
 			c.log.Warn().Err(err).Msg("failed to encode observed context")
 			continue
 		}
-		written[id] = e.lastSeen
+		// A single document larger than the limit is sent alone. Several documents share a request
+		// only while the body stays within MaxBulkBytes.
+		if buf.Len() > 0 && buf.Len()+op.Len() > c.opts.MaxBulkBytes {
+			send()
+		}
+		buf.Write(op.Bytes())
+		batch[id] = e.lastSeen
 	}
+	send()
 	if sampledOut > 0 {
 		c.log.Debug().Int("sampled_out", sampledOut).Msg("new observed contexts over the per-flush limit were dropped")
 	}
-	if len(written) == 0 {
+	if written+failed == 0 {
 		return
 	}
+	c.trimKnown()
+	c.log.Debug().Int("written", written).Int("failed", failed).Msg("observed contexts flushed")
+}
 
-	data, err := c.client.Bulk(ctx, buf.Bytes())
+func (c *Collector) sendBulk(ctx context.Context, body []byte, written map[string]time.Time) (int, int) {
+	data, err := c.client.Bulk(ctx, body)
 	if err != nil {
 		c.log.Warn().Err(err).Int("contexts", len(written)).Msg("failed to write observed contexts")
-		return
+		return 0, len(written)
 	}
 	var resp bulkResponse
 	if err := json.Unmarshal(data, &resp); err != nil {
 		c.log.Warn().Err(err).Msg("failed to decode observed contexts bulk response")
-		return
+		return 0, len(written)
 	}
 	failed := 0
 	for _, item := range resp.Items {
@@ -354,8 +503,7 @@ func (c *Collector) flush(ctx context.Context) {
 			}
 		}
 	}
-	c.trimKnown()
-	c.log.Debug().Int("written", len(written)-failed).Int("failed", failed).Msg("observed contexts flushed")
+	return len(written) - failed, failed
 }
 
 func (c *Collector) trimKnown() {

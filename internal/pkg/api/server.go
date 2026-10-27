@@ -74,6 +74,12 @@ func NewServer(addr string, cfg *config.Server, opts ...APIOpt) *server {
 		// and applying it in both places would count Fleet requests twice.
 		handler = throttleWithCount(cfg.Limits.MaxConnections)(handler)
 	}
+	if a.ff != nil {
+		// Outside the connection cap, so a saturated cap still returns CORS headers and a
+		// preflight does not take a slot. The route-level CORS middleware covers the OFREP
+		// rate limiter, which sits inside the cap.
+		handler = ofrep.PrefixMiddleware("/ofrep/", a.ffOrigins)(handler)
+	}
 
 	s.handler = handler
 	return &s
