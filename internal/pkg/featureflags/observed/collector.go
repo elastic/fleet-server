@@ -247,10 +247,7 @@ func (c *Collector) release(n int) {
 	}
 	for {
 		cur := c.retained.Load()
-		next := cur - int64(n)
-		if next < 0 {
-			next = 0
-		}
+		next := max(cur-int64(n), 0)
 		if c.retained.CompareAndSwap(cur, next) {
 			return
 		}
