@@ -6,10 +6,12 @@ package store
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"maps"
+	"net/http"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -58,8 +60,9 @@ type Syncer struct {
 	now    func() time.Time
 
 	// lowerBound is the start time of the last successful poll or full reload.
-	lowerBound   time.Time
-	indexMissing bool
+	lowerBound      time.Time
+	indexMissing    bool
+	uuidUnavailable bool
 }
 
 // NewSyncer returns a Syncer that publishes into store.
@@ -216,13 +219,35 @@ func (s *Syncer) markIndexMissing(missing bool) {
 
 // entryFor reuses the parsed entry of the current snapshot when the document did not change.
 // The index UUID has to match: a recreated index can reuse _seq_no and _primary_term.
+// The source hash covers the case where the UUID cannot be read.
 func entryFor(prev *Snapshot, indexUUID string, raw RawDoc) docEntry {
 	if prev != nil && prev.IndexUUID == indexUUID {
-		if e, ok := prev.docs[raw.ID]; ok && e.version == raw.Version {
+		if e, ok := prev.docs[raw.ID]; ok && e.version == raw.Version && e.sourceHash == sha256.Sum256(raw.Source) {
 			return e
 		}
 	}
 	return parseDoc(raw)
+}
+
+// indexUUID returns the definitions index UUID.
+// A forbidden settings read is reported once and treated as an empty UUID, so definitions still load
+// on a cluster whose fleet-server service account has not yet been granted view_index_metadata.
+func (s *Syncer) indexUUID(ctx context.Context) (string, error) {
+	uuid, err := s.client.IndexUUID(ctx, s.opts.Index)
+	if err == nil || errors.Is(err, esclient.ErrIndexNotFound) {
+		return uuid, err
+	}
+	var respErr *esclient.ResponseError
+	if errors.As(err, &respErr) && respErr.Status == http.StatusForbidden {
+		if !s.uuidUnavailable {
+			s.uuidUnavailable = true
+			s.log.Warn().Err(err).Msg("feature flags index uuid is not readable; definitions still load, " +
+				"and a recreated index is picked up on the next full resync. " +
+				"Grant the fleet-server service account view_index_metadata on .feature-flags-definitions*")
+		}
+		return "", nil
+	}
+	return "", err
 }
 
 func rawDoc(hit searchHit) RawDoc {
@@ -233,7 +258,7 @@ func rawDoc(hit searchHit) RawDoc {
 // Pages are read from one point in time, ordered by _shard_doc, which is unique for the life of that point in time.
 func (s *Syncer) fullReload(ctx context.Context) error {
 	start := s.now()
-	uuid, err := s.client.IndexUUID(ctx, s.opts.Index)
+	uuid, err := s.indexUUID(ctx)
 	if errors.Is(err, esclient.ErrIndexNotFound) {
 		s.publishEmpty(start)
 		return nil
@@ -309,7 +334,7 @@ func (s *Syncer) poll(ctx context.Context) error {
 	if snap == nil {
 		return s.fullReload(ctx)
 	}
-	uuid, err := s.client.IndexUUID(ctx, s.opts.Index)
+	uuid, err := s.indexUUID(ctx)
 	if errors.Is(err, esclient.ErrIndexNotFound) {
 		s.markIndexMissing(true)
 		if snap.DocCount() > 0 {
@@ -361,7 +386,7 @@ func (s *Syncer) poll(ctx context.Context) error {
 	var docs map[string]docEntry
 	for _, hit := range resp.Hits.Hits {
 		raw := rawDoc(hit)
-		if v, ok := snap.docVersion(raw.ID); ok && v == raw.Version {
+		if e, ok := snap.docs[raw.ID]; ok && e.version == raw.Version && e.sourceHash == sha256.Sum256(raw.Source) {
 			continue
 		}
 		if docs == nil {

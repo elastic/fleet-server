@@ -180,8 +180,10 @@ curl -X POST https://fleet-server:8220/ofrep/v1/evaluate/flags/discover.cascadeL
 ## Limitations
 
 - Elasticsearch must allow access to the indices. They are registered as a `.feature-flags*` system
-  index, and the `fleet-server` service account needs `read` on `.feature-flags-definitions*` and `read`
-  and `write` on `.feature-flags-observed-contexts*`. Until that change reaches Elasticsearch snapshots,
+  index, and the `fleet-server` service account needs `read` and `view_index_metadata` on
+  `.feature-flags-definitions*` and `read` and `write` on `.feature-flags-observed-contexts*`.
+  `view_index_metadata` is what allows reading the index UUID. Without it, definitions still load and a
+  recreated index is picked up on the next full resync. Until that change reaches Elasticsearch snapshots,
   run Elasticsearch from source (for example with `yarn es source` in Kibana) on the branch with the grants.
 - Observed contexts, including the `targetingKey`, may contain personal data. Collection is opt-in and
   attributes can be excluded; Kibana enforces retention.

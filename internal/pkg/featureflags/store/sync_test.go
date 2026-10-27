@@ -34,17 +34,19 @@ type fakeDoc struct {
 
 // fakeES implements the subset of the search API used by the Syncer.
 type fakeES struct {
-	mu         sync.Mutex
-	docs       map[string]*fakeDoc
-	seqNo      int64
-	order      int
-	uuid       string
-	missing    bool
-	partial    bool
-	fail       error
-	searches   []map[string]any
-	pitsOpened int
-	pitsClosed int
+	mu      sync.Mutex
+	docs    map[string]*fakeDoc
+	seqNo   int64
+	order   int
+	uuid    string
+	missing bool
+	partial bool
+	// uuidForbidden makes IndexUUID return the settings-read authorization error.
+	uuidForbidden bool
+	fail          error
+	searches      []map[string]any
+	pitsOpened    int
+	pitsClosed    int
 }
 
 func newFakeES() *fakeES {
@@ -157,6 +159,9 @@ func (f *fakeES) IndexUUID(context.Context, string) (string, error) {
 	defer f.mu.Unlock()
 	if f.fail != nil {
 		return "", f.fail
+	}
+	if f.uuidForbidden {
+		return "", &esclient.ResponseError{Status: 403, Type: "security_exception", Reason: "unauthorized"}
 	}
 	if f.missing {
 		return "", &esclient.ResponseError{Status: 404, Type: "index_not_found_exception"}
@@ -423,6 +428,28 @@ func TestFailedPollWidensWindow(t *testing.T) {
 	gte := searches[len(searches)-1]["query"].(map[string]any)["range"].(map[string]any)["updated_at"].(map[string]any)["gte"]
 	assert.Equal(t, loadedAt.Add(-time.Minute).Format(time.RFC3339Nano), gte, "the lower bound is kept after a failure")
 	assert.NotNil(t, st.Load().Flag("a"))
+}
+
+func TestLoadContinuesWhenIndexUUIDIsForbidden(t *testing.T) {
+	es := newFakeES()
+	es.uuidForbidden = true
+	s, st, clock := newTestSyncer(es, 100)
+	es.put(t, "a", clock.Now(), flagDoc("a", false))
+
+	require.NoError(t, s.fullReload(t.Context()))
+	require.True(t, st.Ready())
+	assert.Equal(t, "", st.Load().IndexUUID)
+	assert.Equal(t, false, defaultOf(t, st.Load(), "a"))
+	assert.Equal(t, 0, es.pitBalance())
+
+	// Same _seq_no, different source. The source hash still forces a reparse on the next full reload.
+	es.replaceSource(t, "a", flagDoc("a", true))
+	require.NoError(t, s.fullReload(t.Context()))
+	assert.Equal(t, true, defaultOf(t, st.Load(), "a"))
+
+	clock.Advance(10 * time.Second)
+	require.NoError(t, s.poll(t.Context()))
+	assert.True(t, st.Ready())
 }
 
 func TestPartialSearchIsRejected(t *testing.T) {

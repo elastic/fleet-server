@@ -31,9 +31,10 @@ type DocVersion struct {
 // docEntry is a document of the definitions index. doc is nil when the source could not be parsed;
 // the entry is still kept so the document count matches the index.
 type docEntry struct {
-	version DocVersion
-	doc     *definitions.Document
-	flag    *eval.Flag
+	version    DocVersion
+	sourceHash [32]byte
+	doc        *definitions.Document
+	flag       *eval.Flag
 }
 
 // Snapshot is an immutable view of the definitions index. It must not be modified once published.
@@ -128,7 +129,7 @@ type RawDoc struct {
 
 // parseDoc parses a raw document, compiling flags. Invalid sources yield an entry without document.
 func parseDoc(raw RawDoc) docEntry {
-	entry := docEntry{version: raw.Version}
+	entry := docEntry{version: raw.Version, sourceHash: sha256.Sum256(raw.Source)}
 	// UseNumber keeps integers larger than 2^53 exact. The default decoder turns them into float64.
 	dec := json.NewDecoder(bytes.NewReader(raw.Source))
 	dec.UseNumber()
@@ -180,6 +181,8 @@ func buildSnapshot(docs map[string]docEntry, indexUUID string) *Snapshot {
 		h.Write([]byte(strconv.FormatInt(e.version.SeqNo, 10)))
 		h.Write([]byte{0})
 		h.Write([]byte(strconv.FormatInt(e.version.PrimaryTerm, 10)))
+		h.Write([]byte{0})
+		h.Write(e.sourceHash[:])
 		h.Write([]byte{0})
 
 		if e.doc == nil {
