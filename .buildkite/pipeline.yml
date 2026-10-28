@@ -18,7 +18,7 @@ common:
         debug: true
   - bk_analytics_token_plugin: &bk_analytics_token_plugin
       elastic/vault-secrets#v0.1.0:
-        path: "kv/ci-shared/platform-ingest/buildkite_analytics_token"
+        path: "kv/ci-shared/platform-ingest/fleet_server_buildkite_analytics_token"
         field: "token"
         env_var: "BUILDKITE_ANALYTICS_TOKEN"
   - docker_elastic_login_plugin: &docker_elastic_login_plugin
