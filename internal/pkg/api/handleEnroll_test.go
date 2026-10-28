@@ -452,9 +452,7 @@ func TestEnrollWithAgentIDExistingPendingUninstallResetsOutputs(t *testing.T) {
 	var pbkdf2Cfg config.PBKDF2
 	pbkdf2Cfg.InitDefaults()
 	replaceHash, err := hashReplaceToken(replaceToken, pbkdf2Cfg)
-	if err != nil {
-		t.Fatalf("error generating bcrypt hash: %v", err)
-	}
+	require.NoError(t, err)
 	req := &EnrollRequest{
 		Type: "PERMANENT",
 		Id:   &agentID,
