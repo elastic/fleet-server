@@ -173,6 +173,10 @@ type (
 		// check in with an invalid or disabled API key.
 		GracefulForceUnenroll GracefulForceUnenrollConfig `config:"graceful_force_unenroll"`
 
+		// EvaluateConditions controls which input conditions Fleet Server evaluates
+		// before delivering a policy to an agent.
+		EvaluateConditions EvaluateConditionsConfig `config:"evaluate_conditions"`
+
 		// SyncEnrollmentWrite (config key: feature_flags._sync_enrollment_write) selects the enrollment write strategy.
 		// When false (default), agent documents are written via the async bulk queue — existing behavior.
 		// When true, agent documents are written synchronously with refresh=wait_for, making the document
@@ -187,6 +191,16 @@ type (
 		// Hidden escape hatch for specific support cases; agents newer than Fleet Server are not a supported
 		// configuration, and Fleet Server will ignore fields and action types it does not know about.
 		MaxAgentVersion AgentVersionLimit `config:"_max_agent_version"`
+	}
+
+	// EvaluateConditionsConfig selects the input conditions Fleet Server evaluates.
+	EvaluateConditionsConfig struct {
+		// AgentID omits Synthetics inputs and streams pinned to another agent by
+		// an exact `${agent.id} == '<id>'` condition from the policy sent to an
+		// agent; inputs of any other type are sent unchanged.
+		// Elastic Agent discards them anyway; this only reduces the policy size.
+		// Defaults to true.
+		AgentID bool `config:"agent_id"`
 	}
 
 	// GracefulForceUnenrollConfig controls the graceful-force-unenroll feature.
@@ -221,6 +235,7 @@ func (c *Server) InitDefaults() {
 	c.PGP.InitDefaults()
 	c.PDKDF2.InitDefaults()
 	c.Features.EnableOpAMP = true
+	c.Features.EvaluateConditions.AgentID = true
 	c.Features.GracefulForceUnenroll.MaxBytes = DefaultGracefulForceUnenrollMaxBytes
 }
 
