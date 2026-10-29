@@ -7,15 +7,15 @@
 ### Fixes [fleet-server-9.4.9-fixes]
 
 
-* Refresh PGP key when server.pgp.upstream_url is changed. [#8157](https://github.com/elastic/fleet-server/pull/8157) [#8159](https://github.com/elastic/fleet-server/pull/8159) 
-* Retry enrollment write in sync path to reduce ghost agents. [#8157](https://github.com/elastic/fleet-server/pull/8157) [#8159](https://github.com/elastic/fleet-server/pull/8159) 
+* Refresh PGP key when server.pgp.upstream_url is changed. [#8121](https://github.com/elastic/fleet-server/pull/8121) [#7836](https://github.com/elastic/fleet-server/issues/7836)
+* Retry enrollment write in sync path to reduce ghost agents. [#7960](https://github.com/elastic/fleet-server/pull/7960) [#7741](https://github.com/elastic/fleet-server/issues/7741)
 
   Transient Elasticsearch errors during agent enrollment could leave ghost agents —
   offline agent records that were never successfully enrolled. Fleet Server now
   retries the enrollment write on these transient errors, reducing the likelihood
   of ghost agents appearing during large-scale enrollment bursts.
   
-* Avoid out-of-memory kills when many agents check in right after Fleet Server starts. [#8157](https://github.com/elastic/fleet-server/pull/8157) [#8159](https://github.com/elastic/fleet-server/pull/8159) 
+* Avoid out-of-memory kills when many agents check in right after Fleet Server starts. [#8097](https://github.com/elastic/fleet-server/pull/8097) 
 
   When an agent checked in for a policy that Fleet Server had not cached yet, the
   check-in loaded every policy from Elasticsearch in its own goroutine. Right after
