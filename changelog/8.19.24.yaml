@@ -1,0 +1,44 @@
+version: 8.19.24
+entries:
+    - kind: bug-fix
+      summary: Retry enrollment write in sync path to reduce ghost agents
+      description: |
+        Transient Elasticsearch errors during agent enrollment could leave ghost agents —
+        offline agent records that were never successfully enrolled. Fleet Server now
+        retries the enrollment write on these transient errors, reducing the likelihood
+        of ghost agents appearing during large-scale enrollment bursts.
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/8155
+        - https://github.com/elastic/fleet-server/pull/8161
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1790865432
+      file:
+        name: 1790865432-retry-sync-enrollment-write.yaml
+        checksum: 9ea9900cc43831f77a8b308e2183048c235b9e81
+    - kind: bug-fix
+      summary: Avoid out-of-memory kills when many agents request artifacts right after Fleet Server starts
+      description: |
+        When an agent requested an artifact for a policy that Fleet Server had not cached
+        yet, the authorization of the request loaded every policy from Elasticsearch in its
+        own goroutine. Right after a start, many agents requesting artifacts at once for
+        different policies each ran a full load of every policy at the same time, and the
+        memory used by the decoded policies could exceed the memory limit of the container
+        and get Fleet Server OOMKilled.
+
+        Fleet Server now loads only the policy the agent needs, and agents that ask for the
+        same policy while it is being loaded wait for that one load instead of starting
+        their own.
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/8155
+        - https://github.com/elastic/fleet-server/pull/8161
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1792519354
+      file:
+        name: 1792519354-load-only-the-requested-policy-when-an-artifact-request-misses-the-policy-cache.yaml
+        checksum: e72d22ff5d3f009bc870cb23c3db805905cd8abf

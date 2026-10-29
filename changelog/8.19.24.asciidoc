@@ -1,0 +1,33 @@
+// begin 8.19.24 relnotes
+
+[[release-notes-8.19.24]]
+==  8.19.24
+
+Review important information about the  8.19.24 release.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[discrete]
+[[bug-fixes-8.19.24]]
+=== Bug fixes
+
+
+
+
+* Retry enrollment write in sync path to reduce ghost agents. https://github.com/elastic/fleet-server/pull/8155[#8155] https://github.com/elastic/fleet-server/pull/8161[#8161] 
+* Avoid out-of-memory kills when many agents request artifacts right after Fleet Server starts. https://github.com/elastic/fleet-server/pull/8155[#8155] https://github.com/elastic/fleet-server/pull/8161[#8161] 
+
+// end 8.19.24 relnotes
