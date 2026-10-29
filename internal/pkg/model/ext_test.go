@@ -167,6 +167,58 @@ func TestAgentAPIKeyIDs(t *testing.T) {
 	}
 }
 
+func TestAgentOutputAPIKeyIDs(t *testing.T) {
+	tcs := []struct {
+		name  string
+		agent Agent
+		want  []ToRetireAPIKeyIdsItems
+	}{
+		{
+			name: "excludes the access API key",
+			agent: Agent{
+				AccessAPIKeyID: "access_api_key_id",
+				Outputs: map[string]*PolicyOutput{
+					"default": {APIKeyID: "default_api_key_id"}, //nolint:gosec // test data, not real credentials
+					"p2": { //nolint:gosec // test data, not real credentials
+						APIKeyID: "p2_api_key_id",
+						ToRetireAPIKeyIds: []ToRetireAPIKeyIdsItems{{
+							ID:     "p2_to_retire_key",
+							Output: "remote",
+						}}},
+				},
+			},
+			want: []ToRetireAPIKeyIdsItems{
+				{ID: "default_api_key_id", Output: "", RetiredAt: ""},
+				{ID: "p2_api_key_id", Output: "p2", RetiredAt: ""},
+				{ID: "p2_to_retire_key", Output: "remote", RetiredAt: ""},
+			},
+		},
+		{
+			name: "no outputs returns nothing",
+			agent: Agent{
+				AccessAPIKeyID: "access_api_key_id",
+			},
+			want: nil,
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			got := tc.agent.OutputAPIKeyIDs()
+
+			// The access key must never be present.
+			for _, k := range got {
+				assert.NotEqual(t, tc.agent.AccessAPIKeyID, k.ID,
+					"OutputAPIKeyIDs must not include the access API key")
+			}
+
+			// if A contains B and B contains A => A = B
+			assert.Subset(t, tc.want, got)
+			assert.Subset(t, got, tc.want)
+		})
+	}
+}
+
 func TestAgentComputeTagsHash(t *testing.T) {
 	hash := func(t *testing.T, tags ...string) string {
 		t.Helper()
