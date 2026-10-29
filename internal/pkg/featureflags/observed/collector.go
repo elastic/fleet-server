@@ -197,6 +197,13 @@ func (c *Collector) add(o observation) {
 			return
 		}
 	}
+	// A context written within last_seen_resolution is remembered by document id only.
+	// Its body is not queued: the next flush would skip it, and the entry would occupy a pending slot.
+	// The remembered time stays at the last write, so a poll after the resolution is stored.
+	if last, ok := c.known[DocID(o.app, o.env, c.contextKey(o.ctx))]; ok && o.at.Sub(last) <= c.opts.LastSeenResolution {
+		c.release(o.bytes)
+		return
+	}
 	e := c.toEntry(o)
 	e.size = entryBytes(e)
 	id := DocID(e.App, e.Environment, e.ContextKey)
@@ -299,22 +306,44 @@ func truncate(s string) string {
 	return string(runes[:MaxValueLength])
 }
 
+// contextKey is the document identity: the original targeting key, or the sha256 of the
+// canonical untruncated context when there is none. Stored values may be truncated later.
+func (c *Collector) contextKey(ctx eval.Context) string {
+	if tk, ok := ctx[eval.TargetingKey].(string); ok && tk != "" {
+		if _, skip := c.exclude[eval.TargetingKey]; !skip {
+			return tk
+		}
+	}
+	identity := make(map[string]any, len(ctx))
+	for k, v := range ctx {
+		if _, skip := c.exclude[k]; skip {
+			continue
+		}
+		switch t := v.(type) {
+		case string, bool, float64, json.Number:
+			identity[k] = t
+		default:
+			b, err := json.Marshal(t)
+			if err != nil {
+				continue
+			}
+			identity[k] = string(b)
+		}
+	}
+	// encoding/json sorts map keys, so this is a canonical form of the untruncated context.
+	canonical, _ := json.Marshal(identity)
+	sum := sha256.Sum256(canonical)
+	return hex.EncodeToString(sum[:])
+}
+
 func (c *Collector) toEntry(o observation) *entry {
 	e := &entry{
 		App:            o.app,
 		Environment:    o.env,
+		ContextKey:     c.contextKey(o.ctx),
 		Context:        make(map[string]any, len(o.ctx)),
 		AttributeTypes: make(map[string]string, len(o.ctx)),
 		lastSeen:       o.at,
-	}
-	// Identity is taken from the original values. Stored attribute values are truncated afterwards,
-	// so two targeting keys that share a 256-character prefix stay distinct documents.
-	identity := make(map[string]any, len(o.ctx))
-	var contextKey string
-	if tk, ok := o.ctx[eval.TargetingKey].(string); ok && tk != "" {
-		if _, skip := c.exclude[eval.TargetingKey]; !skip {
-			contextKey = tk
-		}
 	}
 	for k, v := range o.ctx {
 		if _, skip := c.exclude[k]; skip {
@@ -322,15 +351,12 @@ func (c *Collector) toEntry(o observation) *entry {
 		}
 		switch t := v.(type) {
 		case string:
-			identity[k] = t
 			e.Context[k] = truncate(t)
 			e.AttributeTypes[k] = TypeString
 		case bool:
-			identity[k] = t
 			e.Context[k] = t
 			e.AttributeTypes[k] = TypeBoolean
 		case float64, json.Number:
-			identity[k] = t
 			e.Context[k] = t
 			e.AttributeTypes[k] = TypeNumber
 		default:
@@ -339,7 +365,6 @@ func (c *Collector) toEntry(o observation) *entry {
 			if err != nil {
 				continue
 			}
-			identity[k] = string(b)
 			e.Context[k] = truncate(string(b))
 			e.AttributeTypes[k] = TypeString
 		}
@@ -348,15 +373,6 @@ func (c *Collector) toEntry(o observation) *entry {
 	slices.Sort(e.Attributes)
 	if e.Attributes == nil {
 		e.Attributes = []string{}
-	}
-
-	if contextKey != "" {
-		e.ContextKey = contextKey
-	} else {
-		// encoding/json sorts map keys, so this is a canonical form of the untruncated context.
-		canonical, _ := json.Marshal(identity)
-		sum := sha256.Sum256(canonical)
-		e.ContextKey = hex.EncodeToString(sum[:])
 	}
 	return e
 }

@@ -217,8 +217,12 @@ func TestCollectorLastSeenResolution(t *testing.T) {
 	c.flush(t.Context())
 	require.Equal(t, 1, client.bulkCount())
 
+	writtenAt := c.known[DocID("app", "env", "k")]
 	*now = now.Add(30 * time.Minute)
 	c.observeSync("app", "env", ctx)
+	assert.Empty(t, c.pending, "a recently written context keeps no body")
+	assert.Equal(t, writtenAt, c.known[DocID("app", "env", "k")], "the remembered time stays at the last write")
+	assert.Equal(t, int64(0), c.retained.Load())
 	c.flush(t.Context())
 	assert.Equal(t, 1, client.bulkCount(), "last_seen moved less than the resolution")
 
@@ -232,6 +236,22 @@ func TestCollectorLastSeenResolution(t *testing.T) {
 	params := ops[0].Body["script"].(map[string]any)["params"].(map[string]any)
 	assert.Equal(t, "2026-01-01T01:01:00Z", params["last_seen"])
 	assert.Equal(t, []any{"new", "targetingKey"}, params["attributes"])
+}
+
+func TestCollectorKnownContextLeavesRoomForNewOnes(t *testing.T) {
+	client := &fakeClient{}
+	c, now := newTestCollector(client, Options{MaxPending: 1, LastSeenResolution: time.Hour})
+
+	c.observeSync("app", "env", eval.Context{"targetingKey": "known", "kibana.version": "9.6.0"})
+	c.flush(t.Context())
+
+	*now = now.Add(time.Minute)
+	c.observeSync("app", "env", eval.Context{"targetingKey": "known", "kibana.version": "9.7.0"})
+	c.observeSync("app", "env", eval.Context{"targetingKey": "new"})
+
+	require.Len(t, c.pending, 1)
+	assert.Equal(t, "new", c.pending[DocID("app", "env", "new")].ContextKey)
+	assert.Equal(t, uint64(0), c.dropped.Load())
 }
 
 func TestCollectorCapsNewContextsPerAppAndEnvironment(t *testing.T) {

@@ -146,6 +146,7 @@ Context attributes are dotted keys. Both flat keys (`{"kibana.version": "9.3.0"}
 ```
 
 - Collection never blocks requests: contexts are buffered in memory and dropped when the buffers are full.
+  A context already written within `last_seen_resolution` is not buffered again; only its document id and write time are kept.
 - `exclude_attributes` are dropped before anything is stored. Values are truncated to 256 characters.
   The document identity uses the original targeting key, before that truncation. Lists are stored as
   their JSON string.
