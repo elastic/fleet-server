@@ -16,8 +16,8 @@ const (
 	defaultFeatureFlagsResyncInterval         = time.Hour
 	defaultFeatureFlagsDefinitionsIndex       = ".feature-flags-definitions"
 	defaultFeatureFlagsObservedContextsIndex  = ".feature-flags-observed-contexts"
-	defaultObservedContextsFlushInterval      = 60 * time.Second
-	defaultObservedContextsMaxNewPerFlush     = 1000
+	defaultObservedContextsFlushInterval      = 30 * time.Second
+	defaultObservedContextsMaxNewPerFlush     = 10000
 	defaultObservedContextsLastSeenResolution = time.Hour
 
 	minFeatureFlagsPollInterval  = time.Second

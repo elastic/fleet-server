@@ -38,14 +38,14 @@ set in the Fleet Server integration's input configuration.
 | `observed_contexts_index` | `.feature-flags-observed-contexts` | Index the observed contexts are written to. |
 | `cors.allowed_origins` | `[]` | Origins allowed to call the endpoints from a browser. `*` allows any origin. |
 | `observed_contexts.enabled` | `false` | Records the evaluation contexts. |
-| `observed_contexts.flush_interval` | `60s` | How often the contexts are written. Minimum `1s`. |
-| `observed_contexts.max_new_contexts_per_flush` | `1000` | Previously unseen contexts written per app and environment on each flush; the rest are dropped. |
+| `observed_contexts.flush_interval` | `30s` | How often the contexts are written. Minimum `1s`. |
+| `observed_contexts.max_new_contexts_per_flush` | `10000` | Previously unseen contexts written per app and environment on each flush; the rest are dropped. |
 | `observed_contexts.last_seen_resolution` | `1h` | A known context is written again only when its `last_seen` moves by more than this. |
 | `observed_contexts.exclude_attributes` | `[]` | Context attributes (dotted keys) that are never stored. |
 
-The endpoints are rate limited by `server.limits.ofrep_limit` (by default an interval of `1ms`, a burst
-of `1000`, no maximum of concurrent requests, and a `64KiB` body limit). Their metrics are reported under
-`http_server.routes.ofrep`.
+The endpoints are rate limited by `server.limits.ofrep_limit` (by default an interval of `100µs`,
+10,000 requests per second, a burst of `10000`, no maximum of concurrent requests, and a `64KiB` body
+limit). Their metrics are reported under `http_server.routes.ofrep`.
 
 Changing the section restarts Fleet Server's subsystems, like other server configuration changes.
 

@@ -37,8 +37,8 @@ func TestFeatureFlagsServiceDefaults(t *testing.T) {
 	assert.Equal(t, ".feature-flags-observed-contexts", ffs.ObservedContextsIndex)
 	assert.Empty(t, ffs.CORS.AllowedOrigins)
 	assert.False(t, ffs.ObservedContexts.Enabled)
-	assert.Equal(t, 60*time.Second, ffs.ObservedContexts.FlushInterval)
-	assert.Equal(t, 1000, ffs.ObservedContexts.MaxNewContextsPerFlush)
+	assert.Equal(t, 30*time.Second, ffs.ObservedContexts.FlushInterval)
+	assert.Equal(t, 10000, ffs.ObservedContexts.MaxNewContextsPerFlush)
 	assert.Equal(t, time.Hour, ffs.ObservedContexts.LastSeenResolution)
 	assert.Empty(t, ffs.ObservedContexts.ExcludeAttributes)
 
