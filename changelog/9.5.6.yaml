@@ -5,9 +5,9 @@ entries:
       description: ""
       component: fleet-server
       pr:
-        - https://github.com/elastic/fleet-server/pull/8153
-        - https://github.com/elastic/fleet-server/pull/8162
-      issue: []
+        - https://github.com/elastic/fleet-server/pull/7938
+      issue:
+        - https://github.com/elastic/fleet-server/issues/7836
       impact: ""
       action: ""
       timestamp: 1790750092
@@ -23,9 +23,9 @@ entries:
         of ghost agents appearing during large-scale enrollment bursts.
       component: fleet-server
       pr:
-        - https://github.com/elastic/fleet-server/pull/8153
-        - https://github.com/elastic/fleet-server/pull/8162
-      issue: []
+        - https://github.com/elastic/fleet-server/pull/7945
+      issue:
+        - https://github.com/elastic/fleet-server/issues/7741
       impact: ""
       action: ""
       timestamp: 1790865432
@@ -46,8 +46,7 @@ entries:
         their own.
       component: fleet-server
       pr:
-        - https://github.com/elastic/fleet-server/pull/8153
-        - https://github.com/elastic/fleet-server/pull/8162
+        - https://github.com/elastic/fleet-server/pull/8083
       issue: []
       impact: ""
       action: ""
