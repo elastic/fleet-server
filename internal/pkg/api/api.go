@@ -76,6 +76,15 @@ func WithAudit(audit *AuditT) APIOpt {
 	}
 }
 
+// WithFeatureFlags mounts the feature flags (OFREP) handler, which serves the /ofrep/ paths.
+// allowedOrigins are applied outside the OFREP rate limiter so throttled responses still carry CORS headers.
+func WithFeatureFlags(h http.Handler, allowedOrigins []string) APIOpt {
+	return func(a *apiServer) {
+		a.ff = h
+		a.ffOrigins = allowedOrigins
+	}
+}
+
 func WithTracer(tracer *apm.Tracer) APIOpt {
 	return func(a *apiServer) {
 		a.tracer = tracer
@@ -85,16 +94,18 @@ func WithTracer(tracer *apm.Tracer) APIOpt {
 // FIXME: Cleanup needed for: metrics endpoint (actually a separate listener?), endpoint auth
 // FIXME: Should we use strict handler
 type apiServer struct {
-	ct    *CheckinT
-	et    *EnrollerT
-	at    *ArtifactT
-	ack   *AckT
-	st    *StatusT
-	oa    *OpAMPT
-	ut    *UploadT
-	ft    *FileDeliveryT
-	pt    *PGPRetrieverT
-	audit *AuditT
+	ct        *CheckinT
+	et        *EnrollerT
+	at        *ArtifactT
+	ack       *AckT
+	st        *StatusT
+	oa        *OpAMPT
+	ut        *UploadT
+	ft        *FileDeliveryT
+	pt        *PGPRetrieverT
+	audit     *AuditT
+	ff        http.Handler
+	ffOrigins []string
 
 	// tracer is used by the wrapping server to instrument the API server
 	tracer *apm.Tracer

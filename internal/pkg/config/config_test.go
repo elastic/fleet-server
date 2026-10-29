@@ -52,6 +52,7 @@ func TestConfig(t *testing.T) {
 							PollTimeout:        defaultPollTimeout,
 							PolicyDebounceTime: defaultPolicyDebounceTime,
 						},
+						FeatureFlagsService: defaultFeatureFlagsService(),
 					},
 				},
 				Logging: defaultLogging(),
@@ -81,6 +82,7 @@ func TestConfig(t *testing.T) {
 							PollTimeout:        defaultPollTimeout,
 							PolicyDebounceTime: defaultPolicyDebounceTime,
 						},
+						FeatureFlagsService: defaultFeatureFlagsService(),
 					},
 				},
 				Logging: defaultLogging(),
@@ -103,6 +105,7 @@ func TestConfig(t *testing.T) {
 							PollTimeout:        defaultPollTimeout,
 							PolicyDebounceTime: defaultPolicyDebounceTime,
 						},
+						FeatureFlagsService: defaultFeatureFlagsService(),
 					},
 				},
 				Logging: defaultLogging(),
@@ -125,6 +128,7 @@ func TestConfig(t *testing.T) {
 							PollTimeout:        defaultPollTimeout,
 							PolicyDebounceTime: defaultPolicyDebounceTime,
 						},
+						FeatureFlagsService: defaultFeatureFlagsService(),
 					},
 				},
 				Logging: defaultLogging(),
@@ -215,6 +219,7 @@ func TestConfig(t *testing.T) {
 						PollTimeout:        defaultPollTimeout,
 						PolicyDebounceTime: defaultPolicyDebounceTime,
 					},
+					FeatureFlagsService: defaultFeatureFlagsService(),
 				},
 			},
 			Logging: defaultLogging(),
@@ -533,6 +538,12 @@ func generateServerLimits(maxAgents int) ServerLimits {
 	var d ServerLimits
 	d.MaxAgents = maxAgents
 	d.LoadLimits(loadLimits(&log, maxAgents))
+	return d
+}
+
+func defaultFeatureFlagsService() FeatureFlagsService {
+	var d FeatureFlagsService
+	d.InitDefaults()
 	return d
 }
 

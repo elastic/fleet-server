@@ -66,6 +66,13 @@ const (
 	defaultOpAMPMax      = 0
 	defaultOpAMPMaxBody  = 3 * 1024 * 1024
 
+	// OFREP evaluation is in memory, so this is well above the checkin limit.
+	// 100µs is 10,000 requests per second: a production-sized process accepted 6,000.
+	defaultOFREPInterval = 100 * time.Microsecond
+	defaultOFREPBurst    = 10000
+	defaultOFREPMax      = 0
+	defaultOFREPMaxBody  = 64 * 1024
+
 	defaultUploadStartInterval = time.Second * 2
 	defaultUploadStartBurst    = 5
 	defaultUploadStartMax      = 10
@@ -167,6 +174,7 @@ type serverLimitDefaults struct {
 	AckLimit           limit `config:"ack_limit"`
 	StatusLimit        limit `config:"status_limit"`
 	OpAMPLimit         limit `config:"opamp_limit"`
+	OFREPLimit         limit `config:"ofrep_limit"`
 	UploadStartLimit   limit `config:"upload_start_limit"`
 	UploadEndLimit     limit `config:"upload_end_limit"`
 	UploadChunkLimit   limit `config:"upload_chunk_limit"`
@@ -222,6 +230,12 @@ func defaultserverLimitDefaults() *serverLimitDefaults {
 			Burst:    defaultOpAMPBurst,
 			Max:      defaultOpAMPMax,
 			MaxBody:  defaultOpAMPMaxBody,
+		},
+		OFREPLimit: limit{
+			Interval: defaultOFREPInterval,
+			Burst:    defaultOFREPBurst,
+			Max:      defaultOFREPMax,
+			MaxBody:  defaultOFREPMaxBody,
 		},
 		UploadStartLimit: limit{
 			Interval: defaultUploadStartInterval,

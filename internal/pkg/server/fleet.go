@@ -28,6 +28,8 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
+	"github.com/elastic/fleet-server/v7/internal/pkg/featureflags"
+	"github.com/elastic/fleet-server/v7/internal/pkg/featureflags/esclient"
 	"github.com/elastic/fleet-server/v7/internal/pkg/gc"
 	"github.com/elastic/fleet-server/v7/internal/pkg/monitor"
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
@@ -264,6 +266,8 @@ func configChangedServer(zlog zerolog.Logger, curCfg, newCfg *config.Config) boo
 		zlog.Info().Msg("output configuration has changed")
 	case !reflect.DeepEqual(curCfg.Inputs[0].Server, newCfg.Inputs[0].Server):
 		zlog.Info().Msg("server configuration has changed")
+	case !reflect.DeepEqual(curCfg.Inputs[0].FeatureFlagsService, newCfg.Inputs[0].FeatureFlagsService):
+		zlog.Info().Msg("feature flags service configuration has changed")
 	default:
 		changed = false
 	}
@@ -582,20 +586,28 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 		return fmt.Errorf("failed to initialize opamp: %w", err)
 	}
 
+	apiOpts := []api.APIOpt{
+		api.WithCheckin(ct),
+		api.WithEnroller(et),
+		api.WithArtifact(at),
+		api.WithAck(ack),
+		api.WithStatus(st),
+		api.WithOpAMP(oa),
+		api.WithUpload(ut),
+		api.WithFileDelivery(ft),
+		api.WithPGP(pt),
+		api.WithAudit(auditT),
+		api.WithTracer(tracer),
+	}
+
+	if ffCfg := cfg.Inputs[0].FeatureFlagsService; ffCfg.Enabled {
+		ff := featureflags.New(ffCfg, esclient.New(esCli), *zerolog.Ctx(ctx))
+		g.Go(loggedRunFunc(ctx, "Feature flags service", ff.Run))
+		apiOpts = append(apiOpts, api.WithFeatureFlags(ff.Handler(), ffCfg.CORS.AllowedOrigins))
+	}
+
 	for _, endpoint := range (&cfg.Inputs[0].Server).BindEndpoints() {
-		apiServer := api.NewServer(endpoint, &cfg.Inputs[0].Server,
-			api.WithCheckin(ct),
-			api.WithEnroller(et),
-			api.WithArtifact(at),
-			api.WithAck(ack),
-			api.WithStatus(st),
-			api.WithOpAMP(oa),
-			api.WithUpload(ut),
-			api.WithFileDelivery(ft),
-			api.WithPGP(pt),
-			api.WithAudit(auditT),
-			api.WithTracer(tracer),
-		)
+		apiServer := api.NewServer(endpoint, &cfg.Inputs[0].Server, apiOpts...)
 		g.Go(loggedRunFunc(ctx, "Http server", func(ctx context.Context) error {
 			return apiServer.Run(ctx)
 		}))

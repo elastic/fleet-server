@@ -16,12 +16,15 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/rs/zerolog"
 	zlog "github.com/rs/zerolog/log"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
+	"github.com/elastic/fleet-server/v7/internal/pkg/featureflags/ofrep"
 	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger/ecs"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger/zap"
 )
@@ -60,6 +63,22 @@ func NewServer(addr string, cfg *config.Server, opts ...APIOpt) *server {
 		zlog.Info().Msg("enabling OpAMP endpoint")
 		handler = addOpAMPRouteHandler(handler, a.oa, &cfg.Limits)
 		s.connContext = a.oa.connCtx
+	}
+	if a.ff != nil {
+		zlog.Info().Msg("enabling feature flags (OFREP) endpoints")
+		handler = addFeatureFlagsRouteHandler(handler, a.ff, a.ffOrigins, &cfg.Limits)
+	}
+	if cfg.Limits.MaxConnections > 0 {
+		// One in-flight cap for every request route. Applying it inside the generated router
+		// would leave OpAMP and OFREP, which are mounted in front of that router, uncapped,
+		// and applying it in both places would count Fleet requests twice.
+		handler = throttleWithCount(cfg.Limits.MaxConnections)(handler)
+	}
+	if a.ff != nil {
+		// Outside the connection cap, so a saturated cap still returns CORS headers and a
+		// preflight does not take a slot. The route-level CORS middleware covers the OFREP
+		// rate limiter, which sits inside the cap.
+		handler = ofrep.PrefixMiddleware("/ofrep/", a.ffOrigins)(handler)
 	}
 
 	s.handler = handler
@@ -159,6 +178,24 @@ func addOpAMPRouteHandler(existingHandler http.Handler, oa *OpAMPT, cfg *config.
 
 	opAMPHandler := oa.handler
 	r.HandleFunc("/v1/opamp", http.HandlerFunc(opAMPHandler))
+
+	// Handle existing routes
+	r.Mount("/", existingHandler)
+
+	return r
+}
+
+// addFeatureFlagsRouteHandler serves the /ofrep/ paths with ff, in front of the existing routes.
+// CORS wraps the rate limiter so a 429, and a preflight that would otherwise be throttled,
+// still includes Access-Control-Allow-Origin.
+func addFeatureFlagsRouteHandler(existingHandler http.Handler, ff http.Handler, allowedOrigins []string, cfg *config.ServerLimits) http.Handler {
+	if cfg.OFREPLimit.MaxBody > 0 {
+		ff = http.MaxBytesHandler(ff, cfg.OFREPLimit.MaxBody)
+	}
+	ff = ofrep.Middleware(allowedOrigins)(Limiter(cfg).middleware(ff))
+
+	r := chi.NewRouter()
+	r.With(logger.Middleware, middleware.Recoverer).Handle("/ofrep/*", ff)
 
 	// Handle existing routes
 	r.Mount("/", existingHandler)

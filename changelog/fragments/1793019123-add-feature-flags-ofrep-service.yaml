@@ -1,0 +1,12 @@
+kind: feature
+
+summary: Add an experimental feature flags evaluation service with OFREP endpoints.
+
+description: |
+  When `inputs[].feature_flags_service.enabled` is set, Fleet Server keeps the
+  feature flags definitions written by Kibana in memory and serves OpenFeature
+  Remote Evaluation Protocol (OFREP) evaluations under `/ofrep/v1/evaluate/flags`.
+  It can optionally record the evaluation contexts it sees to help build
+  targeting rules. The service is disabled by default and is a proof of concept.
+
+component: fleet-server
