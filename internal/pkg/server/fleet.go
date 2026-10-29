@@ -539,7 +539,7 @@ func (f *Fleet) runSubsystems(ctx context.Context, cfg *config.Config, g *errgro
 	st := api.NewStatusT(&cfg.Inputs[0].Server, bulker, f.cache, api.WithSelfMonitor(sm), api.WithBuildInfo(f.bi))
 	ut := api.NewUploadT(&cfg.Inputs[0].Server, bulker, monCli, f.cache) // uses no-retry client for bufferless chunk upload
 	ft := api.NewFileDeliveryT(&cfg.Inputs[0].Server, bulker, monCli, f.cache)
-	pt := api.NewPGPRetrieverT(&cfg.Inputs[0].Server, bulker, f.cache)
+	pt := api.NewPGPRetrieverT(ctx, &cfg.Inputs[0].Server, bulker, f.cache)
 	auditT := api.NewAuditT(&cfg.Inputs[0].Server, bulker, f.cache)
 
 	for _, endpoint := range (&cfg.Inputs[0].Server).BindEndpoints() {
