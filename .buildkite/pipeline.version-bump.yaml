@@ -47,6 +47,7 @@ steps:
         REPOSITORY: "fleet-server"
         CURRENT_RELEASE: "${NEW_VERSION}"
         DISABLE_DEV_ISSUE: "true"
+        DISABLE_RELEASE_PREPARE: "true"
         REVIEWERS: "elastic/elastic-agent-release"
 
   - block: "Ready to fetch for DRA artifacts?"
