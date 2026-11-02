@@ -28,6 +28,6 @@ Review important information about the  8.19.24 release.
 
 
 * Retry the enrollment write on transient Elasticsearch errors to reduce offline agents that never enrolled. https://github.com/elastic/fleet-server/pull/7961[#7961] https://github.com/elastic/fleet-server/issues/7741[#7741]
-* Avoid out-of-memory kills when many agents check in right after Fleet Server starts. https://github.com/elastic/fleet-server/pull/8098[#8098]
+* Avoid out-of-memory kills when many agents request artifacts right after Fleet Server starts. https://github.com/elastic/fleet-server/pull/8098[#8098]
 
 // end 8.19.24 relnotes
