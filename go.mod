@@ -4,7 +4,7 @@ go 1.26.10
 
 require (
 	github.com/Pallinder/go-randomdata v1.2.0
-	github.com/cenkalti/backoff/v7 v7.0.1
+	github.com/cenkalti/backoff/v7 v7.0.3
 	github.com/dgraph-io/ristretto/v2 v2.4.2
 	github.com/docker/go-units v0.5.0
 	github.com/elastic/elastic-agent-client/v7 v7.20.0
@@ -13,7 +13,7 @@ require (
 	github.com/elastic/elastic-transport-go/v8 v8.11.0
 	github.com/elastic/go-elasticsearch/v9 v9.5.2
 	github.com/elastic/go-ucfg v0.9.2
-	github.com/fxamacker/cbor/v2 v2.9.6
+	github.com/fxamacker/cbor/v2 v2.10.0
 	github.com/go-chi/chi/v5 v5.5.0
 	github.com/gofrs/uuid/v5 v5.5.1
 	github.com/google/go-cmp v0.7.0
@@ -40,10 +40,10 @@ require (
 	go.elastic.co/ecszerolog v0.2.0
 	go.opentelemetry.io/otel v1.47.0
 	go.uber.org/zap v1.28.0
-	golang.org/x/net v0.61.0
+	golang.org/x/net v0.62.0
 	golang.org/x/sync v0.24.0
 	golang.org/x/time v0.16.0
-	google.golang.org/grpc v1.84.0
+	google.golang.org/grpc v1.85.0
 	google.golang.org/protobuf v1.36.12
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -96,7 +96,7 @@ require (
 	golang.org/x/crypto v0.58.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect
 	golang.org/x/text v0.43.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260706201446-f0a921348800 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260817212433-ac3dfec99bb1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	howett.net/plist v1.0.1 // indirect
 )
