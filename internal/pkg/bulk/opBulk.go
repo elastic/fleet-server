@@ -11,7 +11,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/elastic/go-elasticsearch/v8/esapi"
+	"github.com/elastic/go-elasticsearch/v9/esapi"
 	"github.com/mailru/easyjson"
 	"github.com/rs/zerolog"
 	"go.elastic.co/apm/v2"
