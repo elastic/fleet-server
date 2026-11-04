@@ -29,10 +29,16 @@ var (
 )
 
 func main() {
+	buildTime, err := build.Time(BuildTime)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "invalid build time %q: %v\n", BuildTime, err)
+		os.Exit(1)
+	}
+
 	cmd := fleet.NewCommand(build.Info{
 		Version:   Version,
 		Commit:    Commit,
-		BuildTime: build.Time(BuildTime),
+		BuildTime: buildTime,
 	})
 	if err := cmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
