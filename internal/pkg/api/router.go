@@ -5,6 +5,8 @@
 package api
 
 import (
+	"bufio"
+	"net"
 	"net/http"
 	"regexp"
 	"strings"
@@ -27,9 +29,8 @@ func newRouter(cfg *config.ServerLimits, si ServerInterface, tracer *apm.Tracer)
 	}
 	r.Use(logger.Middleware) // Attach middlewares to router directly so the occur before any request parsing/validation
 	r.Use(middleware.Recoverer)
-	if cfg.MaxConnections > 0 {
-		r.Use(throttleWithCount(cfg.MaxConnections))
-	}
+	// MaxConnections is applied once in NewServer, around the combined route tree.
+	// OpAMP and OFREP are mounted in front of this router, so a throttle here would not cover them.
 	r.Use(Limiter(cfg).middleware)
 	return HandlerWithOptions(si, ChiServerOptions{
 		BaseRouter:       r,
@@ -49,6 +50,7 @@ type limiter struct {
 	ack            *limit.Limiter
 	status         *limit.Limiter
 	opAMP          *limit.Limiter
+	ofrep          *limit.Limiter
 	uploadBegin    *limit.Limiter
 	uploadChunk    *limit.Limiter
 	uploadComplete *limit.Limiter
@@ -65,6 +67,7 @@ func Limiter(cfg *config.ServerLimits) *limiter {
 		ack:            limit.NewLimiter(&cfg.AckLimit),
 		status:         limit.NewLimiter(&cfg.StatusLimit),
 		opAMP:          limit.NewLimiter(&cfg.OpAMPLimit),
+		ofrep:          limit.NewLimiter(&cfg.OFREPLimit),
 		uploadBegin:    limit.NewLimiter(&cfg.UploadStartLimit),
 		uploadChunk:    limit.NewLimiter(&cfg.UploadChunkLimit),
 		uploadComplete: limit.NewLimiter(&cfg.UploadEndLimit),
@@ -115,6 +118,18 @@ func (s *statusRecorder) Unwrap() http.ResponseWriter {
 	return s.ResponseWriter
 }
 
+// Hijack preserves http.Hijacker. gorilla/websocket type-asserts the writer it is given;
+// Unwrap is not enough, so OpAMP upgrades fail when this recorder is the outermost writer.
+func (s *statusRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	return http.NewResponseController(s.ResponseWriter).Hijack()
+}
+
+// Flush preserves http.Flusher for handlers that stream.
+func (s *statusRecorder) Flush() {
+	// The inner writer may not flush. Callers that only need Hijack are unaffected.
+	_ = http.NewResponseController(s.ResponseWriter).Flush()
+}
+
 var pgpReg = regexp.MustCompile(`\/api\/agents\/upgrades\/[0-9]+\.[0-9]+\.[0-9]+\/pgp-public-key`)
 
 // pathToOperation determines the endpoint passed on the request path.
@@ -135,6 +150,10 @@ func pathToOperation(path string) string {
 
 	if path == "/v1/opamp" {
 		return "opamp"
+	}
+
+	if strings.HasPrefix(path, "/ofrep/") {
+		return "ofrep"
 	}
 
 	if strings.HasPrefix(path, "/api/fleet/") {
@@ -193,6 +212,8 @@ func (l *limiter) middleware(next http.Handler) http.Handler {
 			l.auditUnenroll.Wrap("audit-unenroll", &cntAuditUnenroll, zerolog.DebugLevel)(next).ServeHTTP(w, r)
 		case "opamp":
 			l.opAMP.Wrap("opamp", &cntOpAMP, zerolog.DebugLevel)(next).ServeHTTP(w, r)
+		case "ofrep":
+			l.ofrep.Wrap("ofrep", &cntOFREP, zerolog.DebugLevel)(next).ServeHTTP(w, r)
 		default:
 			// no tracking or limits
 			next.ServeHTTP(w, r)

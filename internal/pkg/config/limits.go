@@ -31,6 +31,7 @@ type ServerLimits struct {
 	AckLimit           Limit `config:"ack_limit"`
 	StatusLimit        Limit `config:"status_limit"`
 	OpAMPLimit         Limit `config:"opamp_limit"`
+	OFREPLimit         Limit `config:"ofrep_limit"`
 	UploadStartLimit   Limit `config:"upload_start_limit"`
 	UploadEndLimit     Limit `config:"upload_end_limit"`
 	UploadChunkLimit   Limit `config:"upload_chunk_limit"`
@@ -56,6 +57,7 @@ func (c *ServerLimits) Validate() error {
 		{"ack_limit", c.AckLimit},
 		{"status_limit", c.StatusLimit},
 		{"opamp_limit", c.OpAMPLimit},
+		{"ofrep_limit", c.OFREPLimit},
 		{"upload_start_limit", c.UploadStartLimit},
 		{"upload_end_limit", c.UploadEndLimit},
 		{"upload_chunk_limit", c.UploadChunkLimit},
@@ -89,6 +91,7 @@ func (c *ServerLimits) LoadLimits(limits *envLimits) {
 	c.AckLimit = mergeEnvLimit(c.AckLimit, l.AckLimit)
 	c.StatusLimit = mergeEnvLimit(c.StatusLimit, l.StatusLimit)
 	c.OpAMPLimit = mergeEnvLimit(c.OpAMPLimit, l.OpAMPLimit)
+	c.OFREPLimit = mergeEnvLimit(c.OFREPLimit, l.OFREPLimit)
 	c.UploadStartLimit = mergeEnvLimit(c.UploadStartLimit, l.UploadStartLimit)
 	c.UploadEndLimit = mergeEnvLimit(c.UploadEndLimit, l.UploadEndLimit)
 	c.UploadChunkLimit = mergeEnvLimit(c.UploadChunkLimit, l.UploadChunkLimit)

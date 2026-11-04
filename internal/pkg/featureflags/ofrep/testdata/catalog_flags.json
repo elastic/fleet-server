@@ -1,0 +1,1668 @@
+[
+  {
+    "key": "actions.inboundEventsEnabled",
+    "name": "actions.inboundEventsEnabled",
+    "description": "Gate for inbound connector event ingress. Kibana's fallback is true. xpack.actions.inboundEvents.enabled remains the hard gate. Set false to stop ingress on Serverless without a restart. Saved connector configuration is left in place.",
+    "value_type": "boolean",
+    "variations": [
+      true,
+      false
+    ],
+    "apps": [
+      "kibana"
+    ],
+    "environments": {
+      "qa": {
+        "default": true
+      },
+      "staging": {
+        "default": true
+      },
+      "production": {
+        "default": true
+      }
+    }
+  },
+  {
+    "key": "alerting.rules.provisionUiamApiKeys",
+    "name": "alerting.rules.provisionUiamApiKeys",
+    "description": "Controlled rollout of UIAM API key provisioning task for alerting rules.",
+    "value_type": "boolean",
+    "variations": [
+      true,
+      false
+    ],
+    "apps": [
+      "kibana"
+    ],
+    "environments": {
+      "qa": {
+        "default": true
+      },
+      "staging": {
+        "default": true
+      },
+      "production": {
+        "default": true
+      }
+    }
+  },
+  {
+    "key": "asCode.useGASchemas",
+    "name": "asCode.useGASchemas",
+    "description": "Feature flag for finalizing As Code API endpoint contracts before promoting them to General Availability (GA).",
+    "value_type": "boolean",
+    "variations": [
+      true,
+      false
+    ],
+    "apps": [
+      "kibana"
+    ],
+    "environments": {
+      "qa": {
+        "default": true
+      },
+      "staging": {
+        "default": true
+      },
+      "production": {
+        "default": true
+      }
+    }
+  },
+  {
+    "key": "automaticImport.v2Enabled",
+    "name": "automaticImport.v2Enabled",
+    "description": "@elastic/integration-experience https://github.com/elastic/kibana-feature-flags/issues/37",
+    "value_type": "boolean",
+    "variations": [
+      true,
+      false
+    ],
+    "apps": [
+      "kibana"
+    ],
+    "environments": {
+      "qa": {
+        "default": false
+      },
+      "staging": {
+        "default": false
+      },
+      "production": {
+        "default": false
+      }
+    }
+  },
+  {
+    "key": "cloudExperiments.rolloutEvaluationProbe",
+    "name": "cloudExperiments.rolloutEvaluationProbe",
+    "description": "Harmless Kibana Core probe for verifying feature flag evaluation rules before applying equivalent rules to a customer-affecting flag. It has no product behavior.",
+    "value_type": "boolean",
+    "variations": [
+      true,
+      false
+    ],
+    "apps": [
+      "kibana"
+    ],
+    "environments": {
+      "qa": {
+        "default": false,
+        "rules": [
+          {
+            "type": "match",
+            "attribute": "kibana.key",
+            "operator": "in",
+            "values": [
+              "af744095321a495c8e9ef3e6ce14f7d7",
+              "a1b1ca4b75c341c39e39a140b9c546bc"
+            ],
+            "return": true
+          },
+          {
+            "type": "match",
+            "attribute": "organization.key",
+            "operator": "in",
+            "values": [
+              "3296295608"
+            ],
+            "return": true
+          }
+        ]
+      },
+      "staging": {
+        "default": false
+      },
+      "production": {
+        "default": false
+      }
+    }
+  },
+  {
+    "key": "coreRendering.defaultThemeName",
+    "name": "coreRendering.defaultThemeName",
+    "description": "Owner: @elastic/eui-team\nOriginal issue: https://github.com/elastic/kibana-feature-flags/issues/9",
+    "value_type": "string",
+    "variations": [
+      "borealis",
+      "amsterdam"
+    ],
+    "apps": [
+      "kibana"
+    ],
+    "environments": {
+      "qa": {
+        "default": "borealis"
+      },
+      "staging": {
+        "default": "borealis"
+      },
+      "production": {
+        "default": "borealis"
+      }
+    }
+  },
+  {
+    "key": "discover.cascadeLayoutEnabled",
+    "name": "discover.cascadeLayoutEnabled",
+    "description": "Owner: @elastic/kibana-discover\nOriginal Link: https://github.com/elastic/kibana-feature-flags/issues/63",
+    "value_type": "boolean",
+    "variations": [
+      true,
+      false
+    ],
+    "apps": [
+      "kibana"
+    ],
+    "environments": {
+      "qa": {
+        "default": true
+      },
+      "staging": {
+        "default": true
+      },
+      "production": {
+        "default": true
+      }
+    }
+  },
+  {
+    "key": "discover.isEsqlDefault",
+    "name": "discover.isEsqlDefault",
+    "description": "Makes ES|QL the default mode in Discover (classic mode remains the default when disabled).",
+    "value_type": "boolean",
+    "variations": [
+      true,
+      false
+    ],
+    "apps": [
+      "kibana"
+    ],
+    "environments": {
+      "staging": {
+        "default": false,
+        "rules": [
+          {
+            "type": "match",
+            "attribute": "kibana.offering",
+            "operator": "in",
+            "values": [
+              "serverless"
+            ],
+            "return": true
+          }
+        ]
+      },
+      "production": {
+        "default": false,
+        "rules": [
+          {
+            "type": "match",
+            "attribute": "kibana.offering",
+            "operator": "in",
+            "values": [
+              "serverless"
+            ],
+            "return": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "key": "discover.metricsExperienceEditGridSettingsEnabled",
+    "name": "discover.metricsExperienceEditGridSettingsEnabled",
+    "description": "Enables edit grid settings controls in the Metrics Experience grid in Discover.",
+    "value_type": "boolean",
+    "variations": [
+      true,
+      false
+    ],
+    "apps": [
+      "kibana"
+    ],
+    "environments": {
+      "qa": {
+        "default": true
+      },
+      "staging": {
+        "default": true
+      },
+      "production": {
+        "default": true
+      }
+    }
+  },
+  {
+    "key": "discover.metricsExperienceSortEnabled",
+    "name": "discover.metricsExperienceSortEnabled",
+    "description": "Enables sorting controls in the toolbar for the Metrics Experience grid in Discover.",
+    "value_type": "boolean",
+    "variations": [
+      true,
+      false
+    ],
+    "apps": [
+      "kibana"
+    ],
+    "environments": {
+      "qa": {
+        "default": true
+      },
+      "staging": {
+        "default": true
+      },
+      "production": {
+        "default": true
+      }
+    }
+  },
+  {
+    "key": "discover.tabsEnabled",
+    "name": "discover.tabsEnabled",
+    "description": "Owner: @elastic/kibana-discover\nOriginal issue: https://github.com/elastic/kibana-feature-flags/issues/23",
+    "value_type": "boolean",
+    "variations": [
+      true,
+      false
+    ],
+    "apps": [
+      "kibana"
+    ],
+    "environments": {
+      "qa": {
+        "default": true
+      },
+      "staging": {
+        "default": true
+      },
+      "production": {
+        "default": true
+      }
+    }
+  },
+  {
+    "key": "elasticConsole.enabled",
+    "name": "elasticConsole.enabled",
+    "description": "Enables an internal API layer for the elastic-console CLI",
+    "value_type": "boolean",
+    "variations": [
+      true,
+      false
+    ],
+    "apps": [
+      "kibana"
+    ],
+    "environments": {
+      "qa": {
+        "default": true
+      },
+      "staging": {
+        "default": true
+      },
+      "production": {
+        "default": true
+      }
+    }
+  },
+  {
+    "key": "entityStore.dualProcess.enabled",
+    "name": "entityStore.dualProcess.enabled",
+    "description": "Master switch for dual-process log extraction in the Entity Store. When enabled, extraction splits into a priority process (authoritative identity sources, zero intentional log loss) and a non-priority process (everything else, best-effort with adaptive sampling). Default off so all deployments run single-process until the rollout is ready.\n",
+    "value_type": "boolean",
+    "variations": [
+      true,
+      false
+    ],
+    "apps": [
+      "kibana"
+    ],
+    "environments": {
+      "qa": {
+        "default": false,
+        "rules": [
+          {
+            "type": "match",
+            "attribute": "kibana.key",
+            "operator": "in",
+            "values": [
+              "d6ce7e48d35e485b9f57a2cc5d814d61"
+            ],
+            "return": true
+          },
+          {
+            "type": "match",
+            "attribute": "kibana.offering",
+            "operator": "in",
+            "values": [
+              "traditional"
+            ],
+            "return": true
+          }
+        ]
+      },
+      "staging": {
+        "default": false,
+        "rules": [
+          {
+            "type": "match",
+            "attribute": "kibana.offering",
+            "operator": "in",
+            "values": [
+              "traditional"
+            ],
+            "return": true
+          }
+        ]
+      },
+      "production": {
+        "default": false,
+        "rules": [
+          {
+            "type": "match",
+            "attribute": "kibana.key",
+            "operator": "in",
+            "values": [
+              "d731644a61da454a98f14410e28552d9"
+            ],
+            "return": true
+          },
+          {
+            "type": "match",
+            "attribute": "kibana.offering",
+            "operator": "in",
+            "values": [
+              "traditional"
+            ],
+            "return": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "key": "entityStore.migrateLegacySecurityAssets",
+    "name": "entityStore.migrateLegacySecurityAssets",
+    "description": "Allow migrating Entity Store v2 Security-scoped indices (.entities.v2.*.security_{space}) to solution-neutral names (.entities.v2.*.{space}). Default off so existing deployments keep reading and writing the old concrete indices until the cutover is verified on a large environment.\n",
+    "value_type": "boolean",
+    "variations": [
+      true,
+      false
+    ],
+    "apps": [
+      "kibana"
+    ],
+    "environments": {
+      "qa": {
+        "default": false,
+        "rules": [
+          {
+            "type": "match",
+            "attribute": "kibana.key",
+            "operator": "in",
+            "values": [
+              "c89a91ab68fe4277b49ba4cb74541c83",
+              "d40d33608c2d4760ae3ce8544755205a",
+              "efcb38db674446469335539ab9b3dd83",
+              "c6d0ab0b076b475e84a6fc3a09dfbc31",
+              "a56d843deb4e4545b7140f0af0011327",
+              "a2382edc085e43a19df9fc0376071ea4",
+              "e693956e77d641439fd4afad18f31d81",
+              "ca2dbe3d33a04d9d97cea2a63dc0015f",
+              "d7716157c9d64f3aa0856e637dd8a1aa",
+              "ecd59467f1764173acace269463a5d82"
+            ],
+            "return": true
+          },
+          {
+            "type": "match",
+            "attribute": "kibana.offering",
+            "operator": "in",
+            "values": [
+              "traditional"
+            ],
+            "return": true
+          }
+        ]
+      },
+      "staging": {
+        "default": false,
+        "rules": [
+          {
+            "type": "match",
+            "attribute": "kibana.offering",
+            "operator": "in",
+            "values": [
+              "traditional"
+            ],
+            "return": true
+          }
+        ]
+      },
+      "production": {
+        "default": false,
+        "rules": [
+          {
+            "type": "match",
+            "attribute": "kibana.offering",
+            "operator": "in",
+            "values": [
+              "traditional"
+            ],
+            "return": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "key": "featureFlagsExample.exampleBoolean",
+    "name": "featureFlagsExample.exampleBoolean",
+    "description": "Owner: @elastic/kibana-core\nOriginal Issue: https://github.com/elastic/kibana-feature-flags/issues/5",
+    "value_type": "boolean",
+    "variations": [
+      true,
+      false
+    ],
+    "apps": [
+      "kibana"
+    ],
+    "environments": {
+      "qa": {
+        "default": false
+      },
+      "staging": {
+        "default": false
+      },
+      "production": {
+        "default": false
+      }
+    }
+  },
+  {
+    "key": "featureFlagsExample.exampleNumber",
+    "name": "featureFlagsExample.exampleNumber",
+    "description": "Owner: @elastic/kibana-core\nOriginal Issue: https://github.com/elastic/kibana-feature-flags/issues/6",
+    "value_type": "number",
+    "variations": [
+      99,
+      1
+    ],
+    "apps": [
+      "kibana",
+      "cloud-ui"
+    ],
+    "environments": {
+      "qa": {
+        "default": 1
+      },
+      "staging": {
+        "default": 1
+      },
+      "production": {
+        "default": 1
+      }
+    }
+  },
+  {
+    "key": "featureFlagsExample.exampleString",
+    "name": "featureFlagsExample.exampleString",
+    "description": "Owner: @elastic/kibana-core\nOriginal Issue: https://github.com/elastic/kibana-feature-flags/issues/7",
+    "value_type": "string",
+    "variations": [
+      "green",
+      "red"
+    ],
+    "apps": [
+      "kibana"
+    ],
+    "environments": {
+      "qa": {
+        "default": "red"
+      },
+      "staging": {
+        "default": "red"
+      },
+      "production": {
+        "default": "red"
+      }
+    }
+  },
+  {
+    "key": "featureFlagsStreams.contentPackUIEnabled",
+    "name": "featureFlagsStreams.contentPackUIEnabled",
+    "description": "Owner: @elastic/streams-ui\nOriginal issue: https://github.com/elastic/kibana-feature-flags/issues/15",
+    "value_type": "boolean",
+    "variations": [
+      true,
+      false
+    ],
+    "apps": [
+      "kibana"
+    ],
+    "environments": {
+      "qa": {
+        "default": true
+      },
+      "staging": {
+        "default": false
+      },
+      "production": {
+        "default": false
+      }
+    }
+  },
+  {
+    "key": "fleet.awsIdentityFederationEnabled",
+    "name": "fleet.awsIdentityFederationEnabled",
+    "description": "Kill switch for the AWS Identity Federation option in Fleet's var_groups \"Setup Access\" selector. When false, every var_group option with `provider: aws` (the `identity_federation` credential_type option in the aws, aws_bedrock, aws_logs and aws_mq packages) is hidden from the package policy form; the rest of the var_groups experience is unaffected. Existing policies already using identity federation stay editable. Sibling flags for azure/gcp will follow as those packages migrate. Tracking: https://github.com/elastic/ingest-dev/issues/9446\n",
+    "value_type": "boolean",
+    "variations": [
+      true,
+      false
+    ],
+    "apps": [
+      "kibana"
+    ],
+    "environments": {
+      "qa": {
+        "default": true
+      },
+      "staging": {
+        "default": true
+      },
+      "production": {
+        "default": false,
+        "rules": [
+          {
+            "type": "match",
+            "attribute": "organization.is_elastic_staff",
+            "operator": "in",
+            "values": [
+              true
+            ],
+            "return": true
+          },
+          {
+            "type": "match",
+            "attribute": "kibana.key",
+            "operator": "in",
+            "values": [
+              "f2e495ab608d4449ae75233282633642"
+            ],
+            "return": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "key": "fleet.enableIacProvisioner",
+    "name": "fleet.enableIacProvisioner",
+    "description": "Runtime gate for Fleet calls to the IaC Provisioner. Cloud may inject URL/TLS in all environments; this flag controls whether Kibana uses the service. false is the kill switch \u2014 Kibana will not call the provisioner.",
+    "value_type": "boolean",
+    "variations": [
+      true,
+      false
+    ],
+    "apps": [
+      "kibana"
+    ],
+    "environments": {
+      "qa": {
+        "default": true
+      },
+      "staging": {
+        "default": true
+      },
+      "production": {
+        "default": false,
+        "rules": [
+          {
+            "type": "match",
+            "attribute": "organization.is_elastic_staff",
+            "operator": "in",
+            "values": [
+              true
+            ],
+            "return": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "key": "fleet.enableKafkaKerberosAuth",
+    "name": "fleet.enableKafkaKerberosAuth",
+    "description": "Runtime gate for the Kerberos authentication method of the Fleet Kafka output. When enabled, Kafka outputs can be created or changed to use Kerberos (keytab or username/password) through the Fleet outputs API and the Settings UI.",
+    "value_type": "boolean",
+    "variations": [
+      true,
+      false
+    ],
+    "apps": [
+      "kibana"
+    ],
+    "environments": {
+      "qa": {
+        "default": false
+      },
+      "staging": {
+        "default": false
+      },
+      "production": {
+        "default": false
+      }
+    }
+  },
+  {
+    "key": "fleet.enableKafkaOAuth2Auth",
+    "name": "fleet.enableKafkaOAuth2Auth",
+    "description": "Runtime gate for the OAuth2 authentication method of the Fleet Kafka output. When enabled, Kafka outputs can be created or changed to use OAuth2 (OAUTHBEARER) through the Fleet outputs API and the Settings UI.",
+    "value_type": "boolean",
+    "variations": [
+      true,
+      false
+    ],
+    "apps": [
+      "kibana"
+    ],
+    "environments": {
+      "qa": {
+        "default": false
+      },
+      "staging": {
+        "default": false
+      },
+      "production": {
+        "default": false
+      }
+    }
+  },
+  {
+    "key": "fleet.enableOtlpOutput",
+    "name": "fleet.enableOtlpOutput",
+    "description": "Runtime gate for Fleet OTLP outputs. When enabled, the OTLP output type can be created and managed through the Fleet outputs API, and preconfigured OTLP outputs are created during Fleet setup.",
+    "value_type": "boolean",
+    "variations": [
+      true,
+      false
+    ],
+    "apps": [
+      "kibana"
+    ],
+    "environments": {
+      "qa": {
+        "default": false
+      },
+      "staging": {
+        "default": false
+      },
+      "production": {
+        "default": false
+      }
+    }
+  },
+  {
+    "key": "fleet.enableRestartAgentAction",
+    "name": "fleet.enableRestartAgentAction",
+    "description": "Runtime gate for the Fleet RESTART agent action. When enabled, users can restart agents from the agent details page, agent list, and bulk actions menu, and the restart API endpoints are active.",
+    "value_type": "boolean",
+    "variations": [
+      true,
+      false
+    ],
+    "apps": [
+      "kibana"
+    ],
+    "environments": {
+      "qa": {
+        "default": true
+      },
+      "staging": {
+        "default": true
+      },
+      "production": {
+        "default": true
+      }
+    }
+  },
+  {
+    "key": "fleet.enableSentinelPolicyVersion",
+    "name": "fleet.enableSentinelPolicyVersion",
+    "description": "Runtime gate for the Fleet sentinel policy version. When enabled, every agent policy is also deployed as <policy id>#sentinel and agents are assigned to it, so version-specific policy code paths are exercised for all policies. Requires version specific policies to be enabled.",
+    "value_type": "boolean",
+    "variations": [
+      true,
+      false
+    ],
+    "apps": [
+      "kibana"
+    ],
+    "environments": {
+      "qa": {
+        "default": true
+      },
+      "staging": {
+        "default": true
+      },
+      "production": {
+        "default": false
+      }
+    }
+  },
+  {
+    "key": "ingestHub.enabled",
+    "name": "ingestHub.enabled",
+    "description": "Owner: @elastic/streams-ui\nOriginal Link: https://github.com/elastic/kibana-feature-flags/issues/61",
+    "value_type": "boolean",
+    "variations": [
+      true,
+      false
+    ],
+    "apps": [
+      "kibana"
+    ],
+    "environments": {
+      "qa": {
+        "default": false
+      },
+      "staging": {
+        "default": false
+      },
+      "production": {
+        "default": false
+      }
+    }
+  },
+  {
+    "key": "ingestHub.onboardingEnabled",
+    "name": "ingestHub.onboardingEnabled",
+    "description": "Controlled rollout of the new onboarding flows shared by all project types.",
+    "value_type": "boolean",
+    "variations": [
+      true,
+      false
+    ],
+    "apps": [
+      "kibana"
+    ],
+    "environments": {
+      "qa": {
+        "default": false
+      },
+      "staging": {
+        "default": false
+      },
+      "production": {
+        "default": false,
+        "rules": [
+          {
+            "type": "match",
+            "attribute": "kibana.key",
+            "operator": "in",
+            "values": [
+              "baa67a65044f483c9f7750a32231b2f2",
+              "b4e8113ce3e04298bcc673496e9e456b",
+              "ce1875ce272a411b86620e4e1f886715",
+              "edf7a093369b48c0b9ed18c2da687482",
+              "abf9ac0fad5143a5a2f9980eac852721",
+              "fd103d6b429540fa91fdedf1a2a0c5ad",
+              "af2e1da665114bd793e61fe6c62be08f"
+            ],
+            "return": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "key": "lens.apiFormat",
+    "name": "lens.apiFormat",
+    "description": "Owner: @elastic/kibana-visualizations \nOriginal issue: https://github.com/elastic/kibana-feature-flags/issues/46",
+    "value_type": "boolean",
+    "variations": [
+      true,
+      false
+    ],
+    "apps": [
+      "kibana"
+    ],
+    "environments": {
+      "qa": {
+        "default": false
+      },
+      "staging": {
+        "default": false
+      },
+      "production": {
+        "default": false
+      }
+    }
+  },
+  {
+    "key": "navigation.agentBuilderAtTop",
+    "name": "navigation.agentBuilderAtTop",
+    "description": "Place the Agent Builder link at the top of the solution navigation trees.",
+    "value_type": "boolean",
+    "variations": [
+      true,
+      false
+    ],
+    "apps": [
+      "kibana"
+    ],
+    "environments": {
+      "qa": {
+        "default": true
+      },
+      "staging": {
+        "default": true
+      },
+      "production": {
+        "default": false
+      }
+    }
+  },
+  {
+    "key": "nightshift.enabled",
+    "name": "nightshift.enabled",
+    "description": "Controlled rollout of Nightshift (Technical Preview). Outermost enablement gate evaluated before license/tier/plugin checks; fallback false keeps self-managed and LD-unreachable deployments off. Supersedes streams.significantEventsAvailable.",
+    "value_type": "boolean",
+    "variations": [
+      true,
+      false
+    ],
+    "apps": [
+      "kibana"
+    ],
+    "environments": {
+      "qa": {
+        "default": true
+      },
+      "staging": {
+        "default": true
+      },
+      "production": {
+        "default": false,
+        "rules": [
+          {
+            "type": "match",
+            "attribute": "organization.key",
+            "operator": "in",
+            "values": [
+              2870499056,
+              3456858957,
+              3612216885,
+              3905582651,
+              1719154567,
+              2550228164,
+              2351180961,
+              1336099511,
+              72902139,
+              1727806894,
+              2716147100,
+              3953873479,
+              3987684503,
+              708716325,
+              1920019824,
+              2921167466,
+              659973547
+            ],
+            "return": true
+          },
+          {
+            "type": "match",
+            "attribute": "kibana.key",
+            "operator": "in",
+            "values": [
+              "f11670dac1f348129b9e807d1c61cab1",
+              "ebfde52763b04ae785162b399bb8937c",
+              "f2e495ab608d4449ae75233282633642",
+              "a401348463b5409c9c67c1b36d17d0d4"
+            ],
+            "return": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "key": "notificationCenter.types.modelStatus",
+    "name": "notificationCenter.types.modelStatus",
+    "description": "Enables the Model Status notification type in the Notification Center.",
+    "value_type": "boolean",
+    "variations": [
+      true,
+      false
+    ],
+    "apps": [
+      "kibana"
+    ],
+    "environments": {
+      "qa": {
+        "default": true
+      },
+      "staging": {
+        "default": false
+      },
+      "production": {
+        "default": false
+      }
+    }
+  },
+  {
+    "key": "notificationCenter.uiEnabled",
+    "name": "notificationCenter.uiEnabled",
+    "description": "Master gate for everything user-visible in the Notification Center UI.",
+    "value_type": "boolean",
+    "variations": [
+      true,
+      false
+    ],
+    "apps": [
+      "kibana"
+    ],
+    "environments": {
+      "qa": {
+        "default": true
+      },
+      "staging": {
+        "default": false
+      },
+      "production": {
+        "default": false
+      }
+    }
+  },
+  {
+    "key": "observability.addDataPageV2Enabled",
+    "name": "observability.addDataPageV2Enabled",
+    "description": "Controlled rollout of the Observability Onboarding Add Data page redesign. Gates the v2 rendering path of the landing page.",
+    "value_type": "boolean",
+    "variations": [
+      true,
+      false
+    ],
+    "apps": [
+      "kibana"
+    ],
+    "environments": {
+      "qa": {
+        "default": true,
+        "rules": [
+          {
+            "type": "match",
+            "attribute": "kibana.offering",
+            "operator": "in",
+            "values": [
+              "serverless"
+            ],
+            "return": true
+          },
+          {
+            "type": "match",
+            "attribute": "kibana.version",
+            "operator": "semver_lt",
+            "values": [
+              "9.6.0"
+            ],
+            "return": false
+          }
+        ]
+      },
+      "staging": {
+        "default": true,
+        "rules": [
+          {
+            "type": "match",
+            "attribute": "kibana.offering",
+            "operator": "in",
+            "values": [
+              "serverless"
+            ],
+            "return": true
+          },
+          {
+            "type": "match",
+            "attribute": "kibana.version",
+            "operator": "semver_lt",
+            "values": [
+              "9.6.0"
+            ],
+            "return": false
+          }
+        ]
+      },
+      "production": {
+        "default": true,
+        "rules": [
+          {
+            "type": "match",
+            "attribute": "kibana.offering",
+            "operator": "in",
+            "values": [
+              "serverless"
+            ],
+            "return": true
+          },
+          {
+            "type": "match",
+            "attribute": "kibana.version",
+            "operator": "semver_lt",
+            "values": [
+              "9.6.0"
+            ],
+            "return": false
+          }
+        ]
+      }
+    }
+  },
+  {
+    "key": "observability.ingestReceiptsEnabled",
+    "name": "observability.ingestReceiptsEnabled",
+    "description": "Gate the ingest receipt verification route and the \"We are receiving your data\" toast on the Observability Onboarding API endpoints page until MOTel writes receipts in the target environment.",
+    "value_type": "boolean",
+    "variations": [
+      true,
+      false
+    ],
+    "apps": [
+      "kibana"
+    ],
+    "environments": {
+      "qa": {
+        "default": false,
+        "rules": [
+          {
+            "type": "match",
+            "attribute": "kibana.offering",
+            "operator": "in",
+            "values": [
+              "serverless"
+            ],
+            "return": true
+          }
+        ]
+      },
+      "staging": {
+        "default": false
+      },
+      "production": {
+        "default": false
+      }
+    }
+  },
+  {
+    "key": "observability.managedOtlpGa",
+    "name": "observability.managedOtlpGa",
+    "description": "@elastic/streams-ui https://github.com/elastic/kibana-feature-flags/issues/44",
+    "value_type": "boolean",
+    "variations": [
+      true,
+      false
+    ],
+    "apps": [
+      "kibana"
+    ],
+    "environments": {
+      "qa": {
+        "default": true,
+        "rules": [
+          {
+            "type": "match",
+            "attribute": "kibana.version",
+            "operator": "semver_lt",
+            "values": [
+              "9.3.2"
+            ],
+            "return": false
+          }
+        ]
+      },
+      "staging": {
+        "default": true,
+        "rules": [
+          {
+            "type": "match",
+            "attribute": "kibana.version",
+            "operator": "semver_lt",
+            "values": [
+              "9.3.2"
+            ],
+            "return": false
+          }
+        ]
+      },
+      "production": {
+        "default": true,
+        "rules": [
+          {
+            "type": "match",
+            "attribute": "kibana.version",
+            "operator": "semver_lt",
+            "values": [
+              "9.3.2"
+            ],
+            "return": false
+          }
+        ]
+      }
+    }
+  },
+  {
+    "key": "observability.managedOtlpPrwEndpointEnabled",
+    "name": "observability.managedOtlpPrwEndpointEnabled",
+    "description": "Gate the managed Otlp PRW endpoint on Observability Onboarding Add Data page on ECH environments.",
+    "value_type": "boolean",
+    "variations": [
+      true,
+      false
+    ],
+    "apps": [
+      "kibana"
+    ],
+    "environments": {
+      "qa": {
+        "default": true,
+        "rules": [
+          {
+            "type": "match",
+            "attribute": "kibana.version",
+            "operator": "semver_lt",
+            "values": [
+              "9.4.0"
+            ],
+            "return": false
+          }
+        ]
+      },
+      "staging": {
+        "default": true,
+        "rules": [
+          {
+            "type": "match",
+            "attribute": "kibana.version",
+            "operator": "semver_lt",
+            "values": [
+              "9.4.0"
+            ],
+            "return": false
+          }
+        ]
+      },
+      "production": {
+        "default": true,
+        "rules": [
+          {
+            "type": "match",
+            "attribute": "kibana.version",
+            "operator": "semver_lt",
+            "values": [
+              "9.4.0"
+            ],
+            "return": false
+          }
+        ]
+      }
+    }
+  },
+  {
+    "key": "observability.managedOtlpServiceEnabled",
+    "name": "observability.managedOtlpServiceEnabled",
+    "description": "Owner: @elastic/streams-ui https://github.com/elastic/kibana-feature-flags/issues/28",
+    "value_type": "boolean",
+    "variations": [
+      true,
+      false
+    ],
+    "apps": [
+      "kibana"
+    ],
+    "environments": {
+      "qa": {
+        "default": true
+      },
+      "staging": {
+        "default": true
+      },
+      "production": {
+        "default": true
+      }
+    }
+  },
+  {
+    "key": "observability.metricHeatmapsEnable",
+    "name": "observability.metricHeatmapsEnable",
+    "description": "Gates the heatmap visualization for metrics.",
+    "value_type": "boolean",
+    "variations": [
+      true,
+      false
+    ],
+    "apps": [
+      "kibana"
+    ],
+    "environments": {
+      "qa": {
+        "default": false
+      },
+      "staging": {
+        "default": false
+      },
+      "production": {
+        "default": false
+      }
+    }
+  },
+  {
+    "key": "observability.metricsExemplarsEnabled",
+    "name": "observability.metricsExemplarsEnabled",
+    "description": "Gates the exemplars feature on metric charts. When off, exemplars are not fetched and not shown.",
+    "value_type": "boolean",
+    "variations": [
+      true,
+      false
+    ],
+    "apps": [
+      "kibana"
+    ],
+    "environments": {
+      "qa": {
+        "default": false
+      },
+      "staging": {
+        "default": false
+      },
+      "production": {
+        "default": false
+      }
+    }
+  },
+  {
+    "key": "observability.vendorEndpointsEnabled",
+    "name": "observability.vendorEndpointsEnabled",
+    "description": "Gate the Supabase and Vercel vendor endpoints on the Observability Onboarding Add Data page until their ingest paths are ready end to end.",
+    "value_type": "boolean",
+    "variations": [
+      true,
+      false
+    ],
+    "apps": [
+      "kibana"
+    ],
+    "environments": {
+      "qa": {
+        "default": true
+      },
+      "staging": {
+        "default": true
+      },
+      "production": {
+        "default": true
+      }
+    }
+  },
+  {
+    "key": "reporting.serverlessOnDemandExportEnabled",
+    "name": "reporting.serverlessOnDemandExportEnabled",
+    "description": "Enables on-demand PDF and PNG reports on serverless, rendered by page-render-service. Serverless only. Kibana's fallback is false.",
+    "value_type": "boolean",
+    "variations": [
+      true,
+      false
+    ],
+    "apps": [
+      "kibana"
+    ],
+    "environments": {
+      "qa": {
+        "default": true
+      },
+      "staging": {
+        "default": false
+      },
+      "production": {
+        "default": false
+      }
+    }
+  },
+  {
+    "key": "reporting.serverlessScheduledExportEnabled",
+    "name": "reporting.serverlessScheduledExportEnabled",
+    "description": "Enables scheduled PDF and PNG reports on serverless, rendered by page-render-service. Serverless only. Kibana's fallback is false.",
+    "value_type": "boolean",
+    "variations": [
+      true,
+      false
+    ],
+    "apps": [
+      "kibana"
+    ],
+    "environments": {
+      "qa": {
+        "default": false
+      },
+      "staging": {
+        "default": false
+      },
+      "production": {
+        "default": false
+      }
+    }
+  },
+  {
+    "key": "searchSolution.gettingStartedChatEnabled",
+    "name": "searchSolution.gettingStartedChatEnabled",
+    "description": "Elasticsearch solution chat first getting started view",
+    "value_type": "boolean",
+    "variations": [
+      true,
+      false
+    ],
+    "apps": [
+      "kibana"
+    ],
+    "environments": {
+      "qa": {
+        "default": false
+      },
+      "staging": {
+        "default": false
+      },
+      "production": {
+        "default": false
+      }
+    }
+  },
+  {
+    "key": "securitySolution.useNewEntityAnalyticsPage",
+    "name": "securitySolution.useNewEntityAnalyticsPage",
+    "description": "Gates all Entity Analytics 9.6 facelift UI changes. Off by default until the work is ready for GA. Tracked in elastic/security-team#19082.\n",
+    "value_type": "boolean",
+    "variations": [
+      true,
+      false
+    ],
+    "apps": [
+      "kibana"
+    ],
+    "environments": {
+      "qa": {
+        "default": false,
+        "rules": [
+          {
+            "type": "match",
+            "attribute": "kibana.key",
+            "operator": "in",
+            "values": [
+              "aadb43a559904504945faaa5efb925fe"
+            ],
+            "return": true
+          },
+          {
+            "type": "match",
+            "attribute": "kibana.offering",
+            "operator": "in",
+            "values": [
+              "traditional"
+            ],
+            "return": true
+          }
+        ]
+      },
+      "staging": {
+        "default": false,
+        "rules": [
+          {
+            "type": "match",
+            "attribute": "kibana.offering",
+            "operator": "in",
+            "values": [
+              "traditional"
+            ],
+            "return": true
+          }
+        ]
+      },
+      "production": {
+        "default": false,
+        "rules": [
+          {
+            "type": "match",
+            "attribute": "kibana.offering",
+            "operator": "in",
+            "values": [
+              "traditional"
+            ],
+            "return": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "key": "slo.compositeSloEnabled",
+    "name": "slo.compositeSloEnabled",
+    "description": "Controlled rollout of Composite SLO (Tech Preview 9.5). Gates UI, API handlers, and runtime task execution.",
+    "value_type": "boolean",
+    "variations": [
+      true,
+      false
+    ],
+    "apps": [
+      "kibana"
+    ],
+    "environments": {
+      "qa": {
+        "default": true
+      },
+      "staging": {
+        "default": true
+      },
+      "production": {
+        "default": false,
+        "rules": [
+          {
+            "type": "match",
+            "attribute": "kibana.offering",
+            "operator": "in",
+            "values": [
+              "serverless"
+            ],
+            "rules": [
+              {
+                "type": "match",
+                "attribute": "kibana.project_type",
+                "operator": "in",
+                "values": [
+                  "observability"
+                ],
+                "return": true
+              }
+            ]
+          },
+          {
+            "type": "match",
+            "attribute": "kibana.offering",
+            "operator": "in",
+            "values": [
+              "traditional"
+            ],
+            "return": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "key": "subscriptionStatus.enabled",
+    "name": "subscriptionStatus.enabled",
+    "description": "Show the trial subscription badge in the Serverless header.",
+    "value_type": "boolean",
+    "variations": [
+      true,
+      false
+    ],
+    "apps": [
+      "kibana"
+    ],
+    "environments": {
+      "qa": {
+        "default": true
+      },
+      "staging": {
+        "default": true
+      },
+      "production": {
+        "default": false
+      }
+    }
+  },
+  {
+    "key": "taskManager.provisionUiamApiKeys",
+    "name": "taskManager.provisionUiamApiKeys",
+    "description": "Controlled rollout of UIAM API key provisioning task for Task Manager tasks.",
+    "value_type": "boolean",
+    "variations": [
+      true,
+      false
+    ],
+    "apps": [
+      "kibana"
+    ],
+    "environments": {
+      "qa": {
+        "default": true
+      },
+      "staging": {
+        "default": true
+      },
+      "production": {
+        "default": true
+      }
+    }
+  },
+  {
+    "key": "unifiedSearch.newDateRangePickerEnabled",
+    "name": "unifiedSearch.newDateRangePickerEnabled",
+    "description": "Owner: @elastic/eui-team\nOriginal Link: https://github.com/elastic/kibana-feature-flags/issues/64",
+    "value_type": "boolean",
+    "variations": [
+      true,
+      false
+    ],
+    "apps": [
+      "kibana"
+    ],
+    "environments": {
+      "qa": {
+        "default": true
+      },
+      "staging": {
+        "default": true
+      },
+      "production": {
+        "default": true
+      }
+    }
+  },
+  {
+    "key": "workflows.kibanaRequest.coreSelfClientEnabled",
+    "name": "workflows.kibanaRequest.coreSelfClientEnabled",
+    "description": "Routes all kibana.* workflow steps through Core's HTTP self-client.",
+    "value_type": "boolean",
+    "variations": [
+      true,
+      false
+    ],
+    "apps": [
+      "kibana"
+    ],
+    "environments": {
+      "qa": {
+        "default": true
+      },
+      "staging": {
+        "default": true
+      },
+      "production": {
+        "default": false,
+        "rules": [
+          {
+            "type": "match",
+            "attribute": "kibana.orchestrator_target",
+            "operator": "in",
+            "values": [
+              "production-canary"
+            ],
+            "return": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "key": "xpack.dataFederation.enabled",
+    "name": "xpack.dataFederation.enabled",
+    "description": "Enable data federation for the specified Elastic Cloud organization in QA, including Serverless and ECH.",
+    "value_type": "boolean",
+    "variations": [
+      true,
+      false
+    ],
+    "apps": [
+      "kibana"
+    ],
+    "environments": {
+      "qa": {
+        "default": false,
+        "rules": [
+          {
+            "type": "match",
+            "attribute": "kibana.offering",
+            "operator": "in",
+            "values": [
+              "serverless",
+              "traditional"
+            ],
+            "rules": [
+              {
+                "type": "match",
+                "attribute": "organization.key",
+                "operator": "in",
+                "values": [
+                  "940234d8f372cc1658c01738aeedf6e1"
+                ],
+                "return": true
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+]
