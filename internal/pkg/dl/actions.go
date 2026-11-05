@@ -28,9 +28,10 @@ const (
 )
 
 var (
-	QueryAction          = prepareFindAction()
-	QueryAllAgentActions = prepareFindAllAgentsActions()
-	QueryAgentActions    = prepareFindAgentActions()
+	QueryAction                   = prepareFindAction()
+	QueryAllAgentActions          = prepareFindAllAgentsActions()
+	QueryAgentActions             = prepareFindAgentActions()
+	QueryAgentActionsForUninstall = prepareFindAgentActionsForUninstall()
 
 	// Query for expired actions GC
 	QueryDeleteExpiredActions = prepareDeleteExpiredAction()
@@ -87,6 +88,26 @@ func prepareFindAgentActions() *dsl.Tmpl {
 	return tmpl
 }
 
+// prepareFindAgentActionsForUninstall is like prepareFindAgentActions but also
+// restricts the result to a bound set of action types. It is used for
+// pending-uninstall agents so the allowed-type filter is applied in the query,
+// before the fetch-size limit, rather than after: otherwise a long run of
+// withheld actions could fill the bounded result and starve UNINSTALL/CANCEL
+// delivery indefinitely.
+func prepareFindAgentActionsForUninstall() *dsl.Tmpl {
+	tmpl, root, filter := createBaseActionsQuery()
+
+	filter.Terms(FieldAgents, tmpl.Bind(FieldAgents), nil)
+	filter.Terms(FiledType, tmpl.Bind(FiledType), nil)
+
+	// Select more actions per agent since the agents array is not loaded
+	root.Size(maxAgentActionsFetchSize)
+	root.Source().Excludes(FieldAgents)
+
+	tmpl.MustResolve(root)
+	return tmpl
+}
+
 func createBaseActionsQuery() (tmpl *dsl.Tmpl, root, filter *dsl.Node) {
 	tmpl = dsl.NewTmpl()
 
@@ -119,6 +140,28 @@ func FindAgentActions(ctx context.Context, bulker bulk.Bulk, minSeqNo, maxSeqNo 
 	}
 
 	res, err := findActionsHits(ctx, bulker, QueryAgentActions, index, params, maxSeqNo)
+	if err != nil || res == nil {
+		return nil, err
+	}
+
+	return hitsToActions(res.Hits)
+}
+
+// FindAgentActionsForUninstall is like FindAgentActions but only returns actions
+// whose type is in allowedTypes. It is used for pending-uninstall agents, which
+// may only receive UNINSTALL/CANCEL, so the type filter is applied in the query
+// (before the fetch-size limit) and withheld actions cannot block delivery.
+func FindAgentActionsForUninstall(ctx context.Context, bulker bulk.Bulk, minSeqNo, maxSeqNo sqn.SeqNo, agentID string, allowedTypes []string) ([]model.Action, error) {
+	const index = FleetActions
+	params := map[string]any{
+		FieldSeqNo:      minSeqNo.Value(),
+		FieldMaxSeqNo:   maxSeqNo.Value(),
+		FieldExpiration: time.Now().UTC().Format(time.RFC3339),
+		FieldAgents:     []string{agentID},
+		FiledType:       allowedTypes,
+	}
+
+	res, err := findActionsHits(ctx, bulker, QueryAgentActionsForUninstall, index, params, maxSeqNo)
 	if err != nil || res == nil {
 		return nil, err
 	}

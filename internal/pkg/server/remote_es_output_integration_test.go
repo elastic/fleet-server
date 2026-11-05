@@ -33,11 +33,18 @@ const (
 )
 
 func Checkin(t *testing.T, ctx context.Context, srv *tserver, agentID, key string, shouldHaveRemoteES bool, actionType string) (string, string) {
+	return CheckinWithBody(t, ctx, srv, agentID, key, shouldHaveRemoteES, actionType, checkinBody)
+}
+
+// CheckinWithBody is like Checkin but sends a caller-provided checkin body, so a
+// test can control the reported local_metadata (e.g. the
+// elastic.agent.uninstallable capability) without changing the shared fixtures.
+func CheckinWithBody(t *testing.T, ctx context.Context, srv *tserver, agentID, key string, shouldHaveRemoteES bool, actionType, body string) (string, string) {
 	cli := cleanhttp.DefaultClient()
 	var obj map[string]any
 
 	t.Logf("Fake a checkin for agent %s", agentID)
-	req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+agentID+"/checkin", strings.NewReader(checkinBody))
+	req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+agentID+"/checkin", strings.NewReader(body))
 	require.NoError(t, err)
 	req.Header.Set("Authorization", "ApiKey "+key)
 	req.Header.Set("User-Agent", "elastic agent "+serverVersion)
