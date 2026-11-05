@@ -91,8 +91,8 @@ linters:
       min-occurrences: 2
 
     gomoddirectives:
-      # Allow local `replace` directives. Default is false.
-      replace-local: false
+      # Allow local `replace` directives (e.g. dev-tools submodule in go.mod).
+      replace-local: true
     gomodguard:
       blocked:
         # List of blocked modules.
