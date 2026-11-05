@@ -14,7 +14,6 @@ import (
 var (
 	releasePRLabels   = []string{"release", "Team:Automation", "skip-changelog"}
 	ffReleasePRLabels = []string{"release", "docs", "in progress", "Team:Automation", "skip-changelog"}
-	patchDocsPRLabels = []string{"docs", "in progress", "release", "Team:Automation", "skip-changelog"}
 )
 
 // Feature-freeze merge-timing labels (number = RM merge order).
@@ -23,11 +22,6 @@ const (
 	mergeLabelAfterBranch  = "merge:2-after-branch"
 	mergeLabelAfterImages  = "merge:3-after-images" // defined for shared label defs; PR-C omitted so unused in workflows
 	mergeLabelAfterRelease = "merge:4-after-release"
-)
-
-// Patch-release merge-timing labels.
-const (
-	mergeLabelBeforeBuild = "merge:1-before-build"
 )
 
 func backportLabel(releaseBranch string) string {
@@ -42,12 +36,8 @@ func prBReleaseLabels() []string {
 	return append(append([]string{}, ffReleasePRLabels...), mergeLabelAfterBranch)
 }
 
-func prDNextPatchLabels() []string {
+func patchVersionBumpLabels() []string {
 	return append(append([]string{}, releasePRLabels...), mergeLabelAfterRelease)
-}
-
-func patchBeforeBuildPRLabels() []string {
-	return append(append([]string{}, patchDocsPRLabels...), mergeLabelBeforeBuild)
 }
 
 func checkRequirements(cfg *ReleaseConfig) error {
@@ -232,19 +222,19 @@ func prepFFRelease(repo *GitRepo, cfg *ReleaseConfig) (workflowPR, error) {
 	}, nil
 }
 
-// prepNextPatchOnReleaseBranch prepares the next-patch version bump.
-// Used only by RunPatchRelease (not by RunMajorMinorRelease).
-func prepNextPatchOnReleaseBranch(repo *GitRepo, cfg *ReleaseConfig) (workflowPR, error) {
-	branch := fmt.Sprintf("ff-prep-next-patch-%s", cfg.NextRelease)
-	fmt.Printf("\n--- Preparing next-patch prep: %s on %s ---\n", cfg.NextRelease, cfg.ReleaseBranch)
+// prepPatchVersionBump prepares the post-release version bump to CURRENT_RELEASE.
+// Matches ingest-dev prepare-next-patch. Used only by RunPatchRelease.
+func prepPatchVersionBump(repo *GitRepo, cfg *ReleaseConfig) (workflowPR, error) {
+	branch := fmt.Sprintf("update-version-%s", cfg.CurrentRelease)
+	fmt.Printf("\n--- Preparing patch version bump to %s on %s ---\n", cfg.CurrentRelease, cfg.ReleaseBranch)
 
 	if err := repo.EnsureBranchFrom(cfg.ReleaseBranch, branch); err != nil {
 		return workflowPR{}, err
 	}
-	if err := UpdateVersion(cfg.NextRelease); err != nil {
+	if err := UpdateVersion(cfg.CurrentRelease); err != nil {
 		return workflowPR{}, err
 	}
-	commitMsg := fmt.Sprintf("[Release %s] Update version to %s", cfg.CurrentRelease, cfg.NextRelease)
+	commitMsg := fmt.Sprintf("[Release %s] Update version to %s", cfg.CurrentRelease, cfg.CurrentRelease)
 	if _, err := repo.CommitAll(commitMsg, cfg.GitAuthorName, cfg.GitAuthorEmail); err != nil {
 		return workflowPR{}, err
 	}
@@ -255,12 +245,12 @@ func prepNextPatchOnReleaseBranch(repo *GitRepo, cfg *ReleaseConfig) (workflowPR
 		opts: PROptions{
 			Owner:     cfg.ProjectOwner,
 			Repo:      cfg.ProjectRepo,
-			Title:     fmt.Sprintf("[Release %s] Update version to %s", cfg.CurrentRelease, cfg.NextRelease),
+			Title:     fmt.Sprintf("[Release %s] Update version to %s", cfg.CurrentRelease, cfg.CurrentRelease),
 			Head:      branch,
 			Base:      cfg.ReleaseBranch,
-			Body:      prDNextPatchBody(cfg),
+			Body:      patchVersionBumpBody(cfg),
 			Reviewers: cfg.ProjectReviewers,
-			Labels:    prDNextPatchLabels(),
+			Labels:    patchVersionBumpLabels(),
 		},
 	}, nil
 }
@@ -288,15 +278,15 @@ Fleet Server has no docs/test-env updates in this step.
 `, cfg.CurrentRelease, cfg.CurrentRelease, cfg.ReleaseBranch)
 }
 
-func prDNextPatchBody(cfg *ReleaseConfig) string {
+func patchVersionBumpBody(cfg *ReleaseConfig) string {
 	return fmt.Sprintf(`## [Release %s]
 
-Prepares the %s branch after release of %s.
+Post-release version bump on %s to %s (ingest-dev prepare-next-patch).
 
 - Bumps version/version.go to %s
 
-**Merge:** after the release of %s.
-`, cfg.CurrentRelease, cfg.ReleaseBranch, cfg.CurrentRelease, cfg.NextRelease, cfg.CurrentRelease)
+**Merge:** after the patch release job opens this PR (merge promptly).
+`, cfg.CurrentRelease, cfg.ReleaseBranch, cfg.CurrentRelease, cfg.CurrentRelease)
 }
 
 func ensureMajorMinorCurrentReleaseMatchesBase(repo *GitRepo, cfg *ReleaseConfig) error {
@@ -322,9 +312,9 @@ func ensureMajorMinorCurrentReleaseMatchesBase(repo *GitRepo, cfg *ReleaseConfig
 	return nil
 }
 
-// RunPatchRelease executes the patch release workflow on an existing release branch:
-// 1. Opens PR-A (ensure CURRENT version — historically the "docs" PR; often a no-op)
-// 2. Opens PR-B (next patch version — after release)
+// RunPatchRelease executes the post-release patch bump on an existing release branch.
+// CURRENT_RELEASE is the version to land (NEW_VERSION from version-bump), matching
+// ingest-dev prepare-next-patch. Docs stay off this path.
 func RunPatchRelease(cfg *ReleaseConfig) error {
 	fmt.Println("=== Starting Patch Release Workflow ===")
 
@@ -345,20 +335,16 @@ func RunPatchRelease(cfg *ReleaseConfig) error {
 		cfg.ReleaseBranch = inferReleaseBranch(cfg.CurrentRelease)
 	}
 
-	if err := ensurePatchCurrentReleaseMatchesBranch(repo, cfg); err != nil {
+	if err := ensurePatchBranchReadyForBump(repo, cfg); err != nil {
 		return err
 	}
 
-	prA, err := prepPatchBeforeBuild(repo, cfg)
-	if err != nil {
-		return err
-	}
-	prB, err := prepNextPatchOnReleaseBranch(repo, cfg)
+	prBump, err := prepPatchVersionBump(repo, cfg)
 	if err != nil {
 		return err
 	}
 
-	branchesToFinalize := []workflowPR{prA, prB}
+	branchesToFinalize := []workflowPR{prBump}
 
 	if cfg.DryRun {
 		fmt.Println("\nDRY RUN: Skipping push and PR creation")
@@ -382,7 +368,19 @@ func RunPatchRelease(cfg *ReleaseConfig) error {
 	return nil
 }
 
-func ensurePatchCurrentReleaseMatchesBranch(repo *GitRepo, cfg *ReleaseConfig) error {
+func ensurePatchBranchReadyForBump(repo *GitRepo, cfg *ReleaseConfig) error {
+	prev, err := inferLatestRelease(cfg.CurrentRelease)
+	if err != nil {
+		return err
+	}
+	if prev == "" {
+		return fmt.Errorf(
+			"prepare-next-patch requires CURRENT_RELEASE with patch > 0 (got %s)",
+			cfg.CurrentRelease,
+		)
+	}
+	cfg.LatestRelease = prev
+
 	if err := repo.EnsureBranch(cfg.ReleaseBranch); err != nil {
 		return err
 	}
@@ -390,59 +388,21 @@ func ensurePatchCurrentReleaseMatchesBranch(repo *GitRepo, cfg *ReleaseConfig) e
 	if err != nil {
 		return err
 	}
-	if branchVersion != cfg.CurrentRelease {
+	if branchVersion == cfg.CurrentRelease {
 		return fmt.Errorf(
-			"CURRENT_RELEASE=%s does not match version on branch %s (%s in version/version.go); "+
-				"set CURRENT_RELEASE to the version already on the release branch (the patch being released)",
-			cfg.CurrentRelease, cfg.ReleaseBranch, branchVersion,
+			"CURRENT_RELEASE=%s is already on branch %s; nothing to bump",
+			cfg.CurrentRelease, cfg.ReleaseBranch,
 		)
 	}
-	fmt.Printf("Verified CURRENT_RELEASE=%s matches %s on branch %s\n", cfg.CurrentRelease, branchVersion, cfg.ReleaseBranch)
+	if branchVersion != prev {
+		return fmt.Errorf(
+			"CURRENT_RELEASE=%s expects version %s on branch %s (got %s in version/version.go); "+
+				"set CURRENT_RELEASE to the version to land (NEW_VERSION from version-bump)",
+			cfg.CurrentRelease, prev, cfg.ReleaseBranch, branchVersion,
+		)
+	}
+	fmt.Printf("Verified branch %s is at %s; will bump to CURRENT_RELEASE=%s\n", cfg.ReleaseBranch, branchVersion, cfg.CurrentRelease)
 	return nil
-}
-
-func prepPatchBeforeBuild(repo *GitRepo, cfg *ReleaseConfig) (workflowPR, error) {
-	branch := fmt.Sprintf("patch-release-%s", cfg.CurrentRelease)
-	fmt.Printf("\n--- Preparing PR-A: ensure version %s on %s ---\n", cfg.CurrentRelease, cfg.ReleaseBranch)
-
-	if err := repo.EnsureBranchFrom(cfg.ReleaseBranch, branch); err != nil {
-		return workflowPR{}, err
-	}
-	// Fleet Server has no docs/test-env files. Former prepare-patch-release only
-	// updated version.go; with the shared CURRENT_RELEASE guard that is usually a no-op.
-	if err := UpdateVersion(cfg.CurrentRelease); err != nil {
-		return workflowPR{}, err
-	}
-	commitMsg := fmt.Sprintf("[Release %s] Update docs versions %s", cfg.CurrentRelease, cfg.CurrentRelease)
-	if _, err := repo.CommitAll(commitMsg, cfg.GitAuthorName, cfg.GitAuthorEmail); err != nil {
-		return workflowPR{}, err
-	}
-
-	return workflowPR{
-		branch: branch,
-		base:   cfg.ReleaseBranch,
-		opts: PROptions{
-			Owner:     cfg.ProjectOwner,
-			Repo:      cfg.ProjectRepo,
-			Title:     fmt.Sprintf("[Release %s] Update docs versions %s", cfg.CurrentRelease, cfg.CurrentRelease),
-			Head:      branch,
-			Base:      cfg.ReleaseBranch,
-			Body:      patchBeforeBuildPRBody(cfg.CurrentRelease),
-			Reviewers: cfg.ProjectReviewers,
-			Labels:    patchBeforeBuildPRLabels(),
-		},
-	}, nil
-}
-
-func patchBeforeBuildPRBody(currentRelease string) string {
-	return fmt.Sprintf(`## [Release %s]
-
-Former prepare-patch-release PR for Fleet Server.
-
-Fleet Server has no docs/K8s updates; version/version.go is already %s on the release branch, so this PR is often empty and skipped.
-
-**Merge:** before the final Release build (when changes exist).
-`, currentRelease, currentRelease)
 }
 
 func finalizeWorkflowPRs(repo *GitRepo, gh *GitHubClient, items []workflowPR) ([]workflowPRResult, error) {

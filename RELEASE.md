@@ -17,8 +17,8 @@ export DRY_RUN=true
 # Feature freeze
 mage release:runMajorMinor
 
-# Patch release on an existing release branch
-export CURRENT_RELEASE="9.6.1"   # must already match version on the release branch
+# Patch: CURRENT_RELEASE is the version to land (NEW_VERSION)
+export CURRENT_RELEASE="9.6.1"   # release branch must still be at 9.6.0
 mage release:runPatch
 
 go test -C dev-tools/mage/release ./... -count=1
@@ -41,18 +41,18 @@ Next-patch bumps are **not** opened here; use `mage release:runPatch`.
 
 ## Patch (`mage release:runPatch`)
 
-`CURRENT_RELEASE` is the version **already on** the release branch.
+`CURRENT_RELEASE` is the version to land (`NEW_VERSION` from version-bump). The
+release branch must already be at the previous patch. Docs stay off this path.
 
 | Slot | Branch → base | Changes | Merge label |
 |---|---|---|---|
-| **PR-A** | `patch-release-{CURRENT}` → `X.Y` | ensure version (often skipped; no docs) | `merge:1-before-build` |
-| **PR-B** | `ff-prep-next-patch-{NEXT}` → `X.Y` | bump to next patch | `merge:4-after-release` |
+| **bump** | `update-version-{CURRENT}` → `X.Y` | bump `version.go` to CURRENT | `merge:4-after-release` |
 
 ## Environment variables
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `CURRENT_RELEASE` | yes | — | Version already on base/release branch |
+| `CURRENT_RELEASE` | yes | — | FF: version on base; patch: version to land (`NEW_VERSION`) |
 | `GITHUB_TOKEN` | yes (unless dry run) | — | GitHub API token |
 | `DRY_RUN` | no | `false` | Only `true` enables dry run |
 | `BASE_BRANCH` | no | `main` | Base branch for feature freeze |

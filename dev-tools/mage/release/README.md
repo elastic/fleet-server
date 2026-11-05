@@ -6,13 +6,13 @@ Operator reference for `dev-tools/mage/release/`. Release managers should start 
 
 | Target | CLI command | Purpose |
 |---|---|---|
-| `mage release:runMajorMinor` | `run-major-minor` | Feature freeze: release branch + PR-A/B (no next-patch) |
-| `mage release:runPatch` | `run-patch` | Patch: PR-A (often skipped) + next-patch PR-B |
-| `mage release:updateVersion` | `update-version` | Update `version/version.go` only |
-| `mage release:updateMergify` | `update-mergify` | Append backport rule |
 | `mage release:ensureIssueTracker` | `ensure-issue-tracker` | Create/update release checklist issue |
+| `mage release:runMajorMinor` | `run-major-minor` | Feature freeze: release branch + PR-A/B (no next-patch) |
+| `mage release:runPatch` | `run-patch` | Patch: post-release bump to `CURRENT_RELEASE` |
+| `mage release:updateMergify` | `update-mergify` | Append backport rule |
+| `mage release:updateVersion` | `update-version` | Update `version/version.go` only |
 
-There is **no** `runNextRelease` target; next-patch prep is PR-B inside `runPatch` only (not `runMajorMinor`).
+There is **no** `runNextRelease` target; version bumps after a patch release are opened only by `runPatch` (not `runMajorMinor`).
 
 ## Architecture
 
@@ -22,12 +22,13 @@ There is **no** `runNextRelease` target; next-patch prep is PR-B inside `runPatc
 
 ## Alignment with beats / elastic-agent
 
-Shared process: `CURRENT_RELEASE` must match `version.go`, merge-timing labels, idempotent branches/PRs, issue tracker, nested module.
+Shared process: merge-timing labels, idempotent branches/PRs, issue tracker, nested module.
+Patch `CURRENT_RELEASE` is the version to land (`NEW_VERSION`); the release branch must already be at the previous patch.
 
 Fleet Server differences (from former `fleet-server.mak`):
 
 - No K8s / Helm / docs / test-env updates → **PR-C omitted**
-- Patch “docs” PR has no doc files → often skipped when version already matches
+- Patch opens a single version bump PR (no docs PR)
 
 ## Local testing
 

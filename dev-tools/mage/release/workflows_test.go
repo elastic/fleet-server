@@ -25,18 +25,19 @@ func TestLabelHelpers(t *testing.T) {
 	if !contains(prBReleaseLabels(), mergeLabelAfterBranch) {
 		t.Fatal("PR-B missing merge:2-after-branch")
 	}
-	if !contains(prDNextPatchLabels(), mergeLabelAfterRelease) {
-		t.Fatal("next-patch labels missing merge:4-after-release")
+	if !contains(patchVersionBumpLabels(), mergeLabelAfterRelease) {
+		t.Fatal("patch bump labels missing merge:4-after-release")
 	}
-	if !contains(patchBeforeBuildPRLabels(), mergeLabelBeforeBuild) {
-		t.Fatal("patch PR-A missing merge:1-before-build")
+	if contains(patchVersionBumpLabels(), "docs") {
+		t.Fatal("patch bump must not include docs label")
 	}
 }
 
 func TestPRBodiesMentionFleetScope(t *testing.T) {
 	cfg := &ReleaseConfig{
-		CurrentRelease:          "9.6.0",
-		NextRelease:             "9.6.1",
+		CurrentRelease:          "9.6.1",
+		LatestRelease:           "9.6.0",
+		NextRelease:             "9.6.2",
 		NextProjectMinorVersion: "9.7.0",
 		BaseBranch:              "main",
 		ReleaseBranch:           "9.6",
@@ -48,11 +49,12 @@ func TestPRBodiesMentionFleetScope(t *testing.T) {
 	if !strings.Contains(prBReleaseBody(cfg), "no docs/test-env") {
 		t.Fatal("PR-B body should note missing docs/test-env")
 	}
-	if !strings.Contains(prDNextPatchBody(cfg), "9.6.1") {
-		t.Fatal("next-patch body missing next patch version")
+	body := patchVersionBumpBody(cfg)
+	if !strings.Contains(body, "to 9.6.1") {
+		t.Fatal("patch bump body missing landing version 9.6.1")
 	}
-	if !strings.Contains(patchBeforeBuildPRBody("9.6.1"), "often empty") {
-		t.Fatal("patch PR-A body should note often-empty PR")
+	if strings.Contains(body, "Merge after the release of") {
+		t.Fatal("patch bump body must not park with Merge-after-release wording")
 	}
 }
 
