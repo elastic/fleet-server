@@ -5,7 +5,6 @@
 package release
 
 import (
-	"os"
 	"testing"
 )
 
@@ -119,9 +118,25 @@ func TestLoadConfigFromEnv(t *testing.T) {
 		},
 	}
 
+	releaseEnvKeys := []string{
+		"BASE_BRANCH",
+		"CURRENT_RELEASE",
+		"DRY_RUN",
+		"GITHUB_TOKEN",
+		"GIT_AUTHOR_EMAIL",
+		"GIT_AUTHOR_NAME",
+		"PROJECT_OWNER",
+		"PROJECT_REPO",
+		"PROJECT_REVIEWERS",
+	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			os.Clearenv()
+			// Clear only release-related keys. os.Clearenv() would drop PATH and
+			// break later tests that shell out to git for Push.
+			for _, key := range releaseEnvKeys {
+				t.Setenv(key, "")
+			}
 			for k, v := range tt.envVars {
 				t.Setenv(k, v)
 			}
