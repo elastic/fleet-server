@@ -992,7 +992,18 @@ func (ct *CheckinT) fetchAgentPendingActions(ctx context.Context, seqno sqn.SeqN
 		return nil, fmt.Errorf("fetchAgentPendingActions: %w", err)
 	}
 
-	return actions, err
+	for i := range actions {
+		// Skip actions that filterActions will drop so a bad secret reference
+		// cannot fail the check-in for an action that is never delivered.
+		if !validActionTypes[actions[i].Type] {
+			continue
+		}
+		if err := secret.ReplaceActionSecrets(ctx, &actions[i], ct.bulker); err != nil {
+			return nil, fmt.Errorf("fetchAgentPendingActions: replace secrets in action %q: %w", actions[i].ActionID, err)
+		}
+	}
+
+	return actions, nil
 }
 
 // filterActions removes the POLICY_CHANGE, UPDATE_TAGS, FORCE_UNENROLL action from the passed list as well as any unknown action types.
