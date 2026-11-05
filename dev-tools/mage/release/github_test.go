@@ -72,7 +72,7 @@ func TestCreatePRIdempotent(t *testing.T) {
 	opts := PROptions{
 		Owner: "elastic",
 		Repo:  "fleet-server",
-		Title: "[Release 9.5.0] Prepare release branch",
+		Title: "[Release][9.5.0] Prepare release branch",
 		Head:  "9.5",
 		Base:  "main",
 		Body:  "Release PR body",

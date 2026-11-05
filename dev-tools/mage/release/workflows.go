@@ -170,7 +170,7 @@ func prepMainBackportAndVersion(repo *GitRepo, cfg *ReleaseConfig) (workflowPR, 
 	if err := UpdateVersion(cfg.NextProjectMinorVersion); err != nil {
 		return workflowPR{}, err
 	}
-	commitMsg := fmt.Sprintf("[Release %s] Prepare main for %s and mergify backport-%s", cfg.CurrentRelease, cfg.NextProjectMinorVersion, cfg.ReleaseBranch)
+	commitMsg := fmt.Sprintf("[Release][%s] Prepare main for %s and mergify backport-%s", cfg.CurrentRelease, cfg.NextProjectMinorVersion, cfg.ReleaseBranch)
 	if _, err := repo.CommitAll(commitMsg, cfg.GitAuthorName, cfg.GitAuthorEmail); err != nil {
 		return workflowPR{}, err
 	}
@@ -181,7 +181,7 @@ func prepMainBackportAndVersion(repo *GitRepo, cfg *ReleaseConfig) (workflowPR, 
 		opts: PROptions{
 			Owner:     cfg.ProjectOwner,
 			Repo:      cfg.ProjectRepo,
-			Title:     fmt.Sprintf("[Release %s] Prepare main for %s and mergify backport-%s", cfg.CurrentRelease, cfg.NextProjectMinorVersion, cfg.ReleaseBranch),
+			Title:     fmt.Sprintf("[Release][%s] Prepare main for %s and mergify backport-%s", cfg.CurrentRelease, cfg.NextProjectMinorVersion, cfg.ReleaseBranch),
 			Head:      branch,
 			Base:      cfg.BaseBranch,
 			Body:      prAMainBody(cfg),
@@ -201,7 +201,7 @@ func prepFFRelease(repo *GitRepo, cfg *ReleaseConfig) (workflowPR, error) {
 	if err := UpdateVersion(cfg.CurrentRelease); err != nil {
 		return workflowPR{}, err
 	}
-	commitMsg := fmt.Sprintf("[Release %s] ff-release: update versions %s", cfg.CurrentRelease, cfg.CurrentRelease)
+	commitMsg := fmt.Sprintf("[Release][%s] ff-release: update versions %s", cfg.CurrentRelease, cfg.CurrentRelease)
 	if _, err := repo.CommitAll(commitMsg, cfg.GitAuthorName, cfg.GitAuthorEmail); err != nil {
 		return workflowPR{}, err
 	}
@@ -212,7 +212,7 @@ func prepFFRelease(repo *GitRepo, cfg *ReleaseConfig) (workflowPR, error) {
 		opts: PROptions{
 			Owner:     cfg.ProjectOwner,
 			Repo:      cfg.ProjectRepo,
-			Title:     fmt.Sprintf("[Release %s] ff-release: update versions %s", cfg.CurrentRelease, cfg.CurrentRelease),
+			Title:     fmt.Sprintf("[Release][%s] ff-release: update versions %s", cfg.CurrentRelease, cfg.CurrentRelease),
 			Head:      branch,
 			Base:      cfg.ReleaseBranch,
 			Body:      prBReleaseBody(cfg),
@@ -234,7 +234,7 @@ func prepPatchVersionBump(repo *GitRepo, cfg *ReleaseConfig) (workflowPR, error)
 	if err := UpdateVersion(cfg.CurrentRelease); err != nil {
 		return workflowPR{}, err
 	}
-	commitMsg := fmt.Sprintf("[Release %s] Update version to %s", cfg.CurrentRelease, cfg.CurrentRelease)
+	commitMsg := fmt.Sprintf("[Release][%s] Update version to %s", cfg.CurrentRelease, cfg.CurrentRelease)
 	if _, err := repo.CommitAll(commitMsg, cfg.GitAuthorName, cfg.GitAuthorEmail); err != nil {
 		return workflowPR{}, err
 	}
@@ -245,7 +245,7 @@ func prepPatchVersionBump(repo *GitRepo, cfg *ReleaseConfig) (workflowPR, error)
 		opts: PROptions{
 			Owner:     cfg.ProjectOwner,
 			Repo:      cfg.ProjectRepo,
-			Title:     fmt.Sprintf("[Release %s] Update version to %s", cfg.CurrentRelease, cfg.CurrentRelease),
+			Title:     fmt.Sprintf("[Release][%s] Update version to %s", cfg.CurrentRelease, cfg.CurrentRelease),
 			Head:      branch,
 			Base:      cfg.ReleaseBranch,
 			Body:      patchVersionBumpBody(cfg),
@@ -256,7 +256,7 @@ func prepPatchVersionBump(repo *GitRepo, cfg *ReleaseConfig) (workflowPR, error)
 }
 
 func prAMainBody(cfg *ReleaseConfig) string {
-	return fmt.Sprintf(`## [Release %s]
+	return fmt.Sprintf(`## [Release][%s]
 
 Prepares %s for the %s feature freeze.
 
@@ -268,7 +268,7 @@ Prepares %s for the %s feature freeze.
 }
 
 func prBReleaseBody(cfg *ReleaseConfig) string {
-	return fmt.Sprintf(`## [Release %s]
+	return fmt.Sprintf(`## [Release][%s]
 
 Feature-freeze release branch updates for %s (version/version.go).
 
@@ -279,7 +279,7 @@ Fleet Server has no docs/test-env updates in this step.
 }
 
 func patchVersionBumpBody(cfg *ReleaseConfig) string {
-	return fmt.Sprintf(`## [Release %s]
+	return fmt.Sprintf(`## [Release][%s]
 
 Post-release version bump on %s to %s (ingest-dev prepare-next-patch).
 
