@@ -56,6 +56,7 @@ var (
 
 const (
 	kEncodingGzip  = "gzip"
+	checkinAction  = "checkin"
 	FailedStatus   = "FAILED"
 	DegradedStatus = "DEGRADED"
 
@@ -285,7 +286,7 @@ func (ct *CheckinT) writeEmptyPolicyChangeResponse(zlog zerolog.Logger, w http.R
 		Msg("Returning empty POLICY_CHANGE for agent with invalid API key")
 
 	resp := CheckinResponse{
-		Action:  "checkin",
+		Action:  checkinAction,
 		Actions: []Action{action},
 	}
 
@@ -318,7 +319,7 @@ func (ct *CheckinT) writeUnenrollResponse(zlog zerolog.Logger, w http.ResponseWr
 		Msg("Returning UNENROLL action for agent with invalid API key")
 
 	resp := CheckinResponse{
-		Action:  "checkin",
+		Action:  checkinAction,
 		Actions: []Action{action},
 	}
 
@@ -566,7 +567,7 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 				if errors.Is(ctx.Err(), context.Canceled) {
 					resp := CheckinResponse{
 						AckToken: &ackToken,
-						Action:   "checkin",
+						Action:   checkinAction,
 					}
 					return ct.writeResponse(zlog, w, r, agent, resp)
 				}
@@ -600,7 +601,7 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 
 	resp := CheckinResponse{
 		AckToken: &ackToken,
-		Action:   "checkin",
+		Action:   checkinAction,
 		Actions:  actions,
 	}
 
