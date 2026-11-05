@@ -9,6 +9,7 @@ package secret
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
@@ -18,6 +19,17 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// failingBulk fails secret reads. Every other bulk method is the mock's, so the test exercises the
+// error path of ReplaceActionSecrets without reimplementing the interface.
+type failingBulk struct {
+	*ftesting.MockBulk
+	err error
+}
+
+func (f *failingBulk) ReadSecrets(context.Context, []string) (map[string]string, error) {
+	return nil, f.err
+}
 
 func TestReplaceStringRef(t *testing.T) {
 	secretRefs := map[string]string{
@@ -316,4 +328,61 @@ func TestProcessOutputSecret(t *testing.T) {
 			assert.ElementsMatch(t, tc.expectKeys, keys)
 		})
 	}
+}
+
+func TestReplaceActionSecretsNoReferences(t *testing.T) {
+	data := json.RawMessage(`{"password":"plain"}`)
+	action := model.Action{Data: data}
+	bulker := ftesting.NewMockBulk()
+
+	err := ReplaceActionSecrets(t.Context(), &action, bulker)
+
+	require.NoError(t, err)
+	assert.Equal(t, data, action.Data)
+	assert.Nil(t, action.SecretReferences)
+}
+
+func TestReplaceActionSecrets(t *testing.T) {
+	refs := []model.SecretReferencesItems{
+		{ID: "ref1"},
+		{ID: "ref2"},
+	}
+	input := map[string]any{
+		"password": "$co.elastic.secret{ref1}",
+		"nested": map[string]any{
+			"token": "$co.elastic.secret{ref2}",
+		},
+		"plain": "value",
+	}
+	data, err := json.Marshal(input)
+	require.NoError(t, err)
+
+	action := model.Action{Data: data, SecretReferences: refs}
+	bulker := ftesting.NewMockBulk()
+
+	err = ReplaceActionSecrets(t.Context(), &action, bulker)
+	require.NoError(t, err)
+
+	var out map[string]any
+	require.NoError(t, json.Unmarshal(action.Data, &out))
+	assert.Equal(t, "ref1_value", out["password"])
+	assert.Equal(t, "value", out["plain"])
+	nested, ok := out["nested"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "ref2_value", nested["token"])
+	assert.Nil(t, action.SecretReferences)
+}
+
+func TestReplaceActionSecretsLookupError(t *testing.T) {
+	refs := []model.SecretReferencesItems{{ID: "ref1"}}
+	data := json.RawMessage(`{"password":"$co.elastic.secret{ref1}"}`)
+	action := model.Action{Data: data, SecretReferences: refs}
+	lookupErr := errors.New("secret lookup failed")
+	bulker := &failingBulk{MockBulk: ftesting.NewMockBulk(), err: lookupErr}
+
+	err := ReplaceActionSecrets(t.Context(), &action, bulker)
+
+	require.ErrorIs(t, err, lookupErr)
+	assert.Equal(t, data, action.Data)
+	assert.Equal(t, refs, action.SecretReferences)
 }

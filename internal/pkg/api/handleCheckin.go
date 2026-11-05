@@ -56,6 +56,7 @@ var (
 
 const (
 	kEncodingGzip  = "gzip"
+	checkinAction  = "checkin"
 	FailedStatus   = "FAILED"
 	DegradedStatus = "DEGRADED"
 
@@ -285,7 +286,7 @@ func (ct *CheckinT) writeEmptyPolicyChangeResponse(zlog zerolog.Logger, w http.R
 		Msg("Returning empty POLICY_CHANGE for agent with invalid API key")
 
 	resp := CheckinResponse{
-		Action:  "checkin",
+		Action:  checkinAction,
 		Actions: []Action{action},
 	}
 
@@ -318,7 +319,7 @@ func (ct *CheckinT) writeUnenrollResponse(zlog zerolog.Logger, w http.ResponseWr
 		Msg("Returning UNENROLL action for agent with invalid API key")
 
 	resp := CheckinResponse{
-		Action:  "checkin",
+		Action:  checkinAction,
 		Actions: []Action{action},
 	}
 
@@ -566,7 +567,7 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 				if errors.Is(ctx.Err(), context.Canceled) {
 					resp := CheckinResponse{
 						AckToken: &ackToken,
-						Action:   "checkin",
+						Action:   checkinAction,
 					}
 					return ct.writeResponse(zlog, w, r, agent, resp)
 				}
@@ -600,7 +601,7 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 
 	resp := CheckinResponse{
 		AckToken: &ackToken,
-		Action:   "checkin",
+		Action:   checkinAction,
 		Actions:  actions,
 	}
 
@@ -946,7 +947,18 @@ func (ct *CheckinT) fetchAgentPendingActions(ctx context.Context, seqno sqn.SeqN
 		return nil, fmt.Errorf("fetchAgentPendingActions: %w", err)
 	}
 
-	return actions, err
+	for i := range actions {
+		// Skip actions that filterActions will drop so a bad secret reference
+		// cannot fail the check-in for an action that is never delivered.
+		if !validActionTypes[actions[i].Type] {
+			continue
+		}
+		if err := secret.ReplaceActionSecrets(ctx, &actions[i], ct.bulker); err != nil {
+			return nil, fmt.Errorf("fetchAgentPendingActions: replace secrets in action %q: %w", actions[i].ActionID, err)
+		}
+	}
+
+	return actions, nil
 }
 
 // filterActions removes the POLICY_CHANGE, UPDATE_TAGS, FORCE_UNENROLL action from the passed list as well as any unknown action types.
