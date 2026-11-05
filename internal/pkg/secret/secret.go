@@ -76,7 +76,7 @@ func ProcessInputsSecrets(data *model.PolicyData, secretValues map[string]string
 // the values of secret refs in inputs and input streams properties using the old format
 // for specifying secrets: <path>: $co.elastic.secret{<secret ref>}
 func processInputsWithInlineSecrets(data *model.PolicyData, secretValues map[string]string) ([]map[string]any, []string) {
-	result := make([]map[string]any, 0)
+	result := make([]map[string]any, 0, len(data.Inputs))
 	keys := make([]string, 0)
 	for i, input := range data.Inputs {
 		replacedInput, ks := replaceInlineSecretRefsInMap(input, secretValues)
@@ -92,7 +92,7 @@ func processInputsWithInlineSecrets(data *model.PolicyData, secretValues map[str
 // the values of secret refs in inputs and input streams properties using the new format
 // for specifying secrets: secrets.<path-to-key>.<key>.id:<secret ref>
 func processInputsWithPathSecrets(data *model.PolicyData, secretValues map[string]string) ([]map[string]any, []string) {
-	result := make([]map[string]any, 0)
+	result := make([]map[string]any, 0, len(data.Inputs))
 	keys := make([]string, 0)
 
 	for i, inp := range data.Inputs {
@@ -158,7 +158,7 @@ func replacePathSecretRefsInMap(m smap.Map, secretValues map[string]string) (map
 
 func replacePathSecretRefsInSlice(arr []any, secretValues map[string]string) ([]any, []string) {
 	result := make([]any, len(arr))
-	keys := make([]string, 0)
+	keys := make([]string, 0, len(arr))
 
 	for i, v := range arr {
 		var r any
@@ -180,6 +180,23 @@ func replacePathSecretRefsInSlice(arr []any, secretValues map[string]string) ([]
 	}
 
 	return result, keys
+}
+
+// ReplaceActionSecrets replaces secret references in the action data with their
+// current values and clears the references from the action.
+func ReplaceActionSecrets(ctx context.Context, action *model.Action, bulker bulk.Bulk) error {
+	if len(action.SecretReferences) == 0 {
+		return nil
+	}
+
+	data, err := GetActionDataWithSecrets(ctx, action.Data, action.SecretReferences, bulker)
+	if err != nil {
+		return err
+	}
+
+	action.Data = data
+	action.SecretReferences = nil
+	return nil
 }
 
 func GetActionDataWithSecrets(ctx context.Context, data json.RawMessage, refs []model.SecretReferencesItems, bulker bulk.Bulk) (json.RawMessage, error) {
@@ -346,8 +363,8 @@ func processMapWithPathSecrets(m smap.Map, secretValues map[string]string) []str
 	secrets := m.GetMap(FieldSecrets)
 
 	delete(m, FieldSecrets)
-	secretReferences := make([]model.SecretReferencesItems, 0)
 	outputSecrets := getSecretIDAndPath(secrets)
+	secretReferences := make([]model.SecretReferencesItems, 0, len(outputSecrets))
 	keys := make([]string, 0, len(outputSecrets))
 
 	for _, secret := range outputSecrets {
