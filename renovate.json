@@ -1,0 +1,191 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "gitIgnoredAuthors": [
+    "github-actions[bot]@users.noreply.github.com",
+    "41898282+github-actions[bot]@users.noreply.github.com"
+  ],
+  "dependencyDashboard": true,
+  "enabledManagers": [
+    "gomod",
+    "github-actions",
+    "pre-commit"
+  ],
+  "baseBranchPatterns": [
+    "main",
+    "9.6",
+    "9.5",
+    "9.4",
+    "8.19"
+  ],
+  "labels": [
+    "automation",
+    "dependency",
+    "skip-changelog",
+    "backport-skip",
+    "Team:Elastic-Agent-Control-Plane"
+  ],
+  "pre-commit": {
+    "enabled": true
+  },
+  "packageRules": [
+    {
+      "description": [
+        "Major updates: only on main and the last branch of the previous major",
+        "managed-by: update-renovate-branches"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "matchBaseBranches": [
+        "!/^(main|8\\.19)$/"
+      ],
+      "enabled": false
+    },
+    {
+      "description": [
+        "Codegen updates: only on main and the last branch of the previous major",
+        "managed-by: update-renovate-branches"
+      ],
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchPackageNames": [
+        "/^github\\.com/oapi-codegen//"
+      ],
+      "matchBaseBranches": [
+        "!/^(main|8\\.19)$/"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "Go modules: schedule, PR limit, branch prefix, and post-update tidy",
+      "matchManagers": [
+        "gomod"
+      ],
+      "additionalBranchPrefix": "golang/",
+      "schedule": [
+        "on monday"
+      ],
+      "prConcurrentLimit": 10,
+      "postUpdateOptions": [
+        "gomodTidy"
+      ]
+    },
+    {
+      "description": "go-dependencies: catch-all group for Go modules not claimed by a more specific group",
+      "matchManagers": [
+        "gomod"
+      ],
+      "groupName": "go-dependencies"
+    },
+    {
+      "description": "codegen: oapi-codegen packages that require running 'mage generate' after update",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchPackageNames": [
+        "/^github\\.com/oapi-codegen//"
+      ],
+      "groupName": "codegen"
+    },
+    {
+      "description": "elastic: all Elastic org packages",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchPackageNames": [
+        "/^github\\.com/elastic//",
+        "/^go\\.elastic\\.co//"
+      ],
+      "groupName": "elastic"
+    },
+    {
+      "description": "test-tooling: dependencies used for tests and test infrastructure",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchPackageNames": [
+        "/^github\\.com/testcontainers//",
+        "/^github\\.com/Shopify//",
+        "/^github\\.com/moby//",
+        "/^github\\.com/magefile/mage$/",
+        "/^github\\.com/stretchr//"
+      ],
+      "groupName": "test-tooling"
+    },
+    {
+      "description": "GitHub Actions: grouped weekly Sunday updates",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "groupName": "github-actions",
+      "schedule": [
+        "on sunday"
+      ],
+      "prConcurrentLimit": 10
+    },
+    {
+      "description": "Ignore internal fleet-server module references used in replace directives",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchPackageNames": [
+        "/^github\\.com/elastic/fleet-server/"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "Update elastic/beats outside of Renovate. Each release branch needs Beats version from respective branch.",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchPackageNames": [
+        "github.com/elastic/beats/v7"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "Keep go-json-schema-generate updates manual",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchPackageNames": [
+        "github.com/elastic/go-json-schema-generate"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "GitHub Actions: keep macOS runner updates manual",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "matchDepTypes": [
+        "github-runner"
+      ],
+      "matchPackageNames": [
+        "macos"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "pre-commit: weekly Sunday updates",
+      "matchManagers": [
+        "pre-commit"
+      ],
+      "schedule": [
+        "on sunday"
+      ],
+      "addLabels": [
+        "changelog:dependencies"
+      ],
+      "prConcurrentLimit": 5
+    },
+    {
+      "description": "Distributed oblt-aw client triggers \u2014 pins owned by distribute-client-workflow",
+      "enabled": false,
+      "matchFileNames": [
+        ".github/workflows/trigger-*-aw-*.yml"
+      ]
+    }
+  ]
+}
