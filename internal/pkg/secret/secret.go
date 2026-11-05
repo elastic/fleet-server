@@ -182,6 +182,23 @@ func replacePathSecretRefsInSlice(arr []any, secretValues map[string]string) ([]
 	return result, keys
 }
 
+// ReplaceActionSecrets replaces secret references in the action data with their
+// current values and clears the references from the action.
+func ReplaceActionSecrets(ctx context.Context, action *model.Action, bulker bulk.Bulk) error {
+	if len(action.SecretReferences) == 0 {
+		return nil
+	}
+
+	data, err := GetActionDataWithSecrets(ctx, action.Data, action.SecretReferences, bulker)
+	if err != nil {
+		return err
+	}
+
+	action.Data = data
+	action.SecretReferences = nil
+	return nil
+}
+
 func GetActionDataWithSecrets(ctx context.Context, data json.RawMessage, refs []model.SecretReferencesItems, bulker bulk.Bulk) (json.RawMessage, error) {
 	if len(refs) == 0 {
 		return data, nil
