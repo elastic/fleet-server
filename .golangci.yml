@@ -99,8 +99,6 @@ linters:
         modules:
           - github.com/bytedance/sonic:
               reason: "Federal restriction on bytedance"
-          - github.com/elastic/beats/v7:
-              reason: "There must be no Beats dependency, use elastic-agent-libs instead."
           - github.com/elastic/beats/elastic-agent:
               reason: "There must be no elastic-agent dependency, use elastic-agent-libs instead."
 
