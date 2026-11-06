@@ -16,10 +16,10 @@ import (
 	apmprometheus "go.elastic.co/apm/module/apmprometheus/v2"
 	"go.elastic.co/apm/v2"
 
+	"github.com/elastic/beats/v7/pkg/systemmetrics/report"
 	"github.com/elastic/elastic-agent-libs/api"
 	cfglib "github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/monitoring"
-	"github.com/elastic/elastic-agent-system-metrics/report"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
@@ -98,7 +98,7 @@ func newMetricsRegistry(name string) *metricsRegistry {
 	reg := monitoring.Default
 	return &metricsRegistry{
 		fullName: name,
-		registry: reg.NewRegistry(name),
+		registry: reg.GetOrCreateRegistry(name),
 		promReg:  prometheus.NewRegistry(),
 	}
 }
@@ -110,7 +110,7 @@ func (r *metricsRegistry) newRegistry(name string) *metricsRegistry {
 	}
 	return &metricsRegistry{
 		fullName: fullName,
-		registry: r.registry.NewRegistry(name),
+		registry: r.registry.GetOrCreateRegistry(name),
 		promReg:  r.promReg,
 	}
 }
