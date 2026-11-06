@@ -130,6 +130,16 @@
       "enabled": false
     },
     {
+      "description": "Update elastic/beats outside of Renovate. Each release branch needs Beats version from respective branch.",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchPackageNames": [
+        "github.com/elastic/beats/v7"
+      ],
+      "enabled": false
+    },
+    {
       "description": "Keep go-json-schema-generate updates manual",
       "matchManagers": [
         "gomod"
