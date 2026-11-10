@@ -26,6 +26,7 @@ type bulkT struct {
 	hasSpanLink  bool
 	dedupeKey    string // enrollment dedup key (enrollment_id); routes to kQueueEnrollSearch when set
 	refreshIndex string // index to refresh before msearch in kQueueEnrollSearch
+	flushAfter   int    // queued blocks with flushAfter that trigger a flush
 }
 
 type flagsT int8
@@ -55,15 +56,26 @@ const (
 	ActionFleetSearch
 )
 
+const (
+	actionNameCreate       = "create"
+	actionNameDelete       = "delete"
+	actionNameIndex        = "index"
+	actionNameUpdate       = "update"
+	actionNameUpdateAPIKey = "update_api_key" //nolint:gosec // G101 false positive, this is an action name and not a credential
+	actionNameRead         = "read"
+	actionNameSearch       = "search"
+	actionNameFleetSearch  = "fleet_search"
+)
+
 var actionStrings = []string{
-	"create",
-	"delete",
-	"index",
-	"update",
-	"update_api_key",
-	"read",
-	"search",
-	"fleet_search",
+	actionNameCreate,
+	actionNameDelete,
+	actionNameIndex,
+	actionNameUpdate,
+	actionNameUpdateAPIKey,
+	actionNameRead,
+	actionNameSearch,
+	actionNameFleetSearch,
 }
 
 func (a actionT) String() string {
@@ -83,6 +95,7 @@ func (blk *bulkT) reset() {
 	blk.hasSpanLink = false
 	blk.dedupeKey = ""
 	blk.refreshIndex = ""
+	blk.flushAfter = 0
 }
 
 type respT struct {

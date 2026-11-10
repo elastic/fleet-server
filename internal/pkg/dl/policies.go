@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/http"
 
 	"github.com/rs/zerolog"
 
@@ -55,47 +56,76 @@ func prepareQueryLatestPolicy() *dsl.Tmpl {
 	return tmpl
 }
 
-// QueryLatestPolicies gets the latest revision of every policy, or only of the policy given with
-// WithPolicyID.
+// QueryLatestPolicies gets the latest revision of every policy.
 func QueryLatestPolicies(ctx context.Context, bulker bulk.Bulk, opt ...Option) ([]model.Policy, error) {
 	o := newOption(FleetPolicies, opt...)
-	query := tmplQueryLatestPolicies
-	if o.policyID != "" {
-		var err error
-		query, err = tmplQueryLatestPolicy.RenderOne(FieldPolicyID, o.policyID)
-		if err != nil {
-			return nil, err
-		}
-	}
-	res, err := bulker.Search(ctx, o.indexName, query, bulk.WithIgnoreUnavailble())
+	res, err := bulker.Search(ctx, o.indexName, tmplQueryLatestPolicies, bulk.WithIgnoreUnavailble())
 	if err != nil {
 		return nil, err
 	}
 
-	policyID, ok := res.Aggregations[FieldPolicyID]
+	return appendLatestPolicies([]model.Policy{}, res.Aggregations, NewStringSharer())
+}
+
+// QueryLatestPoliciesByID gets the latest revision of each of the given policies.
+func QueryLatestPoliciesByID(ctx context.Context, bulker bulk.Bulk, policyIDs []string, opt ...Option) ([]model.Policy, error) {
+	if len(policyIDs) == 0 {
+		return nil, nil
+	}
+	o := newOption(FleetPolicies, opt...)
+	ops := make([]bulk.MultiOp, len(policyIDs))
+	for i, policyID := range policyIDs {
+		query, err := tmplQueryLatestPolicy.RenderOne(FieldPolicyID, policyID)
+		if err != nil {
+			return nil, err
+		}
+		ops[i] = bulk.MultiOp{
+			Index: o.indexName,
+			Body:  query,
+		}
+	}
+	items, searchErr := bulker.MSearch(ctx, ops, append(o.bulkOpts, bulk.WithIgnoreUnavailble())...)
+	if len(items) == 0 {
+		return nil, searchErr
+	}
+	policies := make([]model.Policy, 0, len(items))
+	sharer := NewStringSharer()
+	for _, item := range items {
+		switch item.Status {
+		case http.StatusOK:
+			var err error
+			if policies, err = appendLatestPolicies(policies, item.Aggregations, sharer); err != nil {
+				return nil, err
+			}
+		case 0:
+			// The request of this search failed and searchErr holds its error.
+			return nil, searchErr
+		default:
+			return nil, es.TranslateError(item.Status, item.Error)
+		}
+	}
+	return policies, nil
+}
+
+// appendLatestPolicies appends the policies of the latest revision aggregation and shares their
+// strings with sharer.
+func appendLatestPolicies(policies []model.Policy, aggregations map[string]es.Aggregation, sharer *StringSharer) ([]model.Policy, error) {
+	policyID, ok := aggregations[FieldPolicyID]
 	if !ok {
 		// Aggregation will not be here if there index is not available
-		return []model.Policy{}, nil
+		return policies, nil
 	}
-	if len(policyID.Buckets) == 0 {
-		return []model.Policy{}, nil
-	}
-	policies := make([]model.Policy, len(policyID.Buckets))
-	// Share equal strings across the policies as each one is decoded, so that text repeated
-	// across the policies is held in memory only once and at most one policy's duplicates exist
-	// at a time. See StringSharer.
-	sharer := NewStringSharer()
-	for i, bucket := range policyID.Buckets {
+	for _, bucket := range policyID.Buckets {
 		revisionIdx, ok := bucket.Aggregations[FieldRevisionIdx]
 		if !ok || len(revisionIdx.Hits) != 1 {
 			return nil, ErrMissingAggregations
 		}
-		hit := revisionIdx.Hits[0]
-		err = hit.Unmarshal(&policies[i])
-		if err != nil {
+		var policy model.Policy
+		if err := revisionIdx.Hits[0].Unmarshal(&policy); err != nil {
 			return nil, err
 		}
-		sharer.Share(&policies[i])
+		sharer.Share(&policy)
+		policies = append(policies, policy)
 	}
 	return policies, nil
 }

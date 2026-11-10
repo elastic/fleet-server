@@ -1,0 +1,11 @@
+kind: bug-fix
+component: fleet-server
+
+summary: Fix Elasticsearch circuit breaker errors when loading policies
+
+description: |
+  Fleet Server no longer trips Elasticsearch circuit breakers on clusters
+  with many large agent policies. This happened when agents used a policy that
+  Fleet Server could not find or when many agents checked in at the same time.
+
+issue: https://github.com/elastic/fleet-server/issues/8147

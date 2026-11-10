@@ -7,7 +7,9 @@ package dl
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"testing"
 
@@ -16,6 +18,7 @@ import (
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
+	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 )
 
 // searchOnlyBulk answers Search with a canned result; any other method panics (nil embedded interface).
@@ -70,16 +73,24 @@ func TestQueryLatestPoliciesSharesStrings(t *testing.T) {
 	assert.Equal(t, int64(11), policies[1].SeqNo)
 }
 
-// recordingBulk records the query it is asked to run and answers Search with a canned result.
+// recordingBulk records the query it is asked to run and answers Search and MSearch with canned
+// results.
 type recordingBulk struct {
 	bulk.Bulk
 	res   *es.ResultT
+	items []bulk.MsearchResponseItem
+	err   error
 	query []byte
 }
 
 func (b *recordingBulk) Search(_ context.Context, _ string, query []byte, _ ...bulk.Opt) (*es.ResultT, error) {
 	b.query = query
 	return b.res, nil
+}
+
+func (b *recordingBulk) MSearch(_ context.Context, ops []bulk.MultiOp, _ ...bulk.Opt) ([]bulk.MsearchResponseItem, error) {
+	b.query = ops[0].Body
+	return b.items, b.err
 }
 
 func TestQueryLatestPoliciesQuery(t *testing.T) {
@@ -97,8 +108,9 @@ func TestQueryLatestPoliciesQuery(t *testing.T) {
 	})
 
 	t.Run("one policy", func(t *testing.T) {
-		bulker := &recordingBulk{res: &es.ResultT{}}
-		_, err := QueryLatestPolicies(context.Background(), bulker, WithPolicyID("policy-1"))
+		bulker := &recordingBulk{}
+		const id = "policy-1"
+		_, err := QueryLatestPoliciesByID(t.Context(), bulker, []string{id})
 		require.NoError(t, err)
 
 		var got, all map[string]any
@@ -116,8 +128,8 @@ func TestQueryLatestPoliciesQuery(t *testing.T) {
 
 	t.Run("policy id is a value, not part of the query syntax", func(t *testing.T) {
 		const id = `a"}]}} , "x": "y`
-		bulker := &recordingBulk{res: &es.ResultT{}}
-		_, err := QueryLatestPolicies(context.Background(), bulker, WithPolicyID(id))
+		bulker := &recordingBulk{}
+		_, err := QueryLatestPoliciesByID(t.Context(), bulker, []string{id})
 		require.NoError(t, err)
 
 		var got struct {
@@ -135,4 +147,59 @@ func TestQueryLatestPoliciesQuery(t *testing.T) {
 		require.Len(t, got.Query.Bool.Filter, 1)
 		assert.Equal(t, id, got.Query.Bool.Filter[0].Term.PolicyID)
 	})
+}
+
+func TestQueryLatestPoliciesByID(t *testing.T) {
+	// The search for policy a returns its revision 2.
+	found := bulk.MsearchResponseItem{
+		Status: http.StatusOK,
+		Aggregations: map[string]es.Aggregation{FieldPolicyID: {Buckets: []es.Bucket{{
+			Key:          "a",
+			Aggregations: map[string]es.HitsT{FieldRevisionIdx: {Hits: []es.HitT{{Source: []byte(`{"policy_id":"a","revision_idx":2}`)}}}},
+		}}}},
+	}
+	notFound := bulk.MsearchResponseItem{Status: http.StatusOK}
+	malformed := bulk.MsearchResponseItem{
+		Status:       http.StatusOK,
+		Aggregations: map[string]es.Aggregation{FieldPolicyID: {Buckets: []es.Bucket{{Key: "malformed"}}}},
+	}
+	requestErr := errors.New("request failed")
+
+	tests := []struct {
+		name         string
+		items        []bulk.MsearchResponseItem
+		searchErr    error
+		wantPolicies []model.Policy
+		wantErr      error
+	}{
+		{
+			name:         "returns the latest revision of a policy",
+			items:        []bulk.MsearchResponseItem{found},
+			wantPolicies: []model.Policy{{PolicyID: "a", RevisionIdx: 2}},
+		},
+		{
+			name:  "returns no policy for a policy that does not exist",
+			items: []bulk.MsearchResponseItem{notFound},
+		},
+		{
+			name:      "returns the error of a failed request",
+			items:     []bulk.MsearchResponseItem{found, {}},
+			searchErr: requestErr,
+			wantErr:   requestErr,
+		},
+		{
+			name:    "returns the error of a malformed response",
+			items:   []bulk.MsearchResponseItem{found, malformed},
+			wantErr: ErrMissingAggregations,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// recordingBulk returns tc.items whatever the searches are.
+			bulker := &recordingBulk{items: tc.items, err: tc.searchErr}
+			policies, err := QueryLatestPoliciesByID(t.Context(), bulker, []string{"a"})
+			require.ErrorIs(t, err, tc.wantErr)
+			assert.ElementsMatch(t, tc.wantPolicies, policies)
+		})
+	}
 }
