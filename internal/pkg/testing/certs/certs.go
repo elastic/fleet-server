@@ -23,7 +23,22 @@ import (
 	"time"
 )
 
-const ext = ".pem"
+const (
+	ext       = ".pem"
+	localhost = "localhost"
+)
+
+func testSubject(commonName string) pkix.Name {
+	return pkix.Name{
+		CommonName:    commonName,
+		Organization:  []string{"TESTING"},
+		Country:       []string{"CANADA"},
+		Province:      []string{"QUEBEC"},
+		Locality:      []string{"MONTREAL"},
+		StreetAddress: []string{"testing road"},
+		PostalCode:    []string{"HOH OHO"},
+	}
+}
 
 func CertToFile(t *testing.T, cert tls.Certificate, name string) string {
 	t.Helper()
@@ -72,16 +87,8 @@ func KeyToFile(t *testing.T, cert tls.Certificate, name string) string {
 func GenCA(t *testing.T) tls.Certificate {
 	t.Helper()
 	ca := &x509.Certificate{
-		SerialNumber: big.NewInt(2000),
-		Subject: pkix.Name{
-			CommonName:    "localhost",
-			Organization:  []string{"TESTING"},
-			Country:       []string{"CANADA"},
-			Province:      []string{"QUEBEC"},
-			Locality:      []string{"MONTREAL"},
-			StreetAddress: []string{"testing road"},
-			PostalCode:    []string{"HOH OHO"},
-		},
+		SerialNumber:          big.NewInt(2000),
+		Subject:               testSubject(localhost),
 		NotBefore:             time.Now(),
 		NotAfter:              time.Now().Add(1 * time.Hour),
 		IsCA:                  true,
@@ -142,17 +149,9 @@ func GenCert(t *testing.T, ca tls.Certificate) tls.Certificate {
 
 		// Subject Alternative Name fields
 		IPAddresses: []net.IP{{127, 0, 0, 1}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}},
-		DNSNames:    []string{"localhost"},
+		DNSNames:    []string{localhost},
 
-		Subject: pkix.Name{
-			CommonName:    "fleet-server testing",
-			Organization:  []string{"TESTING"},
-			Country:       []string{"CANADA"},
-			Province:      []string{"QUEBEC"},
-			Locality:      []string{"MONTREAL"},
-			StreetAddress: []string{"testing road"},
-			PostalCode:    []string{"HOH OHO"},
-		},
+		Subject: testSubject("fleet-server testing"),
 
 		NotBefore:             ts,
 		NotAfter:              ts.Add(24 * time.Hour),
