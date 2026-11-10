@@ -13,6 +13,7 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"go.elastic.co/apm/v2"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/rs/zerolog"
 
@@ -41,6 +42,8 @@ type SelfMonitor interface {
 	State() client.UnitState
 }
 
+type policyFetcher func(ctx context.Context, bulker bulk.Bulk, policyID string, opt ...dl.Option) (model.Policy, error)
+
 type selfMonitorT struct {
 	log zerolog.Logger
 
@@ -61,6 +64,7 @@ type selfMonitorT struct {
 	checkTime        time.Duration
 
 	startCh chan struct{}
+	checkCh chan struct{}
 }
 
 // NewSelfMonitor creates the self policy monitor.
@@ -75,11 +79,12 @@ func NewSelfMonitor(fleet config.Fleet, bulker bulk.Bulk, monitor monitor.Monito
 		policyID:         policyID,
 		state:            client.UnitStateStarting,
 		reporter:         reporter,
-		policyF:          dl.QueryLatestPolicies,
+		policyF:          dl.QueryLatestPolicy,
 		policiesIndex:    dl.FleetPolicies,
 		enrollmentTokenF: findEnrollmentAPIKeys,
 		checkTime:        DefaultCheckTime,
 		startCh:          make(chan struct{}),
+		checkCh:          make(chan struct{}, 1),
 	}
 }
 
@@ -94,37 +99,47 @@ func (m *selfMonitorT) Run(ctx context.Context) error {
 		return err
 	}
 
-	cT := time.NewTimer(m.checkTime)
-	defer cT.Stop()
-
 	close(m.startCh)
 
-LOOP:
+	// TODO: Since the index monitor waits for every subscriber before it sends the next policy
+	// changes, we need to run the checks in another goroutine.
+	g, gCtx := errgroup.WithContext(ctx)
+	g.Go(func() error {
+		return m.runChecks(gCtx)
+	})
+	for {
+		select {
+		case <-gCtx.Done():
+			return g.Wait()
+		case <-s.Output():
+			m.kickCheck()
+		}
+	}
+}
+
+func (m *selfMonitorT) runChecks(ctx context.Context) error {
+	cT := time.NewTimer(m.checkTime)
 	for {
 		select {
 		case <-ctx.Done():
-			break LOOP
+			return nil
 		case <-cT.C:
-			state, err := m.process(ctx)
-			if err != nil {
-				return err
-			}
-			cT.Reset(m.checkTime)
-			m.log.Trace().Msg(state.String())
-		case hits := <-s.Output():
-			policies, err := unmarshalHits(hits)
-			if err != nil {
-				return err
-			}
-			state, err := m.processPolicies(ctx, policies)
-			if err != nil {
-				return err
-			}
-			m.log.Trace().Msg(state.String())
+		case <-m.checkCh:
 		}
+		state, err := m.process(ctx)
+		if err != nil {
+			return err
+		}
+		cT.Reset(m.checkTime)
+		m.log.Trace().Msg(state.String())
 	}
+}
 
-	return nil
+func (m *selfMonitorT) kickCheck() {
+	select {
+	case m.checkCh <- struct{}{}:
+	default:
+	}
 }
 
 func (m *selfMonitorT) State() client.UnitState {
@@ -148,40 +163,29 @@ func (m *selfMonitorT) process(ctx context.Context) (client.UnitState, error) {
 		ctx = apm.ContextWithTransaction(ctx, trans)
 		defer trans.End()
 	}
-	policies, err := m.policyF(ctx, m.bulker, dl.WithIndexName(m.policiesIndex))
+	policy, err := m.fetchPolicy(ctx)
 	if err != nil {
 		if !errors.Is(err, es.ErrIndexNotFound) {
 			return client.UnitStateFailed, nil
 		}
 		m.log.Debug().Str("index", m.policiesIndex).Msg(es.ErrIndexNotFound.Error())
 	}
-	if len(policies) == 0 {
-		return m.updateState(ctx)
-	}
-	return m.processPolicies(ctx, policies)
-}
-
-func (m *selfMonitorT) processPolicies(ctx context.Context, policies []model.Policy) (client.UnitState, error) {
-	if len(policies) == 0 {
-		// nothing to do
-		return client.UnitStateStarting, nil
-	}
-	latest := m.groupByLatest(policies)
-	for i := range latest {
-		policy := latest[i]
-		if m.policyID != "" && policy.PolicyID == m.policyID {
-			m.policy = &policy
-			break
-		} else if m.policyID == "" && policy.DefaultFleetServer {
-			m.policy = &policy
-			break
-		}
+	if policy != nil {
+		m.policy = policy
 	}
 	return m.updateState(ctx)
 }
 
-func (m *selfMonitorT) groupByLatest(policies []model.Policy) map[string]model.Policy {
-	return groupByLatest(policies)
+func (m *selfMonitorT) fetchPolicy(ctx context.Context) (*model.Policy, error) {
+	// Use the default Fleet Server policy when no policy ID is set.
+	policy, err := m.policyF(ctx, m.bulker, m.policyID, dl.WithIndexName(m.policiesIndex), dl.WithDefaultFleetServerFallback())
+	if errors.Is(err, dl.ErrNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &policy, nil
 }
 
 func (m *selfMonitorT) updateState(ctx context.Context) (client.UnitState, error) {

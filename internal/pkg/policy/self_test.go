@@ -13,13 +13,17 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/gofrs/uuid/v5"
 	"github.com/rs/xid"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
@@ -56,8 +60,15 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 
 	monitor := NewSelfMonitor(cfg, bulker, mm, "", reporter)
 	sm := monitor.(*selfMonitorT)
-	sm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
-		return []model.Policy{}, nil
+	var policyLock sync.Mutex
+	var policyResult []model.Policy
+	sm.policyF = func(ctx context.Context, bulker bulk.Bulk, _ string, opt ...dl.Option) (model.Policy, error) {
+		policyLock.Lock()
+		defer policyLock.Unlock()
+		if len(policyResult) == 0 {
+			return model.Policy{}, dl.ErrNotFound
+		}
+		return policyResult[0], nil
 	}
 
 	var merr error
@@ -100,6 +111,9 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	policyLock.Lock()
+	policyResult = []model.Policy{policy}
+	policyLock.Unlock()
 	chHitT <- []es.HitT{{
 		ID:      rId,
 		SeqNo:   1,
@@ -140,6 +154,9 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	policyLock.Lock()
+	policyResult = []model.Policy{policy}
+	policyLock.Unlock()
 	chHitT <- []es.HitT{{
 		ID:      rId,
 		SeqNo:   2,
@@ -195,10 +212,13 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 
 	var policyLock sync.Mutex
 	var policyResult []model.Policy
-	sm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
+	sm.policyF = func(ctx context.Context, bulker bulk.Bulk, _ string, opt ...dl.Option) (model.Policy, error) {
 		policyLock.Lock()
 		defer policyLock.Unlock()
-		return policyResult, nil
+		if len(policyResult) == 0 {
+			return model.Policy{}, dl.ErrNotFound
+		}
+		return policyResult[0], nil
 	}
 
 	var tokenLock sync.Mutex
@@ -255,15 +275,15 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 	}
 
 	go func() {
+		policyLock.Lock()
+		policyResult = append(policyResult, policy)
+		policyLock.Unlock()
 		chHitT <- []es.HitT{{
 			ID:      rId,
 			SeqNo:   1,
 			Version: 1,
 			Source:  policyData,
 		}}
-		policyLock.Lock()
-		defer policyLock.Unlock()
-		policyResult = append(policyResult, policy)
 	}()
 
 	// should be set to starting because of missing active enrollment keys
@@ -347,8 +367,15 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 
 	monitor := NewSelfMonitor(cfg, bulker, mm, policyID, reporter)
 	sm := monitor.(*selfMonitorT)
-	sm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
-		return []model.Policy{}, nil
+	var policyLock sync.Mutex
+	var policyResult []model.Policy
+	sm.policyF = func(ctx context.Context, bulker bulk.Bulk, _ string, opt ...dl.Option) (model.Policy, error) {
+		policyLock.Lock()
+		defer policyLock.Unlock()
+		if len(policyResult) == 0 {
+			return model.Policy{}, dl.ErrNotFound
+		}
+		return policyResult[0], nil
 	}
 
 	var merr error
@@ -390,6 +417,9 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	policyLock.Lock()
+	policyResult = []model.Policy{policy}
+	policyLock.Unlock()
 	chHitT <- []es.HitT{{
 		ID:      rId,
 		SeqNo:   1,
@@ -430,6 +460,9 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	policyLock.Lock()
+	policyResult = []model.Policy{policy}
+	policyLock.Unlock()
 	chHitT <- []es.HitT{{
 		ID:      rId,
 		SeqNo:   2,
@@ -485,10 +518,13 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 
 	var policyLock sync.Mutex
 	var policyResult []model.Policy
-	sm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
+	sm.policyF = func(ctx context.Context, bulker bulk.Bulk, _ string, opt ...dl.Option) (model.Policy, error) {
 		policyLock.Lock()
 		defer policyLock.Unlock()
-		return policyResult, nil
+		if len(policyResult) == 0 {
+			return model.Policy{}, dl.ErrNotFound
+		}
+		return policyResult[0], nil
 	}
 
 	var tokenLock sync.Mutex
@@ -544,15 +580,15 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 	}
 
 	go func() {
+		policyLock.Lock()
+		policyResult = append(policyResult, policy)
+		policyLock.Unlock()
 		chHitT <- []es.HitT{{
 			ID:      rId,
 			SeqNo:   1,
 			Version: 1,
 			Source:  policyData,
 		}}
-		policyLock.Lock()
-		defer policyLock.Unlock()
-		policyResult = append(policyResult, policy)
 	}()
 
 	// should be set to starting because of missing active enrollment keys
@@ -743,4 +779,88 @@ func TestSelfMonitor_reportOutputSkipIfNotFound(t *testing.T) {
 
 	bulker.AssertExpectations(t)
 	outputBulker.AssertExpectations(t)
+}
+
+func TestSelfMonitor_SearchesOnlyItsPolicy(t *testing.T) {
+	tests := []struct {
+		name     string
+		policyID string
+		want     string
+	}{
+		{
+			name:     "specific policy",
+			policyID: "policy-1",
+			want:     `{"term":{"policy_id":"policy-1"}}`,
+		},
+		{
+			name:     "default policy",
+			policyID: "",
+			want:     `{"term":{"default_fleet_server":true}}`,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var queries []string
+			bulker := ftesting.NewMockBulk()
+			bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+				Run(func(args mock.Arguments) {
+					query, ok := args.Get(2).([]byte)
+					require.True(t, ok)
+					queries = append(queries, string(query))
+				}).
+				Return(&es.ResultT{}, nil)
+			sm := NewSelfMonitor(config.Fleet{}, bulker, mmock.NewMockMonitor(), tc.policyID, &FakeReporter{}).(*selfMonitorT)
+
+			state, err := sm.process(t.Context())
+			require.NoError(t, err)
+
+			require.Equal(t, client.UnitStateStarting, state, "no policy was found")
+			require.Len(t, queries, 1)
+			require.Contains(t, queries[0], tc.want)
+		})
+	}
+}
+
+func TestSelfMonitor_PolicyChangesAreReadWhileACheckRuns(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		chHitT := make(chan []es.HitT, 1)
+		ms := mmock.NewMockSubscription()
+		ms.On("Output").Return((<-chan []es.HitT)(chHitT))
+		mm := mmock.NewMockMonitor()
+		mm.On("Subscribe").Return(ms).Once()
+		mm.On("Unsubscribe", mock.Anything).Return().Once()
+		sm := NewSelfMonitor(config.Fleet{}, ftesting.NewMockBulk(), mm, "policy-1", &FakeReporter{}).(*selfMonitorT)
+
+		release := make(chan struct{})
+		var checks atomic.Int32
+		sm.policyF = func(context.Context, bulk.Bulk, string, ...dl.Option) (model.Policy, error) {
+			// The check at start returns at once and the next checks wait for release.
+			if checks.Add(1) > 1 {
+				<-release
+			}
+			return model.Policy{}, dl.ErrNotFound
+		}
+
+		ctx, cancel := context.WithCancel(t.Context())
+		var wg sync.WaitGroup
+		wg.Go(func() { assert.NoError(t, sm.Run(ctx)) })
+		require.NoError(t, sm.waitStart(ctx))
+
+		for i := range 5 {
+			select {
+			case chHitT <- []es.HitT{{ID: fmt.Sprintf("policy-change-%d", i)}}:
+			case <-time.After(time.Second):
+				require.Failf(t, "policy change not read", "policy change %d was not read while a check was running", i)
+			}
+			synctest.Wait()
+		}
+		require.Equal(t, int32(2), checks.Load(), "the first policy change starts one check")
+
+		close(release)
+		synctest.Wait()
+		require.Equal(t, int32(3), checks.Load(), "the policy changes during a check start one more check")
+
+		cancel()
+		wg.Wait()
+	})
 }
