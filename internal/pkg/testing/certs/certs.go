@@ -68,7 +68,7 @@ func KeyToFile(t *testing.T, cert tls.Certificate, name string) string {
 }
 
 // GenCA generates a CA for tests
-// copied from elastic-agent-libs/transport/tlscommon/ca_pinning_test.go
+// copied from beats pkg/transport/tlscommon/ca_pinning_test.go
 func GenCA(t *testing.T) tls.Certificate {
 	t.Helper()
 	ca := &x509.Certificate{
@@ -132,7 +132,7 @@ func generateSubjectKeyID(pub crypto.PublicKey) []byte {
 }
 
 // GenCert generates a test keypair and signs the cert with the passed CA.
-// copied from elastic-agent-libs/transport/tlscommon/ca_pinning_test.go
+// copied from beats pkg/transport/tlscommon/ca_pinning_test.go
 func GenCert(t *testing.T, ca tls.Certificate) tls.Certificate {
 	t.Helper()
 	ts := time.Now().UTC()

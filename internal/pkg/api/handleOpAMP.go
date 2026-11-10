@@ -24,7 +24,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
 
-	"github.com/elastic/elastic-agent-libs/redact"
+	"github.com/elastic/beats/v7/pkg/redact"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
