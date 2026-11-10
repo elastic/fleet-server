@@ -1,0 +1,13 @@
+kind: bug-fix
+component: fleet-server
+
+summary: Load only the needed policies from Elasticsearch
+
+description: |
+  Fleet Server no longer loads every policy from Elasticsearch in its health
+  checks and in static token enrollments. It now loads only the policies that it
+  needs. On clusters with many large policies these loads tripped the parent
+  circuit breaker of Elasticsearch. As a result unrelated requests failed with
+  429 errors.
+
+issue: https://github.com/elastic/fleet-server/issues/8147

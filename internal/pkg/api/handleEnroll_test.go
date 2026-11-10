@@ -627,19 +627,8 @@ func TestEnrollerT_retrieveStaticTokenEnrollmentToken(t *testing.T) {
 				})
 			}
 			res := &es.ResultT{
-				HitsT: es.HitsT{},
-				Aggregations: map[string]es.Aggregation{
-					"policy_id": {
-						Buckets: []es.Bucket{
-							{
-								Aggregations: map[string]es.HitsT{
-									"revision_idx": {
-										Hits: hits,
-									},
-								},
-							},
-						},
-					},
+				HitsT: es.HitsT{
+					Hits: hits,
 				},
 			}
 			bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(res, nil)
@@ -722,6 +711,29 @@ func TestEnrollerT_retrieveStaticTokenEnrollmentToken(t *testing.T) {
 				},
 			},
 			want:    &model.EnrollmentAPIKey{},
+			wantErr: true,
+		},
+		{
+			name: "empty policy id",
+			fields: fields{
+				staticPolicyTokens: config.StaticPolicyTokens{
+					Enabled: true,
+					PolicyTokens: []config.PolicyToken{
+						{
+							TokenKey: "abcdefg",
+							PolicyID: "",
+						},
+					},
+				},
+				// The mock has no Search expectation so a search for the default policy fails the test.
+				bulker: func() bulk.Bulk { return ftesting.NewMockBulk() },
+			},
+			args: args{
+				enrollmentAPIKey: &apikey.APIKey{
+					Key: "abcdefg",
+				},
+			},
+			want:    nil,
 			wantErr: true,
 		},
 		{

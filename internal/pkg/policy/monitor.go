@@ -75,7 +75,7 @@ type Monitor interface {
 	GetPolicy(ctx context.Context, policyID string) (*model.Policy, error)
 }
 
-type policyFetcher func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error)
+type policyFetcher func(ctx context.Context, bulker bulk.Bulk, policyID string, opt ...dl.Option) (model.Policy, error)
 
 type policyT struct {
 	pp   ParsedPolicy
@@ -93,13 +93,14 @@ type monitorT struct {
 	deployCh chan struct{}
 
 	policies map[string]policyT
+	loadQ    []string
 	pendingQ *subT
 
 	policyF       policyFetcher
 	policiesIndex string
 	limit         *rate.Limiter
 
-	// loadGroup coalesces concurrent loads of the same policy, or of all policies, into one.
+	// loadGroup coalesces concurrent loads of the same policy into one.
 	loadGroup singleflight.Group
 
 	startCh chan struct{}
@@ -123,7 +124,7 @@ func NewMonitor(bulker bulk.Bulk, monitor monitor.Monitor, cfg config.ServerLimi
 		policies:      make(map[string]policyT),
 		pendingQ:      makeHead(),
 		limit:         rate.NewLimiter(interval, burst),
-		policyF:       dl.QueryLatestPolicies,
+		policyF:       dl.QueryLatestPolicy,
 		policiesIndex: dl.FleetPolicies,
 		startCh:       make(chan struct{}),
 	}
@@ -342,22 +343,28 @@ func (m *monitorT) dispatchPending(ctx context.Context) {
 		Msg("policy monitor dispatch complete")
 }
 
-// loadPolicies loads the latest revision of every policy from Elasticsearch and processes them.
+// loadPolicies loads the unknown policies that Subscribe added since the last load. A policy that
+// does not exist is not searched for again because the index monitor reports it when it is created.
 func (m *monitorT) loadPolicies(ctx context.Context) error {
-	return m.load(ctx, "")
+	m.mut.Lock()
+	ids := m.loadQ
+	m.loadQ = nil
+	m.mut.Unlock()
+
+	for _, id := range ids {
+		if err := m.loadPolicy(ctx, id); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // loadPolicy loads the latest revision of a single policy from Elasticsearch and processes it.
-func (m *monitorT) loadPolicy(ctx context.Context, policyID string) error {
-	return m.load(ctx, policyID)
-}
-
-// load loads the policy with the given ID, or every policy if the ID is empty.
 //
 // Callers that ask for the same policy while it is being loaded wait for that load instead of
 // starting their own, so that many agents checking in at once for policies that are not cached
 // yet do not each decode their own copy of the policies in parallel.
-func (m *monitorT) load(ctx context.Context, policyID string) error {
+func (m *monitorT) loadPolicy(ctx context.Context, policyID string) error {
 	for {
 		ch := m.loadGroup.DoChan(policyID, func() (any, error) {
 			err := m.fetchAndProcess(ctx, policyID)
@@ -383,8 +390,7 @@ func (m *monitorT) load(ctx context.Context, policyID string) error {
 	}
 }
 
-// fetchAndProcess fetches the latest revision of the policy with the given ID, or of every policy
-// if the ID is empty, and processes them.
+// fetchAndProcess fetches the latest revision of the policy with the given ID and processes it.
 func (m *monitorT) fetchAndProcess(ctx context.Context, policyID string) error {
 	span, ctx := apm.StartSpan(ctx, "Load policies", "load")
 	defer span.End()
@@ -398,25 +404,20 @@ func (m *monitorT) fetchAndProcess(ctx context.Context, policyID string) error {
 		ctx = apm.ContextWithTransaction(ctx, trans)
 		defer trans.End()
 	}
-	opts := []dl.Option{dl.WithIndexName(m.policiesIndex)}
-	if policyID != "" {
-		opts = append(opts, dl.WithPolicyID(policyID))
-	}
-	policies, err := m.policyF(ctx, m.bulker, opts...)
-	if err != nil {
-		if errors.Is(err, es.ErrIndexNotFound) {
-			m.log.Debug().
-				Str("index", m.policiesIndex).
-				Msg(es.ErrIndexNotFound.Error())
-			return nil
-		}
+	policy, err := m.policyF(ctx, m.bulker, policyID, dl.WithIndexName(m.policiesIndex))
+	switch {
+	case errors.Is(err, es.ErrIndexNotFound):
+		m.log.Debug().
+			Str("index", m.policiesIndex).
+			Msg(es.ErrIndexNotFound.Error())
+		return nil
+	case errors.Is(err, dl.ErrNotFound):
+		m.log.Debug().Str(ecs.PolicyID, policyID).Msg("no policy to monitor")
+		return nil
+	case err != nil:
 		return err
 	}
-	if len(policies) == 0 {
-		m.log.Debug().Msg("no policy to monitor")
-		return nil
-	}
-	return m.processPolicies(ctx, policies)
+	return m.processPolicies(ctx, []model.Policy{policy})
 }
 
 func (m *monitorT) processPolicies(ctx context.Context, policies []model.Policy) error {
@@ -430,7 +431,7 @@ func (m *monitorT) processPolicies(ctx context.Context, policies []model.Policy)
 	m.log.Debug().Int64(ecs.RevisionIdx, policies[0].RevisionIdx).
 		Str(ecs.PolicyID, policies[0].PolicyID).Msg("process policies")
 
-	latest := m.groupByLatest(policies)
+	latest := groupByLatest(policies)
 	for _, policy := range latest {
 		if m.isStaleRevision(policy.PolicyID, policy.RevisionIdx) {
 			m.log.Warn().
@@ -472,10 +473,6 @@ func groupByLatest(policies []model.Policy) map[string]model.Policy {
 		}
 	}
 	return latest
-}
-
-func (m *monitorT) groupByLatest(policies []model.Policy) map[string]model.Policy {
-	return groupByLatest(policies)
 }
 
 func (m *monitorT) updatePolicy(ctx context.Context, pp *ParsedPolicy) bool {
@@ -596,6 +593,7 @@ func (m *monitorT) Subscribe(agentID string, policyID string, revisionIdx int64)
 		p = policyT{head: makeHead()}
 		p.head.pushBack(s)
 		m.policies[policyID] = p
+		m.loadQ = append(m.loadQ, policyID)
 		m.kickLoad()
 	case s.isUpdate(&p.pp.Policy):
 		empty := m.pendingQ.isEmpty()

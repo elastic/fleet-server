@@ -7,9 +7,9 @@ package dl
 import "github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 
 type queryOption struct {
-	indexName string
-	bulkOpts  []bulk.Opt
-	policyID  string
+	indexName                  string
+	bulkOpts                   []bulk.Opt
+	defaultFleetServerFallback bool
 }
 
 // Option for the operation being made
@@ -24,12 +24,11 @@ func WithIndexName(name string) Option {
 	}
 }
 
-// WithPolicyID restricts QueryLatestPolicies to the policy with the given ID.
-//
-// Without it, QueryLatestPolicies returns the latest revision of every policy.
-func WithPolicyID(policyID string) Option {
+// WithDefaultFleetServerFallback makes QueryLatestPolicy get the default Fleet Server policy when
+// the policy ID is empty.
+func WithDefaultFleetServerFallback() Option {
 	return func(opt *queryOption) {
-		opt.policyID = policyID
+		opt.defaultFleetServerFallback = true
 	}
 }
 
