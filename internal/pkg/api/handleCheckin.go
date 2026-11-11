@@ -542,12 +542,11 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 
 	// Subscribe to policy manager for changes on PolicyId > policyRev.
 	//
-	// Pending-uninstall agents only ever receive UNINSTALL/CANCEL, so any policy
-	// change would be withheld below anyway. Skip the subscription entirely for
-	// them: subscribing would consume a shared policy rollout rate-limit token and
-	// clone a policy that is immediately discarded, which at scale could delay
-	// policy updates for enrolled agents. policyCh stays nil, disabling the
-	// policy select case for these agents.
+	// A pending-uninstall agent has been unenrolled and will not apply a policy
+	// change, so skip the subscription entirely for it: subscribing would consume
+	// a shared policy rollout rate-limit token and clone a policy that is never
+	// used, which at scale could delay policy updates for enrolled agents.
+	// policyCh stays nil, disabling the policy select case for these agents.
 	var policyCh <-chan *policy.ParsedPolicy
 	if !agent.UninstallPending {
 		sub, err := ct.pm.Subscribe(agent.Id, agent.PolicyID, revID)

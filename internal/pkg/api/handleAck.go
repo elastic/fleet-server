@@ -220,9 +220,10 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 	// deactivate it: terminal actions (MIGRATE, UNINSTALL) and UNENROLL acks from
 	// agents that don't support the remote UNINSTALL flow (legacy behavior).
 	// uninstallPendingIdxs collects UNENROLL acks from agents that do support it,
-	// which instead keep the agent's credentials and move it into the
-	// pending-uninstall state (only UNINSTALL/CANCEL are delivered afterwards)
-	// until a later UNINSTALL finally invalidates it.
+	// which instead keep the agent's access key and move it into the
+	// pending-uninstall state so a follow-up UNINSTALL can still reach it, until a
+	// later UNINSTALL finally invalidates it. (The agent itself enforces which
+	// actions it accepts while awaiting uninstall; Fleet Server does not filter.)
 	var invalidateIdxs []int
 	var uninstallPendingIdxs []int
 
@@ -702,8 +703,9 @@ func agentSupportsUninstall(zlog zerolog.Logger, agent *model.Agent) bool {
 // handleUninstallPending processes a UNENROLL ack for the remote-uninstall flow.
 // Unlike handleUnenroll it keeps the agent active and keeps its access API key
 // valid, so the agent can keep checking in and still receive the follow-up
-// UNINSTALL action (and its grace-period CANCEL); checkin only delivers
-// UNINSTALL/CANCEL while the pending-uninstall flag is set. It does, however,
+// UNINSTALL action (and its grace-period CANCEL). The agent itself enforces that
+// it only acts on UNINSTALL/CANCEL/REQUEST_DIAGNOSTICS while awaiting uninstall;
+// Fleet Server does not filter actions by this state. It does, however,
 // invalidate the agent's output API keys (for example Elasticsearch) so the
 // unenrolled agent immediately stops shipping data. The access key and the
 // agent's active state are removed when the UNINSTALL is acked (handleUnenroll).

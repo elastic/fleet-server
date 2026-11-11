@@ -243,7 +243,7 @@ type Agent struct {
 	// Unhealthy reason: input/output/other
 	UnhealthyReason []string `json:"unhealthy_reason,omitempty"`
 
-	// True when the agent has been unenrolled as the first step of a Fleet UNINSTALL flow. Its access API key is kept (output keys are invalidated) and only UNINSTALL and CANCEL actions are delivered on checkin until the UNINSTALL is acknowledged, at which point the agent is fully invalidated.
+	// True when the agent has been unenrolled as the first step of a Fleet UNINSTALL flow. Its access API key is kept (output keys are invalidated) so it can still receive the follow-up UNINSTALL or CANCEL, until the UNINSTALL is acknowledged, at which point the agent is fully invalidated. The agent enforces which actions it accepts while in this state.
 	UninstallPending bool `json:"uninstall_pending,omitempty"`
 
 	// Date/time the Elastic Agent was last updated
