@@ -122,14 +122,10 @@ func (d *Dispatcher) process(ctx context.Context, hits []es.HitT) {
 			break
 		}
 
-		secretData, err := secret.GetActionDataWithSecrets(ctx, action.Data, action.SecretReferences, d.bulker)
-		if err != nil {
+		if err := secret.ReplaceActionSecrets(ctx, &action, d.bulker); err != nil {
 			zerolog.Ctx(ctx).Error().Err(err).Msg("Failed to replace secrets in action document")
 			break
 		}
-
-		action.Data = secretData
-		action.SecretReferences = nil
 
 		numAgents := len(action.Agents)
 		for i, agentID := range action.Agents {

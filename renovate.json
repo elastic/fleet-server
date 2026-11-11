@@ -1,5 +1,9 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "gitIgnoredAuthors": [
+    "github-actions[bot]@users.noreply.github.com",
+    "41898282+github-actions[bot]@users.noreply.github.com"
+  ],
   "dependencyDashboard": true,
   "enabledManagers": [
     "gomod",
@@ -131,6 +135,16 @@
       "enabled": false
     },
     {
+      "description": "Update elastic/beats outside of Renovate. Each release branch needs Beats version from respective branch.",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchPackageNames": [
+        "github.com/elastic/beats/v7"
+      ],
+      "enabled": false
+    },
+    {
       "description": "Keep go-json-schema-generate updates manual",
       "matchManagers": [
         "gomod"
@@ -165,6 +179,13 @@
         "changelog:dependencies"
       ],
       "prConcurrentLimit": 5
+    },
+    {
+      "description": "Distributed oblt-aw client triggers — pins owned by distribute-client-workflow",
+      "enabled": false,
+      "matchFileNames": [
+        ".github/workflows/trigger-*-aw-*.yml"
+      ]
     }
   ]
 }

@@ -33,6 +33,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
+	monitormock "github.com/elastic/fleet-server/v7/internal/pkg/monitor/mock"
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
@@ -2553,4 +2554,50 @@ func TestPrepareOTelExporters(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestFetchAgentPendingActionsReplacesSecrets(t *testing.T) {
+	const actionWithSecret = `{"action_id":"action-with-secret","type":"INPUT_ACTION","data":{"parameters":{"credential":"$co.elastic.secret{ref1}"}},"secret_references":[{"id":"ref1"}]}`
+	const actionWithoutSecret = `{"action_id":"action-without-secret","type":"INPUT_ACTION","data":{"parameters":{"credential":"plain"}}}`
+	const filteredActionWithSecret = `{"action_id":"filtered-action","type":"POLICY_CHANGE","data":{"parameters":{"credential":"$co.elastic.secret{ref1}"}},"secret_references":[{"id":"ref1"}]}`
+
+	bulker := ftesting.NewMockBulk()
+	bulker.On("Search", mock.Anything, dl.FleetActions, mock.Anything, mock.Anything).
+		Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{
+			{ID: "action-with-secret", SeqNo: 1, Source: json.RawMessage(actionWithSecret)},
+			{ID: "action-without-secret", SeqNo: 2, Source: json.RawMessage(actionWithoutSecret)},
+			{ID: "filtered-action", SeqNo: 3, Source: json.RawMessage(filteredActionWithSecret)},
+		}}}, nil).Once()
+
+	gcp := monitormock.NewMockMonitor()
+	gcp.On("GetCheckpoint").Return(sqn.SeqNo{3}).Once()
+
+	ct := &CheckinT{bulker: bulker, gcp: gcp}
+	actions, err := ct.fetchAgentPendingActions(t.Context(), sqn.SeqNo{0}, "agent1")
+	require.NoError(t, err)
+	require.Len(t, actions, 3)
+
+	var withSecret map[string]any
+	require.NoError(t, json.Unmarshal(actions[0].Data, &withSecret))
+	withSecretParams, ok := withSecret["parameters"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "ref1_value", withSecretParams["credential"])
+	assert.Empty(t, actions[0].SecretReferences)
+
+	var withoutSecret map[string]any
+	require.NoError(t, json.Unmarshal(actions[1].Data, &withoutSecret))
+	withoutSecretParams, ok := withoutSecret["parameters"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "plain", withoutSecretParams["credential"])
+	assert.Empty(t, actions[1].SecretReferences)
+
+	var filteredAction map[string]any
+	require.NoError(t, json.Unmarshal(actions[2].Data, &filteredAction))
+	filteredActionParams, ok := filteredAction["parameters"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "$co.elastic.secret{ref1}", filteredActionParams["credential"])
+	assert.Len(t, actions[2].SecretReferences, 1)
+
+	bulker.AssertExpectations(t)
+	gcp.AssertExpectations(t)
 }
