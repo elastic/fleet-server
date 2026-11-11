@@ -493,7 +493,11 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 		checkin.WithSeqNo(seqno),
 		checkin.WithVer(ver),
 		checkin.WithUnhealthyReason(unhealthyReason),
-		checkin.WithDeleteAudit(agent.AuditUnenrolledReason != "" || agent.UnenrolledAt != ""),
+		// A pending-uninstall agent is intentionally kept active with unenrolled_at
+		// set while it awaits the UNINSTALL, so exempt it from the cleanup that
+		// strips unenrolled_at/audit_unenrolled_* from active agents (an 8.16.x bug
+		// fix); otherwise this check-in would wipe its unenrolled_at.
+		checkin.WithDeleteAudit(!agent.UninstallPending && (agent.AuditUnenrolledReason != "" || agent.UnenrolledAt != "")),
 	}
 
 	if validated.rawAvailableRollbacks != nil {

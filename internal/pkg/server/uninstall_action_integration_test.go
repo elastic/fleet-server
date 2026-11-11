@@ -137,10 +137,11 @@ func Test_Agent_Uninstall_Action(t *testing.T) {
 }
 
 // AssertAgentPendingUninstall reads the agent document and asserts it is in the
-// pending-uninstall state after an UNENROLL ack: still active with its access
-// key kept (so it can receive the UNINSTALL) and uninstall_pending set. The
-// output keys are invalidated in this state, but that is asserted at the unit
-// level (TestHandleAckEvents) rather than against the real stack here.
+// pending-uninstall state after an UNENROLL ack: the unenroll is finalized
+// (unenrolled_at set) but the agent is kept active with its access key (so it
+// can receive the UNINSTALL) and uninstall_pending set. The output keys are
+// invalidated in this state, but that is asserted at the unit level
+// (TestHandleAckEvents) rather than against the real stack here.
 func AssertAgentPendingUninstall(t *testing.T, ctx context.Context, srv *tserver, agentID string) {
 	t.Helper()
 
@@ -153,6 +154,7 @@ func AssertAgentPendingUninstall(t *testing.T, ctx context.Context, srv *tserver
 	require.NoError(t, json.NewDecoder(res.Body).Decode(&getAgentRes))
 	require.True(t, getAgentRes.Agent.Active, "expected agent to remain active (credentials kept) after UNENROLL")
 	require.True(t, getAgentRes.Agent.UninstallPending, "expected agent to be marked pending uninstall after UNENROLL")
+	require.NotEmpty(t, getAgentRes.Agent.UnenrolledAt, "expected unenrolled_at to be set after UNENROLL (unenroll finalized)")
 }
 
 // AssertAgentInactive reads the agent document and asserts it has been marked
@@ -173,4 +175,6 @@ func AssertAgentInactive(t *testing.T, ctx context.Context, srv *tserver, agentI
 	var getAgentRes GetAgentResponse
 	require.NoError(t, json.NewDecoder(res.Body).Decode(&getAgentRes))
 	require.False(t, getAgentRes.Agent.Active, "expected agent to be inactive after UNINSTALL ack")
+	require.False(t, getAgentRes.Agent.UninstallPending, "expected uninstall_pending to be cleared after UNINSTALL ack")
+	require.NotEmpty(t, getAgentRes.Agent.UninstalledAt, "expected uninstalled_at to be set on the UNINSTALL ack")
 }

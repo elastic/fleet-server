@@ -68,6 +68,7 @@ const (
 
 	FieldAuditUnenrolledTime   = "audit_unenrolled_time"
 	FieldAuditUnenrolledReason = "audit_unenrolled_reason"
+	FieldUninstalledAt         = "uninstalled_at"
 
 	FieldArtifactManifest = "artifact_manifest"
 	FieldArtifacts        = "artifacts"

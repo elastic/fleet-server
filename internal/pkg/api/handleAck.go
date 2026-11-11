@@ -226,6 +226,10 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 	// actions it accepts while awaiting uninstall; Fleet Server does not filter.)
 	var invalidateIdxs []int
 	var uninstallPendingIdxs []int
+	// uninstallAcked records whether an UNINSTALL ack drove the terminal
+	// invalidation, so uninstalled_at is written (distinguishing an uninstalled
+	// agent from a plain unenrolled one).
+	var uninstallAcked bool
 
 	res := NewAckResponse(len(events))
 
@@ -347,6 +351,9 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 					// Terminal: the agent is effectively gone, so invalidate its API
 					// keys and mark it inactive.
 					invalidateIdxs = append(invalidateIdxs, n)
+					if action.Type == TypeUninstall {
+						uninstallAcked = true
+					}
 				}
 			}
 		}
@@ -364,7 +371,7 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 
 	// Process terminal (MIGRATE/UNINSTALL) acks: invalidate keys and deactivate.
 	if len(invalidateIdxs) > 0 {
-		if err := ack.handleUnenroll(ctx, zlog, agent); err != nil {
+		if err := ack.handleUnenroll(ctx, zlog, agent, uninstallAcked); err != nil {
 			zlog.Error().Err(err).Msg("handle unenroll event")
 			for _, idx := range invalidateIdxs {
 				setError(idx, err)
@@ -631,7 +638,7 @@ func (ack *AckT) invalidateAPIKeys(ctx context.Context, zlog zerolog.Logger, toR
 	invalidateAPIKeys(ctx, zlog, ack.bulk, toRetireAPIKeyIDs, skip)
 }
 
-func (ack *AckT) handleUnenroll(ctx context.Context, zlog zerolog.Logger, agent *model.Agent) error {
+func (ack *AckT) handleUnenroll(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, uninstalled bool) error {
 	span, ctx := apm.StartSpan(ctx, "ackUnenroll", "process")
 	defer span.End()
 
@@ -653,9 +660,18 @@ func (ack *AckT) handleUnenroll(ctx context.Context, zlog zerolog.Logger, agent 
 	now := time.Now().UTC().Format(time.RFC3339)
 	doc := bulk.UpdateFields{
 		dl.FieldActive:           false,
-		dl.FieldUnenrolledAt:     now,
 		dl.FieldUpdatedAt:        now,
-		dl.FieldUninstallPending: false, // clear the pending-uninstall state; this is terminal
+		dl.FieldUninstallPending: false, // terminal: clear any pending-uninstall state
+	}
+	if uninstalled {
+		// UNINSTALL ack: the agent was already unenrolled (unenrolled_at set) when
+		// it entered the pending-uninstall state, so preserve that timestamp and
+		// only record the uninstall completion. uninstalled_at (server time)
+		// distinguishes an uninstalled agent from a plain unenrolled one.
+		doc[dl.FieldUninstalledAt] = now
+	} else {
+		// Legacy UNENROLL / MIGRATE: this ack is the unenroll itself.
+		doc[dl.FieldUnenrolledAt] = now
 	}
 
 	body, err := doc.Marshal()
@@ -747,8 +763,14 @@ func (ack *AckT) handleUninstallPending(ctx context.Context, zlog zerolog.Logger
 		output.APIKeyID = ""
 	}
 
+	// Finalize the unenroll exactly as for a non-uninstall-capable agent
+	// (unenrolled_at is set), with two deliberate differences: the agent is kept
+	// active so it can receive the follow-up UNINSTALL, and the additive
+	// uninstall_pending flag records that it is awaiting uninstall. The resulting
+	// state is active: true + unenrolled_at set + uninstall_pending: true.
 	now := time.Now().UTC().Format(time.RFC3339)
 	doc := bulk.UpdateFields{
+		dl.FieldUnenrolledAt:     now,
 		dl.FieldUninstallPending: true,
 		dl.FieldUpdatedAt:        now,
 	}

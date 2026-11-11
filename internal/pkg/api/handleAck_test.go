@@ -329,9 +329,15 @@ func TestHandleAckEvents(t *testing.T) {
 					}},
 				}}, nil)
 				m.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
-				// handleUnenroll marks the agent inactive (invalidating its API keys); the
-				// Update call proves UNINSTALL is dispatched through the invalidation path.
-				m.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+				// handleUnenroll marks the agent inactive (invalidating its API keys) and,
+				// because this is an UNINSTALL ack, records uninstalled_at so the
+				// agent is distinguishable from a plain unenrolled one.
+				m.On("Update", mock.Anything, mock.Anything, mock.Anything,
+					mock.MatchedBy(func(body []byte) bool {
+						s := string(body)
+						return strings.Contains(s, `"active":false`) &&
+							strings.Contains(s, `"uninstalled_at"`)
+					}), mock.Anything).Return(nil).Once()
 				return m
 			},
 		},
@@ -408,6 +414,7 @@ func TestHandleAckEvents(t *testing.T) {
 					mock.MatchedBy(func(body []byte) bool {
 						s := string(body)
 						return strings.Contains(s, "uninstall_pending") &&
+							strings.Contains(s, `"unenrolled_at"`) &&
 							!strings.Contains(s, `"active"`) &&
 							strings.Contains(s, `"api_key":""`) &&
 							strings.Contains(s, `"api_key_id":""`) &&
