@@ -129,6 +129,9 @@ func Test_Agent_Uninstall_Action(t *testing.T) {
 	_, gotID, _ := CheckinWithBodyToken(t, ctx, srv, resp.Item.Id, resp.Item.AccessApiKey, false, string(api.UNINSTALL), uninstallableCheckinBody(unenrollAckToken))
 	require.Equal(t, uninstallActionID, gotID, "expected to receive the created UNINSTALL action")
 
+	t.Log("Verify the pending agent is still active with unenrolled_at kept (exempt from the check-in audit cleanup)")
+	AssertAgentPendingUninstall(t, ctx, srv, resp.Item.Id)
+
 	t.Log("Ack the UNINSTALL action; Fleet Server invalidates the API keys and marks the agent inactive")
 	AgentAck(t, ctx, srv, gotID, resp.Item.Id, resp.Item.AccessApiKey)
 

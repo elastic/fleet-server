@@ -638,6 +638,15 @@ func (ack *AckT) invalidateAPIKeys(ctx context.Context, zlog zerolog.Logger, toR
 	invalidateAPIKeys(ctx, zlog, ack.bulk, toRetireAPIKeyIDs, skip)
 }
 
+// handleUnenroll performs the terminal invalidation shared by the legacy
+// UNENROLL ack (agents that don't support the remote-uninstall flow), MIGRATE,
+// and the final UNINSTALL ack: it invalidates all of the agent's API keys
+// (access and output), deletes their secrets, and marks the agent inactive.
+//
+// The uninstalled flag selects which timestamp is recorded: an UNINSTALL ack
+// records uninstalled_at (and preserves the unenrolled_at set earlier in the
+// pending-uninstall step), while the legacy UNENROLL/MIGRATE ack records
+// unenrolled_at because that ack is the unenroll itself.
 func (ack *AckT) handleUnenroll(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, uninstalled bool) error {
 	span, ctx := apm.StartSpan(ctx, "ackUnenroll", "process")
 	defer span.End()
@@ -669,6 +678,13 @@ func (ack *AckT) handleUnenroll(ctx context.Context, zlog zerolog.Logger, agent 
 		// only record the uninstall completion. uninstalled_at (server time)
 		// distinguishes an uninstalled agent from a plain unenrolled one.
 		doc[dl.FieldUninstalledAt] = now
+		// Fall back to stamping unenrolled_at here if it is somehow missing, e.g.
+		// when the UNENROLL and UNINSTALL acks arrive in the same batch and the
+		// pending-uninstall step was skipped: an uninstalled agent must still
+		// carry an unenrolled_at.
+		if agent.UnenrolledAt == "" {
+			doc[dl.FieldUnenrolledAt] = now
+		}
 	} else {
 		// Legacy UNENROLL / MIGRATE: this ack is the unenroll itself.
 		doc[dl.FieldUnenrolledAt] = now
@@ -683,7 +699,11 @@ func (ack *AckT) handleUnenroll(ctx context.Context, zlog zerolog.Logger, agent 
 		return fmt.Errorf("handleUnenroll update: %w", err)
 	}
 
-	zlog.Info().Msg("ack unenroll")
+	if uninstalled {
+		zlog.Info().Msg("ack uninstall")
+	} else {
+		zlog.Info().Msg("ack unenroll")
+	}
 	return nil
 }
 
