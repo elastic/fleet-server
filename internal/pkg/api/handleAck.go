@@ -723,7 +723,8 @@ func (ack *AckT) handleUninstallPending(ctx context.Context, zlog zerolog.Logger
 
 	// Delete the secrets backing the output API keys: the retired ones (carried
 	// in outputKeys via SecretID) and the current in-use ones (secret ID embedded
-	// in output.APIKey as a reference string).
+	// in output.APIKey as a reference string). This reads output.APIKey, so it
+	// must run before the key fields are cleared below.
 	secretItems := make([]model.ToRetireAPIKeyIdsItems, 0, len(outputKeys)+len(agent.Outputs))
 	secretItems = append(secretItems, outputKeys...)
 	for _, output := range agent.Outputs {
@@ -733,10 +734,26 @@ func (ack *AckT) handleUninstallPending(ctx context.Context, zlog zerolog.Logger
 	}
 	deleteRetiredSecrets(ctx, zlog, ack.bulk, secretItems)
 
+	// Clear the (now-invalidated) output key fields on the agent document so that,
+	// when the agent re-enrolls, policy preparation regenerates fresh keys instead
+	// of reusing a revoked key or a deleted secret reference. Doing this here (on
+	// the unenroll ack) rather than on re-enrollment keeps the consequences of the
+	// unenroll with the unenroll. PermissionsHash is deliberately kept: the
+	// check-in missing-key recovery guard uses "APIKey empty but PermissionsHash
+	// set" to force a policy resend that regenerates the key; ToRetire bookkeeping
+	// is also preserved for cleanup.
+	for _, output := range agent.Outputs {
+		output.APIKey = ""
+		output.APIKeyID = ""
+	}
+
 	now := time.Now().UTC().Format(time.RFC3339)
 	doc := bulk.UpdateFields{
 		dl.FieldUninstallPending: true,
 		dl.FieldUpdatedAt:        now,
+	}
+	if len(agent.Outputs) > 0 {
+		doc[dl.FieldOutputs] = agent.Outputs
 	}
 
 	body, err := doc.Marshal()

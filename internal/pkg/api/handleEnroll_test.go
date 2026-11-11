@@ -438,12 +438,14 @@ func TestEnrollWithAgentIDExistingActive(t *testing.T) {
 	assert.NotContains(t, doc, dl.FieldUpgradedAt)
 }
 
-// TestEnrollWithAgentIDExistingPendingUninstallResetsOutputs verifies that
-// re-enrolling a pending-uninstall agent clears the stale output credential
-// state (api_key/api_key_id/permissions_hash), since those keys were invalidated
-// and their secrets deleted on UNENROLL. Otherwise policy preparation would
-// reuse a revoked key or a deleted secret reference.
-func TestEnrollWithAgentIDExistingPendingUninstallResetsOutputs(t *testing.T) {
+// TestEnrollWithAgentIDExistingPendingUninstallClearsPending verifies that
+// re-enrolling a pending-uninstall agent clears the uninstall_pending flag and
+// does NOT touch the output credentials. The output keys were already
+// invalidated and their doc fields cleared when the UNENROLL was acked
+// (handleUninstallPending); re-enrollment relies on the kept PermissionsHash and
+// the check-in recovery guard to regenerate the keys, so it must not rewrite the
+// outputs here.
+func TestEnrollWithAgentIDExistingPendingUninstallClearsPending(t *testing.T) {
 	ctx := t.Context()
 	rb := &rollback.Rollback{}
 	zlog := zerolog.Logger{}
@@ -470,9 +472,10 @@ func TestEnrollWithAgentIDExistingPendingUninstallResetsOutputs(t *testing.T) {
 	et, _ := NewEnrollerT(verCon, cfg, bulker, c)
 
 	policyID := "my-policy"
-	// Existing pending-uninstall agent with a default output whose key was revoked.
+	// Existing pending-uninstall agent whose output key was already cleared on the
+	// unenroll ack (api_key empty, permissions_hash kept).
 	source := fmt.Sprintf(`{"active":true,"uninstall_pending":true,"agent":{"id":"1234","version":"8.9.0"},"type":"PERMANENT","policy_id":"%s","replace_token":"%s",`+
-		`"outputs":{"default":{"type":"elasticsearch","api_key":"revoked","api_key_id":"revoked-id","permissions_hash":"oldhash","to_retire_api_key_ids":[{"id":"retire-1"}]}}}`, policyID, replaceHash)
+		`"outputs":{"default":{"type":"elasticsearch","api_key":"","api_key_id":"","permissions_hash":"oldhash"}}}`, policyID, replaceHash)
 	bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{
 		HitsT: es.HitsT{
 			Hits: []es.HitT{{
@@ -493,17 +496,11 @@ func TestEnrollWithAgentIDExistingPendingUninstallResetsOutputs(t *testing.T) {
 	require.Equal(t, "created", resp.Action, "enroll failed")
 
 	doc := replaceUpdateDoc(t, bulker)
-	// uninstall_pending must be cleared.
+	// uninstall_pending must be cleared and the policy revision reset to 0.
 	assert.Equal(t, false, doc[dl.FieldUninstallPending])
-	// outputs must be written with cleared credentials but retained retire list.
-	outputs, ok := doc[dl.FieldOutputs].(map[string]any)
-	require.True(t, ok, "expected outputs in update doc")
-	def, ok := outputs["default"].(map[string]any)
-	require.True(t, ok, "expected default output in update doc")
-	assert.Equal(t, "", def["api_key"], "api_key must be cleared so a fresh key is generated")
-	assert.Equal(t, "", def["api_key_id"], "api_key_id must be cleared")
-	assert.Equal(t, "", def["permissions_hash"], "permissions_hash must be cleared")
-	assert.Contains(t, def, "to_retire_api_key_ids", "retirement bookkeeping must be preserved")
+	assert.EqualValues(t, 0, doc[dl.FieldPolicyRevisionIdx])
+	// outputs must NOT be rewritten by re-enrollment; the unenroll ack owns that.
+	assert.NotContains(t, doc, dl.FieldOutputs, "re-enroll must not rewrite outputs; clearing happens on the unenroll ack")
 }
 
 // TestEnrollWithAgentIDExistingActive_VersionedPolicy covers replace-enrollment of an

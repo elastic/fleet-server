@@ -376,7 +376,6 @@ func (et *EnrollerT) _enroll(
 		}
 
 		agent.Active = true
-		wasPendingUninstall := agent.UninstallPending
 		agent.UninstallPending = false
 		agent.Namespaces = namespaces
 		agent.LocalMetadata = localMeta
@@ -415,19 +414,11 @@ func (et *EnrollerT) _enroll(
 			doc[dl.FieldUpgradedAt] = now.UTC().Format(time.RFC3339)
 		}
 
-		// A pending-uninstall agent had its output API keys invalidated and their
-		// secrets deleted on UNENROLL. On re-enrollment clear the stale output
-		// credential state so policy preparation generates fresh keys on the next
-		// check-in, instead of reusing a revoked key or a deleted secret reference.
-		// Retirement bookkeeping (to_retire_api_key_ids) is preserved for cleanup.
-		if wasPendingUninstall && len(agent.Outputs) > 0 {
-			for _, output := range agent.Outputs {
-				output.APIKey = ""
-				output.APIKeyID = ""
-				output.PermissionsHash = ""
-			}
-			doc[dl.FieldOutputs] = agent.Outputs
-		}
+		// Note: a pending-uninstall agent's output keys were invalidated and their
+		// doc fields cleared when the UNENROLL was acked (handleUninstallPending),
+		// so re-enrollment needs no special output handling here: the cleared
+		// key with its kept PermissionsHash triggers the check-in recovery guard,
+		// which forces a policy resend that regenerates the output keys.
 		err = dl.UpdateAgent(ctx, et.bulker, agentID, doc, bulk.WithRefresh())
 		if err != nil {
 			return nil, err

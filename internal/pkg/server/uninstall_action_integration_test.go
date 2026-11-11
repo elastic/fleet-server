@@ -9,6 +9,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
@@ -36,8 +37,15 @@ const uninstallableEnrollBody = `{
 // uninstallableCheckinBody mirrors the shared checkinBody but keeps advertising
 // the uninstallable capability, so it is not dropped from local_metadata when
 // the agent checks in (parseMeta replaces stored metadata with the request's).
-const uninstallableCheckinBody = `{
-    "status": "online",
+// When ackToken is non-empty it is included so the agent's action cursor
+// advances past already-delivered actions on the next check-in.
+func uninstallableCheckinBody(ackToken string) string {
+	ackTokenField := ""
+	if ackToken != "" {
+		ackTokenField = fmt.Sprintf("\"ack_token\": %q,\n    ", ackToken)
+	}
+	return fmt.Sprintf(`{
+    %s"status": "online",
     "message": "checkin ok",
 	"local_metadata": {
 		"elastic": {
@@ -54,7 +62,8 @@ const uninstallableCheckinBody = `{
 			"message": "Healthy"
 		}
 	]
-}`
+}`, ackTokenField)
+}
 
 // Test_Agent_Uninstall_Action verifies the Fleet Server side of the UNINSTALL
 // action. UNINSTALL is only allowed after the agent has been unenrolled: the
@@ -82,7 +91,7 @@ func Test_Agent_Uninstall_Action(t *testing.T) {
 
 	// Consume the initial POLICY_CHANGE action produced on the first checkin.
 	// Use the capability-carrying checkin body so the flag is preserved.
-	initialActionID := AgentCheckinWithBody(t, ctx, srv, resp.Item.Id, resp.Item.AccessApiKey, uninstallableCheckinBody)
+	initialActionID := AgentCheckinWithBody(t, ctx, srv, resp.Item.Id, resp.Item.AccessApiKey, uninstallableCheckinBody(""))
 	AgentAck(t, ctx, srv, initialActionID, resp.Item.Id, resp.Item.AccessApiKey)
 
 	t.Log("Create UNENROLL action (required before UNINSTALL is allowed)")
@@ -95,7 +104,7 @@ func Test_Agent_Uninstall_Action(t *testing.T) {
 	})
 
 	t.Log("Checkin so that the agent receives the UNENROLL action")
-	_, gotUnenrollID := CheckinWithBody(t, ctx, srv, resp.Item.Id, resp.Item.AccessApiKey, false, string(api.UNENROLL), uninstallableCheckinBody)
+	_, gotUnenrollID, unenrollAckToken := CheckinWithBodyToken(t, ctx, srv, resp.Item.Id, resp.Item.AccessApiKey, false, string(api.UNENROLL), uninstallableCheckinBody(""))
 	require.Equal(t, unenrollActionID, gotUnenrollID, "expected to receive the created UNENROLL action")
 
 	t.Log("Ack the UNENROLL action; the agent keeps its access key and stays active, output keys invalidated (pending uninstall)")
@@ -114,8 +123,10 @@ func Test_Agent_Uninstall_Action(t *testing.T) {
 	})
 
 	t.Log("Checkin so that the unenrolled agent receives the UNINSTALL action")
-	// Checkin asserts the delivered action's type equals UNINSTALL and returns its id.
-	_, gotID := CheckinWithBody(t, ctx, srv, resp.Item.Id, resp.Item.AccessApiKey, false, string(api.UNINSTALL), uninstallableCheckinBody)
+	// Send the ack_token from the UNENROLL check-in so the action cursor advances
+	// past the UNENROLL (acking alone does not), otherwise the UNENROLL would be
+	// re-fetched and this check-in's single-action assertion would fail.
+	_, gotID, _ := CheckinWithBodyToken(t, ctx, srv, resp.Item.Id, resp.Item.AccessApiKey, false, string(api.UNINSTALL), uninstallableCheckinBody(unenrollAckToken))
 	require.Equal(t, uninstallActionID, gotID, "expected to receive the created UNINSTALL action")
 
 	t.Log("Ack the UNINSTALL action; Fleet Server invalidates the API keys and marks the agent inactive")

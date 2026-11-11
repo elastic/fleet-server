@@ -376,8 +376,10 @@ func TestHandleAckEvents(t *testing.T) {
 				LocalMetadata:  json.RawMessage(`{"elastic":{"agent":{"uninstallable":true}}}`),
 				Outputs: map[string]*model.PolicyOutput{
 					"default": {
-						APIKeyID: "es-output-key-id",
-						Type:     policy.OutputTypeElasticsearch,
+						APIKey:          "es-output-key",
+						APIKeyID:        "es-output-key-id",
+						PermissionsHash: "oldhash",
+						Type:            policy.OutputTypeElasticsearch,
 					},
 				},
 			},
@@ -399,10 +401,17 @@ func TestHandleAckEvents(t *testing.T) {
 				// agent can still receive the follow-up UNINSTALL. The exact-match on
 				// the output key id implicitly asserts the access key is not included.
 				m.On("APIKeyInvalidate", mock.Anything, []string{"es-output-key-id"}).Return(nil).Once()
+				// The update enters pending-uninstall (not deactivating) and clears
+				// the output key fields on the doc while keeping permissions_hash, so
+				// the check-in recovery guard regenerates the key on re-enroll.
 				m.On("Update", mock.Anything, mock.Anything, mock.Anything,
 					mock.MatchedBy(func(body []byte) bool {
 						s := string(body)
-						return strings.Contains(s, "uninstall_pending") && !strings.Contains(s, `"active"`)
+						return strings.Contains(s, "uninstall_pending") &&
+							!strings.Contains(s, `"active"`) &&
+							strings.Contains(s, `"api_key":""`) &&
+							strings.Contains(s, `"api_key_id":""`) &&
+							strings.Contains(s, `"permissions_hash":"oldhash"`)
 					}), mock.Anything).Return(nil).Once()
 				return m
 			},
