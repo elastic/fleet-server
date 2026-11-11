@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
 
 env:
-  DOCKER_IMAGE: "docker.elastic.co/observability-ci/fleet-server" # needs to rename for rollback
+  DOCKER_IMAGE: "docker.elastic.co/fleet-ci/fleet-server" # needs to rename for rollback
   DOCKER_IMAGE_GIT_TAG: "${BUILDKITE_BRANCH}" # needs to rename for rollback
   DOCKER_IMAGE_LATEST_TAG: "latest" # needs to rename for rollback
   DOCKER_IMAGE_SHA_TAG: "git-${BUILDKITE_COMMIT:0:12}" # needs to rename for rollback, should be "git-${BUILDKITE_COMMIT:0:12}"
