@@ -100,7 +100,7 @@ func (c *Config) LoadServerLimits(log *zerolog.Logger) error {
 	}
 
 	fleetInput := &c.Inputs[0]
-	agentLimits := loadLimits(log, fleetInput.Server.Limits.MaxAgents)
+	agentLimits := loadLimits(log, fleetInput)
 	fleetInput.Cache.LoadLimits(agentLimits)
 	fleetInput.Server.Limits.LoadLimits(agentLimits)
 	return nil
