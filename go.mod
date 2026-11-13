@@ -6,10 +6,17 @@ require (
 	github.com/Pallinder/go-randomdata v1.2.0
 	github.com/dgraph-io/ristretto v0.2.0
 	github.com/docker/go-units v0.5.0
+<<<<<<< HEAD
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261105190440-d25cfa30ebb4
 	github.com/elastic/elastic-agent-client/v7 v7.18.1
 	github.com/elastic/elastic-agent-libs v0.47.0
 	github.com/elastic/go-elasticsearch/v8 v8.19.7
+=======
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261110072329-81f8463d7957
+	github.com/elastic/elastic-agent-client/v7 v7.21.0
+	github.com/elastic/elastic-transport-go/v8 v8.11.0
+	github.com/elastic/go-elasticsearch/v9 v9.5.2
+>>>>>>> 9a4d3f1 (chore(deps): replace `elastic-agent-libs` with `beats/v7/pkg` packages (#8225))
 	github.com/elastic/go-ucfg v0.9.2
 	github.com/fxamacker/cbor/v2 v2.9.6
 	github.com/go-chi/chi/v5 v5.4.0

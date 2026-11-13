@@ -12,7 +12,12 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
+<<<<<<< HEAD
 	"github.com/elastic/elastic-agent-libs/logp"
+=======
+	"github.com/elastic/beats/v7/pkg/logp"
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger/ecs"
+>>>>>>> 9a4d3f1 (chore(deps): replace `elastic-agent-libs` with `beats/v7/pkg` packages (#8225))
 )
 
 func encoderConfig() zapcore.EncoderConfig {

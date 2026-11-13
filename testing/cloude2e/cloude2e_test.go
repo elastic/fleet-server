@@ -18,7 +18,7 @@ import (
 	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/beats/v7/pkg/kibana"
 
 	"github.com/elastic/fleet-server/pkg/api"
 	"github.com/elastic/fleet-server/v7/version"
