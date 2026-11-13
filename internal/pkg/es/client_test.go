@@ -24,13 +24,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
+	"github.com/elastic/beats/v7/pkg/transport/tlscommon"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/testing/certs"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/go-elasticsearch/v9"
 	"github.com/elastic/go-elasticsearch/v9/esapi"
+)
+
+const (
+	testHTTPS = "https"
+	testOpGet = "Get"
+	testESURL = "https://es.example"
 )
 
 var enabled bool = true
@@ -59,7 +65,7 @@ func TestClientCerts(t *testing.T) {
 		client, err := NewClient(t.Context(), &config.Config{
 			Output: config.Output{
 				Elasticsearch: config.Elasticsearch{
-					Protocol: "https",
+					Protocol: testHTTPS,
 					Hosts:    []string{server.URL},
 					TLS: &tlscommon.Config{
 						Enabled: &enabled,
@@ -104,7 +110,7 @@ func TestClientCerts(t *testing.T) {
 		client, err := NewClient(t.Context(), &config.Config{
 			Output: config.Output{
 				Elasticsearch: config.Elasticsearch{
-					Protocol: "https",
+					Protocol: testHTTPS,
 					Hosts:    []string{server.URL},
 					TLS: &tlscommon.Config{
 						Enabled: &enabled,
@@ -154,7 +160,7 @@ func TestClientCerts(t *testing.T) {
 		client, err := NewClient(t.Context(), &config.Config{
 			Output: config.Output{
 				Elasticsearch: config.Elasticsearch{
-					Protocol: "https",
+					Protocol: testHTTPS,
 					Hosts:    []string{server.URL},
 					TLS: &tlscommon.Config{
 						Enabled: &enabled,
@@ -192,7 +198,7 @@ func TestConnectionTLS(t *testing.T) {
 	cfg := &config.Config{
 		Output: config.Output{
 			Elasticsearch: config.Elasticsearch{
-				Protocol: "https",
+				Protocol: testHTTPS,
 				Hosts:    []string{server.URL},
 				TLS: &tlscommon.Config{
 					Enabled: &enabled,
@@ -297,8 +303,8 @@ func TestIsTLSHandshakeError(t *testing.T) {
 		{
 			name: "wrapped via *url.Error (mirrors net/http transport)",
 			err: &url.Error{
-				Op:  "Get",
-				URL: "https://es.example",
+				Op:  testOpGet,
+				URL: testESURL,
 				Err: certErr,
 			},
 			want: true,
@@ -306,8 +312,8 @@ func TestIsTLSHandshakeError(t *testing.T) {
 		{
 			name: "doubly wrapped (fmt.Errorf around *url.Error)",
 			err: fmt.Errorf("retry: %w", &url.Error{
-				Op:  "Get",
-				URL: "https://es.example",
+				Op:  testOpGet,
+				URL: testESURL,
 				Err: certErr,
 			}),
 			want: true,
@@ -325,10 +331,10 @@ func TestWithRetryOnTLSHandshakeError(t *testing.T) {
 	certErr := &tls.CertificateVerificationError{
 		Err: errors.New("x509: certificate signed by unknown authority"),
 	}
-	wrappedCertErr := &url.Error{Op: "Get", URL: "https://es.example", Err: certErr}
+	wrappedCertErr := &url.Error{Op: testOpGet, URL: testESURL, Err: certErr}
 
 	t.Run("composes with no prior predicate", func(t *testing.T) {
-		var cfg elasticsearch.Config
+		var cfg elasticsearch.Config //nolint:staticcheck // tests ConfigOption which uses deprecated elasticsearch.Config
 		WithRetryOnTLSHandshakeError()(&cfg)
 
 		require.NotNil(t, cfg.RetryOnError)
@@ -338,7 +344,7 @@ func TestWithRetryOnTLSHandshakeError(t *testing.T) {
 	})
 
 	t.Run("composes with prior predicate (OR semantics)", func(t *testing.T) {
-		var cfg elasticsearch.Config
+		var cfg elasticsearch.Config //nolint:staticcheck // tests ConfigOption which uses deprecated elasticsearch.Config
 		// Prior predicate retries only on ECONNREFUSED.
 		WithRetryOnErrs(syscall.ECONNREFUSED)(&cfg)
 		WithRetryOnTLSHandshakeError()(&cfg)
@@ -386,7 +392,7 @@ func TestShouldRetryTimeoutForCreate(t *testing.T) {
 }
 
 func TestWithRetryOnTimeoutForCreateComposes(t *testing.T) {
-	cfg := elasticsearch.Config{}
+	cfg := elasticsearch.Config{} //nolint:staticcheck // uses deprecated elasticsearch.Config
 	WithRetryOnErrs(syscall.ECONNRESET)(&cfg)
 	WithRetryOnTimeoutForCreate()(&cfg)
 
@@ -425,13 +431,13 @@ func TestRetryOnTimeoutForCreate(t *testing.T) {
 
 	newClient := func(t *testing.T) *elasticsearch.Client {
 		t.Helper()
-		cfg := elasticsearch.Config{
+		cfg := elasticsearch.Config{ //nolint:staticcheck // uses deprecated elasticsearch.Config
 			Addresses:  []string{server.URL},
 			Transport:  &http.Transport{ResponseHeaderTimeout: 100 * time.Millisecond},
 			MaxRetries: 5,
 		}
 		WithRetryOnTimeoutForCreate()(&cfg)
-		cli, err := elasticsearch.NewClient(cfg)
+		cli, err := elasticsearch.NewClient(cfg) //nolint:staticcheck // uses deprecated NewClient
 		require.NoError(t, err)
 		return cli
 	}
