@@ -428,19 +428,11 @@ Contents of probable licence file $GOMODCACHE/github.com/docker/go-units@v0.5.0/
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/beats/v7
-<<<<<<< HEAD
-Version: v7.0.0-alpha2.0.20261106052046-53397f7917fe
+Version: v7.0.0-alpha2.0.20261112233701-ee45eea5525c
 Licence type (autodetected): Elastic
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/beats/v7@v7.0.0-alpha2.0.20261106052046-53397f7917fe/LICENSE.txt:
-=======
-Version: v7.0.0-alpha2.0.20261110072329-81f8463d7957
-Licence type (autodetected): Elastic
---------------------------------------------------------------------------------
-
-Contents of probable licence file $GOMODCACHE/github.com/elastic/beats/v7@v7.0.0-alpha2.0.20261110072329-81f8463d7957/LICENSE.txt:
->>>>>>> 9a4d3f1 (chore(deps): replace `elastic-agent-libs` with `beats/v7/pkg` packages (#8225))
+Contents of probable licence file $GOMODCACHE/github.com/elastic/beats/v7@v7.0.0-alpha2.0.20261112233701-ee45eea5525c/LICENSE.txt:
 
 Source code in this repository is variously licensed under the Apache License
 Version 2.0, an Apache compatible license, or the Elastic License. Outside of
@@ -5480,11 +5472,11 @@ SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/ebitengine/purego
-Version: v0.11.1
+Version: v0.11.2
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/ebitengine/purego@v0.11.1/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/ebitengine/purego@v0.11.2/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -8088,11 +8080,11 @@ Contents of probable licence file $GOMODCACHE/github.com/prometheus/procfs@v0.22
 
 --------------------------------------------------------------------------------
 Dependency : github.com/shirou/gopsutil/v4
-Version: v4.26.9
+Version: v4.26.10
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/shirou/gopsutil/v4@v4.26.9/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/shirou/gopsutil/v4@v4.26.10/LICENSE:
 
 gopsutil is distributed under BSD license reproduced below.
 
