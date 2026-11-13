@@ -10,10 +10,9 @@ entries:
         reference instead of the secret value.
       component: fleet-server
       pr:
-        - https://github.com/elastic/fleet-server/pull/8192
-        - https://github.com/elastic/fleet-server/pull/8225
-        - https://github.com/elastic/fleet-server/pull/8237
-      issue: []
+        - https://github.com/elastic/fleet-server/pull/8152
+      issue:
+        - https://github.com/elastic/fleet-server/issues/8103
       impact: ""
       action: ""
       timestamp: 1793193137
