@@ -24,7 +24,7 @@ import (
 	"github.com/rs/zerolog"
 	"go.elastic.co/apm/v2"
 
-	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v9"
 )
 
 const (
