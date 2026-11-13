@@ -152,7 +152,7 @@ func searchedPolicyID(query []byte) (string, error) {
 func TestQueryLatestPoliciesByID(t *testing.T) {
 	bulker := &policyMSearchBulk{
 		items: map[string]bulk.MsearchResponseItem{
-			"policy-a": {
+			"policy-a": { //nolint:goconst // fixture policy ID
 				Status: http.StatusOK,
 				Aggregations: map[string]es.Aggregation{
 					FieldPolicyID: {
@@ -169,7 +169,7 @@ func TestQueryLatestPoliciesByID(t *testing.T) {
 					},
 				},
 			},
-			"policy-b": {
+			"policy-b": { //nolint:goconst // fixture policy ID
 				Status: http.StatusOK,
 				Aggregations: map[string]es.Aggregation{
 					FieldPolicyID: {
@@ -186,7 +186,7 @@ func TestQueryLatestPoliciesByID(t *testing.T) {
 					},
 				},
 			},
-			"malformed-policy": {
+			"malformed-policy": { //nolint:goconst // fixture policy ID
 				Status: http.StatusOK,
 				Aggregations: map[string]es.Aggregation{
 					FieldPolicyID: {
@@ -203,7 +203,7 @@ func TestQueryLatestPoliciesByID(t *testing.T) {
 					},
 				},
 			},
-			"timed-out-policy": {
+			"timed-out-policy": { //nolint:goconst // fixture policy ID
 				Status: http.StatusGatewayTimeout,
 				Error: json.RawMessage(`{
 					"root_cause": [{"type": "timeout_exception", "reason": "timed out"}],
@@ -211,13 +211,13 @@ func TestQueryLatestPoliciesByID(t *testing.T) {
 					"reason": "timed out"
 				}`),
 			},
-			"missing-policy": {
+			"missing-policy": { //nolint:goconst // fixture policy ID
 				Status: http.StatusOK,
 				Aggregations: map[string]es.Aggregation{
 					FieldPolicyID: {Buckets: []es.Bucket{}},
 				},
 			},
-			`policy"}]}} , "x": "y`: {
+			`policy"}]}} , "x": "y`: { //nolint:goconst // fixture policy ID
 				Status: http.StatusOK,
 				Aggregations: map[string]es.Aggregation{
 					FieldPolicyID: {Buckets: []es.Bucket{}},
