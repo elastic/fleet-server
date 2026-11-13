@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/beats/v7/pkg/kibana"
 
 	"github.com/elastic/fleet-server/v7/version"
 )
