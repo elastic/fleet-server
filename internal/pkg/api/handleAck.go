@@ -216,7 +216,20 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 	var policyAcks []string
 
 	var policyIdxs []int
-	var unenrollIdxs []int
+	// invalidateIdxs collects acks that invalidate the agent's API keys and
+	// deactivate it: terminal actions (MIGRATE, UNINSTALL) and UNENROLL acks from
+	// agents that don't support the remote UNINSTALL flow (legacy behavior).
+	// uninstallPendingIdxs collects UNENROLL acks from agents that do support it,
+	// which instead keep the agent's access key and move it into the
+	// pending-uninstall state so a follow-up UNINSTALL can still reach it, until a
+	// later UNINSTALL finally invalidates it. (The agent itself enforces which
+	// actions it accepts while awaiting uninstall; Fleet Server does not filter.)
+	var invalidateIdxs []int
+	var uninstallPendingIdxs []int
+	// uninstallAcked records whether an UNINSTALL ack drove the terminal
+	// invalidation, so uninstalled_at is written (distinguishing an uninstalled
+	// agent from a plain unenrolled one).
+	var uninstallAcked bool
 
 	res := NewAckResponse(len(events))
 
@@ -311,15 +324,37 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 		} else {
 			setResult(n, http.StatusOK)
 
-			// UNINSTALL is acked after the agent is effectively removed; like UNENROLL
-			// and MIGRATE it must invalidate the agent's API keys. Only queue it once
-			// the action result has been recorded (this else branch) and the agent did
-			// not report an error, so a failure to record the result does not revoke
-			// keys or mark the agent inactive. It runs after the ack event has been
-			// authenticated, so the agent's ack always succeeds; only subsequent
-			// requests are rejected, which is correct for an uninstalled agent.
-			if event.Error == nil && (action.Type == TypeUnenroll || action.Type == TypeMigrate || action.Type == TypeUninstall) {
-				unenrollIdxs = append(unenrollIdxs, n)
+			// Only act once the action result has been recorded (this else branch)
+			// and the agent did not report an error, so a failure to record the
+			// result does not revoke keys or change the agent's state. This runs
+			// after the ack event has been authenticated, so the agent's ack always
+			// succeeds; only subsequent requests are affected.
+			if event.Error == nil {
+				switch action.Type {
+				case TypeUnenroll:
+					// UNENROLL is the first step of the remote-uninstall flow, but
+					// only for agents that advertise UNINSTALL support (via the
+					// "uninstallable" flag in their local_metadata). For those we keep
+					// the agent's credentials and move it into the pending-uninstall
+					// state so it can still receive the follow-up UNINSTALL (and its
+					// CANCEL); it is finally invalidated when the UNINSTALL is acked.
+					//
+					// Agents that don't advertise support (older agents) keep the
+					// legacy behavior: their credentials are invalidated immediately
+					// on unenroll.
+					if agentSupportsUninstall(log, agent) {
+						uninstallPendingIdxs = append(uninstallPendingIdxs, n)
+					} else {
+						invalidateIdxs = append(invalidateIdxs, n)
+					}
+				case TypeMigrate, TypeUninstall:
+					// Terminal: the agent is effectively gone, so invalidate its API
+					// keys and mark it inactive.
+					invalidateIdxs = append(invalidateIdxs, n)
+					if action.Type == TypeUninstall {
+						uninstallAcked = true
+					}
+				}
 			}
 		}
 		span.End()
@@ -334,12 +369,25 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 		}
 	}
 
-	// Process unenroll acks
-	if len(unenrollIdxs) > 0 {
-		if err := ack.handleUnenroll(ctx, zlog, agent); err != nil {
+	// Process terminal (MIGRATE/UNINSTALL) acks: invalidate keys and deactivate.
+	if len(invalidateIdxs) > 0 {
+		if err := ack.handleUnenroll(ctx, zlog, agent, uninstallAcked); err != nil {
 			zlog.Error().Err(err).Msg("handle unenroll event")
-			// Set errors for each unenroll event
-			for _, idx := range unenrollIdxs {
+			for _, idx := range invalidateIdxs {
+				setError(idx, err)
+			}
+		}
+	}
+
+	// Process UNENROLL acks: keep credentials, enter the pending-uninstall state.
+	// Skip this when the same batch also contained a terminal transition
+	// (MIGRATE/UNINSTALL): that takes precedence and already invalidated and
+	// deactivated the agent, so setting uninstall_pending here would leave an
+	// inactive agent incorrectly marked pending.
+	if len(uninstallPendingIdxs) > 0 && len(invalidateIdxs) == 0 {
+		if err := ack.handleUninstallPending(ctx, zlog, agent); err != nil {
+			zlog.Error().Err(err).Msg("handle unenroll event (pending uninstall)")
+			for _, idx := range uninstallPendingIdxs {
 				setError(idx, err)
 			}
 		}
@@ -590,7 +638,16 @@ func (ack *AckT) invalidateAPIKeys(ctx context.Context, zlog zerolog.Logger, toR
 	invalidateAPIKeys(ctx, zlog, ack.bulk, toRetireAPIKeyIDs, skip)
 }
 
-func (ack *AckT) handleUnenroll(ctx context.Context, zlog zerolog.Logger, agent *model.Agent) error {
+// handleUnenroll performs the terminal invalidation shared by the legacy
+// UNENROLL ack (agents that don't support the remote-uninstall flow), MIGRATE,
+// and the final UNINSTALL ack: it invalidates all of the agent's API keys
+// (access and output), deletes their secrets, and marks the agent inactive.
+//
+// The uninstalled flag selects which timestamp is recorded: an UNINSTALL ack
+// records uninstalled_at (and preserves the unenrolled_at set earlier in the
+// pending-uninstall step), while the legacy UNENROLL/MIGRATE ack records
+// unenrolled_at because that ack is the unenroll itself.
+func (ack *AckT) handleUnenroll(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, uninstalled bool) error {
 	span, ctx := apm.StartSpan(ctx, "ackUnenroll", "process")
 	defer span.End()
 
@@ -611,9 +668,26 @@ func (ack *AckT) handleUnenroll(ctx context.Context, zlog zerolog.Logger, agent 
 
 	now := time.Now().UTC().Format(time.RFC3339)
 	doc := bulk.UpdateFields{
-		dl.FieldActive:       false,
-		dl.FieldUnenrolledAt: now,
-		dl.FieldUpdatedAt:    now,
+		dl.FieldActive:           false,
+		dl.FieldUpdatedAt:        now,
+		dl.FieldUninstallPending: false, // terminal: clear any pending-uninstall state
+	}
+	if uninstalled {
+		// UNINSTALL ack: the agent was already unenrolled (unenrolled_at set) when
+		// it entered the pending-uninstall state, so preserve that timestamp and
+		// only record the uninstall completion. uninstalled_at (server time)
+		// distinguishes an uninstalled agent from a plain unenrolled one.
+		doc[dl.FieldUninstalledAt] = now
+		// Fall back to stamping unenrolled_at here if it is somehow missing, e.g.
+		// when the UNENROLL and UNINSTALL acks arrive in the same batch and the
+		// pending-uninstall step was skipped: an uninstalled agent must still
+		// carry an unenrolled_at.
+		if agent.UnenrolledAt == "" {
+			doc[dl.FieldUnenrolledAt] = now
+		}
+	} else {
+		// Legacy UNENROLL / MIGRATE: this ack is the unenroll itself.
+		doc[dl.FieldUnenrolledAt] = now
 	}
 
 	body, err := doc.Marshal()
@@ -625,7 +699,115 @@ func (ack *AckT) handleUnenroll(ctx context.Context, zlog zerolog.Logger, agent 
 		return fmt.Errorf("handleUnenroll update: %w", err)
 	}
 
-	zlog.Info().Msg("ack unenroll")
+	if uninstalled {
+		zlog.Info().Msg("ack uninstall")
+	} else {
+		zlog.Info().Msg("ack unenroll")
+	}
+	return nil
+}
+
+// agentSupportsUninstall reports whether the agent advertises support for the
+// Fleet remote UNINSTALL action. The agent reports this through the
+// "uninstallable" flag in the elastic.agent section of its local_metadata (the
+// same place "upgradeable" lives). Fleet Server stores local_metadata as an
+// opaque blob, so it is parsed here on demand.
+//
+// Older agents that predate the UNINSTALL action omit the flag, so this returns
+// false for them and the caller falls back to the legacy unenroll behavior
+// (invalidate credentials immediately).
+func agentSupportsUninstall(zlog zerolog.Logger, agent *model.Agent) bool {
+	if len(agent.LocalMetadata) == 0 {
+		return false
+	}
+
+	var meta struct {
+		Elastic struct {
+			Agent struct {
+				Uninstallable bool `json:"uninstallable"`
+			} `json:"agent"`
+		} `json:"elastic"`
+	}
+	if err := json.Unmarshal(agent.LocalMetadata, &meta); err != nil {
+		zlog.Warn().Err(err).Msg("failed to parse local_metadata for uninstall support; assuming legacy unenroll behavior")
+		return false
+	}
+
+	return meta.Elastic.Agent.Uninstallable
+}
+
+// handleUninstallPending processes a UNENROLL ack for the remote-uninstall flow.
+// Unlike handleUnenroll it keeps the agent active and keeps its access API key
+// valid, so the agent can keep checking in and still receive the follow-up
+// UNINSTALL action (and its grace-period CANCEL). The agent itself enforces that
+// it only acts on UNINSTALL/CANCEL/REQUEST_DIAGNOSTICS while awaiting uninstall;
+// Fleet Server does not filter actions by this state. It does, however,
+// invalidate the agent's output API keys (for example Elasticsearch) so the
+// unenrolled agent immediately stops shipping data. The access key and the
+// agent's active state are removed when the UNINSTALL is acked (handleUnenroll).
+func (ack *AckT) handleUninstallPending(ctx context.Context, zlog zerolog.Logger, agent *model.Agent) error {
+	span, ctx := apm.StartSpan(ctx, "ackUninstallPending", "process")
+	defer span.End()
+
+	// Invalidate the output API keys (but not the access key) so the agent stops
+	// shipping data to its outputs once it has been unenrolled.
+	outputKeys := agent.OutputAPIKeyIDs()
+	if len(outputKeys) > 0 {
+		zlog.Info().Any("fleet.policy.apiKeyIDsToRetire", outputKeys).Msg("handleUninstallPending invalidate output API keys")
+		ack.invalidateAPIKeys(ctx, zlog, outputKeys, "")
+	}
+
+	// Delete the secrets backing the output API keys: the retired ones (carried
+	// in outputKeys via SecretID) and the current in-use ones (secret ID embedded
+	// in output.APIKey as a reference string). This reads output.APIKey, so it
+	// must run before the key fields are cleared below.
+	secretItems := make([]model.ToRetireAPIKeyIdsItems, 0, len(outputKeys)+len(agent.Outputs))
+	secretItems = append(secretItems, outputKeys...)
+	for _, output := range agent.Outputs {
+		if secretID, ok := secret.ParseSecretReference(output.APIKey); ok {
+			secretItems = append(secretItems, model.ToRetireAPIKeyIdsItems{SecretID: secretID})
+		}
+	}
+	deleteRetiredSecrets(ctx, zlog, ack.bulk, secretItems)
+
+	// Clear the (now-invalidated) output key fields on the agent document so that,
+	// when the agent re-enrolls, policy preparation regenerates fresh keys instead
+	// of reusing a revoked key or a deleted secret reference. Doing this here (on
+	// the unenroll ack) rather than on re-enrollment keeps the consequences of the
+	// unenroll with the unenroll. PermissionsHash is deliberately kept: the
+	// check-in missing-key recovery guard uses "APIKey empty but PermissionsHash
+	// set" to force a policy resend that regenerates the key; ToRetire bookkeeping
+	// is also preserved for cleanup.
+	for _, output := range agent.Outputs {
+		output.APIKey = ""
+		output.APIKeyID = ""
+	}
+
+	// Finalize the unenroll exactly as for a non-uninstall-capable agent
+	// (unenrolled_at is set), with two deliberate differences: the agent is kept
+	// active so it can receive the follow-up UNINSTALL, and the additive
+	// uninstall_pending flag records that it is awaiting uninstall. The resulting
+	// state is active: true + unenrolled_at set + uninstall_pending: true.
+	now := time.Now().UTC().Format(time.RFC3339)
+	doc := bulk.UpdateFields{
+		dl.FieldUnenrolledAt:     now,
+		dl.FieldUninstallPending: true,
+		dl.FieldUpdatedAt:        now,
+	}
+	if len(agent.Outputs) > 0 {
+		doc[dl.FieldOutputs] = agent.Outputs
+	}
+
+	body, err := doc.Marshal()
+	if err != nil {
+		return fmt.Errorf("handleUninstallPending marshal: %w", err)
+	}
+
+	if err = ack.bulk.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
+		return fmt.Errorf("handleUninstallPending update: %w", err)
+	}
+
+	zlog.Info().Msg("ack unenroll: agent entered pending-uninstall state, output keys invalidated, access key kept")
 	return nil
 }
 

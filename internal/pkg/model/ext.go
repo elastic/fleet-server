@@ -49,7 +49,8 @@ func (a *Agent) CheckDifferentVersion(ver string) string {
 }
 
 // APIKeyIDs returns all the API keys, the valid, in-use as well as the one
-// marked to be retired.
+// marked to be retired. This includes the access API key (used to communicate
+// with Fleet) and all output API keys.
 func (a *Agent) APIKeyIDs() []ToRetireAPIKeyIdsItems {
 	if a == nil {
 		return nil
@@ -63,6 +64,21 @@ func (a *Agent) APIKeyIDs() []ToRetireAPIKeyIdsItems {
 		})
 	}
 
+	keys = append(keys, a.OutputAPIKeyIDs()...)
+
+	return keys
+}
+
+// OutputAPIKeyIDs returns the API keys used by the agent's outputs (for example
+// the Elasticsearch output), both the in-use keys and the ones marked to be
+// retired. Unlike APIKeyIDs it deliberately excludes the access API key, so it
+// can be used to invalidate an agent's output keys (stopping it from shipping
+// data) while keeping it able to communicate with Fleet.
+func (a *Agent) OutputAPIKeyIDs() []ToRetireAPIKeyIdsItems {
+	if a == nil {
+		return nil
+	}
+	keys := make([]ToRetireAPIKeyIdsItems, 0, len(a.Outputs))
 	for outputName, output := range a.Outputs {
 		if output.APIKeyID != "" {
 			name := ""
@@ -84,7 +100,6 @@ func (a *Agent) APIKeyIDs() []ToRetireAPIKeyIdsItems {
 	}
 
 	return keys
-
 }
 
 // FeatureIncludeTagsInEvents is the policy feature that adds the agent tags to the events.

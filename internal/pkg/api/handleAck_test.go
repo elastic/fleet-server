@@ -209,6 +209,9 @@ func TestHandleAckEvents(t *testing.T) {
 		res    AckResponse
 		err    error
 		bulker func(t *testing.T) *ftesting.MockBulk
+		// agent, when set, overrides the shared default agent for the test case
+		// (used to control local_metadata, e.g. the "uninstallable" flag).
+		agent *model.Agent
 	}{
 		{
 			name: "nil",
@@ -309,6 +312,14 @@ func TestHandleAckEvents(t *testing.T) {
 		},
 		{
 			name: "uninstall action found invalidates api key",
+			// The agent was already unenrolled (unenrolled_at set) when it entered
+			// the pending-uninstall state, so the UNINSTALL ack must preserve that
+			// timestamp rather than overwrite it.
+			agent: &model.Agent{
+				ESDocument:   model.ESDocument{Id: "ab12dcd8-bde0-4045-92dc-c4b27668d735"},
+				Agent:        &model.AgentMetadata{Version: "8.0.0"},
+				UnenrolledAt: "2020-01-01T00:00:00Z",
+			},
 			events: []AckRequest_Events_Item{{
 				json.RawMessage(`{
 				"action_id": "2b12dcd8-bde0-4045-92dc-c4b27668d733"
@@ -326,9 +337,17 @@ func TestHandleAckEvents(t *testing.T) {
 					}},
 				}}, nil)
 				m.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
-				// handleUnenroll marks the agent inactive (invalidating its API keys); the
-				// Update call proves UNINSTALL is dispatched through the invalidation path.
-				m.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+				// handleUnenroll marks the agent inactive (invalidating its API keys)
+				// and, because this is an UNINSTALL ack, records uninstalled_at so the
+				// agent is distinguishable from a plain unenrolled one. The existing
+				// unenrolled_at is preserved (not overwritten).
+				m.On("Update", mock.Anything, mock.Anything, mock.Anything,
+					mock.MatchedBy(func(body []byte) bool {
+						s := string(body)
+						return strings.Contains(s, `"active":false`) &&
+							strings.Contains(s, `"uninstalled_at"`) &&
+							!strings.Contains(s, `"unenrolled_at"`)
+					}), mock.Anything).Return(nil).Once()
 				return m
 			},
 		},
@@ -355,6 +374,140 @@ func TestHandleAckEvents(t *testing.T) {
 				// No Update mock: a cancelled/failed UNINSTALL must NOT invalidate the
 				// agent's keys or mark it inactive, so the agent keeps running. An
 				// unexpected Update call would fail this test.
+				return m
+			},
+		},
+		{
+			// UNENROLL from an agent that advertises UNINSTALL support (via the
+			// "uninstallable" flag in local_metadata) is the first step of the
+			// remote-uninstall flow: it must keep the agent's credentials and only
+			// record uninstall_pending, NOT deactivate the agent. The matched Update
+			// proves the pending-uninstall path; a deactivating update (active:false)
+			// would not match and fail.
+			name: "unenroll action from uninstallable agent enters pending-uninstall and keeps credentials",
+			agent: &model.Agent{
+				ESDocument:     model.ESDocument{Id: "ab12dcd8-bde0-4045-92dc-c4b27668d735"},
+				Agent:          &model.AgentMetadata{Version: "8.0.0"},
+				AccessAPIKeyID: "access-key-id",
+				LocalMetadata:  json.RawMessage(`{"elastic":{"agent":{"uninstallable":true}}}`),
+				Outputs: map[string]*model.PolicyOutput{
+					"default": {
+						APIKey:          "es-output-key",
+						APIKeyID:        "es-output-key-id",
+						PermissionsHash: "oldhash",
+						Type:            policy.OutputTypeElasticsearch,
+					},
+				},
+			},
+			events: []AckRequest_Events_Item{{
+				json.RawMessage(`{
+				"action_id": "2b12dcd8-bde0-4045-92dc-c4b27668d733"
+			    }`), // an UNENROLL action
+			}},
+			res: newAckResponse(false, []AckResponseItem{newAckResponseItem(http.StatusOK)}),
+			bulker: func(t *testing.T) *ftesting.MockBulk {
+				m := ftesting.NewMockBulk()
+				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "2b12dcd8-bde0-4045-92dc-c4b27668d733")), mock.Anything).Return(&es.ResultT{HitsT: es.HitsT{
+					Hits: []es.HitT{{
+						Source: []byte(`{"action_id":"2b12dcd8-bde0-4045-92dc-c4b27668d733","type":"UNENROLL"}`),
+					}},
+				}}, nil)
+				m.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
+				// Only the output key is invalidated; the access key is kept so the
+				// agent can still receive the follow-up UNINSTALL. The exact-match on
+				// the output key id implicitly asserts the access key is not included.
+				m.On("APIKeyInvalidate", mock.Anything, []string{"es-output-key-id"}).Return(nil).Once()
+				// The update enters pending-uninstall (not deactivating) and clears
+				// the output key fields on the doc while keeping permissions_hash, so
+				// the check-in recovery guard regenerates the key on re-enroll.
+				m.On("Update", mock.Anything, mock.Anything, mock.Anything,
+					mock.MatchedBy(func(body []byte) bool {
+						s := string(body)
+						return strings.Contains(s, "uninstall_pending") &&
+							strings.Contains(s, `"unenrolled_at"`) &&
+							!strings.Contains(s, `"active"`) &&
+							strings.Contains(s, `"api_key":""`) &&
+							strings.Contains(s, `"api_key_id":""`) &&
+							strings.Contains(s, `"permissions_hash":"oldhash"`)
+					}), mock.Anything).Return(nil).Once()
+				return m
+			},
+		},
+		{
+			// A batch containing both an UNENROLL and a terminal UNINSTALL ack must
+			// take the terminal path only: the agent is invalidated and deactivated,
+			// and the pending-uninstall transition is skipped so the agent is not
+			// left inactive-but-pending. Exactly one deactivating update (active:false)
+			// must happen; a second update setting uninstall_pending would be
+			// unmatched and fail the test.
+			name: "batch with unenroll and terminal uninstall takes terminal path only",
+			agent: &model.Agent{
+				ESDocument:    model.ESDocument{Id: "ab12dcd8-bde0-4045-92dc-c4b27668d735"},
+				Agent:         &model.AgentMetadata{Version: "8.0.0"},
+				LocalMetadata: json.RawMessage(`{"elastic":{"agent":{"uninstallable":true}}}`),
+			},
+			events: []AckRequest_Events_Item{
+				{json.RawMessage(`{"action_id": "1b12dcd8-bde0-4045-92dc-c4b27668d731"}`)}, // UNENROLL
+				{json.RawMessage(`{"action_id": "2b12dcd8-bde0-4045-92dc-c4b27668d733"}`)}, // UNINSTALL
+			},
+			res: newAckResponse(false, []AckResponseItem{newAckResponseItem(http.StatusOK), newAckResponseItem(http.StatusOK)}),
+			bulker: func(t *testing.T) *ftesting.MockBulk {
+				m := ftesting.NewMockBulk()
+				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "1b12dcd8-bde0-4045-92dc-c4b27668d731")), mock.Anything).Return(&es.ResultT{HitsT: es.HitsT{
+					Hits: []es.HitT{{
+						Source: []byte(`{"action_id":"1b12dcd8-bde0-4045-92dc-c4b27668d731","type":"UNENROLL"}`),
+					}},
+				}}, nil)
+				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "2b12dcd8-bde0-4045-92dc-c4b27668d733")), mock.Anything).Return(&es.ResultT{HitsT: es.HitsT{
+					Hits: []es.HitT{{
+						Source: []byte(`{"action_id":"2b12dcd8-bde0-4045-92dc-c4b27668d733","type":"UNINSTALL"}`),
+					}},
+				}}, nil)
+				m.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
+				// Only the terminal (deactivating) update is allowed. A pending update
+				// (uninstall_pending without active) would not match and fail. Because
+				// the pending step was skipped, the agent has no unenrolled_at yet, so
+				// the terminal update must stamp it as a fallback alongside
+				// uninstalled_at.
+				m.On("Update", mock.Anything, mock.Anything, mock.Anything,
+					mock.MatchedBy(func(body []byte) bool {
+						s := string(body)
+						return strings.Contains(s, `"active":false`) &&
+							strings.Contains(s, `"uninstalled_at"`) &&
+							strings.Contains(s, `"unenrolled_at"`)
+					}), mock.Anything).Return(nil).Once()
+				return m
+			},
+		},
+		{
+			// UNENROLL from an agent that does NOT advertise UNINSTALL support (no
+			// "uninstallable" flag in local_metadata, e.g. an older agent) keeps the
+			// legacy behavior: invalidate credentials immediately and deactivate the
+			// agent. The matched deactivating update (active:false) proves the legacy
+			// invalidation path was taken instead of pending-uninstall.
+			name: "unenroll action from legacy agent invalidates api key",
+			agent: &model.Agent{
+				ESDocument: model.ESDocument{Id: "ab12dcd8-bde0-4045-92dc-c4b27668d735"},
+				Agent:      &model.AgentMetadata{Version: "8.0.0"},
+			},
+			events: []AckRequest_Events_Item{{
+				json.RawMessage(`{
+				"action_id": "2b12dcd8-bde0-4045-92dc-c4b27668d733"
+			    }`), // an UNENROLL action
+			}},
+			res: newAckResponse(false, []AckResponseItem{newAckResponseItem(http.StatusOK)}),
+			bulker: func(t *testing.T) *ftesting.MockBulk {
+				m := ftesting.NewMockBulk()
+				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "2b12dcd8-bde0-4045-92dc-c4b27668d733")), mock.Anything).Return(&es.ResultT{HitsT: es.HitsT{
+					Hits: []es.HitT{{
+						Source: []byte(`{"action_id":"2b12dcd8-bde0-4045-92dc-c4b27668d733","type":"UNENROLL"}`),
+					}},
+				}}, nil)
+				m.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
+				m.On("Update", mock.Anything, mock.Anything, mock.Anything,
+					mock.MatchedBy(func(body []byte) bool {
+						return strings.Contains(string(body), `"active"`)
+					}), mock.Anything).Return(nil).Once()
 				return m
 			},
 		},
@@ -677,7 +830,11 @@ func TestHandleAckEvents(t *testing.T) {
 			bulker := tc.bulker(t)
 			ack := NewAckT(cfg, bulker, cache)
 
-			res, err := ack.handleAckEvents(ctx, logger, agent, tc.events)
+			tcAgent := agent
+			if tc.agent != nil {
+				tcAgent = tc.agent
+			}
+			res, err := ack.handleAckEvents(ctx, logger, tcAgent, tc.events)
 			assert.Equal(t, tc.res, res)
 
 			if err != nil {
@@ -695,6 +852,54 @@ func TestHandleAckEvents(t *testing.T) {
 				}
 			}
 			bulker.AssertExpectations(t)
+		})
+	}
+}
+
+func TestAgentSupportsUninstall(t *testing.T) {
+	logger := testlog.SetLogger(t)
+
+	tests := []struct {
+		name string
+		meta json.RawMessage
+		want bool
+	}{
+		{
+			name: "nil local_metadata",
+			meta: nil,
+			want: false,
+		},
+		{
+			name: "empty object",
+			meta: json.RawMessage(`{}`),
+			want: false,
+		},
+		{
+			name: "uninstallable true",
+			meta: json.RawMessage(`{"elastic":{"agent":{"uninstallable":true}}}`),
+			want: true,
+		},
+		{
+			name: "uninstallable false",
+			meta: json.RawMessage(`{"elastic":{"agent":{"uninstallable":false}}}`),
+			want: false,
+		},
+		{
+			name: "uninstallable flag absent (legacy agent)",
+			meta: json.RawMessage(`{"elastic":{"agent":{"upgradeable":true}}}`),
+			want: false,
+		},
+		{
+			name: "malformed local_metadata",
+			meta: json.RawMessage(`{not json`),
+			want: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			agent := &model.Agent{LocalMetadata: tc.meta}
+			assert.Equal(t, tc.want, agentSupportsUninstall(logger, agent))
 		})
 	}
 }

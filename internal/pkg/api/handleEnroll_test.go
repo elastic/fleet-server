@@ -438,6 +438,71 @@ func TestEnrollWithAgentIDExistingActive(t *testing.T) {
 	assert.NotContains(t, doc, dl.FieldUpgradedAt)
 }
 
+// TestEnrollWithAgentIDExistingPendingUninstallClearsPending verifies that
+// re-enrolling a pending-uninstall agent clears the uninstall_pending flag and
+// does NOT touch the output credentials. The output keys were already
+// invalidated and their doc fields cleared when the UNENROLL was acked
+// (handleUninstallPending); re-enrollment relies on the kept PermissionsHash and
+// the check-in recovery guard to regenerate the keys, so it must not rewrite the
+// outputs here.
+func TestEnrollWithAgentIDExistingPendingUninstallClearsPending(t *testing.T) {
+	ctx := t.Context()
+	rb := &rollback.Rollback{}
+	zlog := zerolog.Logger{}
+	agentID := "1234"
+	replaceToken := "replace_token"
+	var pbkdf2Cfg config.PBKDF2
+	pbkdf2Cfg.InitDefaults()
+	replaceHash, err := hashReplaceToken(replaceToken, pbkdf2Cfg)
+	require.NoError(t, err)
+	req := &EnrollRequest{
+		Type: "PERMANENT",
+		Id:   &agentID,
+		Metadata: EnrollMetadata{
+			UserProvided: []byte("{}"),
+			Local:        []byte("{}"),
+		},
+		ReplaceToken: &replaceToken,
+	}
+	verCon := mustBuildConstraints("8.9.0")
+	cfg := &config.Server{}
+	cfg.InitDefaults()
+	c, _ := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
+	bulker := ftesting.NewMockBulk()
+	et, _ := NewEnrollerT(verCon, cfg, bulker, c)
+
+	policyID := "my-policy"
+	// Existing pending-uninstall agent whose output key was already cleared on the
+	// unenroll ack (api_key empty, permissions_hash kept).
+	source := fmt.Sprintf(`{"active":true,"uninstall_pending":true,"agent":{"id":"1234","version":"8.9.0"},"type":"PERMANENT","policy_id":"%s","replace_token":"%s",`+
+		`"outputs":{"default":{"type":"elasticsearch","api_key":"","api_key_id":"","permissions_hash":"oldhash"}}}`, policyID, replaceHash)
+	bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{
+		HitsT: es.HitsT{
+			Hits: []es.HitT{{
+				ID:     "1234",
+				Index:  dl.FleetAgents,
+				Source: []byte(source),
+			}},
+		},
+	}, nil)
+	bulker.On("APIKeyRead", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(
+		&apikey.APIKeyMetadata{ID: "1234"}, nil)
+	bulker.On("APIKeyInvalidate", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	bulker.On("APIKeyCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(
+		&apikey.APIKey{ID: "1234", Key: "1234"}, nil)
+	bulker.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+	resp, _ := et._enroll(ctx, rb, zlog, req, policyID, []string{}, "8.9.0")
+	require.Equal(t, "created", resp.Action, "enroll failed")
+
+	doc := replaceUpdateDoc(t, bulker)
+	// uninstall_pending must be cleared and the policy revision reset to 0.
+	assert.Equal(t, false, doc[dl.FieldUninstallPending])
+	assert.EqualValues(t, 0, doc[dl.FieldPolicyRevisionIdx])
+	// outputs must NOT be rewritten by re-enrollment; the unenroll ack owns that.
+	assert.NotContains(t, doc, dl.FieldOutputs, "re-enroll must not rewrite outputs; clearing happens on the unenroll ack")
+}
+
 // TestEnrollWithAgentIDExistingActive_VersionedPolicy covers replace-enrollment of an
 // agent that has been reassigned to a version-specific policy variant (e.g. "my-policy#9.6")
 // by Kibana's version-specific policy assignment task. Enrollment API keys are only ever

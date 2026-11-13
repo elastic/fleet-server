@@ -33,11 +33,27 @@ const (
 )
 
 func Checkin(t *testing.T, ctx context.Context, srv *tserver, agentID, key string, shouldHaveRemoteES bool, actionType string) (string, string) {
+	return CheckinWithBody(t, ctx, srv, agentID, key, shouldHaveRemoteES, actionType, checkinBody)
+}
+
+// CheckinWithBody is like Checkin but sends a caller-provided checkin body, so a
+// test can control the reported local_metadata (e.g. the
+// elastic.agent.uninstallable capability) without changing the shared fixtures.
+func CheckinWithBody(t *testing.T, ctx context.Context, srv *tserver, agentID, key string, shouldHaveRemoteES bool, actionType, body string) (string, string) {
+	remoteAPIKey, actionID, _ := CheckinWithBodyToken(t, ctx, srv, agentID, key, shouldHaveRemoteES, actionType, body)
+	return remoteAPIKey, actionID
+}
+
+// CheckinWithBodyToken is like CheckinWithBody but also returns the response's
+// ack_token. The caller must send that token in the next check-in so the agent's
+// action cursor advances past already-delivered actions — posting to /acks does
+// not advance it, so otherwise the next check-in re-fetches the same action.
+func CheckinWithBodyToken(t *testing.T, ctx context.Context, srv *tserver, agentID, key string, shouldHaveRemoteES bool, actionType, body string) (remoteAPIKey, actionID, ackToken string) {
 	cli := cleanhttp.DefaultClient()
 	var obj map[string]any
 
 	t.Logf("Fake a checkin for agent %s", agentID)
-	req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+agentID+"/checkin", strings.NewReader(checkinBody))
+	req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/"+agentID+"/checkin", strings.NewReader(body))
 	require.NoError(t, err)
 	req.Header.Set("Authorization", "ApiKey "+key)
 	req.Header.Set("User-Agent", "elastic agent "+serverVersion)
@@ -52,6 +68,10 @@ func Checkin(t *testing.T, ctx context.Context, srv *tserver, agentID, key strin
 	err = json.Unmarshal(p, &obj)
 	require.NoError(t, err)
 
+	// Expose the response ack_token (absent for an empty response) so the caller
+	// can advance the action cursor on the next check-in.
+	ackToken, _ = obj["ack_token"].(string)
+
 	actionsRaw, ok := obj["actions"]
 	require.True(t, ok, "expected actions is missing")
 	actions, ok := actionsRaw.([]any)
@@ -62,13 +82,13 @@ func Checkin(t *testing.T, ctx context.Context, srv *tserver, agentID, key strin
 
 	aIDRaw, ok := action["id"]
 	require.True(t, ok, "expected action id attribute missing")
-	actionID, ok := aIDRaw.(string)
+	actionID, ok = aIDRaw.(string)
 	require.True(t, ok, "expected action id to be string")
 
 	typeRaw := action["type"]
 	require.Equal(t, actionType, typeRaw)
 	if actionType != "POLICY_CHANGE" {
-		return "", actionID
+		return "", actionID, ackToken
 	}
 	dataRaw := action["data"]
 	data, ok := dataRaw.(map[string]any)
@@ -77,7 +97,6 @@ func Checkin(t *testing.T, ctx context.Context, srv *tserver, agentID, key strin
 	require.True(t, ok, "expected policy to be map")
 	outputs, ok := policy["outputs"].(map[string]any)
 	require.True(t, ok, "expected outputs to be map")
-	var remoteAPIKey string
 	if shouldHaveRemoteES {
 		remoteES, ok := outputs["remoteES"].(map[string]any)
 		require.True(t, ok, "expected remoteES to be map")
@@ -95,7 +114,7 @@ func Checkin(t *testing.T, ctx context.Context, srv *tserver, agentID, key strin
 	require.True(t, ok, "expected defaultAPIKey to be string")
 	require.NotEqual(t, remoteAPIKey, defaultAPIKey, "expected remote api key to be different than default")
 
-	return remoteAPIKey, actionID
+	return remoteAPIKey, actionID, ackToken
 }
 
 func getRemoteElasticsearchCa(t *testing.T) string {
