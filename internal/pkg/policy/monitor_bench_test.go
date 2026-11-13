@@ -20,8 +20,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
-	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 )
@@ -307,34 +305,6 @@ func peakHeapDuring(fn func()) uint64 {
 	return peak.Load()
 }
 
-// searchOnlyBulk answers Search with the policy documents at a new revision on every call, as a
-// search for the latest revision of every policy would; any other method panics (nil embedded
-// interface). Every result holds its own copy of the documents, like an Elasticsearch response.
-// It returns an already decoded es.ResultT, so decoding the response itself (es.Bucket) is not part
-// of what is measured.
-type searchOnlyBulk struct {
-	bulk.Bulk
-	docs    [][]byte
-	offsets []int
-	rev     *int
-}
-
-// HasTracer is called by loadPolicies; there is no APM tracer in the benchmark.
-func (b searchOnlyBulk) HasTracer() bool { return false }
-
-func (b searchOnlyBulk) Search(context.Context, string, []byte, ...bulk.Opt) (*es.ResultT, error) {
-	*b.rev++
-	hits := hitsFor(b.docs, b.offsets, *b.rev)
-	buckets := make([]es.Bucket, len(hits))
-	for i, hit := range hits {
-		buckets[i] = es.Bucket{
-			Key:          fmt.Sprintf("policy-%d", i),
-			Aggregations: map[string]es.HitsT{dl.FieldRevisionIdx: {Hits: []es.HitT{hit}}},
-		}
-	}
-	return &es.ResultT{Aggregations: map[string]es.Aggregation{dl.FieldPolicyID: {Buckets: buckets}}}, nil
-}
-
 // BenchmarkMonitorProcessHits feeds a full set of 100 policies (about 19 MB of JSON) to the policy
 // monitor the way policy changes reach it after startup (processHits), with one sub-benchmark per
 // kind of content:
@@ -359,15 +329,6 @@ func BenchmarkMonitorProcessHits(b *testing.B) {
 	b.Run("unique", func(b *testing.B) { benchmarkMonitor(b, true, processHitsLoader) })
 }
 
-// BenchmarkMonitorLoadPolicies is the same as BenchmarkMonitorProcessHits for the other way policies
-// reach the monitor: a full load (loadPolicies), which happens at startup and whenever a policy is
-// requested that the monitor does not have. It searches for the latest revision of every policy
-// through dl.QueryLatestPolicies. See BenchmarkMonitorProcessHits for what is reported.
-func BenchmarkMonitorLoadPolicies(b *testing.B) {
-	b.Run("duplicated", func(b *testing.B) { benchmarkMonitor(b, false, loadPoliciesLoader) })
-	b.Run("unique", func(b *testing.B) { benchmarkMonitor(b, true, loadPoliciesLoader) })
-}
-
 // monitorLoader returns a monitor and a function that makes it process a new revision of all the
 // policies in docs, one way or another.
 type monitorLoader func(b *testing.B, docs [][]byte, offsets []int) (*monitorT, func())
@@ -384,23 +345,6 @@ func processHitsLoader(b *testing.B, docs [][]byte, offsets []int) (*monitorT, f
 		rev++
 		if err := m.processHits(context.Background(), hitsFor(docs, offsets, rev)); err != nil {
 			b.Fatalf("processHits: %v", err)
-		}
-	}
-}
-
-func loadPoliciesLoader(b *testing.B, docs [][]byte, offsets []int) (*monitorT, func()) {
-	rev := benchBaseRevision
-	m := &monitorT{
-		log:           zerolog.Nop(),
-		bulker:        searchOnlyBulk{docs: docs, offsets: offsets, rev: &rev},
-		policies:      map[string]policyT{},
-		pendingQ:      makeHead(),
-		policyF:       dl.QueryLatestPolicies,
-		policiesIndex: dl.FleetPolicies,
-	}
-	return m, func() {
-		if err := m.loadPolicies(context.Background()); err != nil {
-			b.Fatalf("loadPolicies: %v", err)
 		}
 	}
 }
