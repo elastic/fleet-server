@@ -25,7 +25,12 @@ import (
 	"testing"
 	"time"
 
+<<<<<<< HEAD
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
+=======
+	backoff "github.com/cenkalti/backoff/v7"
+	"github.com/elastic/beats/v7/pkg/transport/tlscommon"
+>>>>>>> 9a4d3f1 (chore(deps): replace `elastic-agent-libs` with `beats/v7/pkg` packages (#8225))
 	"github.com/elastic/elastic-transport-go/v8/elastictransport"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/testing/certs"
