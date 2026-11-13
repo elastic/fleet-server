@@ -15,7 +15,7 @@ Version: v7.0.3
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/cenkalti/backoff/v7@v7.0.3/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/cenkalti/backoff/v7@v7.0.3/LICENSE:
 
 The MIT License (MIT)
 
@@ -45,7 +45,7 @@ Version: v2.4.2
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/dgraph-io/ristretto/v2@v2.4.2/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/dgraph-io/ristretto/v2@v2.4.2/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -231,7 +231,7 @@ Version: v0.5.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/docker/go-units@v0.5.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/docker/go-units@v0.5.0/LICENSE:
 
 
                                  Apache License
@@ -432,7 +432,7 @@ Version: v7.0.0-alpha2.0.20261110072329-81f8463d7957
 Licence type (autodetected): Elastic
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/elastic/beats/v7@v7.0.0-alpha2.0.20261110072329-81f8463d7957/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/beats/v7@v7.0.0-alpha2.0.20261110072329-81f8463d7957/LICENSE.txt:
 
 Source code in this repository is variously licensed under the Apache License
 Version 2.0, an Apache compatible license, or the Elastic License. Outside of
@@ -455,7 +455,7 @@ Version: v7.21.0
 Licence type (autodetected): Elastic
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/elastic/elastic-agent-client/v7@v7.21.0/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-client/v7@v7.21.0/LICENSE.txt:
 
 ELASTIC LICENSE AGREEMENT
 
@@ -688,7 +688,7 @@ Version: v8.11.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/elastic/elastic-transport-go/v8@v8.11.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-transport-go/v8@v8.11.0/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -899,7 +899,7 @@ Version: v9.5.2
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/elastic/go-elasticsearch/v9@v9.5.2/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/go-elasticsearch/v9@v9.5.2/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -1110,7 +1110,7 @@ Version: v0.9.2
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/elastic/go-ucfg@v0.9.2/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/go-ucfg@v0.9.2/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -1321,7 +1321,7 @@ Version: v2.10.0
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/fxamacker/cbor/v2@v2.10.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/fxamacker/cbor/v2@v2.10.0/LICENSE:
 
 MIT License
 
@@ -1351,7 +1351,7 @@ Version: v5.5.0
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/go-chi/chi/v5@v5.5.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/go-chi/chi/v5@v5.5.0/LICENSE:
 
 Copyright (c) 2015-present Peter Kieltyka (https://github.com/pkieltyka), Google Inc.
 
@@ -1381,7 +1381,7 @@ Version: v5.5.1
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/gofrs/uuid/v5@v5.5.1/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/gofrs/uuid/v5@v5.5.1/LICENSE:
 
 Copyright (C) 2013-2018 by Maxim Bublis <b@codemonkey.ru>
 
@@ -1411,7 +1411,7 @@ Version: v1.9.0
 Licence type (autodetected): MPL-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/hashicorp/go-version@v1.9.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/hashicorp/go-version@v1.9.0/LICENSE:
 
 Copyright IBM Corp. 2014, 2025
 
@@ -1777,7 +1777,7 @@ Version: v2.0.7
 Licence type (autodetected): MPL-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/hashicorp/golang-lru/v2@v2.0.7/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/hashicorp/golang-lru/v2@v2.0.7/LICENSE:
 
 Copyright (c) 2014 HashiCorp, Inc.
 
@@ -2151,7 +2151,7 @@ Version: v0.9.2
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/mailru/easyjson@v0.9.2/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/mailru/easyjson@v0.9.2/LICENSE:
 
 Copyright (c) 2016 Mail.Ru Group
 
@@ -2168,7 +2168,7 @@ Version: v1.0.3
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/miolini/datacounter@v1.0.3/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/miolini/datacounter@v1.0.3/LICENSE:
 
 The MIT License (MIT)
 
@@ -2200,7 +2200,7 @@ Version: v1.6.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/oapi-codegen/runtime@v1.6.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/oapi-codegen/runtime@v1.6.0/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -2411,7 +2411,7 @@ Version: v0.25.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/open-telemetry/opamp-go@v0.25.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/open-telemetry/opamp-go@v0.25.0/LICENSE:
 
 
                                  Apache License
@@ -2623,7 +2623,7 @@ Version: v0.0.0-20210728143218-7b4eea64cf58
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/pbnjay/memory@v0.0.0-20210728143218-7b4eea64cf58/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/pbnjay/memory@v0.0.0-20210728143218-7b4eea64cf58/LICENSE:
 
 BSD 3-Clause License
 
@@ -2662,7 +2662,7 @@ Version: v1.25.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/prometheus/client_golang@v1.25.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/prometheus/client_golang@v1.25.0/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -2873,7 +2873,7 @@ Version: v1.6.0
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/rs/xid@v1.6.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/rs/xid@v1.6.0/LICENSE:
 
 Copyright (c) 2015 Olivier Poitrey <rs@dailymotion.com>
 
@@ -2902,7 +2902,7 @@ Version: v1.35.1
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/rs/zerolog@v1.35.1/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/rs/zerolog@v1.35.1/LICENSE:
 
 MIT License
 
@@ -2933,7 +2933,7 @@ Version: v1.10.2
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/spf13/cobra@v1.10.2/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/spf13/cobra@v1.10.2/LICENSE.txt:
 
                                 Apache License
                            Version 2.0, January 2004
@@ -3117,7 +3117,7 @@ Version: v2.7.12
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/go.elastic.co/apm/module/apmchiv5/v2@v2.7.12/LICENSE:
+Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmchiv5/v2@v2.7.12/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -3328,7 +3328,7 @@ Version: v2.7.12
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/go.elastic.co/apm/module/apmelasticsearch/v2@v2.7.12/LICENSE:
+Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmelasticsearch/v2@v2.7.12/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -3539,7 +3539,7 @@ Version: v2.7.12
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/go.elastic.co/apm/module/apmhttp/v2@v2.7.12/LICENSE:
+Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmhttp/v2@v2.7.12/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -3750,7 +3750,7 @@ Version: v2.7.12
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/go.elastic.co/apm/module/apmprometheus/v2@v2.7.12/LICENSE:
+Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmprometheus/v2@v2.7.12/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -3961,7 +3961,7 @@ Version: v2.7.12
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/go.elastic.co/apm/module/apmzerolog/v2@v2.7.12/LICENSE:
+Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmzerolog/v2@v2.7.12/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -4172,7 +4172,7 @@ Version: v2.7.12
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/go.elastic.co/apm/v2@v2.7.12/LICENSE:
+Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/v2@v2.7.12/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -4383,7 +4383,7 @@ Version: v0.2.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/go.elastic.co/ecszerolog@v0.2.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/go.elastic.co/ecszerolog@v0.2.0/LICENSE:
 
 
                                  Apache License
@@ -4595,7 +4595,7 @@ Version: v1.47.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/go.opentelemetry.io/otel@v1.47.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/go.opentelemetry.io/otel@v1.47.0/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -4835,7 +4835,7 @@ Version: v1.28.0
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/go.uber.org/zap@v1.28.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/go.uber.org/zap@v1.28.0/LICENSE:
 
 Copyright (c) 2016-2024 Uber Technologies, Inc.
 
@@ -4864,7 +4864,7 @@ Version: v0.62.0
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/golang.org/x/net@v0.62.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/golang.org/x/net@v0.62.0/LICENSE:
 
 Copyright 2009 The Go Authors.
 
@@ -4901,7 +4901,7 @@ Version: v0.24.0
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/golang.org/x/sync@v0.24.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/golang.org/x/sync@v0.24.0/LICENSE:
 
 Copyright 2009 The Go Authors.
 
@@ -4938,7 +4938,7 @@ Version: v0.16.0
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/golang.org/x/time@v0.16.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/golang.org/x/time@v0.16.0/LICENSE:
 
 Copyright 2009 The Go Authors.
 
@@ -4975,7 +4975,7 @@ Version: v1.85.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/google.golang.org/grpc@v1.85.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/google.golang.org/grpc@v1.85.0/LICENSE:
 
 
                                  Apache License
@@ -5187,7 +5187,7 @@ Version: v1.36.12
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/google.golang.org/protobuf@v1.36.12/LICENSE:
+Contents of probable licence file $GOMODCACHE/google.golang.org/protobuf@v1.36.12/LICENSE:
 
 Copyright (c) 2018 The Go Authors. All rights reserved.
 
@@ -5224,7 +5224,7 @@ Version: v3.0.1
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/gopkg.in/yaml.v3@v3.0.1/LICENSE:
+Contents of probable licence file $GOMODCACHE/gopkg.in/yaml.v3@v3.0.1/LICENSE:
 
 
 This project is covered by two different licenses: MIT and Apache.
@@ -5290,7 +5290,7 @@ Version: v0.6.4
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/!microsoft/go-winio@v0.6.4/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/!microsoft/go-winio@v0.6.4/LICENSE:
 
 The MIT License (MIT)
 
@@ -5322,7 +5322,7 @@ Version: v2.0.0
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/apapsch/go-jsonmerge/v2@v2.0.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/apapsch/go-jsonmerge/v2@v2.0.0/LICENSE:
 
 MIT License
 
@@ -5353,7 +5353,7 @@ Version: v1.0.0
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/armon/go-radix@v1.0.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/armon/go-radix@v1.0.0/LICENSE:
 
 The MIT License (MIT)
 
@@ -5383,7 +5383,7 @@ Version: v1.0.1
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/beorn7/perks@v1.0.1/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/beorn7/perks@v1.0.1/LICENSE:
 
 Copyright (C) 2013 Blake Mizerany
 
@@ -5413,7 +5413,7 @@ Version: v2.3.0
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/cespare/xxhash/v2@v2.3.0/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/cespare/xxhash/v2@v2.3.0/LICENSE.txt:
 
 Copyright (c) 2016 Caleb Spare
 
@@ -5445,7 +5445,7 @@ Version: v1.0.1
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/dustin/go-humanize@v1.0.1/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/dustin/go-humanize@v1.0.1/LICENSE:
 
 Copyright (c) 2005-2008  Dustin Sallings <dustin@spy.net>
 
@@ -5476,7 +5476,7 @@ Version: v0.11.1
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/ebitengine/purego@v0.11.1/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/ebitengine/purego@v0.11.1/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -5687,7 +5687,7 @@ Version: v0.0.12
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/elastic/go-structform@v0.0.12/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/go-structform@v0.0.12/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -5898,7 +5898,7 @@ Version: v1.15.5
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/elastic/go-sysinfo@v1.15.5/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/go-sysinfo@v1.15.5/LICENSE.txt:
 
 
                                  Apache License
@@ -6110,7 +6110,7 @@ Version: v1.0.2
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/elastic/go-windows@v1.0.2/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/go-windows@v1.0.2/LICENSE.txt:
 
 
                                  Apache License
@@ -6322,7 +6322,7 @@ Version: v0.14.4
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/elastic/gosigar@v0.14.4/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/gosigar@v0.14.4/LICENSE:
 
                               Apache License
                         Version 2.0, January 2004
@@ -6533,7 +6533,7 @@ Version: v1.18.0
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/fatih/color@v1.18.0/LICENSE.md:
+Contents of probable licence file $GOMODCACHE/github.com/fatih/color@v1.18.0/LICENSE.md:
 
 The MIT License (MIT)
 
@@ -6563,7 +6563,7 @@ Version: v1.4.4
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/go-logr/logr@v1.4.4/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/go-logr/logr@v1.4.4/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -6774,7 +6774,7 @@ Version: v1.2.2
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/go-logr/stdr@v1.2.2/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/go-logr/stdr@v1.2.2/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -6985,7 +6985,7 @@ Version: v1.3.0
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/go-ole/go-ole@v1.3.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/go-ole/go-ole@v1.3.0/LICENSE:
 
 The MIT License (MIT)
 
@@ -7016,7 +7016,7 @@ Version: v1.6.0
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/google/uuid@v1.6.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/google/uuid@v1.6.0/LICENSE:
 
 Copyright (c) 2009,2014 Google Inc. All rights reserved.
 
@@ -7053,7 +7053,7 @@ Version: v1.5.4-0.20250319132907-e064f32e3674
 Licence type (autodetected): BSD-2-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/gorilla/websocket@v1.5.4-0.20250319132907-e064f32e3674/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/gorilla/websocket@v1.5.4-0.20250319132907-e064f32e3674/LICENSE:
 
 Copyright (c) 2013 The Gorilla WebSocket Authors. All rights reserved.
 
@@ -7085,7 +7085,7 @@ Version: v1.1.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/inconshreveable/mousetrap@v1.1.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/inconshreveable/mousetrap@v1.1.0/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -7296,7 +7296,7 @@ Version: v1.0.0
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/josharian/intern@v1.0.0/license.md:
+Contents of probable licence file $GOMODCACHE/github.com/josharian/intern@v1.0.0/license.md:
 
 MIT License
 
@@ -7327,7 +7327,7 @@ Version: v0.1.14
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/mattn/go-colorable@v0.1.14/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/mattn/go-colorable@v0.1.14/LICENSE:
 
 The MIT License (MIT)
 
@@ -7358,7 +7358,7 @@ Version: v0.0.20
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/mattn/go-isatty@v0.0.20/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/mattn/go-isatty@v0.0.20/LICENSE:
 
 Copyright (c) Yasuhiro MATSUMOTO <mattn.jp@gmail.com>
 
@@ -7377,7 +7377,7 @@ Version: v0.0.0-20191010083416-a7dc8b61c822
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/munnerz/goautoneg@v0.0.0-20191010083416-a7dc8b61c822/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/munnerz/goautoneg@v0.0.0-20191010083416-a7dc8b61c822/LICENSE:
 
 Copyright (c) 2011, Open Knowledge Foundation Ltd.
 All rights reserved.
@@ -7418,7 +7418,7 @@ Version: v0.9.1
 Licence type (autodetected): BSD-2-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/pkg/errors@v0.9.1/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/pkg/errors@v0.9.1/LICENSE:
 
 Copyright (c) 2015, Dave Cheney <dave@cheney.net>
 All rights reserved.
@@ -7451,7 +7451,7 @@ Version: v0.6.3
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/prometheus/client_model@v0.6.3/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/prometheus/client_model@v0.6.3/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -7662,7 +7662,7 @@ Version: v0.72.1
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/prometheus/common@v0.72.1/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/prometheus/common@v0.72.1/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -7873,7 +7873,7 @@ Version: v0.22.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/prometheus/procfs@v0.22.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/prometheus/procfs@v0.22.0/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -8084,7 +8084,7 @@ Version: v4.26.9
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/shirou/gopsutil/v4@v4.26.9/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/shirou/gopsutil/v4@v4.26.9/LICENSE:
 
 gopsutil is distributed under BSD license reproduced below.
 
@@ -8154,7 +8154,7 @@ Version: v1.0.10
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/spf13/pflag@v1.0.10/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/spf13/pflag@v1.0.10/LICENSE:
 
 Copyright (c) 2012 Alex Ogier. All rights reserved.
 Copyright (c) 2012 The Go Authors. All rights reserved.
@@ -8192,7 +8192,7 @@ Version: v0.4.0
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/tklauser/go-sysconf@v0.4.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/tklauser/go-sysconf@v0.4.0/LICENSE:
 
 BSD 3-Clause License
 
@@ -8231,7 +8231,7 @@ Version: v0.12.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/tklauser/numcpus@v0.12.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/tklauser/numcpus@v0.12.0/LICENSE:
 
 
                                  Apache License
@@ -8443,7 +8443,7 @@ Version: v0.8.4
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/x448/float16@v0.8.4/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/x448/float16@v0.8.4/LICENSE:
 
 MIT License
 
@@ -8475,7 +8475,7 @@ Version: v1.2.4
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/github.com/yusufpapurcu/wmi@v1.2.4/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/yusufpapurcu/wmi@v1.2.4/LICENSE:
 
 The MIT License (MIT)
 
@@ -8505,7 +8505,7 @@ Version: v1.0.3
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/go.elastic.co/ecszap@v1.0.3/LICENSE:
+Contents of probable licence file $GOMODCACHE/go.elastic.co/ecszap@v1.0.3/LICENSE:
 
 
                                  Apache License
@@ -8716,7 +8716,7 @@ Version: v1.5.1
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/go.elastic.co/fastjson@v1.5.1/LICENSE:
+Contents of probable licence file $GOMODCACHE/go.elastic.co/fastjson@v1.5.1/LICENSE:
 
 Copyright 2018 Elasticsearch BV
 
@@ -8749,7 +8749,7 @@ Version: v1.2.1
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/go.opentelemetry.io/auto/sdk@v1.2.1/LICENSE:
+Contents of probable licence file $GOMODCACHE/go.opentelemetry.io/auto/sdk@v1.2.1/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -8960,7 +8960,7 @@ Version: v1.47.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/go.opentelemetry.io/otel/log@v1.47.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/go.opentelemetry.io/otel/log@v1.47.0/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -9200,7 +9200,7 @@ Version: v1.47.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/go.opentelemetry.io/otel/metric@v1.47.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/go.opentelemetry.io/otel/metric@v1.47.0/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -9440,7 +9440,7 @@ Version: v1.47.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/go.opentelemetry.io/otel/trace@v1.47.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/go.opentelemetry.io/otel/trace@v1.47.0/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -9680,7 +9680,7 @@ Version: v1.11.0
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/go.uber.org/multierr@v1.11.0/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/go.uber.org/multierr@v1.11.0/LICENSE.txt:
 
 Copyright (c) 2017-2021 Uber Technologies, Inc.
 
@@ -9709,7 +9709,7 @@ Version: v0.49.0
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/golang.org/x/sys@v0.49.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/golang.org/x/sys@v0.49.0/LICENSE:
 
 Copyright 2009 The Go Authors.
 
@@ -9746,7 +9746,7 @@ Version: v0.43.0
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/golang.org/x/text@v0.43.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/golang.org/x/text@v0.43.0/LICENSE:
 
 Copyright 2009 The Go Authors.
 
@@ -9783,7 +9783,7 @@ Version: v0.0.0-20261019180522-ce908d29299b
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/google.golang.org/genproto/googleapis/rpc@v0.0.0-20261019180522-ce908d29299b/LICENSE:
+Contents of probable licence file $GOMODCACHE/google.golang.org/genproto/googleapis/rpc@v0.0.0-20261019180522-ce908d29299b/LICENSE:
 
 
                                  Apache License
@@ -9995,7 +9995,7 @@ Version: v2.4.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/gopkg.in/yaml.v2@v2.4.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/gopkg.in/yaml.v2@v2.4.0/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -10206,7 +10206,7 @@ Version: v1.0.1
 Licence type (autodetected): BSD-2-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file /var/folders/2k/jqsw2z0x283837kvpr0lhjch0000gn/T/cursor-sandbox-cache/0c2900d08752e0f74c3797d8a928530e/go-mod/howett.net/plist@v1.0.1/LICENSE:
+Contents of probable licence file $GOMODCACHE/howett.net/plist@v1.0.1/LICENSE:
 
 Copyright (c) 2013, Dustin L. Howett. All rights reserved.
 
