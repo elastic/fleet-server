@@ -8,7 +8,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
+	"slices"
 
 	"github.com/rs/zerolog"
 
@@ -22,8 +24,12 @@ import (
 var (
 	tmplQueryLatestPolicies = prepareQueryLatestPolicies()
 	tmplQueryLatestPolicy   = prepareQueryLatestPolicy()
-	ErrMissingAggregations  = errors.New("missing expected aggregation result")
 	tmplQueryPolicies       = prepareQueryPolicies()
+)
+
+var (
+	ErrMissingAggregations = errors.New("missing expected aggregation result")
+	ErrInvalidPolicy       = errors.New("invalid policy")
 )
 
 // addLatestRevisionAggs adds the aggregation that returns the latest revision of each policy
@@ -90,19 +96,33 @@ func QueryLatestPoliciesByID(ctx context.Context, bulker bulk.Bulk, policyIDs []
 	}
 	policies := make([]model.Policy, 0, len(items))
 	sharer := NewStringSharer()
-	for _, item := range items {
+	var errs []error
+	for i, policyID := range policyIDs {
+		item := items[i]
+		var err error
 		switch item.Status {
 		case http.StatusOK:
-			var err error
-			if policies, err = appendLatestPolicies(policies, item.Aggregations, sharer); err != nil {
-				return nil, err
+			var found []model.Policy
+			if found, err = appendLatestPolicies(policies, item.Aggregations, sharer); err != nil {
+				err = fmt.Errorf("policy %s: %w: %w", policyID, ErrInvalidPolicy, err)
+			} else {
+				policies = found
 			}
 		case 0:
 			// The request of this search failed and searchErr holds its error.
-			return nil, searchErr
+			err = searchErr
 		default:
-			return nil, es.TranslateError(item.Status, item.Error)
+			err = es.TranslateError(item.Status, item.Error)
 		}
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if len(errs) > 0 {
+		// Remove the consecutive copies of a request error because a failed request gives the same
+		// error to each of its searches.
+		uniqueErrs := errors.Join(slices.Compact(errs)...)
+		return policies, fmt.Errorf("search failed for %d of %d policies: %w", len(errs), len(policyIDs), uniqueErrs)
 	}
 	return policies, nil
 }

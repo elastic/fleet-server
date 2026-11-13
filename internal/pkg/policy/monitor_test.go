@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"net/http"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -28,6 +29,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/semaphore"
 	"golang.org/x/time/rate"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
@@ -841,11 +843,25 @@ func searchedPolicyIDs(t *testing.T, ops []bulk.MultiOp) []string {
 
 func newTestPolicy(revisionIdx int64) model.Policy {
 	return model.Policy{
-		ESDocument:  model.ESDocument{Id: xid.New().String(), Version: 1, SeqNo: 1},
-		PolicyID:    uuid.Must(uuid.NewV4()).String(),
-		Data:        policyDataDefault,
+		ESDocument: model.ESDocument{Id: xid.New().String(), Version: 1, SeqNo: 1},
+		PolicyID:   uuid.Must(uuid.NewV4()).String(),
+		Data: &model.PolicyData{
+			Outputs: map[string]map[string]any{
+				"default": {"type": "elasticsearch"},
+			},
+		},
 		RevisionIdx: revisionIdx,
 	}
+}
+
+func (m *monitorT) loadedPolicyIDs() []string {
+	var policyIDs []string
+	for policyID, p := range m.policies {
+		if p.pp.Policy.PolicyID != "" {
+			policyIDs = append(policyIDs, policyID)
+		}
+	}
+	return policyIDs
 }
 
 func TestMonitor_CacheMissLoadsOnlyTheRequestedPolicy(t *testing.T) {
@@ -966,29 +982,200 @@ func TestMonitor_PolicyThatDidNotLoadIsLoadedOnTheNextSubscribe(t *testing.T) {
 	}
 }
 
-func TestMonitor_KickSearchesOnlyThePoliciesThatSubscribeAskedFor(t *testing.T) {
-	var searched []string
-	pm := NewMonitor(ftesting.NewMockBulk(), mmock.NewMockMonitor(), config.ServerLimits{}).(*monitorT)
-	pm.policiesF = func(_ context.Context, _ bulk.Bulk, policyIDs []string, _ ...dl.Option) ([]model.Policy, error) {
-		searched = append(searched, policyIDs...)
-		return nil, nil
-	}
-
-	_, err := pm.Subscribe("agent-1", "missing", 1)
-	require.NoError(t, err)
-	require.NoError(t, pm.loadPolicies(t.Context()))
-	_, err = pm.Subscribe("agent-2", "other", 1)
-	require.NoError(t, err)
-	require.NoError(t, pm.loadPolicies(t.Context()))
-	assert.Equal(t, []string{"missing", "other"}, searched, "a kick for another policy does not search for the missing policy")
-
-	_, err = pm.Subscribe("agent-3", "missing", 1)
-	require.NoError(t, err)
-	require.NoError(t, pm.loadPolicies(t.Context()))
-	assert.Equal(t, []string{"missing", "other", "missing"}, searched, "a new Subscribe for the missing policy searches for it again")
+// policyStore is used in tests to store and search policies.
+type policyStore struct {
+	// Result of the search for each policy ID. A nil error means that the policy exists.
+	policies map[string]error
+	// IDs of the policies of each search.
+	searchedIDs [][]string
 }
 
-func TestMonitor_SearchesForAtMostMaxPolicySearchesPolicies(t *testing.T) {
+var (
+	errSearchFailed  = errors.New("search failed")
+	errInvalidPolicy = errors.New("invalid policy")
+)
+
+func (s *policyStore) search(_ context.Context, _ bulk.Bulk, policyIDs []string, _ ...dl.Option) ([]model.Policy, error) {
+	var policies []model.Policy
+	var errs []error
+	for _, policyID := range policyIDs {
+		err, ok := s.policies[policyID]
+		if !ok {
+			continue
+		}
+		if errors.Is(err, errInvalidPolicy) {
+			policy := newTestPolicy(1)
+			policy.PolicyID = policyID
+			policy.Data = &model.PolicyData{}
+			policies = append(policies, policy)
+			continue
+		}
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		policy := newTestPolicy(1)
+		policy.PolicyID = policyID
+		policies = append(policies, policy)
+	}
+	s.searchedIDs = append(s.searchedIDs, slices.Clone(policyIDs))
+	return policies, errors.Join(errs...)
+}
+
+func (s *policyStore) clear() {
+	s.searchedIDs = nil
+}
+
+func TestMonitor_LoadPolicies(t *testing.T) {
+	store := &policyStore{
+		policies: map[string]error{
+			"policy-a":             nil,
+			"policy-b":             nil,
+			"failed-policy":        errSearchFailed,
+			"invalid-policy":       errInvalidPolicy,
+			"missing-index-policy": es.ErrIndexNotFound,
+		},
+	}
+
+	tests := []struct {
+		name string
+		// Policies that the monitor knows from earlier subscriptions but has not loaded yet.
+		oldPolicies []string
+		// Policies that the monitor has already loaded.
+		cachedPolicies []string
+		// Policies of new subscriptions.
+		newPolicies []string
+		// Number of policies in a search.
+		batchSize int
+		// Policies that the monitor has loaded after the load.
+		wantPolicies []string
+		// IDs of the policies that the store received.
+		wantSearchedIDs []string
+		wantErr         error
+	}{
+		{
+			name:         "new policies are loaded",
+			newPolicies:  []string{"policy-a", "policy-b"},
+			wantPolicies: []string{"policy-a", "policy-b"},
+		},
+		{
+			name:         "a policy that is not in the store is not loaded",
+			newPolicies:  []string{"policy-a", "policy-not-in-store"},
+			wantPolicies: []string{"policy-a"},
+		},
+		{
+			name:        "no policy is loaded when none is in the store",
+			newPolicies: []string{"policy-not-in-store"},
+		},
+		{
+			name:        "a missing index does not return an error",
+			newPolicies: []string{"missing-index-policy"},
+		},
+		{
+			name:         "valid policies are loaded when other policies fail",
+			newPolicies:  []string{"policy-a", "failed-policy"},
+			wantPolicies: []string{"policy-a"},
+			wantErr:      errSearchFailed,
+		},
+		{
+			name:         "valid policies are loaded when another policy cannot be parsed",
+			newPolicies:  []string{"policy-a", "invalid-policy", "policy-b"},
+			wantPolicies: []string{"policy-a", "policy-b"},
+			wantErr:      ErrDefaultOutputNotFound,
+		},
+		{
+			name:            "a cached policy is not searched again",
+			cachedPolicies:  []string{"policy-a"},
+			newPolicies:     []string{"policy-a", "policy-b"},
+			wantSearchedIDs: []string{"policy-b"},
+			wantPolicies:    []string{"policy-a", "policy-b"},
+		},
+		{
+			name:            "an old policy is not loaded without a new subscription",
+			oldPolicies:     []string{"policy-b"},
+			newPolicies:     []string{"policy-a"},
+			wantSearchedIDs: []string{"policy-a"},
+			wantPolicies:    []string{"policy-a"},
+		},
+		{
+			name:            "an old policy is loaded after a new subscription",
+			oldPolicies:     []string{"policy-b"},
+			newPolicies:     []string{"policy-b"},
+			wantSearchedIDs: []string{"policy-b"},
+			wantPolicies:    []string{"policy-b"},
+		},
+		{
+			name:         "policies are searched in batches of the batch size",
+			newPolicies:  []string{"policy-a", "policy-b"},
+			batchSize:    1,
+			wantPolicies: []string{"policy-a", "policy-b"},
+		},
+		{
+			name:         "valid policies are loaded when another batch fails",
+			newPolicies:  []string{"policy-a", "failed-policy"},
+			batchSize:    1,
+			wantPolicies: []string{"policy-a"},
+			wantErr:      errSearchFailed,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			policies := make(map[string]policyT)
+			for _, policyID := range tc.cachedPolicies {
+				policies[policyID] = policyT{pp: ParsedPolicy{Policy: model.Policy{PolicyID: policyID, RevisionIdx: 1}}}
+			}
+			// Policies of earlier subscriptions are in the monitor without data and they are not queued.
+			for _, policyID := range tc.oldPolicies {
+				policies[policyID] = policyT{head: makeHead()}
+			}
+			// Subscribe adds an empty entry and queues the policy for the next load.
+			loadQ := make(map[string]struct{})
+			for _, policyID := range tc.newPolicies {
+				if _, ok := policies[policyID]; !ok {
+					policies[policyID] = policyT{head: makeHead()}
+				}
+				loadQ[policyID] = struct{}{}
+			}
+
+			batchSize := defaultPolicySearchBatchSize
+			if tc.batchSize > 0 {
+				batchSize = tc.batchSize
+			}
+
+			pm := &monitorT{
+				bulker:        ftesting.NewMockBulk(),
+				searches:      semaphore.NewWeighted(int64(batchSize)),
+				searchesBatch: batchSize,
+				policiesF:     store.search,
+				policies:      policies,
+				loadQ:         loadQ,
+			}
+
+			t.Cleanup(store.clear)
+			err := pm.loadPolicies(t.Context())
+			if tc.wantErr == nil {
+				require.NoError(t, err)
+			} else {
+				require.ErrorIs(t, err, tc.wantErr)
+			}
+
+			// Only the expected policies are searched.
+			searchedIDs := slices.Concat(store.searchedIDs...)
+			if len(tc.wantSearchedIDs) > 0 {
+				assert.ElementsMatch(t, tc.wantSearchedIDs, searchedIDs)
+			}
+
+			// The expected policies are loaded.
+			assert.ElementsMatch(t, tc.wantPolicies, pm.loadedPolicyIDs())
+
+			// The searches are split in batches of the batch size.
+			wantBatches := (len(searchedIDs) + batchSize - 1) / batchSize
+			assert.Len(t, store.searchedIDs, wantBatches)
+		})
+	}
+}
+
+func TestMonitor_PoliciesInFlightAreLimited(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		release := make(chan struct{})
 		var mut sync.Mutex
@@ -1033,24 +1220,20 @@ func TestMonitor_ConcurrentCacheMissesShareLoads(t *testing.T) {
 		release := make(chan struct{})
 		var mut sync.Mutex
 		var searched []string
-		bulker := ftesting.NewMockBulk()
-		bulker.On("MSearch", mock.Anything, mock.MatchedBy(func(ops []bulk.MultiOp) bool { return len(ops) == 1 && searchedPolicyID(t, ops[0].Body) == a.PolicyID }), mock.Anything).
-			Run(func(mock.Arguments) {
-				mut.Lock()
-				searched = append(searched, a.PolicyID)
-				mut.Unlock()
-				<-release
-			}).
-			Return([]bulk.MsearchResponseItem{policySearchResult(t, a)}, nil)
-		bulker.On("MSearch", mock.Anything, mock.MatchedBy(func(ops []bulk.MultiOp) bool { return len(ops) == 1 && searchedPolicyID(t, ops[0].Body) == b.PolicyID }), mock.Anything).
-			Run(func(mock.Arguments) {
-				mut.Lock()
-				searched = append(searched, b.PolicyID)
-				mut.Unlock()
-				<-release
-			}).
-			Return([]bulk.MsearchResponseItem{policySearchResult(t, b)}, nil)
-		pm := NewMonitor(bulker, mmock.NewMockMonitor(), config.ServerLimits{}).(*monitorT)
+		pm := NewMonitor(ftesting.NewMockBulk(), mmock.NewMockMonitor(), config.ServerLimits{}).(*monitorT)
+		pm.policiesF = func(_ context.Context, _ bulk.Bulk, policyIDs []string, _ ...dl.Option) ([]model.Policy, error) {
+			mut.Lock()
+			searched = append(searched, policyIDs...)
+			mut.Unlock()
+			<-release
+			var policies []model.Policy
+			for _, policy := range []model.Policy{a, b} {
+				if slices.Contains(policyIDs, policy.PolicyID) {
+					policies = append(policies, policy)
+				}
+			}
+			return policies, nil
+		}
 
 		const callersA, callersB = 5, 3
 		revsA := make([]int64, callersA)

@@ -445,7 +445,11 @@ func (m *monitorT) fetchAndProcess(ctx context.Context, policyIDs []string) erro
 	policies, err := m.policiesF(ctx, m.bulker, policyIDs, dl.WithIndexName(m.policiesIndex),
 		dl.WithBulkOpts(bulk.WithFlushAfter(m.searchesBatch)))
 	m.searches.Release(n)
-	if err != nil {
+	if len(policies) == 0 {
+		if err == nil {
+			m.log.Debug().Msg("no policy to monitor")
+			return nil
+		}
 		if errors.Is(err, es.ErrIndexNotFound) {
 			m.log.Debug().
 				Str("index", m.policiesIndex).
@@ -454,11 +458,8 @@ func (m *monitorT) fetchAndProcess(ctx context.Context, policyIDs []string) erro
 		}
 		return err
 	}
-	if len(policies) == 0 {
-		m.log.Debug().Msg("no policy to monitor")
-		return nil
-	}
-	return m.processPolicies(ctx, policies)
+	processErr := m.processPolicies(ctx, policies)
+	return errors.Join(processErr, err)
 }
 
 func (m *monitorT) processPolicies(ctx context.Context, policies []model.Policy) error {
@@ -472,6 +473,7 @@ func (m *monitorT) processPolicies(ctx context.Context, policies []model.Policy)
 	m.log.Debug().Int64(ecs.RevisionIdx, policies[0].RevisionIdx).
 		Str(ecs.PolicyID, policies[0].PolicyID).Msg("process policies")
 
+	var errs []error
 	latest := m.groupByLatest(policies)
 	for _, policy := range latest {
 		if m.isStaleRevision(policy.PolicyID, policy.RevisionIdx) {
@@ -483,12 +485,13 @@ func (m *monitorT) processPolicies(ctx context.Context, policies []model.Policy)
 		}
 		pp, err := NewParsedPolicy(ctx, m.bulker, policy)
 		if err != nil {
-			return err
+			errs = append(errs, fmt.Errorf("policy %s: %w", policy.PolicyID, err))
+			continue
 		}
 
 		m.updatePolicy(ctx, pp)
 	}
-	return nil
+	return errors.Join(errs...)
 }
 
 // isStaleRevision reports whether the incoming revision_idx is not newer than
