@@ -770,6 +770,72 @@ func TestHandleMessageCapabilities(t *testing.T) {
 	}
 }
 
+func mockBulkerOpAMPExistingAgentWithSequence(t *testing.T, sequenceNum int64) *ftesting.MockBulk {
+	t.Helper()
+	bulker := ftesting.NewMockBulk()
+	agent := model.Agent{
+		LastCheckinStatus: string(CheckinRequestStatusOnline),
+		SequenceNum:       sequenceNum,
+	}
+	agentBytes, err := json.Marshal(agent)
+	require.NoError(t, err)
+	bulker.On("Search", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything).
+		Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{{ID: "agent-123", Source: agentBytes}}}}, nil)
+	return bulker
+}
+
+func TestHandleMessageReportFullState(t *testing.T) {
+	const testAPIKeyID = "test-key"
+	reportFullState := uint64(protobufs.ServerToAgentFlags_ServerToAgentFlags_ReportFullState)
+
+	cases := []struct {
+		name      string
+		getBulker func(t *testing.T) *ftesting.MockBulk
+		sequence  uint64
+		wantFlag  bool
+	}{
+		{
+			name:      "new enrollment reports full state",
+			getBulker: func(t *testing.T) *ftesting.MockBulk { return mockBulkerOpAMPNewEnrollment(t, testAPIKeyID) },
+			wantFlag:  true,
+		},
+		{
+			name:      "steady state does not report full state",
+			getBulker: func(t *testing.T) *ftesting.MockBulk { return mockBulkerOpAMPExistingAgentWithSequence(t, 7) },
+			sequence:  8,
+			wantFlag:  false,
+		},
+		{
+			name:      "sequence drift reports full state",
+			getBulker: func(t *testing.T) *ftesting.MockBulk { return mockBulkerOpAMPExistingAgentWithSequence(t, 7) },
+			sequence:  12,
+			wantFlag:  true,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			bulker := tc.getBulker(t)
+			checker := &mockCheckin{}
+			oa := &OpAMPT{bulk: bulker, bc: checker, enrollLimit: limit.NewLimiter(nil)}
+
+			agentUID := uuid.Must(uuid.NewV7())
+			zlog := zerolog.New(io.Discard)
+			apiKey := &apikey.APIKey{ID: testAPIKeyID}
+
+			handler := oa.handleMessage(zlog, apiKey)
+			msg := &protobufs.AgentToServer{
+				InstanceUid: agentUID.Bytes(),
+				SequenceNum: tc.sequence,
+			}
+
+			resp := handler(t.Context(), nil, msg)
+
+			require.Nil(t, resp.ErrorResponse)
+			require.Equal(t, tc.wantFlag, resp.Flags&reportFullState != 0)
+		})
+	}
+}
+
 func TestHandleMessageRequestInstanceUid(t *testing.T) {
 	const testAPIKeyID = "test-key"
 
