@@ -16,10 +16,10 @@ import (
 	apmprometheus "go.elastic.co/apm/module/apmprometheus/v2"
 	"go.elastic.co/apm/v2"
 
+	"github.com/elastic/beats/v7/pkg/api"
+	cfglib "github.com/elastic/beats/v7/pkg/config"
+	"github.com/elastic/beats/v7/pkg/monitoring"
 	"github.com/elastic/beats/v7/pkg/systemmetrics/report"
-	"github.com/elastic/elastic-agent-libs/api"
-	cfglib "github.com/elastic/elastic-agent-libs/config"
-	"github.com/elastic/elastic-agent-libs/monitoring"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/build"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
