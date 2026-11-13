@@ -10,7 +10,7 @@ replace (
 require (
 	github.com/Shopify/toxiproxy/v2 v2.12.0
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261110072329-81f8463d7957
-	github.com/elastic/elastic-agent-client/v7 v7.20.0
+	github.com/elastic/elastic-agent-client/v7 v7.21.0
 	github.com/elastic/fleet-server/pkg/api v0.0.0-00010101000000-000000000000
 	github.com/elastic/fleet-server/v7 v7.17.29
 	github.com/gofrs/uuid/v5 v5.5.1
@@ -37,7 +37,6 @@ require (
 	github.com/docker/go-connections v0.7.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/ebitengine/purego v0.11.1 // indirect
-	github.com/elastic/elastic-agent-libs v0.47.0 // indirect
 	github.com/elastic/go-sysinfo v1.15.5 // indirect
 	github.com/elastic/go-ucfg v0.9.2 // indirect
 	github.com/elastic/go-windows v1.0.2 // indirect
