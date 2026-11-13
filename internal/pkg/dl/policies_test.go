@@ -7,6 +7,7 @@ package dl
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -34,40 +35,37 @@ func policySource(inputs string) []byte {
 		`"data":{"id":"p","revision":3,"outputs":{"o":{"type":"elasticsearch","hosts":["h"]}},"agent":{"x":{"y":1}},"inputs":%s}}`, inputs)
 }
 
-// TestQueryLatestPoliciesSharesStrings verifies that the policies QueryLatestPolicies returns share
-// the memory of equal long strings, and that they still get their Elasticsearch metadata.
-func TestQueryLatestPoliciesSharesStrings(t *testing.T) {
+// TestQueryLatestPolicySharesStrings verifies that equal long strings of the policy share memory
+// and that the policy still gets its Elasticsearch metadata.
+func TestQueryLatestPolicySharesStrings(t *testing.T) {
 	query := strings.Repeat("SELECT name, path FROM processes WHERE ", 4)
-	buckets := make([]es.Bucket, 2)
-	for i := range buckets {
-		hit := es.HitT{
-			ID:     fmt.Sprintf("doc-%d", i),
-			SeqNo:  int64(10 + i),
-			Source: policySource(fmt.Sprintf(`[{"query":%q}]`, query)),
-		}
-		buckets[i] = es.Bucket{
-			Key:          fmt.Sprintf("policy-%d", i),
-			Aggregations: map[string]es.HitsT{FieldRevisionIdx: {Hits: []es.HitT{hit}}},
-		}
+	bulker := searchOnlyBulk{
+		res: &es.ResultT{
+			HitsT: es.HitsT{
+				Hits: []es.HitT{
+					{
+						ID:     "doc-1",
+						SeqNo:  11,
+						Source: policySource(fmt.Sprintf(`[{"query":%q},{"query":%q}]`, query, query)),
+					},
+				},
+			},
+		},
 	}
-	bulker := searchOnlyBulk{res: &es.ResultT{
-		Aggregations: map[string]es.Aggregation{FieldPolicyID: {Buckets: buckets}},
-	}}
 
-	policies, err := QueryLatestPolicies(context.Background(), bulker)
+	policy, err := QueryLatestPolicy(t.Context(), bulker, "p")
 	require.NoError(t, err)
-	require.Len(t, policies, 2)
 
 	queryOf := func(i int) string {
-		q, ok := policies[i].Data.Inputs[0]["query"].(string)
+		q, ok := policy.Data.Inputs[i]["query"].(string)
 		require.True(t, ok)
 		return q
 	}
 	assert.Equal(t, query, queryOf(0))
 	assert.Equal(t, query, queryOf(1))
-	assert.True(t, sameBacking(queryOf(0), queryOf(1)), "the policies share the query")
-	assert.Equal(t, "doc-1", policies[1].Id, "Elasticsearch metadata is set as hit.Unmarshal does")
-	assert.Equal(t, int64(11), policies[1].SeqNo)
+	assert.True(t, sameBacking(queryOf(0), queryOf(1)), "the inputs share the query")
+	assert.Equal(t, "doc-1", policy.Id, "Elasticsearch metadata is set as hit.Unmarshal does")
+	assert.Equal(t, int64(11), policy.SeqNo)
 }
 
 // recordingBulk records the query it is asked to run and answers Search with a canned result.
@@ -75,50 +73,31 @@ type recordingBulk struct {
 	bulk.Bulk
 	res   *es.ResultT
 	query []byte
+	err   error
 }
 
 func (b *recordingBulk) Search(_ context.Context, _ string, query []byte, _ ...bulk.Opt) (*es.ResultT, error) {
 	b.query = query
-	return b.res, nil
+	return b.res, b.err
 }
 
-func TestQueryLatestPoliciesQuery(t *testing.T) {
-	t.Run("all policies", func(t *testing.T) {
+func TestQueryLatestPolicyQuery(t *testing.T) {
+	t.Run("query", func(t *testing.T) {
 		bulker := &recordingBulk{res: &es.ResultT{}}
-		_, err := QueryLatestPolicies(context.Background(), bulker)
-		require.NoError(t, err)
+		_, err := QueryLatestPolicy(t.Context(), bulker, "policy-1")
+		require.ErrorIs(t, err, ErrNotFound)
 		assert.JSONEq(t, `{
-			"size": 0,
-			"aggs": {"policy_id": {
-				"terms": {"field": "policy_id", "size": 10000},
-				"aggs": {"revision_idx": {"top_hits": {"size": 1, "sort": [{"revision_idx": "desc"}]}}}
-			}}
+			"size": 1,
+			"query": {"bool": {"filter": [{"term": {"policy_id": "policy-1"}}]}},
+			"sort": [{"revision_idx": "desc"}]
 		}`, string(bulker.query))
-	})
-
-	t.Run("one policy", func(t *testing.T) {
-		bulker := &recordingBulk{res: &es.ResultT{}}
-		_, err := QueryLatestPolicies(context.Background(), bulker, WithPolicyID("policy-1"))
-		require.NoError(t, err)
-
-		var got, all map[string]any
-		require.NoError(t, json.Unmarshal(bulker.query, &got))
-		require.NoError(t, json.Unmarshal(tmplQueryLatestPolicies, &all))
-
-		query, err := json.Marshal(got["query"])
-		require.NoError(t, err)
-		assert.JSONEq(t, `{"bool": {"filter": [{"term": {"policy_id": "policy-1"}}]}}`, string(query))
-
-		// Apart from the filter, it is the query for all policies, so both take the same code path.
-		delete(got, "query")
-		assert.Equal(t, all, got)
 	})
 
 	t.Run("policy id is a value, not part of the query syntax", func(t *testing.T) {
 		const id = `a"}]}} , "x": "y`
 		bulker := &recordingBulk{res: &es.ResultT{}}
-		_, err := QueryLatestPolicies(context.Background(), bulker, WithPolicyID(id))
-		require.NoError(t, err)
+		_, err := QueryLatestPolicy(t.Context(), bulker, id)
+		require.ErrorIs(t, err, ErrNotFound)
 
 		var got struct {
 			Query struct {
@@ -134,5 +113,91 @@ func TestQueryLatestPoliciesQuery(t *testing.T) {
 		require.NoError(t, json.Unmarshal(bulker.query, &got))
 		require.Len(t, got.Query.Bool.Filter, 1)
 		assert.Equal(t, id, got.Query.Bool.Filter[0].Term.PolicyID)
+	})
+
+	t.Run("search error", func(t *testing.T) {
+		errSearch := errors.New("search failed")
+		_, err := QueryLatestPolicy(t.Context(), &recordingBulk{err: errSearch}, "policy-1")
+		require.ErrorIs(t, err, errSearch)
+	})
+}
+
+// searchesBulk answers each Search with the next of res and records the queries.
+type searchesBulk struct {
+	bulk.Bulk
+	res     []*es.ResultT
+	queries []string
+}
+
+func (b *searchesBulk) Search(_ context.Context, _ string, query []byte, _ ...bulk.Opt) (*es.ResultT, error) {
+	b.queries = append(b.queries, string(query))
+	if len(b.queries) > len(b.res) {
+		return nil, errors.New("unexpected search")
+	}
+	return b.res[len(b.queries)-1], nil
+}
+
+func TestQueryLatestPolicyDefaultFleetServer(t *testing.T) {
+	policyIDs := &es.ResultT{
+		Aggregations: map[string]es.Aggregation{
+			FieldPolicyID: {
+				Buckets: []es.Bucket{
+					{Key: "old-default"},
+					{Key: "default"},
+				},
+			},
+		},
+	}
+
+	t.Run("policy whose latest revision is the default", func(t *testing.T) {
+		bulker := &searchesBulk{
+			res: []*es.ResultT{
+				policyIDs,
+				{
+					HitsT: es.HitsT{
+						Hits: []es.HitT{
+							{Source: []byte(`{"policy_id":"old-default","revision_idx":5,"default_fleet_server":false}`)},
+							{Source: []byte(`{"policy_id":"default","revision_idx":2,"default_fleet_server":true}`)},
+						},
+					},
+				},
+			},
+		}
+
+		policy, err := QueryLatestPolicy(t.Context(), bulker, "", WithDefaultFleetServerFallback())
+		require.NoError(t, err)
+
+		assert.Equal(t, "default", policy.PolicyID)
+		assert.Equal(t, int64(2), policy.RevisionIdx)
+		require.Len(t, bulker.queries, 2)
+		assert.JSONEq(t, `{
+			"size": 0,
+			"query": {"bool": {"filter": [{"term": {"default_fleet_server": true}}]}},
+			"aggs": {"policy_id": {"terms": {"field": "policy_id", "size": 10000}}}
+		}`, bulker.queries[0], "the IDs of the policies with a default revision")
+		assert.JSONEq(t, `{
+			"size": 2,
+			"query": {"bool": {"filter": [{"terms": {"policy_id": ["old-default", "default"]}}]}},
+			"collapse": {"field": "policy_id"},
+			"sort": [{"revision_idx": "desc"}]
+		}`, bulker.queries[1], "the latest revision of each of these policies")
+	})
+
+	t.Run("no policy with a default revision", func(t *testing.T) {
+		bulker := &searchesBulk{
+			res: []*es.ResultT{
+				{},
+			},
+		}
+		_, err := QueryLatestPolicy(t.Context(), bulker, "", WithDefaultFleetServerFallback())
+		require.ErrorIs(t, err, ErrNotFound)
+		assert.Len(t, bulker.queries, 1)
+	})
+
+	t.Run("empty policy ID without the fallback", func(t *testing.T) {
+		bulker := &searchesBulk{}
+		_, err := QueryLatestPolicy(t.Context(), bulker, "")
+		require.ErrorIs(t, err, ErrNotFound)
+		assert.Empty(t, bulker.queries, "nothing is searched for")
 	})
 }

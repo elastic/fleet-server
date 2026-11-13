@@ -18,81 +18,124 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 )
 
-var (
-	tmplQueryLatestPolicies = prepareQueryLatestPolicies()
-	tmplQueryLatestPolicy   = prepareQueryLatestPolicy()
-	ErrMissingAggregations  = errors.New("missing expected aggregation result")
-	tmplQueryPolicies       = prepareQueryPolicies()
-)
-
-// addLatestRevisionAggs adds the aggregation that returns the latest revision of each policy
-// matched by the query.
-func addLatestRevisionAggs(root *dsl.Node) {
-	policyID := root.Aggs().Agg(FieldPolicyID)
-	policyID.Terms("field", FieldPolicyID, nil).Size(10000)
-	revisionIdx := policyID.Aggs().Agg(FieldRevisionIdx).TopHits()
-	revisionIdx.Size(1)
-	rSort := revisionIdx.Sort()
-	rSort.SortOrder(FieldRevisionIdx, dsl.SortDescend)
+// QueryLatestPolicy gets the latest revision of the policy. With WithDefaultFleetServerFallback it
+// gets the default Fleet Server policy when the policy ID is empty.
+func QueryLatestPolicy(ctx context.Context, bulker bulk.Bulk, policyID string, opt ...Option) (model.Policy, error) {
+	o := newOption(FleetPolicies, opt...)
+	if policyID != "" {
+		return QueryLatestPolicyByID(ctx, bulker, policyID, opt...)
+	}
+	if o.defaultFleetServerFallback {
+		return QueryDefaultFleetServerPolicy(ctx, bulker, opt...)
+	}
+	return model.Policy{}, ErrNotFound
 }
 
-func prepareQueryLatestPolicies() []byte {
-	root := dsl.NewRoot()
-	root.Size(0)
-	addLatestRevisionAggs(root)
-	return root.MustMarshalJSON()
+// QueryLatestPolicyByID gets the latest revision of the policy with the given ID.
+func QueryLatestPolicyByID(ctx context.Context, bulker bulk.Bulk, policyID string, opt ...Option) (model.Policy, error) {
+	o := newOption(FleetPolicies, opt...)
+	query, err := tmplQueryLatestPolicyByID.RenderOne(FieldPolicyID, policyID)
+	if err != nil {
+		return model.Policy{}, err
+	}
+	res, err := bulker.Search(ctx, o.indexName, query, bulk.WithIgnoreUnavailble())
+	if err != nil {
+		return model.Policy{}, err
+	}
+	if len(res.Hits) == 0 {
+		return model.Policy{}, ErrNotFound
+	}
+	var policy model.Policy
+	if err := res.Hits[0].Unmarshal(&policy); err != nil {
+		return model.Policy{}, err
+	}
+	NewStringSharer().Share(&policy)
+	return policy, nil
 }
 
-// prepareQueryLatestPolicy prepares the same query as prepareQueryLatestPolicies, restricted to
-// the policy bound to FieldPolicyID.
-func prepareQueryLatestPolicy() *dsl.Tmpl {
+var tmplQueryLatestPolicyByID = prepareQueryLatestPolicyByID()
+
+func prepareQueryLatestPolicyByID() *dsl.Tmpl {
 	tmpl := dsl.NewTmpl()
 	root := dsl.NewRoot()
-	root.Size(0)
+	root.Size(1)
 	root.Query().Bool().Filter().Term(FieldPolicyID, tmpl.Bind(FieldPolicyID), nil)
-	addLatestRevisionAggs(root)
+	root.Sort().SortOrder(FieldRevisionIdx, dsl.SortDescend)
 	tmpl.MustResolve(root)
 	return tmpl
 }
 
-// QueryLatestPolicies gets the latest revision of every policy, or only of the policy given with
-// WithPolicyID.
-func QueryLatestPolicies(ctx context.Context, bulker bulk.Bulk, opt ...Option) ([]model.Policy, error) {
-	o := newOption(FleetPolicies, opt...)
-	query := tmplQueryLatestPolicies
-	if o.policyID != "" {
-		var err error
-		query, err = tmplQueryLatestPolicy.RenderOne(FieldPolicyID, o.policyID)
-		if err != nil {
-			return nil, err
+// QueryDefaultFleetServerPolicy gets the latest revision of the default Fleet Server policy.
+func QueryDefaultFleetServerPolicy(ctx context.Context, bulker bulk.Bulk, opt ...Option) (model.Policy, error) {
+	// TODO: This is not atomic, the two queries can read different states of the index. Kibana
+	// must make the latest default policy unique to allow a single search (e.g. dedicated ts).
+	policyIDs, err := QueryDefaultFleetServerPolicyIDs(ctx, bulker, opt...)
+	if err != nil {
+		return model.Policy{}, err
+	}
+	policies, err := QueryLatestPoliciesByID(ctx, bulker, policyIDs, opt...)
+	if err != nil {
+		return model.Policy{}, err
+	}
+	for _, policy := range policies {
+		// Policies that are not the default anymore are also returned at their latest revision.
+		if policy.DefaultFleetServer {
+			return policy, nil
 		}
+	}
+	return model.Policy{}, ErrNotFound
+}
+
+// QueryDefaultFleetServerPolicyIDs gets the IDs of the policies that have a revision marked as
+// default_fleet_server.
+func QueryDefaultFleetServerPolicyIDs(ctx context.Context, bulker bulk.Bulk, opt ...Option) ([]string, error) {
+	o := newOption(FleetPolicies, opt...)
+	query := queryDefaultFleetServerPolicyIDs
+	res, err := bulker.Search(ctx, o.indexName, query, bulk.WithIgnoreUnavailble())
+	if err != nil {
+		return nil, err
+	}
+
+	buckets := res.Aggregations[FieldPolicyID].Buckets
+	policyIDs := make([]string, len(buckets))
+	for i, bucket := range buckets {
+		policyIDs[i] = bucket.Key
+	}
+	return policyIDs, nil
+}
+
+var queryDefaultFleetServerPolicyIDs = prepareQueryDefaultFleetServerPolicyIDs()
+
+func prepareQueryDefaultFleetServerPolicyIDs() []byte {
+	root := dsl.NewRoot()
+	root.Size(0)
+	root.Query().Bool().Filter().Term(FieldDefaultFleetServer, true, nil)
+	root.Aggs().Agg(FieldPolicyID).Terms("field", FieldPolicyID, nil).Size(10000)
+	return root.MustMarshalJSON()
+}
+
+// QueryLatestPoliciesByID gets the latest revision of each of the policies.
+func QueryLatestPoliciesByID(ctx context.Context, bulker bulk.Bulk, policyIDs []string, opt ...Option) ([]model.Policy, error) {
+	if len(policyIDs) == 0 {
+		return nil, nil
+	}
+	o := newOption(FleetPolicies, opt...)
+	query, err := tmplQueryLatestPoliciesByID.Render(map[string]any{
+		FieldPolicyID: policyIDs,
+		FieldSize:     len(policyIDs),
+	})
+	if err != nil {
+		return nil, err
 	}
 	res, err := bulker.Search(ctx, o.indexName, query, bulk.WithIgnoreUnavailble())
 	if err != nil {
 		return nil, err
 	}
 
-	policyID, ok := res.Aggregations[FieldPolicyID]
-	if !ok {
-		// Aggregation will not be here if there index is not available
-		return []model.Policy{}, nil
-	}
-	if len(policyID.Buckets) == 0 {
-		return []model.Policy{}, nil
-	}
-	policies := make([]model.Policy, len(policyID.Buckets))
-	// Share equal strings across the policies as each one is decoded, so that text repeated
-	// across the policies is held in memory only once and at most one policy's duplicates exist
-	// at a time. See StringSharer.
+	policies := make([]model.Policy, len(res.Hits))
 	sharer := NewStringSharer()
-	for i, bucket := range policyID.Buckets {
-		revisionIdx, ok := bucket.Aggregations[FieldRevisionIdx]
-		if !ok || len(revisionIdx.Hits) != 1 {
-			return nil, ErrMissingAggregations
-		}
-		hit := revisionIdx.Hits[0]
-		err = hit.Unmarshal(&policies[i])
-		if err != nil {
+	for i, hit := range res.Hits {
+		if err := hit.Unmarshal(&policies[i]); err != nil {
 			return nil, err
 		}
 		sharer.Share(&policies[i])
@@ -100,22 +143,15 @@ func QueryLatestPolicies(ctx context.Context, bulker bulk.Bulk, opt ...Option) (
 	return policies, nil
 }
 
-// CreatePolicy creates a new policy in the index
-func CreatePolicy(ctx context.Context, bulker bulk.Bulk, policy model.Policy, opt ...Option) (string, error) {
-	o := newOption(FleetPolicies, opt...)
-	data, err := json.Marshal(&policy)
-	if err != nil {
-		return "", err
-	}
-	return bulker.Create(ctx, o.indexName, "", data, bulk.WithRefresh())
-}
+var tmplQueryLatestPoliciesByID = prepareQueryLatestPoliciesByID()
 
-func prepareQueryPolicies() *dsl.Tmpl {
+func prepareQueryLatestPoliciesByID() *dsl.Tmpl {
 	tmpl := dsl.NewTmpl()
 	root := dsl.NewRoot()
-	root.Size(100)
-	root.Sort().SortOrder("@timestamp", "desc")
-	root.Source().Includes("data.outputs")
+	root.Query().Bool().Filter().Terms(FieldPolicyID, tmpl.Bind(FieldPolicyID), nil)
+	root.WithSize(tmpl.Bind(FieldSize))
+	root.Param("collapse", map[string]string{"field": FieldPolicyID})
+	root.Sort().SortOrder(FieldRevisionIdx, dsl.SortDescend)
 	tmpl.MustResolve(root)
 	return tmpl
 }
@@ -145,4 +181,42 @@ func QueryOutputFromPolicy(ctx context.Context, bulker bulk.Bulk, outputName str
 	}
 	zerolog.Ctx(ctx).Debug().Str(ecs.PolicyOutputName, outputName).Msg("policy with output not found")
 	return nil, nil
+}
+
+var tmplQueryPolicies = prepareQueryPolicies()
+
+func prepareQueryPolicies() *dsl.Tmpl {
+	tmpl := dsl.NewTmpl()
+	root := dsl.NewRoot()
+	root.Size(100)
+	root.Sort().SortOrder("@timestamp", "desc")
+	root.Source().Includes("data.outputs")
+	tmpl.MustResolve(root)
+	return tmpl
+}
+
+// CheckPoliciesIndexAccess checks that the policies index can be searched. A missing index is not an error.
+func CheckPoliciesIndexAccess(ctx context.Context, bulker bulk.Bulk, opt ...Option) error {
+	o := newOption(FleetPolicies, opt...)
+	query := queryPoliciesIndexAccess
+	_, err := bulker.Search(ctx, o.indexName, query, bulk.WithIgnoreUnavailble())
+	return err
+}
+
+var queryPoliciesIndexAccess = prepareQueryPoliciesIndexAccess()
+
+func prepareQueryPoliciesIndexAccess() []byte {
+	root := dsl.NewRoot()
+	root.Size(0)
+	return root.MustMarshalJSON()
+}
+
+// CreatePolicy creates a new policy in the index
+func CreatePolicy(ctx context.Context, bulker bulk.Bulk, policy model.Policy, opt ...Option) (string, error) {
+	o := newOption(FleetPolicies, opt...)
+	data, err := json.Marshal(&policy)
+	if err != nil {
+		return "", err
+	}
+	return bulker.Create(ctx, o.indexName, "", data, bulk.WithRefresh())
 }

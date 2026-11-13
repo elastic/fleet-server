@@ -75,7 +75,7 @@ func NewSelfMonitor(fleet config.Fleet, bulker bulk.Bulk, monitor monitor.Monito
 		policyID:         policyID,
 		state:            client.UnitStateStarting,
 		reporter:         reporter,
-		policyF:          dl.QueryLatestPolicies,
+		policyF:          dl.QueryLatestPolicy,
 		policiesIndex:    dl.FleetPolicies,
 		enrollmentTokenF: findEnrollmentAPIKeys,
 		checkTime:        DefaultCheckTime,
@@ -105,18 +105,16 @@ LOOP:
 		case <-ctx.Done():
 			break LOOP
 		case <-cT.C:
+			// Update the state from the latest policy at a fixed interval.
 			state, err := m.process(ctx)
 			if err != nil {
 				return err
 			}
 			cT.Reset(m.checkTime)
 			m.log.Trace().Msg(state.String())
-		case hits := <-s.Output():
-			policies, err := unmarshalHits(hits)
-			if err != nil {
-				return err
-			}
-			state, err := m.processPolicies(ctx, policies)
+		case <-s.Output():
+			// Update the state from the latest policy as soon as any policy changes in Elasticsearch.
+			state, err := m.process(ctx)
 			if err != nil {
 				return err
 			}
@@ -148,40 +146,31 @@ func (m *selfMonitorT) process(ctx context.Context) (client.UnitState, error) {
 		ctx = apm.ContextWithTransaction(ctx, trans)
 		defer trans.End()
 	}
-	policies, err := m.policyF(ctx, m.bulker, dl.WithIndexName(m.policiesIndex))
+	policy, err := m.fetchPolicy(ctx)
 	if err != nil {
 		if !errors.Is(err, es.ErrIndexNotFound) {
 			return client.UnitStateFailed, nil
 		}
 		m.log.Debug().Str("index", m.policiesIndex).Msg(es.ErrIndexNotFound.Error())
 	}
-	if len(policies) == 0 {
-		return m.updateState(ctx)
-	}
-	return m.processPolicies(ctx, policies)
-}
-
-func (m *selfMonitorT) processPolicies(ctx context.Context, policies []model.Policy) (client.UnitState, error) {
-	if len(policies) == 0 {
-		// nothing to do
-		return client.UnitStateStarting, nil
-	}
-	latest := m.groupByLatest(policies)
-	for i := range latest {
-		policy := latest[i]
-		if m.policyID != "" && policy.PolicyID == m.policyID {
-			m.policy = &policy
-			break
-		} else if m.policyID == "" && policy.DefaultFleetServer {
-			m.policy = &policy
-			break
-		}
+	if policy != nil {
+		m.policy = policy
 	}
 	return m.updateState(ctx)
 }
 
-func (m *selfMonitorT) groupByLatest(policies []model.Policy) map[string]model.Policy {
-	return groupByLatest(policies)
+// fetchPolicy gets the latest revision of the policy of this Fleet Server or of the default
+// Fleet Server policy.
+func (m *selfMonitorT) fetchPolicy(ctx context.Context) (*model.Policy, error) {
+	// Use the default Fleet Server policy when no policy ID is set.
+	policy, err := m.policyF(ctx, m.bulker, m.policyID, dl.WithIndexName(m.policiesIndex), dl.WithDefaultFleetServerFallback())
+	if errors.Is(err, dl.ErrNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &policy, nil
 }
 
 func (m *selfMonitorT) updateState(ctx context.Context) (client.UnitState, error) {

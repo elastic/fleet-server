@@ -9,11 +9,14 @@ package policy
 import (
 	"context"
 	"errors"
+	"maps"
+	"slices"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/gofrs/uuid/v5"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
@@ -39,6 +42,13 @@ func TestMonitor_Integration(t *testing.T) {
 	ctx = testlog.SetLogger(t).WithContext(ctx)
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, dl.FleetPolicies)
+	unrelated := model.Policy{
+		PolicyID:    uuid.Must(uuid.NewV4()).String(),
+		Data:        &intPolData,
+		RevisionIdx: 1,
+	}
+	_, err := dl.CreatePolicy(ctx, bulker, unrelated, dl.WithIndexName(index))
+	require.NoError(t, err)
 
 	im, err := monitor.New(index, bulker.Client(), bulker.Client())
 	if err != nil {
@@ -105,6 +115,10 @@ func TestMonitor_Integration(t *testing.T) {
 	case <-tm.C:
 		timedout = true
 	}
+	pm.mut.Lock()
+	cached := slices.Collect(maps.Keys(pm.policies))
+	pm.mut.Unlock()
+	assert.Equal(t, []string{policyID}, cached, "a policy without subscriptions is not loaded")
 
 	cancel()
 	imwg.Wait()

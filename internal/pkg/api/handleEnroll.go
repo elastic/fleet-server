@@ -185,21 +185,11 @@ func (et *EnrollerT) retrieveStaticTokenEnrollmentToken(ctx context.Context, zlo
 }
 
 func (et *EnrollerT) fetchPolicy(ctx context.Context, policyID string) (model.Policy, error) {
-	policies, err := dl.QueryLatestPolicies(ctx, et.bulker)
-	if err != nil {
-		return model.Policy{}, err
-	}
-
-	var policy model.Policy
-	for _, p := range policies {
-		if p.PolicyID == policyID {
-			policy = p
-		}
-	}
-	if policy.PolicyID != policyID {
+	policy, err := dl.QueryLatestPolicy(ctx, et.bulker, policyID)
+	if errors.Is(err, dl.ErrNotFound) {
 		return model.Policy{}, ErrPolicyNotFound
 	}
-	return policy, nil
+	return policy, err
 }
 
 func (et *EnrollerT) _enroll(
