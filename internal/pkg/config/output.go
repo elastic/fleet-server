@@ -93,13 +93,13 @@ func (c *Elasticsearch) Validate() error {
 }
 
 // ToESConfig converts the configuration object into the config for the elasticsearch client.
-func (c *Elasticsearch) ToESConfig(longPoll bool) (elasticsearch.Config, error) {
+func (c *Elasticsearch) ToESConfig(longPoll bool) (elasticsearch.Config, error) { //nolint:staticcheck // uses deprecated elasticsearch.Config; full migration to functional options tracked separately
 	// build the addresses
 	addrs := make([]string, len(c.Hosts))
 	for i, host := range c.Hosts {
 		addr, err := makeURL(c.Protocol, c.Path, host, 9200)
 		if err != nil {
-			return elasticsearch.Config{}, err
+			return elasticsearch.Config{}, err //nolint:staticcheck // uses deprecated elasticsearch.Config
 		}
 		addrs[i] = addr
 	}
@@ -134,7 +134,7 @@ func (c *Elasticsearch) ToESConfig(longPoll bool) (elasticsearch.Config, error) 
 	if c.TLS != nil && c.TLS.IsEnabled() {
 		tls, err := tlscommon.LoadTLSConfig(c.TLS, zap.NewStub("elasticsearch-output"))
 		if err != nil {
-			return elasticsearch.Config{}, err
+			return elasticsearch.Config{}, err //nolint:staticcheck // uses deprecated elasticsearch.Config
 		}
 		httpTransport.TLSClientConfig = tls.ToConfig()
 	}
@@ -143,7 +143,7 @@ func (c *Elasticsearch) ToESConfig(longPoll bool) (elasticsearch.Config, error) 
 		if c.ProxyURL != "" {
 			proxyURL, err := urlutil.ParseURL(c.ProxyURL)
 			if err != nil {
-				return elasticsearch.Config{}, err
+				return elasticsearch.Config{}, err //nolint:staticcheck // uses deprecated elasticsearch.Config
 			}
 			httpTransport.Proxy = http.ProxyURL(proxyURL)
 		} else {
@@ -173,12 +173,12 @@ func (c *Elasticsearch) ToESConfig(longPoll bool) (elasticsearch.Config, error) 
 	if c.ServiceToken == "" && c.ServiceTokenPath != "" {
 		p, err := os.ReadFile(c.ServiceTokenPath)
 		if err != nil {
-			return elasticsearch.Config{}, fmt.Errorf("unable to read service_token_path: %w", err)
+			return elasticsearch.Config{}, fmt.Errorf("unable to read service_token_path: %w", err) //nolint:staticcheck // uses deprecated elasticsearch.Config
 		}
 		serviceToken = string(p)
 	}
 
-	return elasticsearch.Config{
+	return elasticsearch.Config{ //nolint:staticcheck // uses deprecated elasticsearch.Config; full migration tracked separately
 		Addresses:    addrs,
 		ServiceToken: serviceToken,
 		Header:       h,

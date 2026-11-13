@@ -40,13 +40,8 @@ const (
 	kOpAMPMod          = "opAMP"
 	serverCapabilities = uint64(protobufs.ServerCapabilities_ServerCapabilities_AcceptsStatus |
 		protobufs.ServerCapabilities_ServerCapabilities_AcceptsEffectiveConfig)
-<<<<<<< HEAD
-=======
-	tagsKey             = "tags"
-	reenrolled          = "reenrolled"
 	contentTypeHeader   = "Content-Type"
 	protobufContentType = "application/x-protobuf"
->>>>>>> 9a4d3f1 (chore(deps): replace `elastic-agent-libs` with `beats/v7/pkg` packages (#8225))
 )
 
 type OpAMPT struct {
