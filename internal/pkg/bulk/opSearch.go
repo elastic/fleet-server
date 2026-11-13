@@ -126,13 +126,13 @@ func (b *Bulker) MSearch(ctx context.Context, ops []MultiOp, opts ...Opt) ([]Mse
 		return nil, err
 	}
 
-	var lastErr error
+	var requestErr error
 	items := make([]MsearchResponseItem, len(ops))
 	for range ops {
 		select {
 		case r := <-ch:
-			if r.err != nil {
-				lastErr = r.err
+			if r.err != nil && r.data == nil {
+				requestErr = r.err
 			}
 			if r.data != nil {
 				items[r.idx] = *r.data.(*MsearchResponseItem) //nolint:errcheck // response data type is guaranteed by the bulk engine
@@ -141,7 +141,7 @@ func (b *Bulker) MSearch(ctx context.Context, ops []MultiOp, opts ...Opt) ([]Mse
 			return nil, ctx.Err()
 		}
 	}
-	return items, lastErr
+	return items, requestErr
 }
 
 func (b *Bulker) writeMsearchMeta(buf *Buf, index string, moreIndices []string, checkpoints []int64, ignoreUnavailble bool) error {

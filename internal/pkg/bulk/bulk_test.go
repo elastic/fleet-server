@@ -11,9 +11,13 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"slices"
 	"strconv"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
@@ -422,15 +426,7 @@ func TestMSearchFlushAfter(t *testing.T) {
 		{Index: testIndex, Body: []byte(`{}`)},
 	}
 	bulker := NewBulker(&fixedTransport{body: msearchResponse(len(ops))}, nil, WithFlushInterval(time.Hour))
-	ctx, cancel := context.WithCancel(t.Context())
-	var wg sync.WaitGroup
-	wg.Go(func() {
-		if err := bulker.Run(ctx); !errors.Is(err, context.Canceled) {
-			t.Error(err)
-		}
-	})
-	defer wg.Wait()
-	defer cancel()
+	ctx := runBulker(t, bulker)
 
 	searchCtx, cancelSearch := context.WithTimeout(ctx, 10*time.Second)
 	defer cancelSearch()
@@ -441,4 +437,63 @@ func TestMSearchFlushAfter(t *testing.T) {
 	if len(items) != len(ops) {
 		t.Fatalf("got %d items, want %d", len(items), len(ops))
 	}
+}
+
+// runBulker runs the bulker until the end of the test and returns its context.
+func runBulker(t *testing.T, bulker *Bulker) context.Context {
+	t.Helper()
+	ctx, cancel := context.WithCancel(t.Context())
+	var wg sync.WaitGroup
+	wg.Go(func() {
+		if err := bulker.Run(ctx); !errors.Is(err, context.Canceled) {
+			t.Error(err)
+		}
+	})
+	t.Cleanup(func() {
+		cancel()
+		wg.Wait()
+	})
+	return ctx
+}
+
+type performFunc func(*http.Request) (*http.Response, error)
+
+func (f performFunc) Perform(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
+
+func TestMSearchReturnsTheErrorOfAFailedRequest(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		requestErr := errors.New("request failed")
+		rejected := `{"responses":[{"status":429,"error":{"type":"es_rejected_execution_exception","reason":"rejected"}}],"took":1}`
+		var calls atomic.Int32
+		transport := performFunc(func(*http.Request) (*http.Response, error) {
+			if calls.Add(1) == 1 {
+				return nil, requestErr
+			}
+			// Answer after the error of the first request reached MSearch.
+			time.Sleep(time.Second)
+			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(rejected))}, nil
+		})
+		bulker := NewBulker(transport, nil, WithFlushInterval(time.Hour))
+		ctx := runBulker(t, bulker)
+
+		ops := []MultiOp{
+			{Index: testIndex, Body: []byte(`{}`)},
+			{Index: testIndex, Body: []byte(`{}`)},
+		}
+		// WithFlushAfter(1) sends each search in its own request.
+		items, err := bulker.MSearch(ctx, ops, WithFlushAfter(1))
+		if !errors.Is(err, requestErr) {
+			t.Fatalf("got error %v, want %v", err, requestErr)
+		}
+		if len(items) != len(ops) {
+			t.Fatalf("got %d items, want %d", len(items), len(ops))
+		}
+		statuses := []int{items[0].Status, items[1].Status}
+		slices.Sort(statuses)
+		if !slices.Equal(statuses, []int{0, http.StatusTooManyRequests}) {
+			t.Fatalf("got item statuses %v, want 0 for the failed request and 429 for the rejected search", statuses)
+		}
+	})
 }
