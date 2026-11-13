@@ -7,9 +7,8 @@ require (
 	github.com/cenkalti/backoff/v7 v7.0.3
 	github.com/dgraph-io/ristretto/v2 v2.4.2
 	github.com/docker/go-units v0.5.0
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261104093103-ee4981601f01
-	github.com/elastic/elastic-agent-client/v7 v7.20.0
-	github.com/elastic/elastic-agent-libs v0.47.0
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261110072329-81f8463d7957
+	github.com/elastic/elastic-agent-client/v7 v7.21.0
 	github.com/elastic/elastic-transport-go/v8 v8.11.0
 	github.com/elastic/go-elasticsearch/v9 v9.5.2
 	github.com/elastic/go-ucfg v0.9.2
