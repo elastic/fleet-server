@@ -1,0 +1,21 @@
+version: 8.19.25
+entries:
+    - kind: bug-fix
+      summary: Refresh PGP key when server.pgp.upstream_url is changed.
+      description: ""
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/7979
+        - https://github.com/elastic/fleet-server/pull/8020
+        - https://github.com/elastic/fleet-server/pull/8031
+        - https://github.com/elastic/fleet-server/pull/8112
+        - https://github.com/elastic/fleet-server/pull/8171
+        - https://github.com/elastic/fleet-server/pull/8225
+        - https://github.com/elastic/fleet-server/pull/8238
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1790750092
+      file:
+        name: 1790750092-refresh-custom-upstream-pgp-key.yaml
+        checksum: 581699a667a32aafccf546b818c7b1f1f718ed9b
