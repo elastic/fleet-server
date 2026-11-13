@@ -29,9 +29,9 @@ import (
 
 const cloudPolicyID = "policy-elastic-agent-on-cloud"
 
-// maxPolicySearches limits the policies in flight because Elasticsearch keeps msearch responses in
-// memory. Other searches return small results. 64 keeps loads about as fast as with no limit.
-const maxPolicySearches = 64
+// defaultPolicySearchBatchSize is the number of policies in a search and the limit of policies being
+// searched at once. It prevents circuit breaker errors in Elasticsearch caused by large responses.
+const defaultPolicySearchBatchSize = 64
 
 var ErrPolicyNotFound = errors.New("policy not found")
 
@@ -114,7 +114,8 @@ type monitorT struct {
 	loadGroup singleflight.Group
 
 	// searches holds one unit for each policy that is being searched for.
-	searches *semaphore.Weighted
+	searches      *semaphore.Weighted
+	searchesBatch int
 
 	startCh chan struct{}
 	stopCh  chan struct{}
@@ -141,7 +142,8 @@ func NewMonitor(bulker bulk.Bulk, monitor monitor.Monitor, cfg config.ServerLimi
 		limit:         rate.NewLimiter(interval, burst),
 		policiesF:     dl.QueryLatestPoliciesByID,
 		policiesIndex: dl.FleetPolicies,
-		searches:      semaphore.NewWeighted(maxPolicySearches),
+		searches:      semaphore.NewWeighted(defaultPolicySearchBatchSize),
+		searchesBatch: defaultPolicySearchBatchSize,
 		startCh:       make(chan struct{}),
 		stopCh:        make(chan struct{}),
 	}
@@ -375,8 +377,9 @@ func (m *monitorT) loadPolicies(ctx context.Context) error {
 	m.mut.Unlock()
 
 	var errs []error
-	for group := range slices.Chunk(ids, maxPolicySearches) {
-		errs = append(errs, m.fetchAndProcess(ctx, group))
+	for group := range slices.Chunk(ids, m.searchesBatch) {
+		err := m.fetchAndProcess(ctx, group)
+		errs = append(errs, err)
 	}
 	return errors.Join(errs...)
 }
@@ -419,7 +422,7 @@ func (m *monitorT) loadPolicy(ctx context.Context, policyID string) error {
 }
 
 // fetchAndProcess fetches the latest revision of the policies with the given IDs and processes them.
-// It searches for at most maxPolicySearches policies.
+// It searches for at most searchesBatch policies.
 func (m *monitorT) fetchAndProcess(ctx context.Context, policyIDs []string) error {
 	span, ctx := apm.StartSpan(ctx, "Load policies", "load")
 	defer span.End()
@@ -437,10 +440,10 @@ func (m *monitorT) fetchAndProcess(ctx context.Context, policyIDs []string) erro
 	if err := m.searches.Acquire(ctx, n); err != nil {
 		return err
 	}
-	// Send the searches as soon as maxPolicySearches are queued because no more can be queued
+	// Send the searches as soon as searchesBatch are queued because no more can be queued
 	// until they return.
 	policies, err := m.policiesF(ctx, m.bulker, policyIDs, dl.WithIndexName(m.policiesIndex),
-		dl.WithBulkOpts(bulk.WithFlushAfter(maxPolicySearches)))
+		dl.WithBulkOpts(bulk.WithFlushAfter(m.searchesBatch)))
 	m.searches.Release(n)
 	if err != nil {
 		if errors.Is(err, es.ErrIndexNotFound) {

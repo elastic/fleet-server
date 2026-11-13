@@ -1005,7 +1005,7 @@ func TestMonitor_SearchesForAtMostMaxPolicySearchesPolicies(t *testing.T) {
 			mut.Unlock()
 			return nil, nil
 		}
-		for i := range maxPolicySearches + 10 {
+		for i := range defaultPolicySearchBatchSize + 10 {
 			_, err := pm.Subscribe(fmt.Sprintf("agent-%d", i), fmt.Sprintf("policy-%d", i), 1)
 			require.NoError(t, err)
 		}
@@ -1019,11 +1019,11 @@ func TestMonitor_SearchesForAtMostMaxPolicySearchesPolicies(t *testing.T) {
 		synctest.Wait() // the single loads wait for the batch load
 
 		mut.Lock()
-		assert.Equal(t, maxPolicySearches, searching)
+		assert.Equal(t, defaultPolicySearchBatchSize, searching)
 		mut.Unlock()
 		close(release)
 		wg.Wait()
-		assert.Equal(t, maxPolicySearches, maxSearching)
+		assert.Equal(t, defaultPolicySearchBatchSize, maxSearching)
 	})
 }
 
