@@ -9,13 +9,6 @@ import (
 	"maps"
 	"slices"
 	"time"
-<<<<<<< HEAD
-=======
-
-	"github.com/elastic/beats/v7/pkg/str"
-
-	"github.com/elastic/fleet-server/v7/internal/pkg/smap"
->>>>>>> 9a4d3f1 (chore(deps): replace `elastic-agent-libs` with `beats/v7/pkg` packages (#8225))
 )
 
 // Time returns the time for the current leader.
