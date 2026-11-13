@@ -37,6 +37,7 @@ github.com/dustin/go-humanize v1.0.1 h1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkp
 github.com/dustin/go-humanize v1.0.1/go.mod h1:Mu1zIs6XwVuF/gI1OepvI0qD18qycQx+mFykh5fBlto=
 github.com/ebitengine/purego v0.11.1 h1:2zpWRSQNVKN4eKsKO9eM1ILDgWfYMY9GwqRmK6XeQ/0=
 github.com/ebitengine/purego v0.11.1/go.mod h1:DCHPP08djqhNSoTfImcnHYQRZmd0qhakvrozqaEYhGQ=
+<<<<<<< HEAD
 github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261105162333-48d0117e5b74 h1:41wyssI2vriyLL99VDjs/UOCC5eTpIV8cm04eJEoyv8=
 github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261105162333-48d0117e5b74/go.mod h1:xnXRXGHcXudC1jCuyiLoErJHR4cRZJUL3UQseOJn2b8=
 github.com/elastic/elastic-agent-client/v7 v7.20.0 h1:3aMCdZx+3ZqFT4YghogqWxTxtyGafxWjWQnJQJ10Rg8=
@@ -45,6 +46,14 @@ github.com/elastic/elastic-agent-libs v0.47.0 h1:fltOh0mETIlW3LYExX62iacL63sHXST
 github.com/elastic/elastic-agent-libs v0.47.0/go.mod h1:UdVxZVDx8WH3nFi1vELRbxeeZ2cMP0tt74SJK2O49g8=
 github.com/elastic/elastic-transport-go/v8 v8.9.0 h1:KeT/2P54F0xS0S8Y3Pf+tFDg4HmBgReQMB+BMz8dDAs=
 github.com/elastic/elastic-transport-go/v8 v8.9.0/go.mod h1:ssMTvNS2hwf7CaiGsRRsx4gQHFZ/jS/DkLcISxekWzc=
+=======
+github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261110072329-81f8463d7957 h1:6QAfU/D+mIjiVGgBN98U9H2H/kPt8OPCTs1DIdfgF5Y=
+github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261110072329-81f8463d7957/go.mod h1:mbnqEaw+tIbyiWu+RPs5quLdavbzXarndMPrYzanT+0=
+github.com/elastic/elastic-agent-client/v7 v7.21.0 h1:G2RkxMgsPwYlZMgH1DEswNQUEssnHe321OY4EYiMzSw=
+github.com/elastic/elastic-agent-client/v7 v7.21.0/go.mod h1:7Uen/EzVK7JG7ErIDofZDWdbyPsinbghHEfgIxaO/PY=
+github.com/elastic/elastic-transport-go/v8 v8.11.0 h1:taYmqC2M6+fZt/+W+ENYh/W5L9+KrlJGOSbEJs8egWc=
+github.com/elastic/elastic-transport-go/v8 v8.11.0/go.mod h1:DZQ0szCNywc9F+C9l/Kkd4n69SvJVj0I3yK1Of7s3l8=
+>>>>>>> 9a4d3f1 (chore(deps): replace `elastic-agent-libs` with `beats/v7/pkg` packages (#8225))
 github.com/elastic/go-elasticsearch/v9 v9.5.2 h1:+SnIMDLdfSSS+hIp2CZDQNUQZKd5JuViG3yGvJkrgA0=
 github.com/elastic/go-elasticsearch/v9 v9.5.2/go.mod h1:EbZnYlTlbhNqRt98YW+QSM2SEKplN5o8J+G6d9STOVo=
 github.com/elastic/go-structform v0.0.12 h1:HXpzlAKyej8T7LobqKDThUw7BMhwV6Db24VwxNtgxCs=

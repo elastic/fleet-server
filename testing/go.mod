@@ -9,8 +9,8 @@ replace (
 
 require (
 	github.com/Shopify/toxiproxy/v2 v2.12.0
-	github.com/elastic/elastic-agent-client/v7 v7.20.0
-	github.com/elastic/elastic-agent-libs v0.47.0
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261110072329-81f8463d7957
+	github.com/elastic/elastic-agent-client/v7 v7.21.0
 	github.com/elastic/fleet-server/pkg/api v0.0.0-00010101000000-000000000000
 	github.com/elastic/fleet-server/v7 v7.0.0-00010101000000-000000000000
 	github.com/gofrs/uuid/v5 v5.5.1
@@ -46,7 +46,11 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
+<<<<<<< HEAD
 	github.com/klauspost/compress v1.18.6 // indirect
+=======
+	github.com/klauspost/compress v1.20.3 // indirect
+>>>>>>> 9a4d3f1 (chore(deps): replace `elastic-agent-libs` with `beats/v7/pkg` packages (#8225))
 	github.com/lufia/plan9stats v0.0.0-20260330125221-c963978e514e // indirect
 	github.com/magiconair/properties v1.8.10 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
@@ -76,7 +80,7 @@ require (
 	go.elastic.co/ecszap v1.0.3 // indirect
 	go.elastic.co/fastjson v1.5.1 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
-	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.69.0 // indirect
+	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.70.0 // indirect
 	go.opentelemetry.io/otel v1.47.0 // indirect
 	go.opentelemetry.io/otel/log v1.47.0 // indirect
 	go.opentelemetry.io/otel/metric v1.47.0 // indirect

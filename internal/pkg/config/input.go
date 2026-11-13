@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
+	"github.com/elastic/beats/v7/pkg/transport/tlscommon"
 	fleetversion "github.com/elastic/fleet-server/v7/version"
 	"github.com/hashicorp/go-version"
 )
