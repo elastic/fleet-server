@@ -146,8 +146,9 @@ fleet:
 #     # Note that use of limit attributes excluding max_agents is considered an advanced use case.
 #     # A 0 value will disable any specific limit.
 #     limits:
-#       # max_agents is the preffered way to set limits
-#       # If specified a set of other limits is automatically loaded.
+#       # max_agents is the preferred way to set limits.
+#       # Set it to the number of agents that this Fleet Server serves to load the limits for that number.
+#       # If 0, Fleet Server sets the limits from its available memory.
 #       max_agents: 0
 #       # max_header_byte_size is the request header size limit
 #       max_header_byte_size: 8192 # 8Kib
@@ -285,6 +286,9 @@ fleet:
 #
 #        // enable OpAMP endpoint (enabled by default)
 #        enable_opamp: true
+#
+#        // calculate checkin_limit.max from the available memory when max_agents is not set (disabled by default)
+#        checkin_limit_from_memory: false
 #
 #        // Input conditions Fleet Server evaluates before sending a policy to an agent.
 #        evaluate_conditions:

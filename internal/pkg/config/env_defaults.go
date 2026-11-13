@@ -10,14 +10,8 @@ import (
 	"io"
 	"io/fs"
 	"math"
-	"os"
-	"runtime"
-	"runtime/debug"
-	"strconv"
-	"strings"
 	"time"
 
-	"github.com/pbnjay/memory"
 	"github.com/rs/zerolog"
 
 	"github.com/elastic/go-ucfg/yaml"
@@ -113,7 +107,7 @@ func defaultEnvLimits() *envLimits {
 	return &envLimits{
 		Agents: valueRange{
 			Min: 0,
-			Max: int(getMaxInt()),
+			Max: math.MaxInt,
 		},
 		Server: defaultserverLimitDefaults(),
 		Cache:  defaultCacheLimits(),
@@ -299,22 +293,23 @@ func init() {
 	}
 }
 
-// loadLimits loads cache and server_limit settings based on the passed agentLimit number.
-// If agentLimit < 0 the default settings are used.
-// If agentLimit > 0 the settings from the matching default/*.yml file are used based off agent count.
-// If agentLimit == 0 then the settings from default/*.yml are used based off system memory.
+// loadLimits loads cache and server_limit settings based on server.limits.max_agents of in.
+// If max_agents < 0 the default settings are used.
+// If max_agents > 0 the settings from the matching default/*.yml file are used based off agent count.
+// If max_agents == 0 then the settings from default/*.yml are used based off system memory.
 // If a lookup fails, default settings are used.
-func loadLimits(log *zerolog.Logger, agentLimit int) *envLimits {
+func loadLimits(log *zerolog.Logger, in *Input) *envLimits {
+	agentLimit := in.Server.Limits.MaxAgents
 	if agentLimit < 0 {
 		return defaultEnvLimits()
 	} else if agentLimit == 0 {
-		return memEnvLimits(log)
+		return memEnvLimits(log, in)
 	}
 	for _, l := range defaults {
 		// get nearest limits for configured agent numbers
 		if l.Agents.Min <= agentLimit && agentLimit <= l.Agents.Max {
 			log.Info().Msgf("Using system limits for %d to %d agents for a configured value of %d agents", l.Agents.Min, l.Agents.Max, agentLimit)
-			ramSize := memMB()
+			ramSize, _ := memoryMB(in.Server.Runtime)
 			if ramSize < l.RecommendedRAM {
 				log.Warn().Msgf("Detected %d MiB of available memory, which is lower than the recommended amount (%d MiB) for the configured agent limit", ramSize, l.RecommendedRAM)
 			}
@@ -323,91 +318,4 @@ func loadLimits(log *zerolog.Logger, agentLimit int) *envLimits {
 	}
 	log.Info().Msgf("No applicable limit for %d agents, using default.", agentLimit)
 	return defaultEnvLimits()
-}
-
-// cgroupMemMB returns the cgroup memory limit in MiB.
-// It is a var so that unit tests can replace it.
-var cgroupMemMB func() (uint64, bool) = cgroupMemoryLimitMB
-
-// containerMemoryMB returns available memory in MiB using this priority order:
-//  1. GOMEMLIMIT, if explicitly set
-//  2. cgroup memory limit (v2, then v1), for containers without an explicit GOMEMLIMIT
-//  3. host total RAM, for non-containerised deployments
-func containerMemoryMB() uint64 {
-	limit := debug.SetMemoryLimit(-1)
-	if limit > 0 && limit != math.MaxInt64 {
-		return uint64(limit) / 1024 / 1024
-	}
-	if mb, ok := cgroupMemMB(); ok {
-		return mb
-	}
-	return memory.TotalMemory() / 1024 / 1024
-}
-
-// cgroupMemoryLimitMB reads the container memory limit from cgroup files.
-// It tries cgroup v2 first, then cgroup v1. This only checks the cgroup mount
-// root, so it does not account for limits imposed by nested cgroups. Returns
-// (0, false) when no applicable limit is found (unlimited, missing file, or
-// parse error).
-func cgroupMemoryLimitMB() (uint64, bool) {
-	if mb, ok := readCgroupMemoryFile("/sys/fs/cgroup/memory.max"); ok {
-		return mb, true
-	}
-	return readCgroupMemoryFile("/sys/fs/cgroup/memory/memory.limit_in_bytes")
-}
-
-// readCgroupMemoryFile parses a cgroup memory limit file and returns the
-// value in MiB. Returns (0, false) when the file doesn't exist, contains
-// "max" (unlimited), or the value is at or above cgroup v1's page-aligned
-// unlimited sentinel.
-func readCgroupMemoryFile(path string) (uint64, bool) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return 0, false
-	}
-	s := strings.TrimSpace(string(data))
-	if s == "max" {
-		return 0, false
-	}
-	n, err := strconv.ParseUint(s, 10, 64)
-	if err != nil || n >= cgroupV1UnlimitedMemoryLimit() {
-		return 0, false
-	}
-	return n / 1024 / 1024, true
-}
-
-// cgroupV1UnlimitedMemoryLimit is the value cgroup v1 exposes for an
-// unrestricted memory limit: MaxInt64 rounded down to the system page size.
-func cgroupV1UnlimitedMemoryLimit() uint64 {
-	pageSize := int64(os.Getpagesize())
-	return uint64(math.MaxInt64 / pageSize * pageSize) //nolint:gosec // the page-aligned result is always non-negative
-}
-
-// memMB returns available memory in MiB.
-// It is a var so that unit tests can replace it.
-var memMB func() uint64 = containerMemoryMB
-
-func memEnvLimits(log *zerolog.Logger) *envLimits {
-	mem := memMB()
-	k := 0
-	var recRAM uint64
-	for i, l := range defaults {
-		if mem >= l.RecommendedRAM && l.RecommendedRAM > recRAM {
-			k = i
-			recRAM = l.RecommendedRAM
-		}
-	}
-	if recRAM == 0 {
-		log.Warn().Uint64("memory_mb", mem).Msg("No settings with recommended ram found, using default.")
-		return defaultEnvLimits()
-	}
-	log.Info().Uint64("memory_mb", mem).Uint64("recommended_mb", recRAM).Msg("Found settings with recommended ram.")
-	return defaults[k]
-}
-
-func getMaxInt() int64 {
-	if strings.HasSuffix(runtime.GOARCH, "64") {
-		return math.MaxInt64
-	}
-	return math.MaxInt32
 }
