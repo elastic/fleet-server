@@ -27,6 +27,6 @@ Review important information about the  8.19.25 release.
 
 
 
-* Refresh PGP key when server.pgp.upstream_url is changed. https://github.com/elastic/fleet-server/pull/7938[#7938] https://github.com/elastic/fleet-server/issues/7836[#7836] 
+* Refresh PGP key when `server.pgp.upstream_url` is changed. https://github.com/elastic/fleet-server/pull/7938[#7938] https://github.com/elastic/fleet-server/issues/7836[#7836] 
 
 // end 8.19.25 relnotes
