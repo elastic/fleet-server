@@ -17,19 +17,11 @@ import (
 	"strings"
 	"time"
 
-<<<<<<< HEAD
-	urlutil "github.com/elastic/elastic-agent-libs/kibana"
-	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
-	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
-	"github.com/elastic/go-elasticsearch/v8"
-=======
 	urlutil "github.com/elastic/beats/v7/pkg/kibana"
+	"github.com/elastic/beats/v7/pkg/logp"
 	"github.com/elastic/beats/v7/pkg/transport/httpcommon"
 	"github.com/elastic/beats/v7/pkg/transport/tlscommon"
-	"github.com/elastic/fleet-server/v7/internal/pkg/logger/zap"
-
->>>>>>> 9a4d3f1 (chore(deps): replace `elastic-agent-libs` with `beats/v7/pkg` packages (#8225))
+	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/rs/zerolog"
 )
 

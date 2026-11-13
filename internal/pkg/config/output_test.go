@@ -26,11 +26,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-<<<<<<< HEAD
 	"github.com/elastic/go-elasticsearch/v8"
-=======
-	"github.com/elastic/beats/v7/pkg/transport/tlscommon"
->>>>>>> 9a4d3f1 (chore(deps): replace `elastic-agent-libs` with `beats/v7/pkg` packages (#8225))
 )
 
 func TestToESConfig(t *testing.T) {

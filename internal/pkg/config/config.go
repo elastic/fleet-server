@@ -15,7 +15,7 @@ import (
 	"github.com/gofrs/uuid"
 	"github.com/rs/zerolog"
 
-	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
+	"github.com/elastic/beats/v7/pkg/transport/tlscommon"
 	"github.com/elastic/fleet-server/v7/version"
 	"github.com/elastic/go-ucfg"
 	"github.com/elastic/go-ucfg/flag"
