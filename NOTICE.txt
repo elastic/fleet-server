@@ -10,12 +10,12 @@ Third party libraries used by the Elastic Beats project:
 
 
 --------------------------------------------------------------------------------
-Dependency : github.com/dgraph-io/ristretto
-Version: v0.2.0
+Dependency : github.com/dgraph-io/ristretto/v2
+Version: v2.4.2
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/dgraph-io/ristretto@v0.2.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/dgraph-io/ristretto/v2@v2.4.2/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
