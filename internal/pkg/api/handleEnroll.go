@@ -23,7 +23,7 @@ import (
 
 	"go.elastic.co/apm/v2"
 
-	"github.com/elastic/elastic-agent-libs/str"
+	"github.com/elastic/beats/v7/pkg/str"
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"

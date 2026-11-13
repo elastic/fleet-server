@@ -27,7 +27,7 @@ import (
 
 	"github.com/elastic/go-elasticsearch/v9"
 
-	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
+	"github.com/elastic/beats/v7/pkg/transport/tlscommon"
 )
 
 func TestToESConfig(t *testing.T) {
