@@ -39,6 +39,9 @@ const (
 	TypeUninstall = "UNINSTALL"
 )
 
+// ackResponseAction is the value of the action field in every AckResponse.
+const ackResponseAction = "acks"
+
 var (
 	ErrUpdatingInactiveAgent = errors.New("updating inactive agent")
 )
@@ -53,7 +56,7 @@ func (e *HTTPError) Error() string {
 
 func NewAckResponse(size int) AckResponse {
 	return AckResponse{
-		Action: "acks",
+		Action: ackResponseAction,
 		Errors: false,
 		Items:  make([]AckResponseItem, size),
 	}

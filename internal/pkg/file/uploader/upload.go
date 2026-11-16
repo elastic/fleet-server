@@ -20,7 +20,17 @@ import (
 	"go.elastic.co/apm/v2"
 )
 
-const fileKey = "file"
+// Fields of the upload metadata document. The upload ID is stored under file.FieldUploadID.
+const (
+	fileKey          = "file"
+	fieldSize        = "size"
+	fieldActionID    = "action_id"
+	fieldAgentID     = "agent_id"
+	fieldSource      = "src"
+	fieldChunkSize   = "ChunkSize"
+	fieldStatus      = "Status"
+	fieldUploadStart = "upload_start"
+)
 
 var (
 	ErrInvalidUploadID  = errors.New("active upload not found with this ID, it may be expired")
@@ -81,7 +91,7 @@ func (u *Uploader) Begin(ctx context.Context, namespaces []string, data JSDict) 
 		return file.Info{}, err
 	}
 
-	size, _ := data.Int64(fileKey, "size")
+	size, _ := data.Int64(fileKey, fieldSize)
 	if u.sizeLimit != nil && uint64(size) > *u.sizeLimit { //nolint:gosec // disable G115 - negatives are checked for in payload validation
 		vSpan.End()
 		return file.Info{}, ErrFileSizeTooLarge
@@ -95,9 +105,9 @@ func (u *Uploader) Begin(ctx context.Context, namespaces []string, data JSDict) 
 	id := uid.String()
 
 	// grab required fields that were checked already in validation step
-	agentID, _ := data.Str("agent_id")
-	actionID, _ := data.Str("action_id")
-	source, _ := data.Str("src")
+	agentID, _ := data.Str(fieldAgentID)
+	actionID, _ := data.Str(fieldActionID)
+	source, _ := data.Str(fieldSource)
 	docID := fmt.Sprintf("%s.%s", actionID, agentID)
 
 	info := file.Info{
@@ -122,16 +132,16 @@ func (u *Uploader) Begin(ctx context.Context, namespaces []string, data JSDict) 
 		Enrich document with additional server-side fields
 	*/
 
-	if err := data.Put(info.ChunkSize, fileKey, "ChunkSize"); err != nil {
+	if err := data.Put(info.ChunkSize, fileKey, fieldChunkSize); err != nil {
 		return file.Info{}, err
 	}
-	if err := data.Put(info.Status, fileKey, "Status"); err != nil {
+	if err := data.Put(info.Status, fileKey, fieldStatus); err != nil {
 		return file.Info{}, err
 	}
-	if err := data.Put(id, "upload_id"); err != nil {
+	if err := data.Put(id, file.FieldUploadID); err != nil {
 		return file.Info{}, err
 	}
-	if err := data.Put(info.Start.UnixMilli(), "upload_start"); err != nil {
+	if err := data.Put(info.Start.UnixMilli(), fieldUploadStart); err != nil {
 		return file.Info{}, err
 	}
 	if err := data.Put(info.Start.UnixMilli(), "@timestamp"); err != nil {
@@ -191,9 +201,9 @@ func validateUploadPayload(info JSDict) error {
 	required := [][]string{
 		{fileKey, "name"},
 		{fileKey, "mime_type"},
-		{"action_id"},
-		{"agent_id"},
-		{"src"},
+		{fieldActionID},
+		{fieldAgentID},
+		{fieldSource},
 	}
 
 	for _, fields := range required {
@@ -202,7 +212,7 @@ func validateUploadPayload(info JSDict) error {
 		}
 	}
 
-	if size, ok := info.Int64(fileKey, "size"); !ok {
+	if size, ok := info.Int64(fileKey, fieldSize); !ok {
 		return ErrFileSizeRequired
 	} else if size <= 0 {
 		return fmt.Errorf("file.size: %d: %w", size, ErrInvalidFileSize)
