@@ -406,8 +406,9 @@ func (et *EnrollerT) _enroll(
 			dl.FieldUnenrolledReason:      nil,
 			// clear pending-uninstall state: a re-enrolled agent is active again and
 			// must receive its policy and actions normally.
-			dl.FieldUninstallPending: false,
-			dl.FieldUpdatedAt:        now.UTC().Format(time.RFC3339),
+			dl.FieldUninstallPending:      false,
+			dl.FieldUninstallPendingSince: nil,
+			dl.FieldUpdatedAt:             now.UTC().Format(time.RFC3339),
 		}
 		// stamp upgraded_at so Kibana's version-specific policy assignment task will re-evaluate this agent
 		if req.ReplaceToken != nil && *req.ReplaceToken != "" && prevVer != "" && prevVer != ver {

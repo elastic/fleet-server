@@ -670,10 +670,11 @@ func (ack *AckT) handleUnenroll(ctx context.Context, zlog zerolog.Logger, agent 
 	// UNINSTALL) is the only place it is written.
 	now := time.Now().UTC().Format(time.RFC3339)
 	doc := bulk.UpdateFields{
-		dl.FieldActive:           false,
-		dl.FieldUnenrolledAt:     now,
-		dl.FieldUpdatedAt:        now,
-		dl.FieldUninstallPending: false, // terminal: clear any pending-uninstall state
+		dl.FieldActive:                false,
+		dl.FieldUnenrolledAt:          now,
+		dl.FieldUpdatedAt:             now,
+		dl.FieldUninstallPending:      false, // terminal: clear any pending-uninstall state
+		dl.FieldUninstallPendingSince: nil,   // paired with uninstall_pending; cleared with it
 	}
 	if uninstalled {
 		// UNINSTALL ack: additionally record the uninstall completion.
@@ -784,8 +785,9 @@ func (ack *AckT) handleUninstallPending(ctx context.Context, zlog zerolog.Logger
 	// not carry unenrolled_at.
 	now := time.Now().UTC().Format(time.RFC3339)
 	doc := bulk.UpdateFields{
-		dl.FieldUninstallPending: true,
-		dl.FieldUpdatedAt:        now,
+		dl.FieldUninstallPending:      true,
+		dl.FieldUninstallPendingSince: now, // records when uninstall_pending flipped to true
+		dl.FieldUpdatedAt:             now,
 	}
 	if len(agent.Outputs) > 0 {
 		doc[dl.FieldOutputs] = agent.Outputs

@@ -330,15 +330,17 @@ func TestHandleAckEvents(t *testing.T) {
 				}}, nil)
 				m.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
 				// handleUnenroll marks the agent inactive (invalidating its API keys),
-				// stamps unenrolled_at (paired with active: false), and because this is
-				// an UNINSTALL ack also records uninstalled_at so the agent is
-				// distinguishable from a plain unenrolled one.
+				// stamps unenrolled_at (paired with active: false), clears
+				// uninstall_pending[_since], and because this is an UNINSTALL ack also
+				// records uninstalled_at so the agent is distinguishable from a plain
+				// unenrolled one.
 				m.On("Update", mock.Anything, mock.Anything, mock.Anything,
 					mock.MatchedBy(func(body []byte) bool {
 						s := string(body)
 						return strings.Contains(s, `"active":false`) &&
 							strings.Contains(s, `"unenrolled_at"`) &&
-							strings.Contains(s, `"uninstalled_at"`)
+							strings.Contains(s, `"uninstalled_at"`) &&
+							strings.Contains(s, `"uninstall_pending_since":null`)
 					}), mock.Anything).Return(nil).Once()
 				return m
 			},
@@ -415,7 +417,9 @@ func TestHandleAckEvents(t *testing.T) {
 				m.On("Update", mock.Anything, mock.Anything, mock.Anything,
 					mock.MatchedBy(func(body []byte) bool {
 						s := string(body)
-						return strings.Contains(s, "uninstall_pending") &&
+						return strings.Contains(s, `"uninstall_pending":true`) &&
+							// uninstall_pending_since records when the flag flipped.
+							strings.Contains(s, `"uninstall_pending_since"`) &&
 							// unenrolled_at must NOT be set while the agent stays active.
 							!strings.Contains(s, `"unenrolled_at"`) &&
 							!strings.Contains(s, `"active"`) &&

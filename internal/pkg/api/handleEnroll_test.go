@@ -496,8 +496,9 @@ func TestEnrollWithAgentIDExistingPendingUninstallClearsPending(t *testing.T) {
 	require.Equal(t, "created", resp.Action, "enroll failed")
 
 	doc := replaceUpdateDoc(t, bulker)
-	// uninstall_pending must be cleared and the policy revision reset to 0.
+	// uninstall_pending and its timestamp must be cleared and the policy revision reset to 0.
 	assert.Equal(t, false, doc[dl.FieldUninstallPending])
+	assert.Nil(t, doc[dl.FieldUninstallPendingSince])
 	assert.EqualValues(t, 0, doc[dl.FieldPolicyRevisionIdx])
 	// outputs must NOT be rewritten by re-enrollment; the unenroll ack owns that.
 	assert.NotContains(t, doc, dl.FieldOutputs, "re-enroll must not rewrite outputs; clearing happens on the unenroll ack")
