@@ -13,7 +13,7 @@ import (
 	"net/url"
 	"os"
 
-	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
+	"github.com/elastic/beats/v7/pkg/transport/tlscommon"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger/zap"
 
 	apmtransport "go.elastic.co/apm/v2/transport"

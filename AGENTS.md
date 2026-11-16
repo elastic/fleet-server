@@ -173,7 +173,7 @@ mage check:go    # golangci-lint only
 
 - **Imports/format:** `goimports` via `mage check:imports` / `check:ci` ([magefile.go](./magefile.go)).
 - **License headers:** Elastic license via `mage check:headers` (go-licenser).
-- **Lint:** [.golangci.yml](./.golangci.yml). Notably: `fmt.Print*` is forbidden — use the zerolog logger; dependencies on `bytedance/sonic` and `elastic/elastic-agent` are blocked; `nolint` directives must name the specific linter and include an explanation.
+- **Lint:** [.golangci.yml](./.golangci.yml). Notably: `fmt.Print*` is forbidden — use the zerolog logger; dependencies on `bytedance/sonic`, `elastic/elastic-agent` and `elastic/elastic-agent-libs` are blocked (use the `github.com/elastic/beats/v7/pkg/...` packages instead of `elastic-agent-libs`); `nolint` directives must name the specific linter and include an explanation.
 - **Generated code:** Change `model/` sources, then `mage generate`; never hand-edit generated API packages.
 - **Go toolchain version:** [.go-version](./.go-version).
 - **FIPS / crypto:** [docs/fips.md](./docs/fips.md).

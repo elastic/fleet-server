@@ -102,7 +102,9 @@ linters:
           - github.com/bytedance/sonic:
               reason: "Federal restriction on bytedance"
           - github.com/elastic/beats/elastic-agent:
-              reason: "There must be no elastic-agent dependency, use elastic-agent-libs instead."
+              reason: "There must be no elastic-agent dependency, use github.com/elastic/beats/v7/pkg packages instead."
+          - github.com/elastic/elastic-agent-libs:
+              reason: "elastic-agent-libs has been moved into Beats, use github.com/elastic/beats/v7/pkg packages instead."
 
     nakedret:
       # make an issue if func has more lines of code than this setting and it has naked returns; default is 30
