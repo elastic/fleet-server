@@ -312,14 +312,6 @@ func TestHandleAckEvents(t *testing.T) {
 		},
 		{
 			name: "uninstall action found invalidates api key",
-			// The agent was already unenrolled (unenrolled_at set) when it entered
-			// the pending-uninstall state, so the UNINSTALL ack must preserve that
-			// timestamp rather than overwrite it.
-			agent: &model.Agent{
-				ESDocument:   model.ESDocument{Id: "ab12dcd8-bde0-4045-92dc-c4b27668d735"},
-				Agent:        &model.AgentMetadata{Version: "8.0.0"},
-				UnenrolledAt: "2020-01-01T00:00:00Z",
-			},
 			events: []AckRequest_Events_Item{{
 				json.RawMessage(`{
 				"action_id": "2b12dcd8-bde0-4045-92dc-c4b27668d733"
@@ -337,16 +329,16 @@ func TestHandleAckEvents(t *testing.T) {
 					}},
 				}}, nil)
 				m.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
-				// handleUnenroll marks the agent inactive (invalidating its API keys)
-				// and, because this is an UNINSTALL ack, records uninstalled_at so the
-				// agent is distinguishable from a plain unenrolled one. The existing
-				// unenrolled_at is preserved (not overwritten).
+				// handleUnenroll marks the agent inactive (invalidating its API keys),
+				// stamps unenrolled_at (paired with active: false), and because this is
+				// an UNINSTALL ack also records uninstalled_at so the agent is
+				// distinguishable from a plain unenrolled one.
 				m.On("Update", mock.Anything, mock.Anything, mock.Anything,
 					mock.MatchedBy(func(body []byte) bool {
 						s := string(body)
 						return strings.Contains(s, `"active":false`) &&
-							strings.Contains(s, `"uninstalled_at"`) &&
-							!strings.Contains(s, `"unenrolled_at"`)
+							strings.Contains(s, `"unenrolled_at"`) &&
+							strings.Contains(s, `"uninstalled_at"`)
 					}), mock.Anything).Return(nil).Once()
 				return m
 			},
@@ -424,7 +416,8 @@ func TestHandleAckEvents(t *testing.T) {
 					mock.MatchedBy(func(body []byte) bool {
 						s := string(body)
 						return strings.Contains(s, "uninstall_pending") &&
-							strings.Contains(s, `"unenrolled_at"`) &&
+							// unenrolled_at must NOT be set while the agent stays active.
+							!strings.Contains(s, `"unenrolled_at"`) &&
 							!strings.Contains(s, `"active"`) &&
 							strings.Contains(s, `"api_key":""`) &&
 							strings.Contains(s, `"api_key_id":""`) &&
@@ -465,10 +458,9 @@ func TestHandleAckEvents(t *testing.T) {
 				}}, nil)
 				m.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
 				// Only the terminal (deactivating) update is allowed. A pending update
-				// (uninstall_pending without active) would not match and fail. Because
-				// the pending step was skipped, the agent has no unenrolled_at yet, so
-				// the terminal update must stamp it as a fallback alongside
-				// uninstalled_at.
+				// (uninstall_pending without active) would not match and fail. The
+				// terminal update stamps unenrolled_at (paired with active: false)
+				// alongside uninstalled_at.
 				m.On("Update", mock.Anything, mock.Anything, mock.Anything,
 					mock.MatchedBy(func(body []byte) bool {
 						s := string(body)

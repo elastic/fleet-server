@@ -641,12 +641,10 @@ func (ack *AckT) invalidateAPIKeys(ctx context.Context, zlog zerolog.Logger, toR
 // handleUnenroll performs the terminal invalidation shared by the legacy
 // UNENROLL ack (agents that don't support the remote-uninstall flow), MIGRATE,
 // and the final UNINSTALL ack: it invalidates all of the agent's API keys
-// (access and output), deletes their secrets, and marks the agent inactive.
-//
-// The uninstalled flag selects which timestamp is recorded: an UNINSTALL ack
-// records uninstalled_at (and preserves the unenrolled_at set earlier in the
-// pending-uninstall step), while the legacy UNENROLL/MIGRATE ack records
-// unenrolled_at because that ack is the unenroll itself.
+// (access and output), deletes their secrets, marks the agent inactive, and
+// stamps unenrolled_at (always paired with active: false). An UNINSTALL ack
+// additionally records uninstalled_at to distinguish an uninstalled agent from
+// a plain unenrolled one.
 func (ack *AckT) handleUnenroll(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, uninstalled bool) error {
 	span, ctx := apm.StartSpan(ctx, "ackUnenroll", "process")
 	defer span.End()
@@ -666,28 +664,22 @@ func (ack *AckT) handleUnenroll(ctx context.Context, zlog zerolog.Logger, agent 
 	}
 	deleteRetiredSecrets(ctx, zlog, ack.bulk, allSecretItems)
 
+	// unenrolled_at is always stamped here, paired with active: false. The
+	// pending-uninstall step keeps the agent active and deliberately does not set
+	// unenrolled_at, so this terminal ack (legacy UNENROLL, MIGRATE, or the final
+	// UNINSTALL) is the only place it is written.
 	now := time.Now().UTC().Format(time.RFC3339)
 	doc := bulk.UpdateFields{
 		dl.FieldActive:           false,
+		dl.FieldUnenrolledAt:     now,
 		dl.FieldUpdatedAt:        now,
 		dl.FieldUninstallPending: false, // terminal: clear any pending-uninstall state
 	}
 	if uninstalled {
-		// UNINSTALL ack: the agent was already unenrolled (unenrolled_at set) when
-		// it entered the pending-uninstall state, so preserve that timestamp and
-		// only record the uninstall completion. uninstalled_at (server time)
-		// distinguishes an uninstalled agent from a plain unenrolled one.
+		// UNINSTALL ack: additionally record the uninstall completion.
+		// uninstalled_at (server time) distinguishes an uninstalled agent from a
+		// plain unenrolled one.
 		doc[dl.FieldUninstalledAt] = now
-		// Fall back to stamping unenrolled_at here if it is somehow missing, e.g.
-		// when the UNENROLL and UNINSTALL acks arrive in the same batch and the
-		// pending-uninstall step was skipped: an uninstalled agent must still
-		// carry an unenrolled_at.
-		if agent.UnenrolledAt == "" {
-			doc[dl.FieldUnenrolledAt] = now
-		}
-	} else {
-		// Legacy UNENROLL / MIGRATE: this ack is the unenroll itself.
-		doc[dl.FieldUnenrolledAt] = now
 	}
 
 	body, err := doc.Marshal()
@@ -783,14 +775,15 @@ func (ack *AckT) handleUninstallPending(ctx context.Context, zlog zerolog.Logger
 		output.APIKeyID = ""
 	}
 
-	// Finalize the unenroll exactly as for a non-uninstall-capable agent
-	// (unenrolled_at is set), with two deliberate differences: the agent is kept
-	// active so it can receive the follow-up UNINSTALL, and the additive
-	// uninstall_pending flag records that it is awaiting uninstall. The resulting
-	// state is active: true + unenrolled_at set + uninstall_pending: true.
+	// Enter the pending-uninstall state: keep the agent active so it can receive
+	// the follow-up UNINSTALL, and set the additive uninstall_pending flag.
+	// Deliberately do NOT set unenrolled_at here. unenrolled_at is only ever
+	// written together with active: false (the terminal UNINSTALL / legacy
+	// unenroll path), because many consumers treat a set unenrolled_at as meaning
+	// the agent is inactive. A pending-uninstall agent stays active, so it must
+	// not carry unenrolled_at.
 	now := time.Now().UTC().Format(time.RFC3339)
 	doc := bulk.UpdateFields{
-		dl.FieldUnenrolledAt:     now,
 		dl.FieldUninstallPending: true,
 		dl.FieldUpdatedAt:        now,
 	}
