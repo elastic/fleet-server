@@ -139,7 +139,7 @@ const (
 	kibanaTokenEnv = "KIBANA_TOKEN"
 	apmKeyEnv      = "APM_KEY"
 	// placeholderEnvValue silences docker compose warnings about unset vars when the value is not used.
-	placeholderEnvValue = "supress-warning"
+	placeholderEnvValue = "suppress-warning"
 )
 
 // e2e test certs
