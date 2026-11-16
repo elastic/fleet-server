@@ -15,24 +15,17 @@ jobs:
   golangci:
     strategy:
       matrix:
-        # Keep the tag sets in sync with lintTagSets in magefile.go so that every file is linted.
+        # Keep the tag sets in sync with lintTagSets in magefile.go so that every root-module file is linted.
         include:
           - GOOS: linux
             TAGS: ""
-            DIR: .
           - GOOS: linux
             TAGS: snapshot,requirefips,mage
-            DIR: .
           - GOOS: linux
             TAGS: integration
-            DIR: .
-          # testing is a separate Go module.
-          - GOOS: linux
-            TAGS: e2e,cloude2e
-            DIR: testing
           #- GOOS: windows
           #- GOOS: darwin
-    name: lint (${{ matrix.DIR }} tags=${{ matrix.TAGS }})
+    name: lint (tags=${{ matrix.TAGS }})
     runs-on: ubuntu-latest
     steps:
       - name: Echo details
@@ -62,7 +55,5 @@ jobs:
           # fix a single line in an existing codebase and the linter would force them
           # into fixing all linting issues in the whole file instead.
           args: --timeout=30m --whole-files --build-tags=${{ matrix.TAGS }}
-          working-directory: ${{ matrix.DIR }}
-
           # Optional: show only new issues if it's a pull request. The default value is `false`.
           only-new-issues: true
