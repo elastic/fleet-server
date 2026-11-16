@@ -59,8 +59,8 @@ var memMB func() (uint64, memSource) = availableMemoryMB
 var cgroupMemMB func() (uint64, bool) = cgroupMemoryLimitMB
 
 func memEnvLimits(log *zerolog.Logger, in *Input) *envLimits {
-	fromMemory := in.Server.Features.CheckinLimitFromMemory
-	// Without checkin_limit_from_memory, select the tier as before, without server.runtime.
+	fromMemory := in.Server.Features.LimitsFromMemory
+	// Without limits_from_memory, select the tier as before, without server.runtime.
 	var rt Runtime
 	if fromMemory {
 		rt = in.Server.Runtime

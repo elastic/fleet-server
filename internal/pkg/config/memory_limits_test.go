@@ -65,8 +65,8 @@ func TestMemEnvLimitsFeatureFlag(t *testing.T) {
 	off := memEnvLimits(&log, &Input{Server: Server{Runtime: Runtime{MemoryLimit: 2048 * mib}}}).Server.CheckinLimit.Max
 	on := memEnvLimits(&log, memInput(Runtime{})).Server.CheckinLimit.Max
 
-	require.Equal(t, int64(10_000), off, "checkin_limit_from_memory off must keep the tier limit of the detected memory")
-	require.Greater(t, on, off, "checkin_limit_from_memory on must calculate the limit from memory")
+	require.Equal(t, int64(10_000), off, "limits_from_memory off must keep the tier limit of the detected memory")
+	require.Greater(t, on, off, "limits_from_memory on must calculate the limit from memory")
 }
 
 func TestMemEnvLimitsRuntime(t *testing.T) {
@@ -308,7 +308,7 @@ func setMemory(t *testing.T, memoryMB uint64, source memSource) {
 
 // memInput returns an input with rt and the check-in limit from memory turned on.
 func memInput(rt Runtime) *Input {
-	return &Input{Server: Server{Runtime: rt, Features: FeatureFlags{CheckinLimitFromMemory: true}}}
+	return &Input{Server: Server{Runtime: rt, Features: FeatureFlags{LimitsFromMemory: true}}}
 }
 
 // setGOGC sets the GOGC of the runtime until the test ends.
