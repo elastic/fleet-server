@@ -300,3 +300,23 @@ func TestUpdateMergifyDoesNotFalseMatchVersionPrefix(t *testing.T) {
 		t.Error("UpdateMergify() removed existing 9.10 rule")
 	}
 }
+
+func TestUpdateMergifyRejectsNonNumericVersion(t *testing.T) {
+	tmpDir := t.TempDir()
+	mergifyFile := filepath.Join(tmpDir, ".mergify.yml")
+	initialContent := `pull_request_rules: []
+`
+	if err := os.WriteFile(mergifyFile, []byte(initialContent), 0o644); err != nil {
+		t.Fatalf("failed to write initial file: %v", err)
+	}
+	origDir, _ := os.Getwd()
+	defer func() {
+		_ = os.Chdir(origDir)
+	}()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("failed to change to temp directory: %v", err)
+	}
+	if err := UpdateMergify("9.foo.0"); err == nil {
+		t.Fatal("UpdateMergify(9.foo.0) expected error")
+	}
+}

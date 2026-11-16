@@ -20,19 +20,49 @@ func parseSemver(version string) (semver, error) {
 	if len(parts) != 3 {
 		return semver{}, fmt.Errorf("invalid version format: %s (expected major.minor.patch)", version)
 	}
-	major, err := strconv.Atoi(parts[0])
+	major, err := parseUnsignedComponent(parts[0])
 	if err != nil {
 		return semver{}, fmt.Errorf("invalid major version: %s", parts[0])
 	}
-	minor, err := strconv.Atoi(parts[1])
+	minor, err := parseUnsignedComponent(parts[1])
 	if err != nil {
 		return semver{}, fmt.Errorf("invalid minor version: %s", parts[1])
 	}
-	patch, err := strconv.Atoi(parts[2])
+	patch, err := parseUnsignedComponent(parts[2])
 	if err != nil {
 		return semver{}, fmt.Errorf("invalid patch version: %s", parts[2])
 	}
 	return semver{major: major, minor: minor, patch: patch}, nil
+}
+
+// parseUnsignedComponent parses a non-negative decimal integer without a sign
+// prefix. strconv.Atoi accepts "+" / "-" which must not pass as release versions.
+func parseUnsignedComponent(s string) (int, error) {
+	if s == "" || strings.HasPrefix(s, "-") || strings.HasPrefix(s, "+") {
+		return 0, fmt.Errorf("invalid unsigned integer: %q", s)
+	}
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return 0, fmt.Errorf("invalid unsigned integer: %q", s)
+		}
+	}
+	return strconv.Atoi(s)
+}
+
+// branchVersionFromRelease returns the X.Y branch name from an X.Y or X.Y.Z
+// release string after validating that every component is a non-negative integer.
+func branchVersionFromRelease(version string) (string, error) {
+	version = strings.TrimSpace(version)
+	parts := strings.Split(version, ".")
+	if len(parts) != 2 && len(parts) != 3 {
+		return "", fmt.Errorf("invalid version format: %s (expected X.Y or X.Y.Z)", version)
+	}
+	for _, part := range parts {
+		if _, err := parseUnsignedComponent(part); err != nil {
+			return "", fmt.Errorf("invalid version format: %s (expected X.Y or X.Y.Z)", version)
+		}
+	}
+	return fmt.Sprintf("%s.%s", parts[0], parts[1]), nil
 }
 
 func (v semver) String() string {

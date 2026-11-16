@@ -228,14 +228,16 @@ func (g *GitRepo) HasCommitsAheadOf(baseBranch string) (bool, error) {
 	return true, nil
 }
 
-// githubHTTPSPushURL converts SSH-style GitHub remotes to HTTPS so
-// token-authenticated pushes can use HTTPS. HTTPS/HTTP URLs are unchanged.
-// Returns the URL to use and whether it was rewritten from SSH.
+// githubHTTPSPushURL converts SSH-style and plaintext GitHub remotes to HTTPS so
+// token-authenticated pushes can use HTTPS. Existing https://github.com URLs are
+// unchanged. Returns the URL to use and whether it was rewritten.
 func githubHTTPSPushURL(remoteURL string) (string, bool) {
 	u := strings.TrimSpace(remoteURL)
 	switch {
-	case strings.HasPrefix(u, "https://"), strings.HasPrefix(u, "http://"):
+	case strings.HasPrefix(u, "https://github.com/"):
 		return u, false
+	case strings.HasPrefix(u, "http://github.com/"):
+		return "https://github.com/" + strings.TrimPrefix(u, "http://github.com/"), true
 	case strings.HasPrefix(u, "git@github.com:"):
 		return "https://github.com/" + strings.TrimPrefix(u, "git@github.com:"), true
 	case strings.HasPrefix(u, "ssh://git@github.com"):
@@ -261,7 +263,7 @@ func (g *GitRepo) ensureHTTPSRemote(remoteName string) error {
 
 	httpsURL, rewritten := githubHTTPSPushURL(urls[0])
 	if !isTokenPushRemoteURL(httpsURL) {
-		return fmt.Errorf("remote %s URL %q is not HTTPS or file://; token push requires an HTTPS remote", remoteName, urls[0])
+		return fmt.Errorf("remote %s URL %q is not https://github.com/ or file://; token push requires a trusted GitHub HTTPS remote", remoteName, urls[0])
 	}
 	if !rewritten {
 		return nil
@@ -273,10 +275,11 @@ func (g *GitRepo) ensureHTTPSRemote(remoteName string) error {
 }
 
 // isTokenPushRemoteURL reports whether the remote URL can be used with a
-// token-authenticated git push (HTTPS for GitHub, file:// for local tests).
+// token-authenticated git push. Only https://github.com/ remotes and file://
+// (local tests) are accepted so the token is not sent over plaintext HTTP or to
+// arbitrary hosts.
 func isTokenPushRemoteURL(u string) bool {
-	return strings.HasPrefix(u, "https://") ||
-		strings.HasPrefix(u, "http://") ||
+	return strings.HasPrefix(u, "https://github.com/") ||
 		strings.HasPrefix(u, "file://")
 }
 
@@ -375,8 +378,10 @@ func (g *GitRepo) IsClean() (bool, error) {
 }
 
 // SetRemoteURL sets the URL for a remote.
+// When the remote already exists, fetch refspecs are preserved so later
+// git fetch origin keeps working after an SSH→HTTPS rewrite.
 func (g *GitRepo) SetRemoteURL(remoteName, url string) error {
-	_, err := g.repo.Remote(remoteName)
+	remote, err := g.repo.Remote(remoteName)
 	if errors.Is(err, git.ErrRemoteNotFound) {
 		_, err = g.repo.CreateRemote(&config.RemoteConfig{
 			Name: remoteName,
@@ -391,14 +396,17 @@ func (g *GitRepo) SetRemoteURL(remoteName, url string) error {
 		return fmt.Errorf("failed to get remote: %w", err)
 	}
 
+	fetch := append([]config.RefSpec(nil), remote.Config().Fetch...)
+
 	err = g.repo.DeleteRemote(remoteName)
 	if err != nil {
 		return fmt.Errorf("failed to delete remote: %w", err)
 	}
 
 	_, err = g.repo.CreateRemote(&config.RemoteConfig{
-		Name: remoteName,
-		URLs: []string{url},
+		Name:  remoteName,
+		URLs:  []string{url},
+		Fetch: fetch,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to recreate remote: %w", err)

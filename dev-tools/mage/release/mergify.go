@@ -7,7 +7,6 @@ package release
 import (
 	"fmt"
 	"os"
-	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -26,11 +25,10 @@ func UpdateMergify(version string) error {
 		return fmt.Errorf("failed to parse %s: %w", mergifyFile, err)
 	}
 
-	parts := strings.Split(version, ".")
-	if len(parts) != 2 && len(parts) != 3 {
-		return fmt.Errorf("invalid version format: %s (expected X.Y or X.Y.Z)", version)
+	branchVersion, err := branchVersionFromRelease(version)
+	if err != nil {
+		return err
 	}
-	branchVersion := fmt.Sprintf("%s.%s", parts[0], parts[1])
 
 	rules, ok := config["pull_request_rules"].([]interface{})
 	if !ok {

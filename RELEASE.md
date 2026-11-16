@@ -60,7 +60,7 @@ release branch must already be at the previous patch. Docs stay off this path.
 | `PROJECT_REPO` | no | `fleet-server` | GitHub repository |
 | `PROJECT_REVIEWERS` | no | `elastic/elastic-agent-control-plane` | PR reviewers |
 
-Derived (not env-overridable): `NEXT_RELEASE` (patch+1), `NEXT_PROJECT_MINOR_VERSION` (minor+1), `RELEASE_BRANCH` (`X.Y`), `LATEST_RELEASE` (patch−1, or GitHub Releases lookup with git-tag fallback when releases are empty).
+Derived (not env-overridable): `NEXT_RELEASE` (patch+1), `NEXT_PROJECT_MINOR_VERSION` (minor+1), `RELEASE_BRANCH` (`X.Y`), `LATEST_RELEASE` (patch−1 from `CURRENT_RELEASE`; empty when patch is 0).
 
 ## Files updated
 

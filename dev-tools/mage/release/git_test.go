@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 )
@@ -387,6 +388,12 @@ func TestGithubHTTPSPushURL(t *testing.T) {
 			rewritten: false,
 		},
 		{
+			name:      "http github upgraded",
+			in:        "http://github.com/elastic/fleet-server.git",
+			want:      "https://github.com/elastic/fleet-server.git",
+			rewritten: true,
+		},
+		{
 			name:      "non-github ssh unchanged",
 			in:        "git@gitlab.com:group/repo.git",
 			want:      "git@gitlab.com:group/repo.git",
@@ -399,6 +406,26 @@ func TestGithubHTTPSPushURL(t *testing.T) {
 			if got != tt.want || rewritten != tt.rewritten {
 				t.Errorf("githubHTTPSPushURL(%q) = (%q, %v), want (%q, %v)",
 					tt.in, got, rewritten, tt.want, tt.rewritten)
+			}
+		})
+	}
+}
+
+func TestIsTokenPushRemoteURL(t *testing.T) {
+	tests := []struct {
+		in   string
+		want bool
+	}{
+		{"https://github.com/elastic/fleet-server.git", true},
+		{"file:///tmp/repo.git", true},
+		{"http://github.com/elastic/fleet-server.git", false},
+		{"https://evil.example/elastic/fleet-server.git", false},
+		{"git@github.com:elastic/fleet-server.git", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.in, func(t *testing.T) {
+			if got := isTokenPushRemoteURL(tt.in); got != tt.want {
+				t.Errorf("isTokenPushRemoteURL(%q) = %v, want %v", tt.in, got, tt.want)
 			}
 		})
 	}
@@ -423,17 +450,58 @@ func TestEnsureHTTPSRemote(t *testing.T) {
 		}
 	})
 
-	t.Run("rejects non-https remote", func(t *testing.T) {
+	t.Run("preserves fetch refspecs", func(t *testing.T) {
+		gitRepo, _ := createTestGitRepo(t)
+		if err := gitRepo.SetRemoteURL("origin", "git@github.com:elastic/fleet-server.git"); err != nil {
+			t.Fatalf("SetRemoteURL() error = %v", err)
+		}
+		before, err := gitRepo.repo.Remote("origin")
+		if err != nil {
+			t.Fatalf("Remote() error = %v", err)
+		}
+		beforeFetch := append([]config.RefSpec(nil), before.Config().Fetch...)
+		if len(beforeFetch) == 0 {
+			t.Fatal("expected default fetch refspecs before rewrite")
+		}
+		if err := gitRepo.ensureHTTPSRemote("origin"); err != nil {
+			t.Fatalf("ensureHTTPSRemote() error = %v", err)
+		}
+		after, err := gitRepo.repo.Remote("origin")
+		if err != nil {
+			t.Fatalf("Remote() after rewrite error = %v", err)
+		}
+		if got := after.Config().Fetch; len(got) != len(beforeFetch) {
+			t.Fatalf("fetch refspecs = %#v, want %#v", got, beforeFetch)
+		}
+		for i := range beforeFetch {
+			if after.Config().Fetch[i] != beforeFetch[i] {
+				t.Fatalf("fetch[%d] = %q, want %q", i, after.Config().Fetch[i], beforeFetch[i])
+			}
+		}
+	})
+
+	t.Run("rejects non-github remote", func(t *testing.T) {
 		gitRepo, _ := createTestGitRepo(t)
 		if err := gitRepo.SetRemoteURL("origin", "git@gitlab.com:group/repo.git"); err != nil {
 			t.Fatalf("SetRemoteURL() error = %v", err)
 		}
 		err := gitRepo.ensureHTTPSRemote("origin")
 		if err == nil {
-			t.Fatal("ensureHTTPSRemote() expected error for non-HTTPS remote")
+			t.Fatal("ensureHTTPSRemote() expected error for non-GitHub remote")
 		}
-		if !strings.Contains(err.Error(), "not HTTPS") {
-			t.Errorf("ensureHTTPSRemote() error = %v, want mention of not HTTPS", err)
+		if !strings.Contains(err.Error(), "https://github.com/") {
+			t.Errorf("ensureHTTPSRemote() error = %v, want mention of https://github.com/", err)
+		}
+	})
+
+	t.Run("rejects arbitrary https host", func(t *testing.T) {
+		gitRepo, _ := createTestGitRepo(t)
+		if err := gitRepo.SetRemoteURL("origin", "https://evil.example/elastic/fleet-server.git"); err != nil {
+			t.Fatalf("SetRemoteURL() error = %v", err)
+		}
+		err := gitRepo.ensureHTTPSRemote("origin")
+		if err == nil {
+			t.Fatal("ensureHTTPSRemote() expected error for non-GitHub HTTPS remote")
 		}
 	})
 }
