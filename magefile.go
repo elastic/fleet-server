@@ -52,10 +52,10 @@ import (
 var Default = Build.Binary
 
 var Aliases = map[string]interface{}{
-	"build":   Build.Binary,
+	cmdBuild:  Build.Binary,
 	"release": Build.Release,
 	"check":   Check.All,
-	"test":    Test.All,
+	cmdTest:   Test.All,
 }
 
 // env vars that a user can use to control targets.
@@ -66,7 +66,7 @@ const (
 	envDev = "DEV"
 	// envFips is the bool env var to indicate if it's a fips-capable build.
 	envFIPS = "FIPS"
-	// envPlatorms is a string env var, it should be specified as comma seperated list.
+	// envPlatorms is a string env var, it should be specified as comma separated list.
 	envPlatforms = "PLATFORMS"
 	// envVersionQualifier is a string env var that represents the version pre-release quantifier.
 	envVersionQualifier = "VERSION_QUALIFIER"
@@ -104,6 +104,42 @@ const (
 	dockerImage       = "docker.elastic.co/beats-ci/elastic-agent-cloud-fleet"
 	dockerAgentImage  = "fleet-server-e2e-agent"
 	dockerFleetImage  = "docker.elastic.co/observability-ci/fleet-server"
+	dockerImageFile   = "Dockerfile"
+	dockerBuildkitEnv = "DOCKER_BUILDKIT"
+
+	buildDir   = "build"
+	testingDir = "testing"
+
+	devSuffix  = "-dev"
+	fipsSuffix = "-fips"
+
+	osWindows = "windows"
+	archARM64 = "arm64"
+
+	platformDarwinAMD64  = "darwin/amd64"
+	platformDarwinARM64  = "darwin/arm64"
+	platformLinuxAMD64   = "linux/amd64"
+	platformLinuxARM64   = "linux/arm64"
+	platformWindowsAMD64 = "windows/amd64"
+	platformWindowsARM64 = "windows/arm64"
+
+	tagRequireFIPS = "requirefips"
+	tagIntegration = "integration"
+	tagE2E         = "e2e"
+
+	cmdBuild        = "build"
+	cmdTest         = "test"
+	cmdList         = "list"
+	flagTags        = "-tags"
+	flagRace        = "-race"
+	flagNoCache     = "-count=1"
+	flagAutoApprove = "-auto-approve"
+	flagVar         = "-var"
+
+	kibanaTokenEnv = "KIBANA_TOKEN"
+	apmKeyEnv      = "APM_KEY"
+	// placeholderEnvValue silences docker compose warnings about unset vars when the value is not used.
+	placeholderEnvValue = "supress-warning"
 )
 
 // e2e test certs
@@ -119,26 +155,26 @@ var (
 var (
 	// platforms is the list of all supported platforms.
 	platforms = []string{
-		"darwin/amd64",
-		"darwin/arm64",
-		"linux/amd64",
-		"linux/arm64",
-		"windows/amd64",
-		"windows/arm64",
+		platformDarwinAMD64,
+		platformDarwinARM64,
+		platformLinuxAMD64,
+		platformLinuxARM64,
+		platformWindowsAMD64,
+		platformWindowsARM64,
 	}
 
 	// platformsDocker is the list of all platforms that are supported by docker multiplatform builds.
 	platformsDocker = []string{
-		"linux/amd64",
-		"linux/arm64",
+		platformLinuxAMD64,
+		platformLinuxARM64,
 	}
 
 	// platformRemap contains mappings for platforms where if the GOOS/GOARCH key is used, artifacts should use the value instead. Missing keys are unalted.
 	platformRemap = map[string]string{
-		"darwin/amd64":  "darwin/x86_64",
-		"darwin/arm64":  "darwin/aarch64",
-		"linux/amd64":   "linux/x86_64",
-		"windows/amd64": "windows/x86_64",
+		platformDarwinAMD64:  "darwin/x86_64",
+		platformDarwinARM64:  "darwin/aarch64",
+		platformLinuxAMD64:   "linux/x86_64",
+		platformWindowsAMD64: "windows/x86_64",
 	}
 )
 
@@ -187,7 +223,7 @@ const apmRole = `{
 var (
 	// getVersion always returns the same version complete with qualifiers.
 	getVersion = sync.OnceValue(func() string {
-		var ver string = version.DefaultVersion
+		ver := version.DefaultVersion
 		if qualifier, ok := os.LookupEnv(envVersionQualifier); ok && qualifier != "" {
 			ver += "-" + qualifier
 		}
@@ -314,14 +350,14 @@ var (
 		return envToBool(envSnapshot)
 	})
 
-	// getTagsString returns a comma seperated list of go build tags.
+	// getTagsString returns a comma separated list of go build tags.
 	getTagsString = sync.OnceValue(func() string {
 		tags := []string{"grpcnotrace"}
 		if isSnapshot() {
 			tags = append(tags, "snapshot")
 		}
 		if isFIPS() {
-			tags = append(tags, "requirefips")
+			tags = append(tags, tagRequireFIPS)
 		}
 		return strings.Join(tags, ",")
 	})
@@ -385,11 +421,11 @@ func addFIPSEnvVars(env map[string]string) {
 	env["GOFIPS140"] = "v1.0.0" // use a pinned version of the fips provider.
 }
 
-// teeCommand runs the specified command, stdout and stederr will be written to stdout and will be collected and returned.
-func teeCommand(env map[string]string, cmd string, args ...string) ([]byte, error) {
+// teeCommand runs go with the specified args, stdout and stederr will be written to stdout and will be collected and returned.
+func teeCommand(env map[string]string, args ...string) ([]byte, error) {
 	var b bytes.Buffer
 	w := io.MultiWriter(&b, os.Stdout)
-	_, err := sh.Exec(env, w, w, cmd, args...)
+	_, err := sh.Exec(env, w, w, "go", args...)
 	return b.Bytes(), err
 }
 
@@ -440,7 +476,7 @@ func Multipass() error {
 // Clean removes build artifacts.
 func Clean() error {
 	var err error
-	for _, s := range []string{"bin", "build", ".service_token_kibana", ".service_token_fleet-server", ".service_token_fleet-server-remote", ".apm_server_api_key"} {
+	for _, s := range []string{"bin", buildDir, ".service_token_kibana", ".service_token_fleet-server", ".service_token_fleet-server-remote", ".apm_server_api_key"} {
 		log.Println("Removing:", s)
 		if e := os.RemoveAll(s); e != nil {
 			err = errors.Join(err, fmt.Errorf("error removing %q: %w", s, e))
@@ -468,20 +504,20 @@ func (Check) Headers() error {
 }
 
 // Notice generates the NOTICE.txt and NOTICE-fips.txt files.
-func (Check) Notice() {
-	mg.SerialDeps(mg.F(genNotice, false), mg.F(genNotice, true))
+func (Check) Notice(ctx context.Context) {
+	mg.SerialCtxDeps(ctx, mg.F(genNotice, false), mg.F(genNotice, true))
 }
 
 // DetectFIPSCryptoImports will do a best effort attempt to ensure that the imports list for FIPS compatible artifacts does not contain any external crypto libraries.
 // Specifically it will fail if the modules list contains an entry with: "crypto", "gokrb5", or "pbkdf2"
 func (Check) DetectFIPSCryptoImports() error {
-	tags := []string{"requirefips"}
+	tags := []string{tagRequireFIPS}
 	mods, err := getModules(tags...)
 	if err != nil {
 		return err
 	}
 
-	args := append([]string{"list", "-m"}, mods...)
+	args := append([]string{cmdList, "-m"}, mods...)
 	output, err := sh.Output("go", args...)
 	if err != nil {
 		return err
@@ -490,7 +526,7 @@ func (Check) DetectFIPSCryptoImports() error {
 		// keywords are crypto for x/crypto imports, gokrb5 for kerberos, and pbkdf2 for pbkdf2 generation
 		for _, keyword := range []string{"crypto", "gokrb5", "pbkdf2"} {
 			if strings.Contains(line, keyword) {
-				err = errors.Join(err, fmt.Errorf("Detected import %s may implement crypto functionality", line))
+				err = errors.Join(err, fmt.Errorf("detected import %s may implement crypto functionality", line))
 			}
 		}
 	}
@@ -498,12 +534,12 @@ func (Check) DetectFIPSCryptoImports() error {
 }
 
 // genNotice generates the NOTICE.txt or the NOTICE-fips.txt file.
-func genNotice(fips bool) error {
+func genNotice(ctx context.Context, fips bool) error {
 	tags := []string{}
 	outFile := "NOTICE.txt"
 	if fips {
 		log.Println("Generating NOTICE-fips.txt.")
-		tags = append(tags, "requirefips")
+		tags = append(tags, tagRequireFIPS)
 		outFile = "NOTICE-fips.txt"
 	} else {
 		log.Println("Generating NOTICE.txt.")
@@ -525,11 +561,11 @@ func genNotice(fips bool) error {
 	}
 	slices.Sort(mods)
 
-	listArgs := []string{"list", "-m", "-json"}
-	listArgs = append(listArgs, mods...)
-	listCmd := exec.Command("go", listArgs...)
+	listArgs := slices.Concat([]string{cmdList, "-m", "-json"}, mods)
+	listCmd := exec.CommandContext(ctx, "go", listArgs...)
 
-	detectorCmd := exec.Command("go", "tool", "-modfile", filepath.Join("dev-tools", "go.mod"), "go.elastic.co/go-licence-detector",
+	//nolint:gosec // G204: args are fixed paths and the NOTICE file name chosen above
+	detectorCmd := exec.CommandContext(ctx, "go", "tool", "-modfile", filepath.Join("dev-tools", "go.mod"), "go.elastic.co/go-licence-detector",
 		"-includeIndirect",
 		"-rules", filepath.Join("dev-tools", "notice", "rules.json"),
 		"-overrides", filepath.Join("dev-tools", "notice", "overrides.json"),
@@ -571,13 +607,13 @@ func genNotice(fips bool) error {
 // getModules returns a list of direct and indirect modules that are used by the main package and its dependencies.
 // Test and tooling packages are excluded.
 func getModules(extraTags ...string) ([]string, error) {
-	tags := append([]string{"linux", "darwin", "windows"}, extraTags...)
+	tags := append([]string{"linux", "darwin", osWindows}, extraTags...)
 	args := []string{
-		"list",
+		cmdList,
 		"-deps",
 		"-f",
 		"{{with .Module}}{{if not .Main}}{{.Path}}{{end}}{{end}}",
-		"-tags",
+		flagTags,
 		strings.Join(tags, ","),
 	}
 	output, err := sh.Output("go", args...)
@@ -587,7 +623,7 @@ func getModules(extraTags ...string) ([]string, error) {
 	modsMap := map[string]struct{}{}
 	for _, line := range strings.Split(output, "\n") {
 		if len(line) > 0 {
-			modsMap[string(line)] = struct{}{}
+			modsMap[line] = struct{}{}
 		}
 	}
 	return slices.Collect(maps.Keys(modsMap)), nil
@@ -640,12 +676,12 @@ type buildTagSet struct {
 var buildTagSets = []buildTagSet{
 	{Name: "default", Tags: ""},
 	{Name: "snapshot-fips-mage", Tags: "snapshot,requirefips,mage"},
-	{Name: "integration", Tags: "integration"},
+	{Name: tagIntegration, Tags: tagIntegration},
 }
 
 // Go installs and runs golangci-lint once per build-tag set.
-func (Check) Go() error {
-	mg.Deps(getLinter)
+func (Check) Go(ctx context.Context) error {
+	mg.CtxDeps(ctx, getLinter)
 	var err error
 	for _, set := range buildTagSets {
 		args := []string{"run", "-v"}
@@ -661,17 +697,17 @@ func (Check) Go() error {
 }
 
 // Fix runs go fix ./... with all build tags used in the repo root, and testing dir.
-func (Check) Fix() error {
+func (Check) Fix(ctx context.Context) error {
 	err := sh.RunV("go", "fix", "./...")
-	for _, tag := range []string{"snapshot", "integration", "requirefips", "requirefips,snapshot", "requirefips,integration"} {
+	for _, tag := range []string{"snapshot", tagIntegration, tagRequireFIPS, "requirefips,snapshot", "requirefips,integration"} {
 		if e := sh.RunV("go", "fix", "-tags", tag, "./..."); e != nil {
 			err = errors.Join(err, e)
 		}
 	}
-	for _, tag := range []string{"e2e", "cloude2e", "requirefips,e2e", "requirefips,cloude2e"} {
+	for _, tag := range []string{tagE2E, "cloude2e", "requirefips,e2e", "requirefips,cloude2e"} {
 		log.Printf("Running in testing with tags: %s", tag)
-		cmd := exec.Command("go", "fix", "-tags", tag, "./...")
-		cmd.Dir = "testing"
+		cmd := exec.CommandContext(ctx, "go", "fix", "-tags", tag, "./...")
+		cmd.Dir = testingDir
 		if out, e := cmd.CombinedOutput(); e != nil {
 			err = errors.Join(err, fmt.Errorf("%w: %s", e, string(out)))
 		}
@@ -680,7 +716,7 @@ func (Check) Fix() error {
 }
 
 // getLinter ensures that the linter of the correct version is installed to GOPATH.
-func getLinter() error {
+func getLinter(ctx context.Context) error {
 	// exit early if linter exists with same version.
 	if output, err := sh.Output("golangci-lint", "version", "--short"); err == nil && output == strings.TrimPrefix(getLinterVersion(), "v") {
 		log.Println("Linter installation detected.")
@@ -688,7 +724,11 @@ func getLinter() error {
 	}
 	log.Printf("Linter version %q not detected, installing linter.", getLinterVersion())
 
-	resp, err := http.Get("https://raw.githubusercontent.com/golangci/golangci-lint/d58dbde584c801091e74a00940e11ff18c6c68bd/install.sh")
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://raw.githubusercontent.com/golangci/golangci-lint/d58dbde584c801091e74a00940e11ff18c6c68bd/install.sh", nil)
+	if err != nil {
+		return fmt.Errorf("unable to create request: %w", err)
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("http request error: %w", err)
 	}
@@ -702,7 +742,8 @@ func getLinter() error {
 		return fmt.Errorf("go env failure: %w", err)
 	}
 
-	cmd := exec.Command("sh", "-s", "--", "-b", filepath.Join(strings.TrimSpace(pathOut), "bin"), getLinterVersion())
+	//nolint:gosec // G204: runs the pinned golangci-lint install script with the version from our workflow file
+	cmd := exec.CommandContext(ctx, "sh", "-s", "--", "-b", filepath.Join(strings.TrimSpace(pathOut), "bin"), getLinterVersion())
 	cmd.Stdin = resp.Body
 	if out, err := cmd.CombinedOutput(); err != nil {
 		log.Printf("Unable to install golangci-lint err: %v output: %s", err, string(out))
@@ -729,7 +770,7 @@ func (Build) Local() error {
 		addFIPSEnvVars(env)
 	}
 	outFile := filepath.Join("bin", binaryName)
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == osWindows {
 		outFile = filepath.Join("bin", binaryExe)
 
 	}
@@ -744,7 +785,7 @@ func (Build) Local() error {
 // VERSION_QUALIFIER may be used to manually specify a version qualifer for the produced binary.
 func (Build) Binary() {
 	mg.Deps(mg.F(mkDir, filepath.Join("build", "binaries")))
-	deps := make([]interface{}, 0)
+	deps := make([]interface{}, 0, len(getPlatforms()))
 	for _, platform := range getPlatforms() {
 		osArg, archArg, _ := strings.Cut(platform, "/")
 		deps = append(deps, mg.F(goBuild, osArg, archArg, false))
@@ -758,13 +799,13 @@ func goBuild(osArg, archArg string, cover bool) error {
 	env := environMap()
 	env["GOOS"] = osArg
 	env["GOARCH"] = archArg
-	distArr := []string{"fleet-server"}
+	distArr := []string{binaryName}
 	if isFIPS() {
 		addFIPSEnvVars(env)
 		distArr = append(distArr, "fips")
 	}
 	binary := binaryName
-	if osArg == "windows" {
+	if osArg == osWindows {
 		binary = binaryExe
 	}
 	osName := osArg
@@ -779,7 +820,7 @@ func goBuild(osArg, archArg string, cover bool) error {
 	}
 
 	args := []string{
-		"build",
+		cmdBuild,
 		"-tags=" + getTagsString(),
 		"-gcflags=" + getGCFlags(),
 		"-ldflags=" + getLDFlags(),
@@ -802,7 +843,7 @@ func goBuild(osArg, archArg string, cover bool) error {
 // VERSION_QUALIFIER may be used to manually specify a version qualifer for the produced binary.
 func (Build) Cover() {
 	mg.Deps(mg.F(mkDir, filepath.Join("build", "cover")))
-	deps := make([]interface{}, 0)
+	deps := make([]interface{}, 0, len(getPlatforms()))
 	for _, platform := range getPlatforms() {
 		osArg, archArg, _ := strings.Cut(platform, "/")
 		deps = append(deps, mg.F(goBuild, osArg, archArg, true))
@@ -824,7 +865,7 @@ func (Build) Release() {
 		if v, ok := platformRemap[platform]; ok {
 			osName, archName, _ = strings.Cut(v, "/")
 		}
-		if osName == "windows" { // windows distributions are zip not tar.gz
+		if osName == osWindows { // windows distributions are zip not tar.gz
 			deps = append(deps, mg.F(packageWindows, archName))
 			continue
 		}
@@ -840,11 +881,11 @@ func mkDir(dir string) error {
 
 // packageWindows creates a Windows zip distribution for the specified architecture and provides the sha512 sum of the zip.
 func packageWindows(arch string) error {
-	distArr := []string{"fleet-server"}
+	distArr := []string{binaryName}
 	if isFIPS() {
 		distArr = append(distArr, "fips")
 	}
-	distArr = append(distArr, getVersion(), "windows", arch)
+	distArr = append(distArr, getVersion(), osWindows, arch)
 	distName := strings.Join(distArr, "-")
 	srcFile, err := os.Open(filepath.Join("build", "binaries", distName, binaryExe))
 	if err != nil {
@@ -915,12 +956,12 @@ func genSha512(fileName string) error {
 	}
 	computedHash := hex.EncodeToString(sum.Sum(nil))
 	output := fmt.Sprintf("%v  %v", computedHash, filepath.Base(fileName))
-	return os.WriteFile(fileName+".sha512", []byte(output), 0o644)
+	return os.WriteFile(fileName+".sha512", []byte(output), 0o644) //nolint:gosec // G306: published checksum file, must be world-readable
 }
 
 // packgeNix creates a .tar.gz archive for the specified os/arch and provides a sha512 sum for the distribution.
 func packageNix(osArg, archArg string) error {
-	distArr := []string{"fleet-server"}
+	distArr := []string{binaryName}
 	if isFIPS() {
 		distArr = append(distArr, "fips")
 	}
@@ -946,7 +987,7 @@ func packageNix(osArg, archArg string) error {
 		return fmt.Errorf("unable to stat src file: %w", err)
 	}
 
-	// Write the fleet-server file into the archive - seperate parent dir is not needed.
+	// Write the fleet-server file into the archive - separate parent dir is not needed.
 	header, err := tar.FileInfoHeader(srcInfo, srcInfo.Name())
 	if err != nil {
 		return fmt.Errorf("unable to turn srcInfo to header: %w", err)
@@ -975,11 +1016,11 @@ func packageNix(osArg, archArg string) error {
 // FIPS is used to create an image that can compile FIPS-capable binaries.
 func (Docker) Builder() error {
 	suffix := dockerSuffix
-	if runtime.GOARCH == "arm64" {
+	if runtime.GOARCH == archARM64 {
 		suffix = dockerArmSuffix
 	}
 
-	args := []string{"build", "-t", dockerBuilderName + ":" + getGoVersion(), "--build-arg", "GO_VERSION=" + getGoVersion()}
+	args := []string{cmdBuild, "-t", dockerBuilderName + ":" + getGoVersion(), "--build-arg", "GO_VERSION=" + getGoVersion()}
 	if isFIPS() {
 		args = append(args, "-f", dockerBuilderFIPS, "--build-arg", "SUFFIX="+suffix, "--target", "base", ".")
 	} else {
@@ -1053,27 +1094,27 @@ func (Docker) Cover() error {
 // DOCKER_IMAGE may be used to completely specify the image name.
 // DOCKER_IMAGE_TAG may be used to completely specify the image tag.
 func (Docker) Image() error {
-	dockerFile := "Dockerfile"
+	dockerFile := dockerImageFile
 	image := dockerImage
 	version := getVersion()
 	if v, ok := os.LookupEnv(envDockerTag); ok && v != "" {
 		version = v
 	} else if isDEV() {
-		version += "-dev"
+		version += devSuffix
 	}
 	suffix := dockerSuffix
-	if runtime.GOARCH == "arm64" {
+	if runtime.GOARCH == archARM64 {
 		suffix = dockerArmSuffix
 	}
 	if isFIPS() {
 		dockerFile = dockerBuilderFIPS
-		image += "-fips"
+		image += fipsSuffix
 	}
 	if v, ok := os.LookupEnv(envDockerImage); ok && v != "" {
 		image = v
 	}
 
-	return sh.RunWithV(map[string]string{"DOCKER_BUILDKIT": "1"}, "docker", "build",
+	return sh.RunWithV(map[string]string{dockerBuildkitEnv: "1"}, "docker", "build",
 		"--build-arg", "GO_VERSION="+getGoVersion(),
 		"--build-arg", "DEV="+strconv.FormatBool(isDEV()),
 		"--build-arg", "FIPS="+strconv.FormatBool(isFIPS()),
@@ -1098,19 +1139,19 @@ func (Docker) Image() error {
 // DOCKER_IMAGE_TAG may be used to completely specify the image tag.
 // PLATFORMS may be used to specify multiplatform build targets. Defaults to [linux/amd64, linux/arm64].
 func (Docker) Publish() error {
-	dockerFile := "Dockerfile"
+	dockerFile := dockerImageFile
 	image := dockerFleetImage
 	version := getVersion()
 	if v, ok := os.LookupEnv(envDockerTag); ok && v != "" {
 		version = v
 	}
 	suffix := dockerSuffix
-	if runtime.GOARCH == "arm64" {
+	if runtime.GOARCH == archARM64 {
 		suffix = dockerArmSuffix
 	}
 	if isFIPS() {
 		dockerFile = dockerBuilderFIPS
-		image += "-fips"
+		image += fipsSuffix
 	}
 	if v, ok := os.LookupEnv(envDockerImage); ok && v != "" {
 		image = v
@@ -1118,7 +1159,7 @@ func (Docker) Publish() error {
 	if v, ok := os.LookupEnv(envDockerImage); ok && v != "" {
 		image = v
 	}
-	dockerEnv := map[string]string{"DOCKER_BUILDKIT": "1"}
+	dockerEnv := map[string]string{dockerBuildkitEnv: "1"}
 	if err := sh.RunWithV(dockerEnv, "docker", "buildx", "create", "--use"); err != nil {
 		return fmt.Errorf("docker buildx create failed: %w", err)
 	}
@@ -1146,7 +1187,7 @@ func (Docker) Publish() error {
 func (Docker) Push() error {
 	image := dockerImage
 	if isFIPS() {
-		image += "-fips"
+		image += fipsSuffix
 	}
 	if v, ok := os.LookupEnv(envDockerImage); ok && v != "" {
 		image = v
@@ -1182,7 +1223,7 @@ func (Docker) CustomAgentImage() error {
 		baseImageTag = v
 	}
 
-	dockerEnv := map[string]string{"DOCKER_BUILDKIT": "1"}
+	dockerEnv := map[string]string{dockerBuildkitEnv: "1"}
 	err = sh.RunWithV(dockerEnv, "docker", "pull", "--platform", "linux/"+runtime.GOARCH, baseImage+":"+baseImageTag)
 	if err != nil {
 		return fmt.Errorf("failed to pull image: %w", err)
@@ -1201,7 +1242,7 @@ func (Docker) CustomAgentImage() error {
 	}
 	fips := ""
 	if isFIPS() {
-		fips = "-fips"
+		fips = fipsSuffix
 	}
 	err = sh.RunWithV(dockerEnv, "docker", "build",
 		"-f", filepath.Join("dev-tools", "e2e", "Dockerfile"),
@@ -1216,7 +1257,7 @@ func (Docker) CustomAgentImage() error {
 	if err != nil {
 		return fmt.Errorf("failed to build custom agent image: %w", err)
 	}
-	if err := os.WriteFile(filepath.Join("build", "custom-image"), []byte(dockerImage+":"+tag), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join("build", "custom-image"), []byte(dockerImage+":"+tag), 0o644); err != nil { //nolint:gosec // G306: image reference, not a secret
 		log.Printf("Unable to save reference to custom agent image: %v", err)
 	}
 	log.Printf("Custom docker image: %s:%s", dockerImage, tag)
@@ -1238,18 +1279,18 @@ func (Test) Unit() error {
 		addFIPSEnvVars(env)
 	}
 	args := []string{
-		"test",
+		cmdTest,
 		"-tags=" + getTagsString(),
 		"-v",
-		"-race",
+		flagRace,
 		"-coverprofile=" + filepath.Join("build", "coverage-"+runtime.GOOS+".out"),
 	}
 	if v, ok := os.LookupEnv(envTestRun); ok && v != "" {
 		args = append(args, "-run", v)
 	}
 	args = append(args, "./...")
-	output, err := teeCommand(env, "go", args...)
-	err = errors.Join(err, os.WriteFile(filepath.Join("build", "test-unit-"+runtime.GOOS+".out"), output, 0o644))
+	output, err := teeCommand(env, args...)
+	err = errors.Join(err, os.WriteFile(filepath.Join("build", "test-unit-"+runtime.GOOS+".out"), output, 0o644)) //nolint:gosec // G306: test output, not a secret
 	return err
 }
 
@@ -1269,10 +1310,10 @@ func (Test) UnitFIPSOnly() error {
 	}
 	env["GODEBUG"] = "fips140=only,tlsmlkem=0"
 	args := []string{
-		"test",
+		cmdTest,
 		"-tags=" + getTagsString(),
 		"-v",
-		"-race",
+		flagRace,
 		"-coverprofile=" + filepath.Join("build", "coverage-"+runtime.GOOS+".out"),
 	}
 	if v, ok := os.LookupEnv(envTestRun); ok && v != "" {
@@ -1280,8 +1321,8 @@ func (Test) UnitFIPSOnly() error {
 	}
 	args = append(args, "./...")
 
-	output, err := teeCommand(env, "go", args...)
-	err = errors.Join(err, os.WriteFile(filepath.Join("build", "test-unit-fipsonly-"+runtime.GOOS+".out"), output, 0o644))
+	output, err := teeCommand(env, args...)
+	err = errors.Join(err, os.WriteFile(filepath.Join("build", "test-unit-fipsonly-"+runtime.GOOS+".out"), output, 0o644)) //nolint:gosec // G306: test output, not a secret
 	return err
 }
 
@@ -1334,11 +1375,11 @@ func (Test) IntegrationRun(ctx context.Context) error {
 		addFIPSEnvVars(env)
 	}
 	args := []string{
-		"test",
+		cmdTest,
 		"-v",
-		"-tags=" + strings.Join([]string{"integration", getTagsString()}, ","),
-		"-count=1",
-		"-race",
+		"-tags=" + strings.Join([]string{tagIntegration, getTagsString()}, ","),
+		flagNoCache,
+		flagRace,
 		"-p",
 		"1",
 	}
@@ -1347,8 +1388,8 @@ func (Test) IntegrationRun(ctx context.Context) error {
 	}
 	args = append(args, "./...")
 
-	output, err := teeCommand(env, "go", args...)
-	err = errors.Join(err, os.WriteFile(filepath.Join("build", "test-int-"+runtime.GOOS+".out"), output, 0o644))
+	output, err := teeCommand(env, args...)
+	err = errors.Join(err, os.WriteFile(filepath.Join("build", "test-int-"+runtime.GOOS+".out"), output, 0o644)) //nolint:gosec // G306: test output, not a secret
 	return err
 }
 
@@ -1388,7 +1429,7 @@ func getServiceToken(ctx context.Context, account, username, password, host stri
 		if err != nil {
 			return "", fmt.Errorf("unable to request new %s token: %w", account, err)
 		}
-		if err := os.WriteFile(".service_token_"+account, []byte(esToken), 0o640); err != nil {
+		if err := os.WriteFile(".service_token_"+account, []byte(esToken), 0o640); err != nil { //nolint:gosec // G306: token for a local test cluster only
 			log.Printf("Unable to persist ES service token: %v", err)
 		}
 		return esToken, nil
@@ -1407,7 +1448,7 @@ func requestServiceToken(ctx context.Context, username, password, url string) (s
 	client := &http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
+				InsecureSkipVerify: true, //nolint:gosec // G402: local test cluster uses self-signed certs
 			},
 		},
 	}
@@ -1450,7 +1491,7 @@ func (Test) Release() error {
 			osName, archName, _ = strings.Cut(v, "/")
 		}
 		path := filepath.Join("build", "distributions", namePrefix+"-"+osName+"-"+archName+".tar.gz")
-		if osName == "windows" {
+		if osName == osWindows {
 			path = filepath.Join("build", "distributions", namePrefix+"-windows-"+archName+".zip")
 		}
 		_, err := os.Stat(path)
@@ -1561,7 +1602,7 @@ func untar(sourceFile, destinationDir string) error {
 
 		switch header.Typeflag {
 		case tar.TypeDir:
-			if err = os.MkdirAll(path, os.FileMode(header.Mode)); err != nil {
+			if err = os.MkdirAll(path, os.FileMode(header.Mode)); err != nil { //nolint:gosec // G115: mode comes from our own release archive and fits in uint32
 				return err
 			}
 		case tar.TypeReg:
@@ -1579,7 +1620,7 @@ func untar(sourceFile, destinationDir string) error {
 				return err
 			}
 
-			if err = os.Chmod(path, os.FileMode(header.Mode)); err != nil {
+			if err = os.Chmod(path, os.FileMode(header.Mode)); err != nil { //nolint:gosec // G115: mode comes from our own release archive and fits in uint32
 				return err
 			}
 
@@ -1666,14 +1707,14 @@ func checkFIPSBinary(path string) error {
 
 	for _, setting := range info.Settings {
 		switch setting.Key {
-		case "-tags":
+		case flagTags:
 			foundTags = true
 			requireFipsTag := false
 			fips140Tag := false
 
 			for _, tag := range strings.Split(setting.Value, ",") {
 				switch tag {
-				case "requirefips":
+				case tagRequireFIPS:
 					requireFipsTag = true
 				case "fips140v1.0":
 					fips140Tag = true
@@ -1713,7 +1754,7 @@ func checkFIPSBinary(path string) error {
 }
 
 // JunitReport produces junit report files from test-output files in the build dir.
-func (Test) JunitReport() error {
+func (Test) JunitReport(ctx context.Context) error {
 	return filepath.WalkDir("build", func(name string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return fmt.Errorf("walkdir error: %w", err)
@@ -1725,7 +1766,7 @@ func (Test) JunitReport() error {
 			return nil
 		}
 
-		srcFile, err := os.Open(name)
+		srcFile, err := os.Open(name) //nolint:gosec // G122: walks the local build dir only
 		if err != nil {
 			return fmt.Errorf("unable to open source file: %w", err)
 		}
@@ -1733,7 +1774,8 @@ func (Test) JunitReport() error {
 		var output bytes.Buffer
 		var stderr bytes.Buffer
 
-		cmd := exec.Command("go", "tool", "-modfile", filepath.Join("dev-tools", "go.mod"), "github.com/jstemmer/go-junit-report/v2")
+		//nolint:gosec // G204: fixed tool invocation, only the modfile path is computed
+		cmd := exec.CommandContext(ctx, "go", "tool", "-modfile", filepath.Join("dev-tools", "go.mod"), "github.com/jstemmer/go-junit-report/v2")
 		cmd.Stdin = srcFile
 		cmd.Stdout = &output
 		cmd.Stderr = &stderr
@@ -1742,7 +1784,7 @@ func (Test) JunitReport() error {
 		if err != nil {
 			log.Printf("Junit report stderr: %s", stderr.String())
 		}
-		return errors.Join(err, os.WriteFile(name+".xml", output.Bytes(), 0o644))
+		return errors.Join(err, os.WriteFile(name+".xml", output.Bytes(), 0o644)) //nolint:gosec // G306: test report, not a secret
 	})
 }
 
@@ -1770,17 +1812,19 @@ func (Test) Benchmark() error {
 	if v, ok := os.LookupEnv(envBenchmarkArgs); ok && v != "" {
 		benchmarkArgs = v
 	}
-	args := []string{"test", "-bench=" + bFilter, "-tags=" + getTagsString(), "-run=" + bFilter}
-	args = append(args, strings.Split(benchmarkArgs, " ")...)
+	args := slices.Concat(
+		[]string{cmdTest, "-bench=" + bFilter, "-tags=" + getTagsString(), "-run=" + bFilter},
+		strings.Split(benchmarkArgs, " "),
+	)
 	args = append(args, "./...")
 
-	output, err := teeCommand(environMap(), "go", args...)
+	output, err := teeCommand(environMap(), args...)
 
 	outFile := "benchmark-" + getCommitID() + ".out"
 	if v, ok := os.LookupEnv(envBenchBase); ok && v != "" {
 		outFile = v
 	}
-	err = errors.Join(err, os.WriteFile(filepath.Join("build", outFile), output, 0o644))
+	err = errors.Join(err, os.WriteFile(filepath.Join("build", outFile), output, 0o644)) //nolint:gosec // G306: benchmark output, not a secret
 	return err
 }
 
@@ -1870,7 +1914,7 @@ func createCA() error {
 }
 
 func createPassphrase() error {
-	return os.WriteFile(passFile, []byte("abcd1234"), 0o640)
+	return os.WriteFile(passFile, []byte("abcd1234"), 0o640) //nolint:gosec // G306: fixed passphrase for throwaway e2e test certs
 }
 
 func createPrivateKey() error {
@@ -2025,7 +2069,7 @@ func (Test) E2eUp(ctx context.Context) error {
 		return fmt.Errorf("unable to key apm-server's api_key: %w", err)
 	}
 
-	if err := sh.RunWithV(map[string]string{"KIBANA_TOKEN": kibanaToken, "APM_KEY": apmKey},
+	if err := sh.RunWithV(map[string]string{kibanaTokenEnv: kibanaToken, apmKeyEnv: apmKey},
 		"docker", "compose",
 		"-f", filepath.Join("dev-tools", "e2e", "docker-compose.yml"),
 		"--env-file", filepath.Join("dev-tools", "integration", ".env"),
@@ -2047,7 +2091,7 @@ func getAPMKey(ctx context.Context, username, password, host string, body io.Rea
 		if err != nil {
 			return "", fmt.Errorf("unable to request new apm key: %w", err)
 		}
-		if err := os.WriteFile(".apm_server_api_key", []byte(key), 0o640); err != nil {
+		if err := os.WriteFile(".apm_server_api_key", []byte(key), 0o640); err != nil { //nolint:gosec // G306: API key for a local test cluster only
 			log.Printf("Unable to persist API key for apm-server: %v", err)
 		}
 		return key, nil
@@ -2067,7 +2111,7 @@ func requestAPIKey(ctx context.Context, username, password, url string, body io.
 	client := &http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
+				InsecureSkipVerify: true, //nolint:gosec // G402: local test cluster uses self-signed certs
 			},
 		},
 	}
@@ -2103,7 +2147,7 @@ func waitForAPMServer(ctx context.Context) error {
 	client := &http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
+				InsecureSkipVerify: true, //nolint:gosec // G402: local test cluster uses self-signed certs
 			},
 		},
 	}
@@ -2152,11 +2196,11 @@ func (Test) E2eRun(ctx context.Context) error {
 	}
 	image := dockerImage
 	if isFIPS() {
-		image += "-fips"
+		image += fipsSuffix
 	}
 	tag := getVersion()
-	if isDEV() { // tags can have an addtional -dev
-		tag += "-dev"
+	if isDEV() { // tags can have an additional -dev
+		tag += devSuffix
 	}
 	if v, ok := os.LookupEnv(envDockerTag); ok && v != "" {
 		tag = v
@@ -2176,23 +2220,23 @@ func (Test) E2eRun(ctx context.Context) error {
 	var b bytes.Buffer
 	w := io.MultiWriter(&b, os.Stdout)
 
-	args := []string{"test", "-v", "-timeout", "30m", "-tags=" + strings.Join([]string{"e2e", getTagsString()}, ","), "-count=1", "-race", "-p", "1", "./..."}
+	args := []string{cmdTest, "-v", "-timeout", "30m", "-tags=" + strings.Join([]string{tagE2E, getTagsString()}, ","), flagNoCache, flagRace, "-p", "1", "./..."}
 	if v, ok := os.LookupEnv(envTestRun); ok && v != "" {
 		args = append(args, "-run", v)
 	}
-	cmd := exec.Command("go", args...)
-	cmd.Dir = "testing"
+	cmd := exec.CommandContext(ctx, "go", args...)
+	cmd.Dir = testingDir
 	cmd.Env = cmdEnv
 	cmd.Stdout = w
 	cmd.Stderr = w
 	err = cmd.Run()
-	err = errors.Join(err, os.WriteFile(filepath.Join("build", "test-e2e-"+runtime.GOOS+".out"), b.Bytes(), 0o644))
+	err = errors.Join(err, os.WriteFile(filepath.Join("build", "test-e2e-"+runtime.GOOS+".out"), b.Bytes(), 0o644)) //nolint:gosec // G306: test output, not a secret
 	return err
 }
 
 // E2eDown destroys the e2e and integration test environment with docker compose.
 func (Test) E2eDown() error {
-	err := sh.RunWithV(map[string]string{"KIBANA_TOKEN": "supress-warning", "APM_KEY": "supress-warning"}, "docker", "compose", "-f", filepath.Join("dev-tools", "e2e", "docker-compose.yml"), "--env-file", filepath.Join("dev-tools", "integration", ".env"), "down")
+	err := sh.RunWithV(map[string]string{kibanaTokenEnv: placeholderEnvValue, apmKeyEnv: placeholderEnvValue}, "docker", "compose", "-f", filepath.Join("dev-tools", "e2e", "docker-compose.yml"), "--env-file", filepath.Join("dev-tools", "integration", ".env"), "down")
 	if err != nil {
 		return fmt.Errorf("failed to stop e2e environment: %w", err)
 	}
@@ -2216,7 +2260,7 @@ func (Test) ConvertCoverage() error {
 // SNAPSHOT will be set to true, PLATFORMS will be set to: [linux/amd64], DOCKER_IMAGE will be set to docker.elastic.co/beats-ci/elastic-agent-cloud-fleet, and DOCKER_IMAGE_TAG will be set to one that reflects the git commit and current Unix epoch time.
 func (Test) CloudE2E() {
 	os.Setenv(envSnapshot, "true")
-	os.Setenv(envPlatforms, "linux/amd64")
+	os.Setenv(envPlatforms, platformLinuxAMD64)
 	os.Setenv(envDockerImage, dockerImage)
 	os.Setenv(envDockerTag, fmt.Sprintf("git-%s-%d", getCommitID(), time.Now().Unix()))
 	mg.SerialDeps(mg.F(mkDir, "build"), Docker.Cover, Docker.CustomAgentImage, Docker.Push, Test.CloudE2EUp, Test.CloudE2ERun, Test.CloudE2EDown)
@@ -2225,7 +2269,7 @@ func (Test) CloudE2E() {
 // CloudE2EUp provisions the cloud deployment for testing.
 // DOCKER_IMAGE can be used to specify the custom integration server image.
 // DOCKER_IMAGE_TAG can be used to specify the tag of the custom integration server.
-func (Test) CloudE2EUp() error {
+func (Test) CloudE2EUp(ctx context.Context) error {
 	os.Setenv(envSnapshot, "true")
 	imageName := dockerImage
 	imageTag := getVersion()
@@ -2242,7 +2286,7 @@ func (Test) CloudE2EUp() error {
 		return fmt.Errorf("unable to derive stack image tag: %w", err)
 	}
 
-	initCmd := exec.Command("terraform", "init")
+	initCmd := exec.CommandContext(ctx, "terraform", "init")
 	initCmd.Dir = filepath.Join("dev-tools", "cloud", "terraform")
 	initOut, err := initCmd.CombinedOutput()
 	if err != nil {
@@ -2251,14 +2295,14 @@ func (Test) CloudE2EUp() error {
 	}
 	args := []string{
 		"apply",
-		"-auto-approve",
-		"-var", "git_commit=" + getCommitID(),
-		"-var", "elastic_agent_docker_image=" + imageName + ":" + imageTag,
-		"-var", "kibana_docker_image=docker.elastic.co/cloud-release/kibana-cloud:" + stackImageTag,
-		"-var", "elasticsearch_docker_image=docker.elastic.co/cloud-release/elasticsearch-cloud-ess:" + stackImageTag,
+		flagAutoApprove,
+		flagVar, "git_commit=" + getCommitID(),
+		flagVar, "elastic_agent_docker_image=" + imageName + ":" + imageTag,
+		flagVar, "kibana_docker_image=docker.elastic.co/cloud-release/kibana-cloud:" + stackImageTag,
+		flagVar, "elasticsearch_docker_image=docker.elastic.co/cloud-release/elasticsearch-cloud-ess:" + stackImageTag,
 	}
 	log.Printf("Running terraform %s", strings.Join(args, " "))
-	applyCmd := exec.Command("terraform", args...)
+	applyCmd := exec.CommandContext(ctx, "terraform", args...)
 	applyCmd.Dir = filepath.Join("dev-tools", "cloud", "terraform")
 	applyCmd.Stdout = os.Stdout
 	applyCmd.Stderr = os.Stderr
@@ -2425,7 +2469,7 @@ func probeStatusOK(ctx context.Context, client *http.Client, statusURL, user, pa
 }
 
 // CloudE2EDown destroys the testing cloud deployment.
-func (Test) CloudE2EDown() error {
+func (Test) CloudE2EDown(ctx context.Context) error {
 	imageName := dockerImage
 	imageTag := getVersion()
 
@@ -2443,13 +2487,13 @@ func (Test) CloudE2EDown() error {
 
 	args := []string{
 		"destroy",
-		"-auto-approve",
-		"-var", "elastic_agent_docker_image=" + imageName + ":" + imageTag,
-		"-var", "kibana_docker_image=docker.elastic.co/cloud-release/kibana-cloud:" + stackImageTag,
-		"-var", "elasticsearch_docker_image=docker.elastic.co/cloud-release/elasticsearch-cloud-ess:" + stackImageTag,
+		flagAutoApprove,
+		flagVar, "elastic_agent_docker_image=" + imageName + ":" + imageTag,
+		flagVar, "kibana_docker_image=docker.elastic.co/cloud-release/kibana-cloud:" + stackImageTag,
+		flagVar, "elasticsearch_docker_image=docker.elastic.co/cloud-release/elasticsearch-cloud-ess:" + stackImageTag,
 	}
 	log.Printf("Running terraform %s", strings.Join(args, " "))
-	cmd := exec.Command("terraform", args...)
+	cmd := exec.CommandContext(ctx, "terraform", args...)
 	cmd.Dir = filepath.Join("dev-tools", "cloud", "terraform")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -2471,7 +2515,7 @@ func stackImageTagFromEnv() (string, error) {
 }
 
 // CloudE2ERun runs tests against the remote cloud deployment.
-func (Test) CloudE2ERun() error {
+func (Test) CloudE2ERun(ctx context.Context) error {
 	fleetURL, err := cloudTFOutput("fleet_url")
 	if err != nil {
 		return err
@@ -2491,8 +2535,8 @@ func (Test) CloudE2ERun() error {
 
 	var b bytes.Buffer
 	w := io.MultiWriter(&b, os.Stdout)
-	cmd := exec.Command("go", "test", "-v", "-timeout", "30m", "-tags=cloude2e", "-count=1", "-p", "1", "./...")
-	cmd.Dir = "testing"
+	cmd := exec.CommandContext(ctx, "go", "test", "-v", "-timeout", "30m", "-tags=cloude2e", "-count=1", "-p", "1", "./...")
+	cmd.Dir = testingDir
 	cmd.Env = append(os.Environ(),
 		"FLEET_SERVER_URL="+fleetURL,
 		"KIBANA_URL="+kibanaURL,
@@ -2502,6 +2546,6 @@ func (Test) CloudE2ERun() error {
 	cmd.Stdout = w
 	cmd.Stderr = w
 	err = cmd.Run()
-	err = errors.Join(err, os.WriteFile(filepath.Join("build", "test-cloude2e.out"), b.Bytes(), 0o644))
+	err = errors.Join(err, os.WriteFile(filepath.Join("build", "test-cloude2e.out"), b.Bytes(), 0o644)) //nolint:gosec // G306: test output, not a secret
 	return err
 }
