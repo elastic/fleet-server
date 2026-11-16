@@ -627,14 +627,41 @@ func (Check) Ci() {
 	mg.SerialDeps(Generate, Check.Imports, Check.Fix, Check.Headers, Check.Notice, Check.NoChanges)
 }
 
-// Go installs and runs golangci-lint.
-// FIPS enables linting for files containing the requirefips tag.
+// lintTagSet is one golangci-lint run: the build tags to use and the directory
+// (a Go module root) to run in.
+type lintTagSet struct {
+	Dir  string
+	Tags string
+}
+
+// lintTagSets are chosen so that every //go:build expression in the repo is
+// satisfied by at least one run, so all files get linted.
+var lintTagSets = []lintTagSet{
+	{Tags: ""},
+	{Tags: "integration,snapshot,requirefips,mage"},
+	// testing is a separate Go module.
+	{Dir: "testing", Tags: "e2e,cloude2e"},
+}
+
+// Go installs and runs golangci-lint once per build tag set.
 func (Check) Go() error {
 	mg.Deps(getLinter)
-	if isFIPS() {
-		return sh.RunV("golangci-lint", "run", "-v", "--build-tags", "requirefips")
+	var err error
+	for _, set := range lintTagSets {
+		args := []string{"run", "-v"}
+		if set.Tags != "" {
+			args = append(args, "--build-tags", set.Tags)
+		}
+		log.Printf("Running golangci-lint in %q with tags: %q", set.Dir, set.Tags)
+		cmd := exec.Command("golangci-lint", args...)
+		cmd.Dir = set.Dir
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if e := cmd.Run(); e != nil {
+			err = errors.Join(err, fmt.Errorf("golangci-lint dir=%q tags=%q: %w", set.Dir, set.Tags, e))
+		}
 	}
-	return sh.RunV("golangci-lint", "run", "-v")
+	return err
 }
 
 // Fix runs go fix ./... with all build tags used in the repo root, and testing dir.
@@ -690,7 +717,6 @@ func getLinter() error {
 }
 
 // All runs all code checks: check:ci, check:go.
-// FIPS passes the requirefips tag to the linter.
 func (Check) All() {
 	mg.SerialDeps(Check.Ci, Check.Go)
 }
