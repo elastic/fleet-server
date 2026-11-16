@@ -433,12 +433,12 @@ func teeCommand(env map[string]string, args ...string) ([]byte, error) {
 
 // GetVersion displays the fleet-server version with all qualifiers.
 func GetVersion() {
-	fmt.Println(getVersion())
+	fmt.Fprintln(os.Stdout, getVersion())
 }
 
 // Platforms displays all possible plaforms.
 func Platforms() {
-	fmt.Println(strings.Join(getPlatforms(), " "))
+	fmt.Fprintln(os.Stdout, strings.Join(getPlatforms(), " "))
 }
 
 // Multipass launches a mulitpass instance for development.
@@ -489,7 +489,7 @@ func Clean() error {
 func Generate() error {
 	out, err := sh.Output("go", "generate", "./...")
 	if err != nil {
-		fmt.Println(out)
+		fmt.Fprintln(os.Stdout, out)
 		return fmt.Errorf("go generate failure: %w", err)
 	}
 	mg.Deps(Check.Headers)
@@ -637,17 +637,17 @@ func (Check) NoChanges() error {
 	// sh.Output instead of sh.RunV as RunV has some level of terminal control that makes buildkite hang.
 	out, err := sh.Output("git", "diff")
 	if len(out) > 0 {
-		fmt.Println(out)
+		fmt.Fprintln(os.Stdout, out)
 	}
 	if err != nil {
 		return fmt.Errorf("git diff failure: %w", err)
 	}
 	if out, err := sh.Output("git", "update-index", "--refresh"); err != nil {
-		fmt.Println(out)
+		fmt.Fprintln(os.Stdout, out)
 		return fmt.Errorf("git update-index failure: %w", err)
 	}
 	if out, err := sh.Output("git", "diff-index", "--exit-code", "HEAD", "--"); err != nil {
-		fmt.Println(out)
+		fmt.Fprintln(os.Stdout, out)
 		return fmt.Errorf("git diff-index failure: %w", err)
 	}
 	return nil
@@ -688,7 +688,7 @@ func (Check) Go(ctx context.Context) error {
 		if set.Tags != "" {
 			args = append(args, "--build-tags="+set.Tags)
 		}
-		fmt.Printf(">> lint: %s build-tags=%q\n", set.Name, set.Tags)
+		fmt.Fprintf(os.Stdout, ">> lint: %s build-tags=%q\n", set.Name, set.Tags)
 		if e := sh.RunV("golangci-lint", args...); e != nil {
 			err = errors.Join(err, fmt.Errorf("golangci-lint %s build-tags=%q: %w", set.Name, set.Tags, e))
 		}
@@ -2000,7 +2000,7 @@ func validateCerts() error {
 		certFile,
 	)
 	if err != nil {
-		fmt.Println(output)
+		fmt.Fprintln(os.Stdout, output)
 		return fmt.Errorf("unable to verify fleet-server cert with openssl: %w", err)
 	}
 	output, err = sh.Output("openssl",
@@ -2009,7 +2009,7 @@ func validateCerts() error {
 		"-passin", "file:"+passFile,
 	)
 	if err != nil {
-		fmt.Println(output)
+		fmt.Fprintln(os.Stdout, output)
 		return fmt.Errorf("unable to verify fleet-server key with openssl: %w", err)
 	}
 	return nil
