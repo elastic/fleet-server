@@ -10,7 +10,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/elastic/elastic-agent-libs/str"
+	"github.com/elastic/beats/v7/pkg/str"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/smap"
 )
