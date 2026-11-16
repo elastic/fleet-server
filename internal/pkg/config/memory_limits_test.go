@@ -81,6 +81,20 @@ func TestMemEnvLimitsHostTier(t *testing.T) {
 	require.Equal(t, int64(10_000), l.Server.CheckinLimit.Max, "a host without a container limit must keep the tier limit of its RAM")
 }
 
+func TestMemEnvLimitsMemoryPercent(t *testing.T) {
+	setGOGC(t, 100)
+	setMemory(t, 4096, memSourceCgroup)
+	setHostMemory(t, 65_536)
+	log := testlog.SetLogger(t)
+	in := memInput(Runtime{})
+
+	byDefault := memEnvLimits(&log, in).Server.CheckinLimit.Max
+	in.Server.Features.LimitsFromMemory.MemoryPercent = 100
+	withAllMemory := memEnvLimits(&log, in).Server.CheckinLimit.Max
+
+	require.Greater(t, withAllMemory, byDefault, "memory_percent of 100 must allow more check-ins than the default of 75")
+}
+
 func TestMemEnvLimitsRuntime(t *testing.T) {
 	setGOGC(t, 100)
 	setHostMemory(t, 65_536)
@@ -144,9 +158,9 @@ func TestCheckinMaxFromMemory(t *testing.T) {
 	// perAgent is the memory of one agent with its long poll and idle connection.
 	perAgent := int64(checkinLongPollBytes + checkinIdleConnBytes)
 
-	// expectedCheckinMax applies the formula to memoryMB, gogc and cacheMaxCost.
-	expectedCheckinMax := func(memoryMB, gogc, cacheMaxCost int64) int64 {
-		return (memoryMB*mib*fleetMemoryPercent/(100+gogc) - cacheMaxCost) / perAgent
+	// expectedCheckinMax applies the formula to memoryMB, memoryPercent, gogc and cacheMaxCost.
+	expectedCheckinMax := func(memoryMB, memoryPercent, gogc, cacheMaxCost int64) int64 {
+		return (memoryMB*mib*memoryPercent/(100+gogc) - cacheMaxCost) / perAgent
 	}
 
 	testCases := []struct {
@@ -154,6 +168,7 @@ func TestCheckinMaxFromMemory(t *testing.T) {
 		TierCheckinMax     int64
 		HostMemoryMB       uint64
 		MemoryMB           uint64
+		MemoryPercent      int
 		GOGC               int
 		CacheMaxCost       int64
 		ExpectedCheckinMax int64
@@ -163,21 +178,37 @@ func TestCheckinMaxFromMemory(t *testing.T) {
 			TierCheckinMax:     1000,
 			MemoryMB:           4096,
 			GOGC:               100,
-			ExpectedCheckinMax: expectedCheckinMax(4096, 100, defaultCacheMaxCost),
+			ExpectedCheckinMax: expectedCheckinMax(4096, defaultLimitsFromMemoryPercent, 100, defaultCacheMaxCost),
 		},
 		{
 			Name:               "calculate limit from memory with GOGC=20",
 			TierCheckinMax:     1000,
 			MemoryMB:           4096,
 			GOGC:               20,
-			ExpectedCheckinMax: expectedCheckinMax(4096, 20, defaultCacheMaxCost),
+			ExpectedCheckinMax: expectedCheckinMax(4096, defaultLimitsFromMemoryPercent, 20, defaultCacheMaxCost),
 		},
 		{
 			Name:               "use default GOGC when GC is off",
 			TierCheckinMax:     1000,
 			MemoryMB:           4096,
 			GOGC:               -1,
-			ExpectedCheckinMax: expectedCheckinMax(4096, 100, defaultCacheMaxCost),
+			ExpectedCheckinMax: expectedCheckinMax(4096, defaultLimitsFromMemoryPercent, 100, defaultCacheMaxCost),
+		},
+		{
+			Name:               "use configured memory_percent instead of the default",
+			TierCheckinMax:     1000,
+			MemoryMB:           4096,
+			MemoryPercent:      100,
+			GOGC:               100,
+			ExpectedCheckinMax: expectedCheckinMax(4096, 100, 100, defaultCacheMaxCost),
+		},
+		{
+			Name:               "keep tier limit when memory_percent is not valid",
+			TierCheckinMax:     1000,
+			MemoryMB:           4096,
+			MemoryPercent:      101,
+			GOGC:               100,
+			ExpectedCheckinMax: 1000,
 		},
 		{
 			Name:               "use configured cache instead of tier cache",
@@ -185,7 +216,7 @@ func TestCheckinMaxFromMemory(t *testing.T) {
 			MemoryMB:           4096,
 			GOGC:               100,
 			CacheMaxCost:       512 * mib,
-			ExpectedCheckinMax: expectedCheckinMax(4096, 100, 512*mib),
+			ExpectedCheckinMax: expectedCheckinMax(4096, defaultLimitsFromMemoryPercent, 100, 512*mib),
 		},
 		{
 			Name:               "keep tier limit when formula gives less",
@@ -232,7 +263,7 @@ func TestCheckinMaxFromMemory(t *testing.T) {
 			tier := defaultEnvLimits()
 			tier.Server.CheckinLimit.Max = tc.TierCheckinMax
 
-			got := checkinMaxFromMemory(tier, tc.MemoryMB, tc.GOGC, tc.CacheMaxCost)
+			got := checkinMaxFromMemory(tier, tc.MemoryMB, cmp.Or(tc.MemoryPercent, defaultLimitsFromMemoryPercent), tc.GOGC, tc.CacheMaxCost)
 
 			require.Equal(t, tc.ExpectedCheckinMax, got)
 		})
@@ -403,7 +434,13 @@ func setHostMemory(t *testing.T, memoryMB uint64) {
 
 // memInput returns an input with rt and the check-in limit from memory turned on.
 func memInput(rt Runtime) *Input {
-	return &Input{Server: Server{Runtime: rt, Features: FeatureFlags{LimitsFromMemory: true}}}
+	return &Input{Server: Server{
+		Runtime: rt,
+		Features: FeatureFlags{LimitsFromMemory: LimitsFromMemoryConfig{
+			Enabled:       true,
+			MemoryPercent: defaultLimitsFromMemoryPercent,
+		}},
+	}}
 }
 
 // setGOGC sets the GOGC of the runtime until the test ends.

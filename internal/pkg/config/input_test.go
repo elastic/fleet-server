@@ -153,3 +153,23 @@ func TestServerBulkValidate(t *testing.T) {
 		require.NoError(t, cfg.Validate())
 	})
 }
+
+func TestLimitsFromMemoryValidate(t *testing.T) {
+	t.Run("rejects zero MemoryPercent", func(t *testing.T) {
+		cfg := LimitsFromMemoryConfig{}
+		cfg.InitDefaults()
+		cfg.MemoryPercent = 0
+		require.Error(t, cfg.Validate())
+	})
+	t.Run("rejects MemoryPercent above 100", func(t *testing.T) {
+		cfg := LimitsFromMemoryConfig{}
+		cfg.InitDefaults()
+		cfg.MemoryPercent = 101
+		require.Error(t, cfg.Validate())
+	})
+	t.Run("accepts default MemoryPercent", func(t *testing.T) {
+		cfg := LimitsFromMemoryConfig{}
+		cfg.InitDefaults()
+		require.NoError(t, cfg.Validate())
+	})
+}

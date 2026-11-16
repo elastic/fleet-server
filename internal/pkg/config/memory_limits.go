@@ -25,12 +25,6 @@ const (
 	// checkinIdleConnBytes is an upper estimate of the memory of the idle
 	// keep-alive TLS connection that an agent keeps open for acks.
 	checkinIdleConnBytes = 32 * 1024
-
-	// fleetMemoryPercent is the percentage of the memory that Fleet Server plans
-	// to use. The rest is left for Elastic Agent and the other processes that
-	// share the container and its GOMEMLIMIT, such as APM Server in the
-	// Integrations Server on ECH.
-	fleetMemoryPercent = 75
 )
 
 // memSource is the source of the memory value that sets the limits.
@@ -53,9 +47,9 @@ var (
 )
 
 func memEnvLimits(log *zerolog.Logger, in *Input) *envLimits {
-	// Without limits_from_memory, select the tier as before, without server.runtime.
+	fromMemory := in.Server.Features.LimitsFromMemory
 	var rt Runtime
-	if in.Server.Features.LimitsFromMemory {
+	if fromMemory.Enabled {
 		rt = in.Server.Runtime
 	}
 	mem, source := availableMemoryMB(rt)
@@ -66,8 +60,8 @@ func memEnvLimits(log *zerolog.Logger, in *Input) *envLimits {
 	}
 
 	gogc := gcPercent(rt)
-	if in.Server.Features.LimitsFromMemory {
-		limits = limitsFromMemory(limits, mem, gogc, in.Cache.MaxCost)
+	if fromMemory.Enabled {
+		limits = limitsFromMemory(limits, mem, fromMemory.MemoryPercent, gogc, in.Cache.MaxCost)
 	}
 	log.Info().Uint64("memory_mb", mem).Str("memory_source", string(source)).Int("gogc", gogc).Uint64("recommended_mb", limits.RecommendedRAM).
 		Int64("checkin_limit_max", limits.Server.CheckinLimit.Max).Msg("Found settings with recommended ram.")
@@ -90,8 +84,8 @@ func limitsFromTier(mem uint64) *envLimits {
 }
 
 // limitsFromMemory calculates the limits that depend on the available memory.
-func limitsFromMemory(tier *envLimits, mem uint64, gogc int, cacheMaxCost int64) *envLimits {
-	checkinMax := checkinMaxFromMemory(tier, mem, gogc, cacheMaxCost)
+func limitsFromMemory(tier *envLimits, mem uint64, memoryPercent, gogc int, cacheMaxCost int64) *envLimits {
+	checkinMax := checkinMaxFromMemory(tier, mem, memoryPercent, gogc, cacheMaxCost)
 	maxConnections := maxConnectionsFromCheckinMax(tier, checkinMax)
 
 	limits := tier.clone()
@@ -102,10 +96,15 @@ func limitsFromMemory(tier *envLimits, mem uint64, gogc int, cacheMaxCost int64)
 }
 
 // checkinMaxFromMemory returns the checkin_limit.max that the memory allows for the tier limits.
-func checkinMaxFromMemory(limits *envLimits, mem uint64, gogc int, cacheMaxCost int64) int64 {
+func checkinMaxFromMemory(limits *envLimits, mem uint64, memoryPercent, gogc int, cacheMaxCost int64) int64 {
 	// Skip the calculation when there is no check-in limit.
 	tierMax := limits.Server.CheckinLimit.Max
 	if tierMax <= 0 {
+		return tierMax
+	}
+
+	// Skip the calculation when memory_percent is not a valid percentage.
+	if memoryPercent <= 0 || memoryPercent > 100 {
 		return tierMax
 	}
 
@@ -129,7 +128,7 @@ func checkinMaxFromMemory(limits *envLimits, mem uint64, gogc int, cacheMaxCost 
 
 	// live is the heap that Fleet Server can keep in use and still fit in its
 	// share of the memory when the heap grows before the next GC.
-	live := int64(min(mem, math.MaxInt32)) * 1024 * 1024 * fleetMemoryPercent / (100 + growth)
+	live := int64(min(mem, math.MaxInt32)) * 1024 * 1024 * int64(memoryPercent) / (100 + growth)
 
 	// The cache and the agents share the live heap, so the limit is the number
 	// of agents that fit in what the cache leaves.
