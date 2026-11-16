@@ -627,27 +627,34 @@ func (Check) Ci() {
 	mg.SerialDeps(Generate, Check.Imports, Check.Fix, Check.Headers, Check.Notice, Check.NoChanges)
 }
 
-// lintTagSets are the build tag sets golangci-lint runs with, chosen so that
-// every //go:build expression in the root module is satisfied by at least one
-// run. Keep in sync with .github/workflows/golangci-lint.yml.
-var lintTagSets = []string{
-	"",
-	"snapshot,requirefips,mage",
-	"integration",
+// buildTagSet is one build-tag combination golangci-lint runs with.
+type buildTagSet struct {
+	Name string
+	Tags string
 }
 
-// Go installs and runs golangci-lint once per build tag set.
+// buildTagSets are the build-tag combinations we lint with so that files
+// behind a //go:build tag are actually checked. They are chosen so that every
+// //go:build expression in the root module is satisfied by at least one set.
+// Keep in sync with .github/workflows/golangci-lint.yml.
+var buildTagSets = []buildTagSet{
+	{Name: "default", Tags: ""},
+	{Name: "snapshot-fips-mage", Tags: "snapshot,requirefips,mage"},
+	{Name: "integration", Tags: "integration"},
+}
+
+// Go installs and runs golangci-lint once per build-tag set.
 func (Check) Go() error {
 	mg.Deps(getLinter)
 	var err error
-	for _, tags := range lintTagSets {
+	for _, set := range buildTagSets {
 		args := []string{"run", "-v"}
-		if tags != "" {
-			args = append(args, "--build-tags", tags)
+		if set.Tags != "" {
+			args = append(args, "--build-tags="+set.Tags)
 		}
-		log.Printf("Running golangci-lint with tags: %q", tags)
+		fmt.Printf(">> lint: %s build-tags=%q\n", set.Name, set.Tags)
 		if e := sh.RunV("golangci-lint", args...); e != nil {
-			err = errors.Join(err, fmt.Errorf("golangci-lint tags=%q: %w", tags, e))
+			err = errors.Join(err, fmt.Errorf("golangci-lint %s build-tags=%q: %w", set.Name, set.Tags, e))
 		}
 	}
 	return err
