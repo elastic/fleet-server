@@ -24,7 +24,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
 
-	"github.com/elastic/elastic-agent-libs/redact"
+	"github.com/elastic/beats/v7/pkg/redact"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
@@ -42,8 +42,10 @@ const (
 	healthStatusRecoverableError = "StatusRecoverableError"
 	serverCapabilities           = uint64(protobufs.ServerCapabilities_ServerCapabilities_AcceptsStatus |
 		protobufs.ServerCapabilities_ServerCapabilities_AcceptsEffectiveConfig)
-	tagsKey    = "tags"
-	reenrolled = "reenrolled"
+	tagsKey             = "tags"
+	reenrolled          = "reenrolled"
+	contentTypeHeader   = "Content-Type"
+	protobufContentType = "application/x-protobuf"
 )
 
 type OpAMPT struct {
@@ -96,7 +98,7 @@ func (oa *OpAMPT) Init() error {
 						Accept:         false,
 						HTTPStatusCode: http.StatusTooManyRequests,
 						HTTPResponseHeader: map[string]string{
-							"Content-Type": "application/x-protobuf",
+							contentTypeHeader: protobufContentType,
 						},
 					}
 				}
@@ -106,7 +108,7 @@ func (oa *OpAMPT) Init() error {
 						Accept:         false,
 						HTTPStatusCode: http.StatusUnauthorized,
 						HTTPResponseHeader: map[string]string{
-							"Content-Type": "application/x-protobuf",
+							contentTypeHeader: protobufContentType,
 						},
 					}
 				}
