@@ -21,7 +21,10 @@ jobs:
             TAGS: ""
             DIR: .
           - GOOS: linux
-            TAGS: integration,snapshot,requirefips,mage
+            TAGS: snapshot,requirefips,mage
+            DIR: .
+          - GOOS: linux
+            TAGS: integration
             DIR: .
           # testing is a separate Go module.
           - GOOS: linux

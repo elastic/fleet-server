@@ -638,7 +638,8 @@ type lintTagSet struct {
 // satisfied by at least one run, so all files get linted.
 var lintTagSets = []lintTagSet{
 	{Tags: ""},
-	{Tags: "integration,snapshot,requirefips,mage"},
+	{Tags: "snapshot,requirefips,mage"},
+	{Tags: "integration"},
 	// testing is a separate Go module.
 	{Dir: "testing", Tags: "e2e,cloude2e"},
 }
