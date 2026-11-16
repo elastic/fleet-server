@@ -13,8 +13,8 @@ import (
 	"net"
 	"net/http"
 
-	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
+	"github.com/elastic/beats/v7/pkg/logp"
+	"github.com/elastic/beats/v7/pkg/transport/tlscommon"
 	"github.com/go-chi/chi/v5"
 
 	"github.com/rs/zerolog"
