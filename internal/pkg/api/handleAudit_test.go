@@ -91,9 +91,7 @@ func Test_Audit_validateUnenrollRequst(t *testing.T) {
 
 func Test_Audit_markUnenroll(t *testing.T) {
 	agent := &model.Agent{
-		ESDocument: model.ESDocument{
-			Id: "test-id",
-		},
+		Id: "test-id",
 	}
 	bulker := ftesting.NewMockBulk()
 	bulker.On("Update", mock.Anything, dl.FleetAgents, agent.Id, mock.Anything, mock.Anything, mock.Anything).Return(nil)
@@ -137,9 +135,7 @@ func Test_Audit_unenroll(t *testing.T) {
 
 	t.Run("ok", func(t *testing.T) {
 		agent := &model.Agent{
-			ESDocument: model.ESDocument{
-				Id: "test-id",
-			},
+			Id: "test-id",
 		}
 		bulker := ftesting.NewMockBulk()
 		bulker.On("Update", mock.Anything, dl.FleetAgents, agent.Id, mock.Anything, mock.Anything, mock.Anything).Return(nil)

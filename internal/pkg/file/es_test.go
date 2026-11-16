@@ -22,29 +22,27 @@ func TestChunkInfoResultsParseCorrectly(t *testing.T) {
 	size := 3417671
 
 	fakeBulk.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{
-		HitsT: es.HitsT{
-			Hits: []es.HitT{
-				{
-					ID:     baseID + ".0",
-					Index:  "",
-					Source: []byte(""),
-					Fields: map[string]any{
-						"bid":  []any{baseID},
-						"last": []any{false},
-						"sha2": []any{sha2},
-						"size": []any{float64(size)},
-					},
+		Hits: []es.HitT{
+			{
+				ID:     baseID + ".0",
+				Index:  "",
+				Source: []byte(""),
+				Fields: map[string]any{
+					"bid":  []any{baseID},
+					"last": []any{false},
+					"sha2": []any{sha2},
+					"size": []any{float64(size)},
 				},
-				{
-					ID:     baseID + ".1",
-					Index:  "",
-					Source: []byte(""),
-					Fields: map[string]any{
-						"bid":  []any{baseID},
-						"last": []any{true},
-						"sha2": []any{sha2},
-						"size": []any{float64(size)},
-					},
+			},
+			{
+				ID:     baseID + ".1",
+				Index:  "",
+				Source: []byte(""),
+				Fields: map[string]any{
+					"bid":  []any{baseID},
+					"last": []any{true},
+					"sha2": []any{sha2},
+					"size": []any{float64(size)},
 				},
 			},
 		},

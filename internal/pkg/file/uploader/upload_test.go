@@ -302,12 +302,10 @@ func mockUploadInfoResult(bulker *itesting.MockBulk, info file.Info) {
 		mock.Anything,
 		mock.Anything,
 	).Return(&es.ResultT{
-		HitsT: es.HitsT{
-			Hits: []es.HitT{
-				{
-					ID:     info.DocID,
-					Source: out,
-				},
+		Hits: []es.HitT{
+			{
+				ID:     info.DocID,
+				Source: out,
 			},
 		},
 	}, nil).Once()

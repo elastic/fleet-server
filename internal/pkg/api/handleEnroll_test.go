@@ -88,9 +88,7 @@ func TestEnroll(t *testing.T) {
 	et, _ := NewEnrollerT(verCon, cfg, bulker, c)
 
 	bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{
-		HitsT: es.HitsT{
-			Hits: make([]es.HitT, 0),
-		},
+		Hits: make([]es.HitT, 0),
 	}, nil)
 	bulker.On("APIKeyCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(
 		&apikey.APIKey{
@@ -126,9 +124,7 @@ func TestEnrollWithAgentID(t *testing.T) {
 	et, _ := NewEnrollerT(verCon, cfg, bulker, c)
 
 	bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{
-		HitsT: es.HitsT{
-			Hits: make([]es.HitT, 0),
-		},
+		Hits: make([]es.HitT, 0),
 	}, nil)
 	bulker.On("APIKeyCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(
 		&apikey.APIKey{
@@ -167,13 +163,11 @@ func TestEnrollWithAgentIDExistingNonActive(t *testing.T) {
 	et, _ := NewEnrollerT(verCon, cfg, bulker, c)
 
 	bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{
-		HitsT: es.HitsT{
-			Hits: []es.HitT{{
-				ID:     "1234",
-				Index:  dl.FleetAgents,
-				Source: []byte(`{"active":false,"agent":{"id":"1234","version":"8.9.0"},"type":"PERMANENT","policy_id":"1234"}`),
-			}},
-		},
+		Hits: []es.HitT{{
+			ID:     "1234",
+			Index:  dl.FleetAgents,
+			Source: []byte(`{"active":false,"agent":{"id":"1234","version":"8.9.0"},"type":"PERMANENT","policy_id":"1234"}`),
+		}},
 	}, nil)
 	bulker.On("Delete", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	bulker.On("APIKeyCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(
@@ -213,13 +207,11 @@ func TestEnrollWithAgentIDExistingActive_NotReplaceable(t *testing.T) {
 	et, _ := NewEnrollerT(verCon, cfg, bulker, c)
 
 	bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{
-		HitsT: es.HitsT{
-			Hits: []es.HitT{{
-				ID:     "1234",
-				Index:  dl.FleetAgents,
-				Source: []byte(`{"active":true,"agent":{"id":"1234","version":"8.9.0"},"type":"PERMANENT","policy_id":"1234"}`),
-			}},
-		},
+		Hits: []es.HitT{{
+			ID:     "1234",
+			Index:  dl.FleetAgents,
+			Source: []byte(`{"active":true,"agent":{"id":"1234","version":"8.9.0"},"type":"PERMANENT","policy_id":"1234"}`),
+		}},
 	}, nil)
 	_, err := et._enroll(ctx, rb, zlog, req, "1234", []string{}, "8.9.0")
 	if !errors.Is(err, ErrAgentNotReplaceable) {
@@ -255,13 +247,11 @@ func TestEnrollWithAgentIDExistingActive_InvalidReplaceToken_Missing(t *testing.
 
 	source := fmt.Sprintf(`{"active":true,"agent":{"id":"1234","version":"8.9.0"},"type":"PERMANENT","policy_id":"1234","replace_token":"%s"}`, replaceHash)
 	bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{
-		HitsT: es.HitsT{
-			Hits: []es.HitT{{
-				ID:     "1234",
-				Index:  dl.FleetAgents,
-				Source: []byte(source),
-			}},
-		},
+		Hits: []es.HitT{{
+			ID:     "1234",
+			Index:  dl.FleetAgents,
+			Source: []byte(source),
+		}},
 	}, nil)
 	_, err = et._enroll(ctx, rb, zlog, req, "1234", []string{}, "8.9.0")
 	if !errors.Is(err, ErrAgentNotReplaceable) {
@@ -299,13 +289,11 @@ func TestEnrollWithAgentIDExistingActive_InvalidReplaceToken_Mismatch(t *testing
 
 	source := fmt.Sprintf(`{"active":true,"agent":{"id":"1234","version":"8.9.0"},"type":"PERMANENT","policy_id":"1234","replace_token":"%s"}`, replaceHash)
 	bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{
-		HitsT: es.HitsT{
-			Hits: []es.HitT{{
-				ID:     "1234",
-				Index:  dl.FleetAgents,
-				Source: []byte(source),
-			}},
-		},
+		Hits: []es.HitT{{
+			ID:     "1234",
+			Index:  dl.FleetAgents,
+			Source: []byte(source),
+		}},
 	}, nil)
 	_, err = et._enroll(ctx, rb, zlog, req, "1234", []string{}, "8.9.0")
 	if !errors.Is(err, ErrAgentNotReplaceable) {
@@ -343,13 +331,11 @@ func TestEnrollWithAgentIDExistingActive_WrongPolicy(t *testing.T) {
 
 	source := fmt.Sprintf(`{"active":true,"agent":{"id":"1234","version":"8.9.0"},"type":"PERMANENT","policy_id":"1234","replace_token":"%s"}`, replaceHash)
 	bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{
-		HitsT: es.HitsT{
-			Hits: []es.HitT{{
-				ID:     "1234",
-				Index:  dl.FleetAgents,
-				Source: []byte(source),
-			}},
-		},
+		Hits: []es.HitT{{
+			ID:     "1234",
+			Index:  dl.FleetAgents,
+			Source: []byte(source),
+		}},
 	}, nil)
 	_, err = et._enroll(ctx, rb, zlog, req, "5678", []string{}, "8.9.0")
 	if !errors.Is(err, ErrAgentNotReplaceable) {
@@ -406,13 +392,11 @@ func TestEnrollWithAgentIDExistingActive(t *testing.T) {
 	policyID := "my-policy#9.2"
 	source := fmt.Sprintf(`{"active":true,"agent":{"id":"1234","version":"8.9.0"},"type":"PERMANENT","policy_id":"%s","replace_token":"%s"}`, policyID, replaceHash)
 	bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{
-		HitsT: es.HitsT{
-			Hits: []es.HitT{{
-				ID:     "1234",
-				Index:  dl.FleetAgents,
-				Source: []byte(source),
-			}},
-		},
+		Hits: []es.HitT{{
+			ID:     "1234",
+			Index:  dl.FleetAgents,
+			Source: []byte(source),
+		}},
 	}, nil)
 	bulker.On("APIKeyRead", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(
 		&apikey.APIKeyMetadata{ID: "1234"}, nil)
@@ -474,13 +458,11 @@ func TestEnrollWithAgentIDExistingActive_VersionedPolicy(t *testing.T) {
 	// bound to the base policy.
 	source := fmt.Sprintf(`{"active":true,"agent":{"id":"1234","version":"8.9.0"},"type":"PERMANENT","policy_id":"my-policy#9.6","replace_token":"%s"}`, replaceHash)
 	bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{
-		HitsT: es.HitsT{
-			Hits: []es.HitT{{
-				ID:     "1234",
-				Index:  dl.FleetAgents,
-				Source: []byte(source),
-			}},
-		},
+		Hits: []es.HitT{{
+			ID:     "1234",
+			Index:  dl.FleetAgents,
+			Source: []byte(source),
+		}},
 	}, nil)
 	bulker.On("APIKeyRead", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(
 		&apikey.APIKeyMetadata{ID: "1234"}, nil)
@@ -594,7 +576,7 @@ func TestEnrollWithAgentIDExistingActive_UpgradedAt(t *testing.T) {
 			}
 
 			bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{
-				HitsT: es.HitsT{Hits: []es.HitT{{ID: "1234", Index: dl.FleetAgents, Source: []byte(source)}}},
+				Hits: []es.HitT{{ID: "1234", Index: dl.FleetAgents, Source: []byte(source)}},
 			}, nil)
 			bulker.On("APIKeyCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&apikey.APIKey{ID: "1234", Key: "1234"}, nil)
 			bulker.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)

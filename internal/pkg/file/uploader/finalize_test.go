@@ -71,12 +71,10 @@ func TestUploadCompletePerformsRefreshBeforeChunkSearch(t *testing.T) {
 		mock.Anything,                                                // query bytes
 		mock.Anything,                                                // bulk opts
 	).Return(&es.ResultT{
-		HitsT: es.HitsT{
-			Hits: []es.HitT{{
-				ID:     "_sampledocID",
-				Source: mockMeta,
-			}},
-		},
+		Hits: []es.HitT{{
+			ID:     "_sampledocID",
+			Source: mockMeta,
+		}},
 	}, nil).Maybe() // not under test, calling is not required
 	fakeBulk.On("Client").Return(mockClient).Maybe() // inject our mock client, if used
 	mockTX.RoundTripFn = func(req *http.Request) (*http.Response, error) {
@@ -102,17 +100,15 @@ func TestUploadCompletePerformsRefreshBeforeChunkSearch(t *testing.T) {
 		// runs during execution, before return
 		assert.True(t, refreshCalled, "Chunk finalization search occurred without refresh")
 	}).Return(&es.ResultT{
-		HitsT: es.HitsT{
-			Hits: []es.HitT{{
-				ID: "actionID.agentID.0",
-				Fields: map[string]any{
-					file.FieldBaseID: []any{"actionID.agentID"},
-					file.FieldSHA2:   []any{nullHash},
-					"size":           []any{size},
-					file.FieldLast:   []any{true},
-				},
-			}},
-		},
+		Hits: []es.HitT{{
+			ID: "actionID.agentID.0",
+			Fields: map[string]any{
+				file.FieldBaseID: []any{"actionID.agentID"},
+				file.FieldSHA2:   []any{nullHash},
+				"size":           []any{size},
+				file.FieldLast:   []any{true},
+			},
+		}},
 	}, nil)
 
 	c, err := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})

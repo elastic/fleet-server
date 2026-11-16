@@ -25,9 +25,7 @@ import (
 func createRandomEnrollmentAPIKey(policyID string, active bool) model.EnrollmentAPIKey {
 	now := time.Now().UTC()
 	return model.EnrollmentAPIKey{
-		ESDocument: model.ESDocument{
-			Id: xid.New().String(),
-		},
+		Id:        xid.New().String(),
 		Active:    active,
 		APIKey:    "d2JndlFIWUJJUVVxWDVia2NJTV86X0d6ZmljZGNTc1d4R1otbklrZFFRZw==",
 		APIKeyID:  xid.New().String(),

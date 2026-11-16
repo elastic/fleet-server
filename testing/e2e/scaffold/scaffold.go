@@ -691,12 +691,10 @@ func (s *Scaffold) StartToxiproxy(ctx context.Context) *toxitc.Container {
 	container, err := toxitc.Run(ctx, "ghcr.io/shopify/toxiproxy:2.12.0",
 		testcontainers.WithLogger(&logger{s.T()}),
 		testcontainers.CustomizeRequest(testcontainers.GenericContainerRequest{
-			ContainerRequest: testcontainers.ContainerRequest{
-				Hostname: "toxi",
-				// Network is set to the integration test network instead of using host mode so it can easily communicate with other containers.
-				// NOTE: the container will not become healthy when using `testcontainers-go 0.36.x+ if set to NetworkMode: "host"
-				Networks: []string{"integration_default"},
-			}}),
+			Hostname: "toxi",
+			// Network is set to the integration test network instead of using host mode so it can easily communicate with other containers.
+			// NOTE: the container will not become healthy when using `testcontainers-go 0.36.x+ if set to NetworkMode: "host"
+			Networks: []string{"integration_default"}}),
 		toxitc.WithProxy("es", "elasticsearch:9200"),
 	)
 	if err != nil {
@@ -704,12 +702,10 @@ func (s *Scaffold) StartToxiproxy(ctx context.Context) *toxitc.Container {
 		container, err = toxitc.Run(ctx, "ghcr.io/shopify/toxiproxy:2.12.0",
 			testcontainers.WithLogger(&logger{s.T()}),
 			testcontainers.CustomizeRequest(testcontainers.GenericContainerRequest{
-				ContainerRequest: testcontainers.ContainerRequest{
-					Hostname: "toxi",
-					// Network is set to the integration test network instead of using host mode so it can easily communicate with other containers.
-					// NOTE: the container will not become healthy when using `testcontainers-go 0.36.x+ if set to NetworkMode: "host"
-					Networks: []string{"integration_default"},
-				}}),
+				Hostname: "toxi",
+				// Network is set to the integration test network instead of using host mode so it can easily communicate with other containers.
+				// NOTE: the container will not become healthy when using `testcontainers-go 0.36.x+ if set to NetworkMode: "host"
+				Networks: []string{"integration_default"}}),
 			toxitc.WithProxy("es", "elasticsearch:9200"),
 		)
 	}

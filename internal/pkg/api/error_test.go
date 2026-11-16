@@ -35,7 +35,10 @@ func Test_ErrorResp(t *testing.T) {
 		},
 	}, {
 		name: "wrapped elastic error",
-		err:  fmt.Errorf("wrapped error: %w", &es.ErrElastic{}),
+		// Converted to error because ErrElastic's Error method has a value receiver,
+		// and go vet (Go 1.27+) rejects wrapping a pointer to such a type with %w.
+		// Production code returns *es.ErrElastic, so the test wraps a pointer too.
+		err: fmt.Errorf("wrapped error: %w", error(&es.ErrElastic{})),
 		expectedTags: map[string]any{
 			"error_type": "ErrElastic",
 		},
