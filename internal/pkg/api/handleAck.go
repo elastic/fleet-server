@@ -785,9 +785,18 @@ func (ack *AckT) handleUninstallPending(ctx context.Context, zlog zerolog.Logger
 	// not carry unenrolled_at.
 	now := time.Now().UTC().Format(time.RFC3339)
 	doc := bulk.UpdateFields{
-		dl.FieldUninstallPending:      true,
-		dl.FieldUninstallPendingSince: now, // records when uninstall_pending flipped to true
-		dl.FieldUpdatedAt:             now,
+		dl.FieldUninstallPending: true,
+		dl.FieldUpdatedAt:        now,
+	}
+	// Only stamp uninstall_pending_since when the agent first enters the state, so
+	// the timestamp records when it became pending rather than the latest
+	// acknowledgement. A redelivered or retried UNENROLL ack still authenticates
+	// (the access key is retained) and reaches this handler again — a duplicate
+	// action result is treated as success — so without this guard it would
+	// overwrite the original time. The agent is loaded via a refreshed GET on each
+	// ack, so on a sequential retry UninstallPending is already true here.
+	if !agent.UninstallPending {
+		doc[dl.FieldUninstallPendingSince] = now
 	}
 	if len(agent.Outputs) > 0 {
 		doc[dl.FieldOutputs] = agent.Outputs
