@@ -377,6 +377,7 @@ func (et *EnrollerT) _enroll(
 
 		agent.Active = true
 		agent.UninstallPending = false
+		agent.UninstallPendingSince = ""
 		agent.Namespaces = namespaces
 		agent.LocalMetadata = localMeta
 		agent.AccessAPIKeyID = accessAPIKey.ID
