@@ -287,7 +287,8 @@ fleet:
 #        // enable OpAMP endpoint (enabled by default)
 #        enable_opamp: true
 #
-#        // calculate checkin_limit.max from the available memory when max_agents is not set (disabled by default)
+#        // calculate the server limits from the available memory instead of the memory tier (disabled by default)
+#        // only applies when max_agents is not set
 #        limits_from_memory: false
 #
 #        // Input conditions Fleet Server evaluates before sending a policy to an agent.

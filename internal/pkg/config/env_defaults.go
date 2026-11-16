@@ -114,6 +114,19 @@ func defaultEnvLimits() *envLimits {
 	}
 }
 
+// clone returns a deep copy of l.
+func (l *envLimits) clone() *envLimits {
+	c := *l
+	srv := *l.Server
+	if l.Server.MaxFileStorageByteSize != nil {
+		size := *l.Server.MaxFileStorageByteSize
+		srv.MaxFileStorageByteSize = &size
+	}
+	cache := *l.Cache
+	c.Server, c.Cache = &srv, &cache
+	return &c
+}
+
 type cacheLimits struct {
 	NumCounters int64 `config:"num_counters"`
 	MaxCost     int64 `config:"max_cost"`
@@ -309,9 +322,9 @@ func loadLimits(log *zerolog.Logger, in *Input) *envLimits {
 		// get nearest limits for configured agent numbers
 		if l.Agents.Min <= agentLimit && agentLimit <= l.Agents.Max {
 			log.Info().Msgf("Using system limits for %d to %d agents for a configured value of %d agents", l.Agents.Min, l.Agents.Max, agentLimit)
-			ramSize, source := memoryMB(in.Server.Runtime)
-			if ramSize < l.RecommendedRAM {
-				log.Warn().Str("memory_source", string(source)).Msgf("Detected %d MiB of available memory, which is lower than the recommended amount (%d MiB) for the configured agent limit", ramSize, l.RecommendedRAM)
+			mem, source := availableMemoryMB(in.Server.Runtime)
+			if mem < l.RecommendedRAM {
+				log.Warn().Str("memory_source", string(source)).Msgf("Detected %d MiB of available memory, which is lower than the recommended amount (%d MiB) for the configured agent limit", mem, l.RecommendedRAM)
 			}
 			return l
 		}

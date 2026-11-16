@@ -5,7 +5,6 @@
 package config
 
 import (
-	"cmp"
 	"math"
 	"os"
 	"runtime/debug"
@@ -27,10 +26,6 @@ const (
 	// keep-alive TLS connection that an agent keeps open for acks.
 	checkinIdleConnBytes = 32 * 1024
 
-	// maxMemCheckinLimit caps the checkin_limit.max calculated from the memory
-	// when Fleet Server detects more memory than it can use.
-	maxMemCheckinLimit = 100_000
-
 	// fleetMemoryPercent is the percentage of the memory that Fleet Server plans
 	// to use. The rest is left for Elastic Agent and the other processes that
 	// share the container and its GOMEMLIMIT, such as APM Server in the
@@ -50,55 +45,115 @@ const (
 	memSourceHost memSource = "host"
 )
 
-// memMB returns available memory in MiB and its source.
-// It is a var so that unit tests can replace it.
-var memMB func() (uint64, memSource) = availableMemoryMB
-
-// cgroupMemMB returns the cgroup memory limit in MiB.
-// It is a var so that unit tests can replace it.
-var cgroupMemMB func() (uint64, bool) = cgroupMemoryLimitMB
+var (
+	// hostMemMB returns the total RAM of the host in MiB.
+	hostMemMB func() uint64 = hostMemoryMB
+	// cgroupMemMB returns the memory limit of the cgroup in MiB.
+	cgroupMemMB func() (uint64, bool) = cgroupMemoryLimitMB
+)
 
 func memEnvLimits(log *zerolog.Logger, in *Input) *envLimits {
-	fromMemory := in.Server.Features.LimitsFromMemory
 	// Without limits_from_memory, select the tier as before, without server.runtime.
 	var rt Runtime
-	if fromMemory {
+	if in.Server.Features.LimitsFromMemory {
 		rt = in.Server.Runtime
 	}
-	mem, source := memoryMB(rt)
-	gogc := gcPercent(rt)
-	k := 0
-	var recRAM uint64
-	for i, l := range defaults {
-		if mem >= l.RecommendedRAM && l.RecommendedRAM > recRAM {
-			k = i
-			recRAM = l.RecommendedRAM
-		}
-	}
-	if recRAM == 0 {
+	mem, source := availableMemoryMB(rt)
+	limits := limitsFromTier(mem)
+	if limits == nil {
 		log.Warn().Uint64("memory_mb", mem).Str("memory_source", string(source)).Msg("No settings with recommended ram found, using default.")
 		return defaultEnvLimits()
 	}
 
-	l := defaults[k]
-	if fromMemory {
-		l = memCheckinLimits(l, mem, gogc, in.Cache.MaxCost)
+	gogc := gcPercent(rt)
+	if in.Server.Features.LimitsFromMemory {
+		limits = limitsFromMemory(limits, mem, gogc, in.Cache.MaxCost)
 	}
-	log.Info().Uint64("memory_mb", mem).Str("memory_source", string(source)).Int("gogc", gogc).Uint64("recommended_mb", recRAM).
-		Int64("checkin_limit_max", l.Server.CheckinLimit.Max).Msg("Found settings with recommended ram.")
-	return l
+	log.Info().Uint64("memory_mb", mem).Str("memory_source", string(source)).Int("gogc", gogc).Uint64("recommended_mb", limits.RecommendedRAM).
+		Int64("checkin_limit_max", limits.Server.CheckinLimit.Max).Msg("Found settings with recommended ram.")
+	return limits
 }
 
-// memoryMB returns the memory that Fleet Server can use, in MiB, and its source.
-func memoryMB(rt Runtime) (uint64, memSource) {
-	switch {
-	case rt.MemoryLimit == math.MaxInt64:
-		// math.MaxInt64 turns the Go memory limit off so the current limit does not apply.
-		return systemMemoryMB()
-	case rt.MemoryLimit > 0:
-		return uint64(rt.MemoryLimit) / 1024 / 1024, memSourceGoMemLimit
+// limitsFromTier copies the limits of the largest tier that mem allows.
+func limitsFromTier(mem uint64) *envLimits {
+	var tier *envLimits
+	var recRAM uint64
+	for _, l := range defaults {
+		if mem >= l.RecommendedRAM && l.RecommendedRAM > recRAM {
+			tier, recRAM = l, l.RecommendedRAM
+		}
 	}
-	return memMB()
+	if tier == nil {
+		return nil
+	}
+	return tier.clone()
+}
+
+// limitsFromMemory calculates the limits that depend on the available memory.
+func limitsFromMemory(tier *envLimits, mem uint64, gogc int, cacheMaxCost int64) *envLimits {
+	checkinMax := checkinMaxFromMemory(tier, mem, gogc, cacheMaxCost)
+	maxConnections := maxConnectionsFromCheckinMax(tier, checkinMax)
+
+	limits := tier.clone()
+	limits.Server.CheckinLimit.Max = checkinMax
+	limits.Server.MaxConnections = maxConnections
+
+	return limits
+}
+
+// checkinMaxFromMemory returns the checkin_limit.max that the memory allows for the tier limits.
+func checkinMaxFromMemory(limits *envLimits, mem uint64, gogc int, cacheMaxCost int64) int64 {
+	// Skip the calculation when there is no check-in limit.
+	tierMax := limits.Server.CheckinLimit.Max
+	if tierMax <= 0 {
+		return tierMax
+	}
+
+	// Keep the tier limit if no tier matches the host RAM.
+	hostLimits := limitsFromTier(hostMemMB())
+	if hostLimits == nil {
+		return tierMax
+	}
+
+	// Keep GOGC percent of headroom above the live heap, or 100% when the GC is off.
+	growth := int64(gogc)
+	if growth < 0 {
+		growth = 100
+	}
+
+	// Use the configured cache size or the cache of the tier if it is not set.
+	cache := cacheMaxCost
+	if cache == 0 {
+		cache = limits.Cache.MaxCost
+	}
+
+	// live is the heap that Fleet Server can keep in use and still fit in its
+	// share of the memory when the heap grows before the next GC.
+	live := int64(min(mem, math.MaxInt32)) * 1024 * 1024 * fleetMemoryPercent / (100 + growth)
+
+	// The cache and the agents share the live heap, so the limit is the number
+	// of agents that fit in what the cache leaves.
+	checkinMax := (live - cache) / (checkinLongPollBytes + checkinIdleConnBytes)
+
+	// Never go above the limit of the tier for the host RAM.
+	checkinMax = min(checkinMax, hostLimits.Server.CheckinLimit.Max)
+
+	// If the memory allows fewer check-ins than the tier, keep the tier limit.
+	checkinMax = max(checkinMax, tierMax)
+	return checkinMax
+}
+
+// maxConnectionsFromCheckinMax returns the max_connections that checkinMax needs for the tier limits.
+func maxConnectionsFromCheckinMax(limits *envLimits, checkinMax int64) int {
+	// Keep the max_connections of the tier when there is no check-in limit.
+	tierMax := limits.Server.CheckinLimit.Max
+	if tierMax <= 0 {
+		return limits.Server.MaxConnections
+	}
+
+	// Agents can hold more than one connection, so grow max_connections with the check-in limit.
+	maxConnections := int(int64(limits.Server.MaxConnections) * checkinMax / tierMax)
+	return maxConnections
 }
 
 // gcPercent returns the GOGC value that Fleet Server uses.
@@ -119,63 +174,10 @@ func gcPercent(rt Runtime) int {
 	return int(v)
 }
 
-// memCheckinLimits returns a copy of the tier l with a checkin_limit.max
-// calculated from the memory.
-func memCheckinLimits(l *envLimits, memMB uint64, gogc int, cacheMaxCost int64) *envLimits {
-	// Keep no limit when the tier has none (checkin_limit.max is 0).
-	tierMax := l.Server.CheckinLimit.Max
-	if tierMax <= 0 {
-		return l
-	}
-
-	// The heap grows by the GOGC percentage above the live heap before the GC
-	// runs. Keep half of the memory free when the GC is off because only the
-	// memory limit stops it.
-	growth := int64(gogc)
-	if growth < 0 {
-		growth = 100
-	}
-
-	// Use the configured cache size or the cache of the tier if it is not set.
-	cache := cmp.Or(cacheMaxCost, l.Cache.MaxCost)
-
-	// Divide the live heap that the cache does not use by the memory of one agent.
-	live := int64(memMB) * 1024 * 1024 * fleetMemoryPercent / (100 + growth) //nolint:gosec // memory in MiB is far below MaxInt64
-	checkinMax := (live - cache) / (checkinLongPollBytes + checkinIdleConnBytes)
-
-	// If the memory allows fewer check-ins than the tier, keep the tier value for
-	// backward compatibility.
-	checkinMax = max(min(checkinMax, maxMemCheckinLimit), tierMax)
-
-	// Change a copy so that the embedded tier stays the same.
-	srv := *l.Server
-	srv.CheckinLimit.Max = checkinMax
-	// Keep the ratio so that max_connections does not limit check-ins first.
-	srv.MaxConnections = int(int64(srv.MaxConnections) * checkinMax / tierMax)
-	c := *l
-	c.Server = &srv
-	return &c
-}
-
-// availableMemoryMB returns available memory in MiB and its source using this priority order:
-//  1. GOMEMLIMIT, if explicitly set
-//  2. cgroup memory limit (v2, then v1), for containers without an explicit GOMEMLIMIT
-//  3. host total RAM, for non-containerised deployments
-func availableMemoryMB() (uint64, memSource) {
-	limit := debug.SetMemoryLimit(-1)
-	if limit > 0 && limit != math.MaxInt64 {
-		return uint64(limit) / 1024 / 1024, memSourceGoMemLimit
-	}
-	return systemMemoryMB()
-}
-
-// systemMemoryMB returns the cgroup memory limit in MiB and its source. Outside
-// a container it returns the host RAM.
-func systemMemoryMB() (uint64, memSource) {
-	if mb, ok := cgroupMemMB(); ok {
-		return mb, memSourceCgroup
-	}
-	return memory.TotalMemory() / 1024 / 1024, memSourceHost
+// hostMemoryMB returns the total RAM of the host in MiB. In a container it
+// returns the RAM of the host and not the memory limit of the container.
+func hostMemoryMB() uint64 {
+	return memory.TotalMemory() / 1024 / 1024
 }
 
 // cgroupMemoryLimitMB reads the container memory limit from cgroup files.
@@ -215,4 +217,26 @@ func readCgroupMemoryFile(path string) (uint64, bool) {
 func cgroupV1UnlimitedMemoryLimit() uint64 {
 	pageSize := int64(os.Getpagesize())
 	return uint64(math.MaxInt64 / pageSize * pageSize) //nolint:gosec // the page-aligned result is always non-negative
+}
+
+// systemMemoryMB returns the cgroup memory limit in MiB and its source. Outside
+// a container it returns the host RAM.
+func systemMemoryMB() (uint64, memSource) {
+	if mb, ok := cgroupMemMB(); ok {
+		return mb, memSourceCgroup
+	}
+	return hostMemMB(), memSourceHost
+}
+
+// availableMemoryMB returns the memory that Fleet Server can use in MiB.
+func availableMemoryMB(rt Runtime) (uint64, memSource) {
+	limit := rt.MemoryLimit
+	if limit <= 0 {
+		limit = debug.SetMemoryLimit(-1)
+	}
+	// math.MaxInt64 turns the Go memory limit off.
+	if limit > 0 && limit != math.MaxInt64 {
+		return uint64(limit) / 1024 / 1024, memSourceGoMemLimit
+	}
+	return systemMemoryMB()
 }

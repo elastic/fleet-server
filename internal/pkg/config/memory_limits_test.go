@@ -5,6 +5,7 @@
 package config
 
 import (
+	"cmp"
 	"math"
 	"os"
 	"runtime/debug"
@@ -60,6 +61,7 @@ func TestMemEnvLimitsTier(t *testing.T) {
 func TestMemEnvLimitsFeatureFlag(t *testing.T) {
 	setGOGC(t, 100)
 	setMemory(t, 4096, memSourceCgroup)
+	setHostMemory(t, 65_536)
 	log := testlog.SetLogger(t)
 
 	off := memEnvLimits(&log, &Input{Server: Server{Runtime: Runtime{MemoryLimit: 2048 * mib}}}).Server.CheckinLimit.Max
@@ -69,8 +71,19 @@ func TestMemEnvLimitsFeatureFlag(t *testing.T) {
 	require.Greater(t, on, off, "limits_from_memory on must calculate the limit from memory")
 }
 
+func TestMemEnvLimitsHostTier(t *testing.T) {
+	setGOGC(t, 100)
+	setMemory(t, 4096, memSourceHost)
+	log := testlog.SetLogger(t)
+
+	l := memEnvLimits(&log, memInput(Runtime{}))
+
+	require.Equal(t, int64(10_000), l.Server.CheckinLimit.Max, "a host without a container limit must keep the tier limit of its RAM")
+}
+
 func TestMemEnvLimitsRuntime(t *testing.T) {
 	setGOGC(t, 100)
+	setHostMemory(t, 65_536)
 	checkinMax := func(t *testing.T, memoryMB uint64, source memSource, rt Runtime) int64 {
 		t.Helper()
 		setMemory(t, memoryMB, source)
@@ -127,11 +140,11 @@ func TestGCPercent(t *testing.T) {
 	})
 }
 
-func TestMemCheckinLimits(t *testing.T) {
+func TestCheckinMaxFromMemory(t *testing.T) {
 	// perAgent is the memory of one agent with its long poll and idle connection.
 	perAgent := int64(checkinLongPollBytes + checkinIdleConnBytes)
 
-	// expectedCheckinMax applies the formula to memoryMB and gogc.
+	// expectedCheckinMax applies the formula to memoryMB, gogc and cacheMaxCost.
 	expectedCheckinMax := func(memoryMB, gogc, cacheMaxCost int64) int64 {
 		return (memoryMB*mib*fleetMemoryPercent/(100+gogc) - cacheMaxCost) / perAgent
 	}
@@ -139,6 +152,7 @@ func TestMemCheckinLimits(t *testing.T) {
 	testCases := []struct {
 		Name               string
 		TierCheckinMax     int64
+		HostMemoryMB       uint64
 		MemoryMB           uint64
 		GOGC               int
 		CacheMaxCost       int64
@@ -181,11 +195,28 @@ func TestMemCheckinLimits(t *testing.T) {
 			ExpectedCheckinMax: 20_000,
 		},
 		{
-			Name:               "cap limit when formula gives more than maximum",
+			Name:               "cap limit at host tier when formula gives more",
 			TierCheckinMax:     1000,
-			MemoryMB:           262_144,
+			HostMemoryMB:       2048,
+			MemoryMB:           4096,
 			GOGC:               100,
-			ExpectedCheckinMax: maxMemCheckinLimit,
+			ExpectedCheckinMax: 5000,
+		},
+		{
+			Name:               "keep tier limit when host tier is lower",
+			TierCheckinMax:     20_000,
+			HostMemoryMB:       4096,
+			MemoryMB:           16_384,
+			GOGC:               100,
+			ExpectedCheckinMax: 20_000,
+		},
+		{
+			Name:               "keep tier limit when host RAM is below every tier",
+			TierCheckinMax:     1000,
+			HostMemoryMB:       128,
+			MemoryMB:           4096,
+			GOGC:               100,
+			ExpectedCheckinMax: 1000,
 		},
 		{
 			Name:               "keep no limit when tier has none",
@@ -197,25 +228,70 @@ func TestMemCheckinLimits(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
+			setHostMemory(t, cmp.Or(tc.HostMemoryMB, 65_536))
 			tier := defaultEnvLimits()
 			tier.Server.CheckinLimit.Max = tc.TierCheckinMax
 
-			l := memCheckinLimits(tier, tc.MemoryMB, tc.GOGC, tc.CacheMaxCost)
+			got := checkinMaxFromMemory(tier, tc.MemoryMB, tc.GOGC, tc.CacheMaxCost)
 
-			require.Equal(t, tc.ExpectedCheckinMax, l.Server.CheckinLimit.Max)
-			require.Equal(t, tc.TierCheckinMax, tier.Server.CheckinLimit.Max, "memCheckinLimits changed the tier")
+			require.Equal(t, tc.ExpectedCheckinMax, got)
 		})
 	}
+}
 
-	t.Run("keep max_connections ratio of tier", func(t *testing.T) {
-		tier := defaultEnvLimits()
-		tier.Server.CheckinLimit.Max = 1000
-		tier.Server.MaxConnections = 3000
+func TestMaxConnectionsFromCheckinMax(t *testing.T) {
+	testCases := []struct {
+		Name                   string
+		TierCheckinMax         int64
+		TierMaxConnections     int
+		CheckinMax             int64
+		ExpectedMaxConnections int
+	}{
+		{
+			Name:                   "scale max_connections by the check-in ratio",
+			TierCheckinMax:         10_000,
+			TierMaxConnections:     22_000,
+			CheckinMax:             19_325,
+			ExpectedMaxConnections: 42_515,
+		},
+		{
+			Name:                   "keep no connection limit when tier has none",
+			TierCheckinMax:         40_000,
+			CheckinMax:             76_869,
+			ExpectedMaxConnections: 0,
+		},
+		{
+			Name:                   "keep max_connections when tier has no check-in limit",
+			TierMaxConnections:     22_000,
+			ExpectedMaxConnections: 22_000,
+		},
+	}
 
-		l := memCheckinLimits(tier, 4096, 100, 0)
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			tier := defaultEnvLimits()
+			tier.Server.CheckinLimit.Max = tc.TierCheckinMax
+			tier.Server.MaxConnections = tc.TierMaxConnections
 
-		require.Equal(t, 3*int(l.Server.CheckinLimit.Max), l.Server.MaxConnections)
-	})
+			got := maxConnectionsFromCheckinMax(tier, tc.CheckinMax)
+
+			require.Equal(t, tc.ExpectedMaxConnections, got)
+		})
+	}
+}
+
+func TestMemEnvLimitsMaxConnections(t *testing.T) {
+	setGOGC(t, 100)
+	setMemory(t, 4096, memSourceCgroup)
+	setHostMemory(t, 65_536)
+	log := testlog.SetLogger(t)
+	tier := limitsFromTier(4096)
+
+	l := memEnvLimits(&log, memInput(Runtime{}))
+
+	wantMaxConnections := int(int64(tier.Server.MaxConnections) * l.Server.CheckinLimit.Max / tier.Server.CheckinLimit.Max)
+	require.Equal(t, wantMaxConnections, l.Server.MaxConnections, "max_connections must keep the ratio of the tier")
+	require.Equal(t, int64(10_000), limitsFromTier(4096).Server.CheckinLimit.Max, "memEnvLimits changed the tier in defaults")
 }
 
 func TestAvailableMemoryMB(t *testing.T) {
@@ -224,7 +300,7 @@ func TestAvailableMemoryMB(t *testing.T) {
 		prev := debug.SetMemoryLimit(setLimit)
 		t.Cleanup(func() { debug.SetMemoryLimit(prev) })
 
-		got, source := availableMemoryMB()
+		got, source := availableMemoryMB(Runtime{})
 		assert.Equal(t, uint64(256), got)
 		assert.Equal(t, memSourceGoMemLimit, source)
 	})
@@ -236,7 +312,7 @@ func TestAvailableMemoryMB(t *testing.T) {
 		cgroupMemMB = func() (uint64, bool) { return 128, true }
 		t.Cleanup(func() { cgroupMemMB = prevCgroup })
 
-		got, source := availableMemoryMB()
+		got, source := availableMemoryMB(Runtime{})
 		assert.Equal(t, uint64(128), got)
 		assert.Equal(t, memSourceCgroup, source)
 	})
@@ -248,7 +324,7 @@ func TestAvailableMemoryMB(t *testing.T) {
 		cgroupMemMB = func() (uint64, bool) { return 0, false }
 		t.Cleanup(func() { cgroupMemMB = prevCgroup })
 
-		got, source := availableMemoryMB()
+		got, source := availableMemoryMB(Runtime{})
 		assert.Equal(t, memory.TotalMemory()/1024/1024, got)
 		assert.Equal(t, memSourceHost, source)
 	})
@@ -298,12 +374,31 @@ func TestReadCgroupMemoryFile(t *testing.T) {
 
 const mib = 1024 * 1024
 
-// setMemory makes memMB return memoryMB and source until the test ends.
+// setMemory makes Fleet Server detect memoryMB from source until the test ends.
 func setMemory(t *testing.T, memoryMB uint64, source memSource) {
 	t.Helper()
-	prev := memMB
-	memMB = func() (uint64, memSource) { return memoryMB, source }
-	t.Cleanup(func() { memMB = prev })
+	limit, cgroupMB, inCgroup := int64(math.MaxInt64), uint64(0), false
+	switch source {
+	case memSourceGoMemLimit:
+		limit = int64(memoryMB * mib) //nolint:gosec // memory in MiB is far below MaxInt64
+	case memSourceCgroup:
+		cgroupMB, inCgroup = memoryMB, true
+	case memSourceHost:
+		setHostMemory(t, memoryMB)
+	}
+
+	prevLimit := debug.SetMemoryLimit(limit)
+	t.Cleanup(func() { debug.SetMemoryLimit(prevLimit) })
+	prevCgroup := cgroupMemMB
+	cgroupMemMB = func() (uint64, bool) { return cgroupMB, inCgroup }
+	t.Cleanup(func() { cgroupMemMB = prevCgroup })
+}
+
+func setHostMemory(t *testing.T, memoryMB uint64) {
+	t.Helper()
+	prev := hostMemMB
+	hostMemMB = func() uint64 { return memoryMB }
+	t.Cleanup(func() { hostMemMB = prev })
 }
 
 // memInput returns an input with rt and the check-in limit from memory turned on.

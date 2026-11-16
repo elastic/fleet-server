@@ -169,8 +169,8 @@ type (
 		// EnableOpAMP controls whether the OpAMP endpoint is enabled. Defaults to true.
 		EnableOpAMP bool `config:"enable_opamp"`
 
-		// LimitsFromMemory controls whether checkin_limit.max is calculated from the available
-		// memory when max_agents is not set. Defaults to false.
+		// LimitsFromMemory controls whether the server limits are calculated from the available
+		// memory instead of the memory tier when max_agents is not set. Defaults to false.
 		LimitsFromMemory bool `config:"limits_from_memory"`
 
 		// GracefulForceUnenroll configures the three-step escalation applied to agents that

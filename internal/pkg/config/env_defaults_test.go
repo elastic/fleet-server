@@ -46,6 +46,23 @@ func TestLoadLimits(t *testing.T) {
 	}
 }
 
+func TestEnvLimitsClone(t *testing.T) {
+	size := uint64(100)
+	l := defaultEnvLimits()
+	l.Server.MaxFileStorageByteSize = &size
+	want := *l.Server
+	wantCache := *l.Cache
+
+	c := l.clone()
+	c.Server.CheckinLimit.Max = 1
+	*c.Server.MaxFileStorageByteSize = 1
+	c.Cache.MaxCost = 1
+
+	require.Equal(t, want, *l.Server, "changing the clone changed the server limits")
+	require.Equal(t, uint64(100), *l.Server.MaxFileStorageByteSize, "changing the clone changed max_file_storage_size")
+	require.Equal(t, wantCache, *l.Cache, "changing the clone changed the cache limits")
+}
+
 // TestDefaultLimitsYAML keys verifies that all embedded .yml files have keys that match go struct tags.
 // A typo in a yml key, e.g. "pgp_retieval_limit" instead of "pgp_retrieval_limit" causes a test failure.
 func TestDefaultLimitsYAMLKeys(t *testing.T) {

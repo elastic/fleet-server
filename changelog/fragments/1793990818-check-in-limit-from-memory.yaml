@@ -1,8 +1,8 @@
 kind: enhancement
 summary: Calculate the Fleet Server check-in limit from the memory per agent
 description: >-
-  When max_agents is not set, Fleet Server calculates checkin_limit.max from its available memory
-  (or server.runtime.memory_limit if it is set) and the measured memory of each agent connection so
-  it allows more agent connections with the same resources. To use this feature, enable the
-  server.feature_flags.limits_from_memory flag.
+  When max_agents is not set, Fleet Server can calculate checkin_limit.max and max_connections from its
+  available memory (or server.runtime.memory_limit if it is set) instead of using the fixed values of
+  its memory tier. The limits are never lower than the tier and never higher than the tier of the host
+  RAM. To use this feature, enable the server.feature_flags.limits_from_memory flag.
 component: fleet-server
