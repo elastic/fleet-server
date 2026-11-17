@@ -22,6 +22,7 @@ const (
 	testPRURL11           = "https://github.com/elastic/fleet-server/pull/11"
 	testPRURL12           = "https://github.com/elastic/fleet-server/pull/12"
 	testPRURL15           = "https://github.com/elastic/fleet-server/pull/15"
+	testPRURL20           = "https://github.com/elastic/fleet-server/pull/20"
 	testReleaseBranch     = "9.6"
 	testReviewerAlice     = "alice"
 	testReviewerTeam      = "elastic/elastic-agent-control-plane"

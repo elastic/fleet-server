@@ -62,13 +62,13 @@ func TestBuildReleaseIssueBodyMajorMinorSection(t *testing.T) {
 
 func TestMergePRURLsSortsAndDedups(t *testing.T) {
 	got := mergePRURLs(
-		[]string{"https://github.com/elastic/fleet-server/pull/20", testPRURL10},
+		[]string{testPRURL20, testPRURL10},
 		[]string{testPRURL10, testPRURL15},
 	)
 	want := []string{
 		testPRURL10,
 		testPRURL15,
-		"https://github.com/elastic/fleet-server/pull/20",
+		testPRURL20,
 	}
 	if len(got) != len(want) {
 		t.Fatalf("mergePRURLs() len = %d, want %d (%v)", len(got), len(want), got)
