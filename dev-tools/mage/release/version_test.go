@@ -10,13 +10,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const testInvalidFooPatch = "9.foo.0"
-
 func TestSelectLatestReleaseBefore(t *testing.T) {
-	versions := []string{testVersion940, "9.4.3", testVersion950, "v9.3.2", "8.19.1", "not-a-version"}
+	versions := []string{testVersion940, testVersion943, testVersion950, "v9.3.2", "8.19.1", "not-a-version"}
 	got, err := selectLatestReleaseBefore(versions, testVersion950)
 	require.NoError(t, err)
-	require.Equal(t, "9.4.3", got)
+	require.Equal(t, testVersion943, got)
 }
 
 func TestParseSemverRejectsSignedComponents(t *testing.T) {

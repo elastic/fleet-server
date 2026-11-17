@@ -76,7 +76,7 @@ func EnsureReleaseIssueTracker(cfg *ReleaseConfig, workflowPRs []*github.PullReq
 
 	if !found {
 		body := buildReleaseIssueBody(isMajorMinorRelease(cfg.CurrentRelease), prURLs, nil)
-		issue, err := gh.CreateIssue(owner, repo, title, body, []string{"release"})
+		issue, err := gh.CreateIssue(owner, repo, title, body, []string{labelRelease})
 		if err != nil {
 			return err
 		}
@@ -93,7 +93,7 @@ func EnsureReleaseIssueTracker(cfg *ReleaseConfig, workflowPRs []*github.PullReq
 	if err := gh.UpdateIssueBody(owner, repo, existing.GetNumber(), updatedBody); err != nil {
 		return err
 	}
-	if err := gh.AddLabels(owner, repo, existing.GetNumber(), []string{"release"}); err != nil {
+	if err := gh.AddLabels(owner, repo, existing.GetNumber(), []string{labelRelease}); err != nil {
 		printf("Warning: failed to ensure release label on issue #%d: %v\n", existing.GetNumber(), err)
 	}
 	printf("Updated release issue tracker #%d: %s\n", existing.GetNumber(), existing.GetHTMLURL())
@@ -233,14 +233,13 @@ func mergeReleaseIssueBody(existingBody, version string, prURLs []string) (strin
 	}
 
 	const prSection = "## PRs"
-	idx := strings.Index(body, prSection)
-	if idx < 0 {
+	before, after, ok := strings.Cut(body, prSection)
+	if !ok {
 		updated := strings.TrimRight(body, "\n") + "\n\n" + prSection + "\n\n" + formatPRChecklist(allURLs, existingChecked)
 		return updated, true
 	}
 
-	before := body[:idx]
-	oldPRBlock := strings.TrimPrefix(body[idx+len(prSection):], "\n")
+	oldPRBlock := strings.TrimPrefix(after, "\n")
 	newPRBlock := formatPRChecklist(allURLs, existingChecked)
 
 	oldURLs := keys(extractPRCheckboxes(oldPRBlock))

@@ -5,14 +5,10 @@
 package release
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/require"
-)
-
-const (
-	testBaseBranch    = "main"
-	testReleaseBranch = "9.6"
 )
 
 func TestLabelHelpers(t *testing.T) {
@@ -46,10 +42,5 @@ func TestPRBodiesMentionFleetScope(t *testing.T) {
 }
 
 func contains(ss []string, want string) bool {
-	for _, s := range ss {
-		if s == want {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(ss, want)
 }

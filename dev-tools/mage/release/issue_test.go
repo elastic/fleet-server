@@ -22,7 +22,7 @@ func TestReleaseIssueTitle(t *testing.T) {
 }
 
 func TestIsMajorMinorRelease(t *testing.T) {
-	if !isMajorMinorRelease("9.5.0") {
+	if !isMajorMinorRelease(testVersion950) {
 		t.Fatal("expected 9.5.0 to be treated as major/minor")
 	}
 	if isMajorMinorRelease("9.5.1") {
@@ -62,12 +62,12 @@ func TestBuildReleaseIssueBodyMajorMinorSection(t *testing.T) {
 
 func TestMergePRURLsSortsAndDedups(t *testing.T) {
 	got := mergePRURLs(
-		[]string{"https://github.com/elastic/fleet-server/pull/20", "https://github.com/elastic/fleet-server/pull/10"},
-		[]string{"https://github.com/elastic/fleet-server/pull/10", "https://github.com/elastic/fleet-server/pull/15"},
+		[]string{"https://github.com/elastic/fleet-server/pull/20", testPRURL10},
+		[]string{testPRURL10, testPRURL15},
 	)
 	want := []string{
-		"https://github.com/elastic/fleet-server/pull/10",
-		"https://github.com/elastic/fleet-server/pull/15",
+		testPRURL10,
+		testPRURL15,
 		"https://github.com/elastic/fleet-server/pull/20",
 	}
 	if len(got) != len(want) {
@@ -84,14 +84,14 @@ func TestExtractPRCheckboxes(t *testing.T) {
 	body := `
 ## PRs
 
-- [x] https://github.com/elastic/fleet-server/pull/10
-- [ ] https://github.com/elastic/fleet-server/pull/11
+- [x] ` + testPRURL10 + `
+- [ ] ` + testPRURL11 + `
 `
 	got := extractPRCheckboxes(body)
-	if !got["https://github.com/elastic/fleet-server/pull/10"] {
+	if !got[testPRURL10] {
 		t.Fatal("checked PR should be true")
 	}
-	if got["https://github.com/elastic/fleet-server/pull/11"] {
+	if got[testPRURL11] {
 		t.Fatal("unchecked PR should be false")
 	}
 }
@@ -105,23 +105,23 @@ func TestMergeReleaseIssueBodyAddsMissingPRsAndPreservesChecks(t *testing.T) {
 
 ## PRs
 
-- [x] https://github.com/elastic/fleet-server/pull/10
-- [ ] https://github.com/elastic/fleet-server/pull/11
+- [x] ` + testPRURL10 + `
+- [ ] ` + testPRURL11 + `
 `
 	updated, changed := mergeReleaseIssueBody(existing, "9.4.1", []string{
-		"https://github.com/elastic/fleet-server/pull/11",
-		"https://github.com/elastic/fleet-server/pull/12",
+		testPRURL11,
+		testPRURL12,
 	})
 	if !changed {
 		t.Fatal("adding a missing PR should mark the body changed")
 	}
-	if !strings.Contains(updated, "- [x] https://github.com/elastic/fleet-server/pull/10") {
+	if !strings.Contains(updated, "- [x] "+testPRURL10) {
 		t.Fatal("existing checked PR must stay checked")
 	}
-	if !strings.Contains(updated, "- [ ] https://github.com/elastic/fleet-server/pull/11") {
+	if !strings.Contains(updated, "- [ ] "+testPRURL11) {
 		t.Fatal("existing unchecked PR stays unchecked")
 	}
-	if !strings.Contains(updated, "- [ ] https://github.com/elastic/fleet-server/pull/12") {
+	if !strings.Contains(updated, "- [ ] "+testPRURL12) {
 		t.Fatal("new PR should be appended unchecked")
 	}
 	if !strings.Contains(updated, "- [x] Find the Fleet Server release PRs") {
@@ -129,9 +129,9 @@ func TestMergeReleaseIssueBodyAddsMissingPRsAndPreservesChecks(t *testing.T) {
 	}
 
 	_, changedAgain := mergeReleaseIssueBody(updated, "9.4.1", []string{
-		"https://github.com/elastic/fleet-server/pull/10",
-		"https://github.com/elastic/fleet-server/pull/11",
-		"https://github.com/elastic/fleet-server/pull/12",
+		testPRURL10,
+		testPRURL11,
+		testPRURL12,
 	})
 	if changedAgain {
 		t.Fatal("second merge with same PRs should be a no-op")
@@ -145,7 +145,7 @@ func TestMergeReleaseIssueBodyAddsTrackerWhenMissing(t *testing.T) {
 
 - [ ] https://github.com/elastic/fleet-server/pull/10
 `
-	updated, changed := mergeReleaseIssueBody(existing, "9.4.1", []string{"https://github.com/elastic/fleet-server/pull/10"})
+	updated, changed := mergeReleaseIssueBody(existing, "9.4.1", []string{testPRURL10})
 	if !changed {
 		t.Fatal("missing global tracker should trigger an update")
 	}
@@ -159,7 +159,7 @@ func TestEnsureReleaseIssueTrackerDryRun(t *testing.T) {
 		CurrentRelease: "9.4.1",
 		DryRun:         true,
 	}
-	pr := &github.PullRequest{HTMLURL: github.Ptr("https://github.com/elastic/fleet-server/pull/99")}
+	pr := &github.PullRequest{HTMLURL: new("https://github.com/elastic/fleet-server/pull/99")}
 	require.NoError(t, EnsureReleaseIssueTracker(cfg, []*github.PullRequest{pr}))
 }
 
@@ -170,7 +170,7 @@ func TestWarnEnsureReleaseIssueTrackerDoesNotPanicOnError(t *testing.T) {
 func TestPrURLsFromPullRequestsSkipsNil(t *testing.T) {
 	got := prURLsFromPullRequests([]*github.PullRequest{
 		nil,
-		{HTMLURL: github.Ptr("https://github.com/elastic/fleet-server/pull/1")},
+		{HTMLURL: new("https://github.com/elastic/fleet-server/pull/1")},
 	})
 	if len(got) != 1 || got[0] != "https://github.com/elastic/fleet-server/pull/1" {
 		t.Fatalf("unexpected URLs: %v", got)

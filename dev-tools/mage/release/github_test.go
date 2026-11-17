@@ -46,15 +46,15 @@ func newTestGitHubClient(t *testing.T, handler http.Handler) *GitHubClient {
 func TestCreatePRIdempotent(t *testing.T) {
 	createCalls := 0
 	existingPR := &github.PullRequest{
-		Number:  github.Ptr(42),
-		HTMLURL: github.Ptr("https://github.com/elastic/fleet-server/pull/42"),
+		Number:  new(42),
+		HTMLURL: new("https://github.com/elastic/fleet-server/pull/42"),
 		Head: &github.PullRequestBranch{
-			Ref: github.Ptr("9.5"),
+			Ref: new("9.5"),
 		},
 		Base: &github.PullRequestBranch{
-			Ref: github.Ptr("main"),
+			Ref: new("main"),
 		},
-		State: github.Ptr("open"),
+		State: new("open"),
 	}
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -76,11 +76,11 @@ func TestCreatePRIdempotent(t *testing.T) {
 
 	ghClient := newTestGitHubClient(t, handler)
 	opts := PROptions{
-		Owner: "elastic",
-		Repo:  "fleet-server",
+		Owner: releasesLookupOwner,
+		Repo:  releasesLookupRepo,
 		Title: "[Release][9.5.0] Prepare release branch",
 		Head:  "9.5",
-		Base:  "main",
+		Base:  testBaseBranch,
 		Body:  "Release PR body",
 	}
 
@@ -110,9 +110,9 @@ func TestLatestReleaseBeforeUsesReleasesWhenPresent(t *testing.T) {
 		case r.Method == http.MethodGet && r.URL.Path == testAPIReleasesPath:
 			w.Header().Set("Content-Type", "application/json")
 			releases := []*github.RepositoryRelease{
-				{TagName: github.Ptr("v9.5.1")},
-				{TagName: github.Ptr("v9.4.3")},
-				{TagName: github.Ptr("v8.19.1")},
+				{TagName: new("v9.5.1")},
+				{TagName: new("v9.4.3")},
+				{TagName: new("v8.19.1")},
 			}
 			if err := json.NewEncoder(w).Encode(releases); err != nil {
 				t.Errorf("failed to encode releases: %v", err)
@@ -127,7 +127,7 @@ func TestLatestReleaseBeforeUsesReleasesWhenPresent(t *testing.T) {
 	})
 
 	ghClient := newTestGitHubClient(t, handler)
-	got, err := ghClient.LatestReleaseBefore("elastic", "fleet-server", "9.6.0")
+	got, err := ghClient.LatestReleaseBefore(releasesLookupOwner, releasesLookupRepo, "9.6.0")
 	require.NoError(t, err)
 	if got != "9.5.1" {
 		t.Errorf("LatestReleaseBefore() = %q, want 9.5.1", got)
@@ -145,11 +145,11 @@ func TestLatestReleaseBeforeFallsBackToTagsWhenReleasesEmpty(t *testing.T) {
 		case r.Method == http.MethodGet && r.URL.Path == testAPITagsPath:
 			w.Header().Set("Content-Type", "application/json")
 			tags := []*github.RepositoryTag{
-				{Name: github.Ptr("v9.4.4")},
-				{Name: github.Ptr("v9.4.3")},
-				{Name: github.Ptr("v9.3.8")},
-				{Name: github.Ptr("v8.19.1")},
-				{Name: github.Ptr("not-a-version")},
+				{Name: new("v9.4.4")},
+				{Name: new("v9.4.3")},
+				{Name: new("v9.3.8")},
+				{Name: new("v8.19.1")},
+				{Name: new("not-a-version")},
 			}
 			if err := json.NewEncoder(w).Encode(tags); err != nil {
 				t.Errorf("failed to encode tags: %v", err)
@@ -161,7 +161,7 @@ func TestLatestReleaseBeforeFallsBackToTagsWhenReleasesEmpty(t *testing.T) {
 	})
 
 	ghClient := newTestGitHubClient(t, handler)
-	got, err := ghClient.LatestReleaseBefore("elastic", "fleet-server", "9.6.0")
+	got, err := ghClient.LatestReleaseBefore(releasesLookupOwner, releasesLookupRepo, "9.6.0")
 	require.NoError(t, err)
 	if got != "9.4.4" {
 		t.Errorf("LatestReleaseBefore() = %q, want 9.4.4", got)
@@ -171,8 +171,8 @@ func TestLatestReleaseBeforeFallsBackToTagsWhenReleasesEmpty(t *testing.T) {
 func TestCreatePRCreatesWhenNoneExists(t *testing.T) {
 	createCalls := 0
 	newPR := &github.PullRequest{
-		Number:  github.Ptr(99),
-		HTMLURL: github.Ptr("https://github.com/elastic/fleet-server/pull/99"),
+		Number:  new(99),
+		HTMLURL: new("https://github.com/elastic/fleet-server/pull/99"),
 	}
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -196,12 +196,12 @@ func TestCreatePRCreatesWhenNoneExists(t *testing.T) {
 
 	ghClient := newTestGitHubClient(t, handler)
 	pr, err := ghClient.CreatePR(PROptions{
-		Owner: "elastic",
-		Repo:  "fleet-server",
+		Owner: releasesLookupOwner,
+		Repo:  releasesLookupRepo,
 		Title: "New release PR",
-		Head:  "9.6",
-		Base:  "main",
-		Body:  "body",
+		Head:  testReleaseBranch,
+		Base:  testBaseBranch,
+		Body:  testPRBody,
 	})
 	require.NoError(t, err)
 	if pr.GetNumber() != 99 {
@@ -214,7 +214,7 @@ func TestCreatePRCreatesWhenNoneExists(t *testing.T) {
 
 func TestSplitPRReviewers(t *testing.T) {
 	users, teams := splitPRReviewers([]string{
-		"elastic/elastic-agent-control-plane",
+		testReviewerTeam,
 		"some-user",
 		" elastic/other-team ",
 		"",
@@ -231,8 +231,8 @@ func TestSplitPRReviewers(t *testing.T) {
 
 func TestCreatePRRequestsTeamReviewers(t *testing.T) {
 	newPR := &github.PullRequest{
-		Number:  github.Ptr(7),
-		HTMLURL: github.Ptr("https://github.com/elastic/fleet-server/pull/7"),
+		Number:  new(7),
+		HTMLURL: new("https://github.com/elastic/fleet-server/pull/7"),
 	}
 	var reviewersBody github.ReviewersRequest
 
@@ -264,16 +264,16 @@ func TestCreatePRRequestsTeamReviewers(t *testing.T) {
 
 	ghClient := newTestGitHubClient(t, handler)
 	_, err := ghClient.CreatePR(PROptions{
-		Owner:     "elastic",
-		Repo:      "fleet-server",
+		Owner:     releasesLookupOwner,
+		Repo:      releasesLookupRepo,
 		Title:     "Release PR",
-		Head:      "ff-prep-main-9.6.0",
-		Base:      "main",
-		Body:      "body",
-		Reviewers: []string{"elastic/elastic-agent-control-plane", "alice"},
+		Head:      testFFPrepMainBranch,
+		Base:      testBaseBranch,
+		Body:      testPRBody,
+		Reviewers: []string{testReviewerTeam, testReviewerAlice},
 	})
 	require.NoError(t, err)
-	if len(reviewersBody.Reviewers) != 1 || reviewersBody.Reviewers[0] != "alice" {
+	if len(reviewersBody.Reviewers) != 1 || reviewersBody.Reviewers[0] != testReviewerAlice {
 		t.Errorf("Reviewers = %v, want [alice]", reviewersBody.Reviewers)
 	}
 	if len(reviewersBody.TeamReviewers) != 1 || reviewersBody.TeamReviewers[0] != "elastic-agent-control-plane" {

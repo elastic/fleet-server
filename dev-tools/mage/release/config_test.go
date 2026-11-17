@@ -13,11 +13,11 @@ import (
 )
 
 func TestValidateReleaseConfig(t *testing.T) {
-	require.Error(t, ValidateReleaseConfig(&ReleaseConfig{DryRun: true, LatestRelease: "9.4.0"}))
-	require.Error(t, ValidateReleaseConfig(&ReleaseConfig{CurrentRelease: "9.5.0", LatestRelease: "9.4.0"}))
+	require.Error(t, ValidateReleaseConfig(&ReleaseConfig{DryRun: true, LatestRelease: testVersion940}))
+	require.Error(t, ValidateReleaseConfig(&ReleaseConfig{CurrentRelease: testVersion950, LatestRelease: testVersion940}))
 	require.NoError(t, ValidateReleaseConfig(&ReleaseConfig{
-		CurrentRelease: "9.5.0",
-		LatestRelease:  "9.4.0",
+		CurrentRelease: testVersion950,
+		LatestRelease:  testVersion940,
 		DryRun:         true,
 	}))
 }
@@ -26,24 +26,24 @@ func TestEnsureLatestRelease(t *testing.T) {
 	orig := fetchLatestReleaseBefore
 	t.Cleanup(func() { fetchLatestReleaseBefore = orig })
 	fetchLatestReleaseBefore = func(token, owner, repo, current string) (string, error) {
-		return "9.4.3", nil
+		return testVersion943, nil
 	}
 
-	cfg := &ReleaseConfig{CurrentRelease: "9.5.0", DryRun: true}
+	cfg := &ReleaseConfig{CurrentRelease: testVersion950, DryRun: true}
 	require.NoError(t, EnsureLatestRelease(cfg))
-	require.Equal(t, "9.4.3", cfg.LatestRelease)
+	require.Equal(t, testVersion943, cfg.LatestRelease)
 
-	cfg.LatestRelease = "9.4.0"
+	cfg.LatestRelease = testVersion940
 	require.NoError(t, EnsureLatestRelease(cfg))
-	require.Equal(t, "9.4.0", cfg.LatestRelease)
+	require.Equal(t, testVersion940, cfg.LatestRelease)
 }
 
 func TestLoadReleaseSettings(t *testing.T) {
-	t.Setenv("CURRENT_RELEASE", "9.5.0")
+	t.Setenv("CURRENT_RELEASE", testVersion950)
 	t.Setenv("DRY_RUN", "true")
 	settings, err := devtools.LoadReleaseSettings()
 	require.NoError(t, err)
 	require.NoError(t, settings.RequireRelease())
-	require.Equal(t, "9.5.0", settings.CurrentRelease)
+	require.Equal(t, testVersion950, settings.CurrentRelease)
 	require.True(t, settings.DryRun)
 }

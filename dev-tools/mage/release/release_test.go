@@ -13,14 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const (
-	testDefaultVersion940 = `const DefaultVersion = "9.4.0"`
-	testDefaultVersion950 = `const DefaultVersion = "9.5.0"`
-	testVersion940        = "9.4.0"
-	testVersion950        = "9.5.0"
-	testVersionXY         = "9.5"
-)
-
 func TestUpdateVersion(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -124,13 +116,13 @@ const DefaultVersion = "9.4.0"
 
 	t.Chdir(tmpDir)
 
-	err = UpdateVersion("9.5.0")
+	err = UpdateVersion(testVersion950)
 	require.NoError(t, err)
 
 	content1, err := os.ReadFile(versionFile)
 	require.NoError(t, err)
 
-	err = UpdateVersion("9.5.0")
+	err = UpdateVersion(testVersion950)
 	require.NoError(t, err)
 
 	content2, err := os.ReadFile(versionFile)
@@ -160,7 +152,7 @@ func TestUpdateMergify(t *testing.T) {
 
 	t.Chdir(tmpDir)
 
-	err = UpdateMergify("9.5.0")
+	err = UpdateMergify(testVersion950)
 	require.NoError(t, err)
 
 	content, err := os.ReadFile(mergifyFile)
@@ -194,12 +186,12 @@ func TestUpdateMergifyIdempotent(t *testing.T) {
 
 	t.Chdir(tmpDir)
 
-	err = UpdateMergify("9.5.0")
+	err = UpdateMergify(testVersion950)
 	require.NoError(t, err)
 
 	content1, _ := os.ReadFile(mergifyFile)
 
-	err = UpdateMergify("9.5.0")
+	err = UpdateMergify(testVersion950)
 	require.NoError(t, err)
 
 	content2, _ := os.ReadFile(mergifyFile)

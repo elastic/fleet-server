@@ -20,7 +20,7 @@ func UpdateMergify(version string) error {
 		return fmt.Errorf("failed to read %s: %w", mergifyFile, err)
 	}
 
-	var config map[string]interface{}
+	var config map[string]any
 	if err := yaml.Unmarshal(content, &config); err != nil {
 		return fmt.Errorf("failed to parse %s: %w", mergifyFile, err)
 	}
@@ -30,7 +30,7 @@ func UpdateMergify(version string) error {
 		return err
 	}
 
-	rules, ok := config["pull_request_rules"].([]interface{})
+	rules, ok := config["pull_request_rules"].([]any)
 	if !ok {
 		return fmt.Errorf("pull_request_rules not found or invalid format")
 	}
@@ -41,15 +41,15 @@ func UpdateMergify(version string) error {
 		return nil
 	}
 
-	newRule := map[string]interface{}{
+	newRule := map[string]any{
 		"name": fmt.Sprintf("backport patches to %s branch", branchVersion),
-		"conditions": []interface{}{
-			"merged",
+		"conditions": []any{
+			prStateMerged,
 			fmt.Sprintf("label=%s", label),
 		},
-		"actions": map[string]interface{}{
-			"backport": map[string]interface{}{
-				"branches": []interface{}{branchVersion},
+		"actions": map[string]any{
+			"backport": map[string]any{
+				"branches": []any{branchVersion},
 			},
 		},
 	}
@@ -74,34 +74,34 @@ func UpdateMergify(version string) error {
 // mergifyHasBackportRule reports whether pull_request_rules already contains a
 // backport rule for branchVersion. Matching is exact (label condition, rule name,
 // or backport branch) so prefixes like "9.1" do not match "9.10".
-func mergifyHasBackportRule(rules []interface{}, branchVersion, label string) bool {
+func mergifyHasBackportRule(rules []any, branchVersion, label string) bool {
 	labelCond := fmt.Sprintf("label=%s", label)
 	expectedName := fmt.Sprintf("backport patches to %s branch", branchVersion)
 
 	for _, rule := range rules {
-		ruleMap, ok := rule.(map[string]interface{})
+		ruleMap, ok := rule.(map[string]any)
 		if !ok {
 			continue
 		}
 		if name, ok := ruleMap["name"].(string); ok && name == expectedName {
 			return true
 		}
-		if conditions, ok := ruleMap["conditions"].([]interface{}); ok {
+		if conditions, ok := ruleMap["conditions"].([]any); ok {
 			for _, c := range conditions {
 				if s, ok := c.(string); ok && s == labelCond {
 					return true
 				}
 			}
 		}
-		actions, ok := ruleMap["actions"].(map[string]interface{})
+		actions, ok := ruleMap["actions"].(map[string]any)
 		if !ok {
 			continue
 		}
-		backport, ok := actions["backport"].(map[string]interface{})
+		backport, ok := actions["backport"].(map[string]any)
 		if !ok {
 			continue
 		}
-		branches, ok := backport["branches"].([]interface{})
+		branches, ok := backport["branches"].([]any)
 		if !ok {
 			continue
 		}

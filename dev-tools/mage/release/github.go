@@ -77,11 +77,11 @@ func (gh *GitHubClient) CreatePR(opts PROptions) (*github.PullRequest, error) {
 	}
 
 	newPR := &github.NewPullRequest{
-		Title: github.Ptr(opts.Title),
-		Head:  github.Ptr(opts.Head),
-		Base:  github.Ptr(opts.Base),
-		Body:  github.Ptr(opts.Body),
-		Draft: github.Ptr(opts.Draft),
+		Title: new(opts.Title),
+		Head:  new(opts.Head),
+		Base:  new(opts.Base),
+		Body:  new(opts.Body),
+		Draft: new(opts.Draft),
 	}
 
 	pr, _, err := gh.client.PullRequests.Create(gh.ctx, opts.Owner, opts.Repo, newPR)
@@ -184,8 +184,8 @@ func (gh *GitHubClient) listPRsByHeadBase(owner, repo, head, base, state string)
 func (gh *GitHubClient) findPRByExactTitle(owner, repo, base, title string) (*github.PullRequest, bool, error) {
 	query := fmt.Sprintf(`repo:%s/%s is:pr base:%s "%s" in:title`, owner, repo, base, title)
 	result, _, err := gh.client.Search.Issues(gh.ctx, query, &github.SearchOptions{
-		Sort:  "updated",
-		Order: "desc",
+		Sort:  searchSortUpdated,
+		Order: searchOrderDesc,
 		ListOptions: github.ListOptions{
 			PerPage: 10,
 		},
@@ -215,8 +215,11 @@ func (gh *GitHubClient) findPRByExactTitle(owner, repo, base, title string) (*gi
 }
 
 const (
-	prStateOpen    = "open"
-	prStateUnknown = "unknown"
+	prStateMerged     = "merged"
+	prStateOpen       = "open"
+	prStateUnknown    = "unknown"
+	searchOrderDesc   = "desc"
+	searchSortUpdated = "updated"
 )
 
 // pickRelatedPR prefers open PRs, then merged, then other closed PRs.
@@ -256,7 +259,7 @@ func prDisplayState(pr *github.PullRequest) string {
 		return prStateUnknown
 	}
 	if pr.GetMerged() || pr.MergedAt != nil {
-		return "merged"
+		return prStateMerged
 	}
 	state := pr.GetState()
 	if state == "" {
@@ -316,9 +319,9 @@ func (gh *GitHubClient) EnsureLabel(owner, repo, name, color, description string
 	}
 
 	_, _, err = gh.client.Issues.CreateLabel(gh.ctx, owner, repo, &github.Label{
-		Name:        github.Ptr(name),
-		Color:       github.Ptr(color),
-		Description: github.Ptr(description),
+		Name:        new(name),
+		Color:       new(color),
+		Description: new(description),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create label %q: %w", name, err)
@@ -342,8 +345,8 @@ func (gh *GitHubClient) AddLabels(owner, repo string, number int, labels []strin
 func (gh *GitHubClient) FindIssueByTitle(owner, repo, title string) (*github.Issue, bool, error) {
 	query := fmt.Sprintf(`repo:%s/%s is:issue in:title "%s"`, owner, repo, title)
 	result, _, err := gh.client.Search.Issues(gh.ctx, query, &github.SearchOptions{
-		Sort:  "updated",
-		Order: "desc",
+		Sort:  searchSortUpdated,
+		Order: searchOrderDesc,
 		ListOptions: github.ListOptions{
 			PerPage: 20,
 		},
@@ -376,8 +379,8 @@ func (gh *GitHubClient) FindIssueByTitle(owner, repo, title string) (*github.Iss
 // CreateIssue creates a repository issue with the given labels.
 func (gh *GitHubClient) CreateIssue(owner, repo, title, body string, labels []string) (*github.Issue, error) {
 	req := &github.IssueRequest{
-		Title: github.Ptr(title),
-		Body:  github.Ptr(body),
+		Title: new(title),
+		Body:  new(body),
 	}
 	if len(labels) > 0 {
 		req.Labels = &labels
@@ -392,7 +395,7 @@ func (gh *GitHubClient) CreateIssue(owner, repo, title, body string, labels []st
 // UpdateIssueBody replaces the body of an existing issue.
 func (gh *GitHubClient) UpdateIssueBody(owner, repo string, number int, body string) error {
 	_, _, err := gh.client.Issues.Edit(gh.ctx, owner, repo, number, &github.IssueRequest{
-		Body: github.Ptr(body),
+		Body: new(body),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to update issue #%d body: %w", number, err)
@@ -405,8 +408,8 @@ func (gh *GitHubClient) UpdateIssueBody(owner, repo string, number int, body str
 func (gh *GitHubClient) ListReleaseLabeledPRsForVersion(owner, repo, version string) ([]*github.PullRequest, error) {
 	query := fmt.Sprintf(`repo:%s/%s is:pr label:release "%s"`, owner, repo, version)
 	opts := &github.SearchOptions{
-		Sort:  "updated",
-		Order: "desc",
+		Sort:  searchSortUpdated,
+		Order: searchOrderDesc,
 		ListOptions: github.ListOptions{
 			PerPage: 100,
 		},
@@ -432,10 +435,10 @@ func (gh *GitHubClient) ListReleaseLabeledPRsForVersion(owner, repo, version str
 			}
 			seen[num] = struct{}{}
 			prs = append(prs, &github.PullRequest{
-				Number:  github.Ptr(num),
-				HTMLURL: github.Ptr(issue.GetHTMLURL()),
-				Title:   github.Ptr(issue.GetTitle()),
-				State:   github.Ptr(issue.GetState()),
+				Number:  new(num),
+				HTMLURL: new(issue.GetHTMLURL()),
+				Title:   new(issue.GetTitle()),
+				State:   new(issue.GetState()),
 			})
 		}
 		if resp == nil || resp.NextPage == 0 {

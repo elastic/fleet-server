@@ -64,8 +64,8 @@ func createTestGitRepo(t *testing.T) (*GitRepo, string) {
 
 	_, err = w.Commit("Initial commit", &git.CommitOptions{
 		Author: &object.Signature{
-			Name:  "Test User",
-			Email: "test@example.com",
+			Name:  testAuthorName,
+			Email: testAuthorEmail,
 		},
 	})
 	require.NoError(t, err)
@@ -78,15 +78,15 @@ func TestEnsureBranchFrom(t *testing.T) {
 
 	t.Chdir(tmpDir)
 
-	require.NoError(t, gitRepo.EnsureBranchFrom("master", "9.6"))
+	require.NoError(t, gitRepo.EnsureBranchFrom("master", testReleaseBranch))
 
 	branch, err := gitRepo.GetCurrentBranch()
 	require.NoError(t, err)
-	if branch != "9.6" {
-		t.Fatalf("expected branch 9.6, got %s", branch)
+	if branch != testReleaseBranch {
+		t.Fatalf("expected branch %s, got %s", testReleaseBranch, branch)
 	}
 
-	require.NoError(t, gitRepo.EnsureBranchFrom("master", "9.6"))
+	require.NoError(t, gitRepo.EnsureBranchFrom("master", testReleaseBranch))
 }
 
 func TestEnsureBranchFromRemoteOnlyBase(t *testing.T) {
@@ -121,7 +121,7 @@ func TestEnsureBranchFromRemoteOnlyTarget(t *testing.T) {
 		t.Fatalf("Add failed: %v", err)
 	}
 	prepHash, err := w.Commit("prep tip commit", &git.CommitOptions{
-		Author: &object.Signature{Name: "Test User", Email: "test@example.com"},
+		Author: &object.Signature{Name: testAuthorName, Email: testAuthorEmail},
 	})
 	require.NoError(t, err)
 
@@ -150,7 +150,7 @@ func TestEnsureBranchFromRemoteOnlyTarget(t *testing.T) {
 func TestCommitAllNoChanges(t *testing.T) {
 	gitRepo, _ := createTestGitRepo(t)
 
-	committed, err := gitRepo.CommitAll("Empty commit", "Test Author", "test@example.com")
+	committed, err := gitRepo.CommitAll("Empty commit", "Test Author", testAuthorEmail)
 	require.NoError(t, err)
 	if committed {
 		t.Error("CommitAll() should not commit when there are no changes")
@@ -177,7 +177,7 @@ func TestSetRemoteURLIdempotent(t *testing.T) {
 func TestWorkflowBranchNames(t *testing.T) {
 	// update-version-* is created by runPatch only (not runMajorMinor).
 	names := []string{
-		"ff-prep-main-9.6.0",
+		testFFPrepMainBranch,
 		"ff-release-9.6.0",
 		"update-version-9.6.1",
 	}
@@ -304,32 +304,32 @@ func TestGithubHTTPSPushURL(t *testing.T) {
 	}{
 		{
 			name:      "scp ssh",
-			in:        "git@github.com:elastic/fleet-server.git",
-			want:      "https://github.com/elastic/fleet-server.git",
+			in:        testGitHubSSH,
+			want:      testGitHubHTTPS,
 			rewritten: true,
 		},
 		{
 			name:      "ssh scheme",
 			in:        "ssh://git@github.com/elastic/fleet-server.git",
-			want:      "https://github.com/elastic/fleet-server.git",
+			want:      testGitHubHTTPS,
 			rewritten: true,
 		},
 		{
 			name:      "https unchanged",
-			in:        "https://github.com/elastic/fleet-server.git",
-			want:      "https://github.com/elastic/fleet-server.git",
+			in:        testGitHubHTTPS,
+			want:      testGitHubHTTPS,
 			rewritten: false,
 		},
 		{
 			name:      "http github upgraded",
-			in:        "http://github.com/elastic/fleet-server.git",
-			want:      "https://github.com/elastic/fleet-server.git",
+			in:        testGitHubHTTP,
+			want:      testGitHubHTTPS,
 			rewritten: true,
 		},
 		{
 			name:      "non-github ssh unchanged",
-			in:        "git@gitlab.com:group/repo.git",
-			want:      "git@gitlab.com:group/repo.git",
+			in:        testGitLabSSH,
+			want:      testGitLabSSH,
 			rewritten: false,
 		},
 	}
@@ -349,11 +349,11 @@ func TestIsTokenPushRemoteURL(t *testing.T) {
 		in   string
 		want bool
 	}{
-		{"https://github.com/elastic/fleet-server.git", true},
+		{testGitHubHTTPS, true},
 		{"file:///tmp/repo.git", true},
-		{"http://github.com/elastic/fleet-server.git", false},
+		{testGitHubHTTP, false},
 		{"https://evil.example/elastic/fleet-server.git", false},
-		{"git@github.com:elastic/fleet-server.git", false},
+		{testGitHubSSH, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.in, func(t *testing.T) {
@@ -367,11 +367,11 @@ func TestIsTokenPushRemoteURL(t *testing.T) {
 func TestEnsureHTTPSRemote(t *testing.T) {
 	t.Run("rewrites ssh to https", func(t *testing.T) {
 		gitRepo, _ := createTestGitRepo(t)
-		require.NoError(t, gitRepo.SetRemoteURL("origin", "git@github.com:elastic/fleet-server.git"))
+		require.NoError(t, gitRepo.SetRemoteURL("origin", testGitHubSSH))
 		require.NoError(t, gitRepo.ensureHTTPSRemote("origin"))
 		remote, err := gitRepo.repo.Remote("origin")
 		require.NoError(t, err)
-		want := "https://github.com/elastic/fleet-server.git"
+		want := testGitHubHTTPS
 		if got := remote.Config().URLs[0]; got != want {
 			t.Errorf("origin URL = %q, want %q", got, want)
 		}
@@ -379,7 +379,7 @@ func TestEnsureHTTPSRemote(t *testing.T) {
 
 	t.Run("preserves fetch refspecs", func(t *testing.T) {
 		gitRepo, _ := createTestGitRepo(t)
-		require.NoError(t, gitRepo.SetRemoteURL("origin", "git@github.com:elastic/fleet-server.git"))
+		require.NoError(t, gitRepo.SetRemoteURL("origin", testGitHubSSH))
 		before, err := gitRepo.repo.Remote("origin")
 		require.NoError(t, err)
 		beforeFetch := append([]config.RefSpec(nil), before.Config().Fetch...)
@@ -401,7 +401,7 @@ func TestEnsureHTTPSRemote(t *testing.T) {
 
 	t.Run("rejects non-github remote", func(t *testing.T) {
 		gitRepo, _ := createTestGitRepo(t)
-		require.NoError(t, gitRepo.SetRemoteURL("origin", "git@gitlab.com:group/repo.git"))
+		require.NoError(t, gitRepo.SetRemoteURL("origin", testGitLabSSH))
 		err := gitRepo.ensureHTTPSRemote("origin")
 		if err == nil {
 			t.Fatal("ensureHTTPSRemote() expected error for non-GitHub remote")
