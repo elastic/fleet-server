@@ -38,7 +38,7 @@ func EnsureLatestRelease(c *ReleaseConfig) error {
 		return fmt.Errorf("failed to resolve LatestRelease from GitHub: %w", err)
 	}
 	c.LatestRelease = latest
-	fmt.Printf("Resolved LatestRelease from %s/%s: %s\n", releasesLookupOwner, releasesLookupRepo, latest)
+	printf("Resolved LatestRelease from %s/%s: %s\n", releasesLookupOwner, releasesLookupRepo, latest)
 	return nil
 }
 

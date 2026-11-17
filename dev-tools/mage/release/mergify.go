@@ -37,7 +37,7 @@ func UpdateMergify(version string) error {
 
 	label := fmt.Sprintf("backport-%s", branchVersion)
 	if mergifyHasBackportRule(rules, branchVersion, label) {
-		fmt.Printf("Backport rule for %s already exists\n", branchVersion)
+		printf("Backport rule for %s already exists\n", branchVersion)
 		return nil
 	}
 
@@ -67,7 +67,7 @@ func UpdateMergify(version string) error {
 		return fmt.Errorf("failed to write %s: %w", mergifyFile, err)
 	}
 
-	fmt.Printf("Added backport rule for %s to %s\n", branchVersion, mergifyFile)
+	printf("Added backport rule for %s to %s\n", branchVersion, mergifyFile)
 	return nil
 }
 

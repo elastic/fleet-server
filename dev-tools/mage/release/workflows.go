@@ -88,7 +88,7 @@ type workflowPRResult struct {
 // Next-patch bumps are intentionally omitted here; they are created only by
 // RunPatchRelease so patch and minor/FF stay independent.
 func RunMajorMinorRelease(cfg *ReleaseConfig) error {
-	fmt.Println("=== Starting Major/Minor Release Workflow ===")
+	println("=== Starting Major/Minor Release Workflow ===")
 
 	if err := EnsureLatestRelease(cfg); err != nil {
 		return err
@@ -113,7 +113,7 @@ func RunMajorMinorRelease(cfg *ReleaseConfig) error {
 
 	releaseBranch := cfg.ReleaseBranch
 
-	fmt.Printf("Creating release branch: %s\n", releaseBranch)
+	printf("Creating release branch: %s\n", releaseBranch)
 	if err := repo.EnsureBranchFrom(cfg.BaseBranch, releaseBranch); err != nil {
 		return err
 	}
@@ -130,12 +130,12 @@ func RunMajorMinorRelease(cfg *ReleaseConfig) error {
 	branchesToFinalize := []workflowPR{prA, prB}
 
 	if cfg.DryRun {
-		fmt.Println("\nDRY RUN: Skipping push and PR creation")
-		fmt.Printf("Release branch prepared: %s\n", releaseBranch)
+		println("\nDRY RUN: Skipping push and PR creation")
+		printf("Release branch prepared: %s\n", releaseBranch)
 		for _, item := range branchesToFinalize {
-			fmt.Printf("Branch prepared: %s\n", item.branch)
+			printf("Branch prepared: %s\n", item.branch)
 		}
-		fmt.Println("Note: PR-C (main docs) is omitted for fleet-server (no docs/test-env updates)")
+		println("Note: PR-C (main docs) is omitted for fleet-server (no docs/test-env updates)")
 		warnEnsureReleaseIssueTracker(cfg, nil)
 		return nil
 	}
@@ -153,10 +153,10 @@ func RunMajorMinorRelease(cfg *ReleaseConfig) error {
 		return err
 	}
 
-	fmt.Printf("\n=== Major/Minor Release Workflow Complete ===\n")
-	fmt.Printf("Release branch created: %s\n", releaseBranch)
+	printf("\n=== Major/Minor Release Workflow Complete ===\n")
+	printf("Release branch created: %s\n", releaseBranch)
 	printWorkflowPRResults(results)
-	fmt.Println("\nNote: PR-C (main docs) is omitted for fleet-server (no docs/test-env updates)")
+	println("\nNote: PR-C (main docs) is omitted for fleet-server (no docs/test-env updates)")
 
 	warnEnsureReleaseIssueTracker(cfg, prsFromWorkflowResults(results))
 	return nil
@@ -164,7 +164,7 @@ func RunMajorMinorRelease(cfg *ReleaseConfig) error {
 
 func prepMainBackportAndVersion(repo *GitRepo, cfg *ReleaseConfig) (workflowPR, error) {
 	branch := fmt.Sprintf("ff-prep-main-%s", cfg.CurrentRelease)
-	fmt.Printf("\n--- Preparing PR-A: backport rule + version %s on %s ---\n", cfg.NextProjectMinorVersion, cfg.BaseBranch)
+	printf("\n--- Preparing PR-A: backport rule + version %s on %s ---\n", cfg.NextProjectMinorVersion, cfg.BaseBranch)
 
 	if err := repo.EnsureBranchFrom(cfg.BaseBranch, branch); err != nil {
 		return workflowPR{}, err
@@ -198,7 +198,7 @@ func prepMainBackportAndVersion(repo *GitRepo, cfg *ReleaseConfig) (workflowPR, 
 
 func prepFFRelease(repo *GitRepo, cfg *ReleaseConfig) (workflowPR, error) {
 	branch := fmt.Sprintf("ff-release-%s", cfg.CurrentRelease)
-	fmt.Printf("\n--- Preparing PR-B: ff-release %s on %s ---\n", cfg.CurrentRelease, cfg.ReleaseBranch)
+	printf("\n--- Preparing PR-B: ff-release %s on %s ---\n", cfg.CurrentRelease, cfg.ReleaseBranch)
 
 	if err := repo.EnsureBranchFrom(cfg.ReleaseBranch, branch); err != nil {
 		return workflowPR{}, err
@@ -231,7 +231,7 @@ func prepFFRelease(repo *GitRepo, cfg *ReleaseConfig) (workflowPR, error) {
 // Matches ingest-dev prepare-next-patch. Used only by RunPatchRelease.
 func prepPatchVersionBump(repo *GitRepo, cfg *ReleaseConfig) (workflowPR, error) {
 	branch := fmt.Sprintf("update-version-%s", cfg.CurrentRelease)
-	fmt.Printf("\n--- Preparing patch version bump to %s on %s ---\n", cfg.CurrentRelease, cfg.ReleaseBranch)
+	printf("\n--- Preparing patch version bump to %s on %s ---\n", cfg.CurrentRelease, cfg.ReleaseBranch)
 
 	if err := repo.EnsureBranchFrom(cfg.ReleaseBranch, branch); err != nil {
 		return workflowPR{}, err
@@ -313,7 +313,7 @@ func ensureMajorMinorCurrentReleaseMatchesBase(repo *GitRepo, cfg *ReleaseConfig
 			cfg.CurrentRelease, base, branchVersion, base,
 		)
 	}
-	fmt.Printf("Verified CURRENT_RELEASE=%s matches %s on branch %s\n", cfg.CurrentRelease, branchVersion, base)
+	printf("Verified CURRENT_RELEASE=%s matches %s on branch %s\n", cfg.CurrentRelease, branchVersion, base)
 	return nil
 }
 
@@ -321,11 +321,7 @@ func ensureMajorMinorCurrentReleaseMatchesBase(repo *GitRepo, cfg *ReleaseConfig
 // CURRENT_RELEASE is the version to land (NEW_VERSION from version-bump), matching
 // ingest-dev prepare-next-patch. Docs stay off this path.
 func RunPatchRelease(cfg *ReleaseConfig) error {
-	fmt.Println("=== Starting Patch Release Workflow ===")
-
-	if err := EnsureLatestRelease(cfg); err != nil {
-		return err
-	}
+	println("=== Starting Patch Release Workflow ===")
 
 	if err := ValidateReleaseConfig(cfg); err != nil {
 		return err
@@ -360,9 +356,9 @@ func RunPatchRelease(cfg *ReleaseConfig) error {
 	branchesToFinalize := []workflowPR{prBump}
 
 	if cfg.DryRun {
-		fmt.Println("\nDRY RUN: Skipping push and PR creation")
+		println("\nDRY RUN: Skipping push and PR creation")
 		for _, item := range branchesToFinalize {
-			fmt.Printf("Branch prepared: %s\n", item.branch)
+			printf("Branch prepared: %s\n", item.branch)
 		}
 		warnEnsureReleaseIssueTracker(cfg, nil)
 		return nil
@@ -374,7 +370,7 @@ func RunPatchRelease(cfg *ReleaseConfig) error {
 		return err
 	}
 
-	fmt.Printf("\n=== Patch Release Workflow Complete ===\n")
+	printf("\n=== Patch Release Workflow Complete ===\n")
 	printWorkflowPRResults(results)
 
 	warnEnsureReleaseIssueTracker(cfg, prsFromWorkflowResults(results))
@@ -415,7 +411,7 @@ func ensurePatchBranchReadyForBump(repo *GitRepo, cfg *ReleaseConfig) error {
 			cfg.CurrentRelease, prev, cfg.ReleaseBranch, branchVersion,
 		)
 	}
-	fmt.Printf("Verified branch %s is at %s; will bump to CURRENT_RELEASE=%s\n", cfg.ReleaseBranch, branchVersion, cfg.CurrentRelease)
+	printf("Verified branch %s is at %s; will bump to CURRENT_RELEASE=%s\n", cfg.ReleaseBranch, branchVersion, cfg.CurrentRelease)
 	return nil
 }
 
@@ -433,7 +429,7 @@ func finalizeWorkflowPRs(repo *GitRepo, gh *GitHubClient, items []workflowPR) ([
 
 func printWorkflowPRResults(results []workflowPRResult) {
 	for i, result := range results {
-		fmt.Println(formatWorkflowPRLine(i+1, result))
+		println(formatWorkflowPRLine(i+1, result))
 	}
 }
 
@@ -470,7 +466,9 @@ func finalizePR(repo *GitRepo, gh *GitHubClient, branchName, baseBranch string, 
 		return nil, err
 	}
 	if found {
-		gh.ensurePRLabels(opts.Owner, opts.Repo, existingPR.GetNumber(), opts.Labels)
+		if err := gh.ensurePRLabels(opts.Owner, opts.Repo, existingPR.GetNumber(), opts.Labels); err != nil {
+			return nil, err
+		}
 		return existingPR, nil
 	}
 
@@ -479,13 +477,13 @@ func finalizePR(repo *GitRepo, gh *GitHubClient, branchName, baseBranch string, 
 		return nil, err
 	}
 	if !ahead {
-		fmt.Printf("No new commits on %s compared to %s; skipping push and PR creation\n", branchName, baseBranch)
+		printf("No new commits on %s compared to %s; skipping push and PR creation\n", branchName, baseBranch)
 		related, found, err := gh.FindRelatedPR(opts.Owner, opts.Repo, opts.Head, opts.Base, opts.Title)
 		if err != nil {
 			return nil, err
 		}
 		if found {
-			fmt.Printf("Related PR #%d (%s): %s\n", related.GetNumber(), prDisplayState(related), related.GetHTMLURL())
+			printf("Related PR #%d (%s): %s\n", related.GetNumber(), prDisplayState(related), related.GetHTMLURL())
 			return related, nil
 		}
 		return nil, nil

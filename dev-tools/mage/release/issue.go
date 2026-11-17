@@ -26,8 +26,8 @@ var (
 // caller. Release workflows use this so a tracker outage cannot abort PR creation.
 func warnEnsureReleaseIssueTracker(cfg *ReleaseConfig, workflowPRs []*github.PullRequest) {
 	if err := EnsureReleaseIssueTracker(cfg, workflowPRs); err != nil {
-		fmt.Printf("Warning: ensure release issue tracker failed (release workflow continues): %v\n", err)
-		fmt.Println("Re-run with: mage release:ensureIssueTracker")
+		printf("Warning: ensure release issue tracker failed (release workflow continues): %v\n", err)
+		println("Re-run with: mage release:ensureIssueTracker")
 	}
 }
 
@@ -49,9 +49,9 @@ func EnsureReleaseIssueTracker(cfg *ReleaseConfig, workflowPRs []*github.PullReq
 	seedURLs := prURLsFromPullRequests(workflowPRs)
 
 	if cfg.DryRun {
-		fmt.Printf("\nDRY RUN: Would ensure issue tracker %q\n", title)
-		fmt.Printf("Seed PRs from workflow: %d\n", len(seedURLs))
-		fmt.Printf("Global tracker: %s\n", globalReleaseTrackerURL)
+		printf("\nDRY RUN: Would ensure issue tracker %q\n", title)
+		printf("Seed PRs from workflow: %d\n", len(seedURLs))
+		printf("Global tracker: %s\n", globalReleaseTrackerURL)
 		return nil
 	}
 
@@ -80,13 +80,13 @@ func EnsureReleaseIssueTracker(cfg *ReleaseConfig, workflowPRs []*github.PullReq
 		if err != nil {
 			return err
 		}
-		fmt.Printf("Created release issue tracker #%d: %s\n", issue.GetNumber(), issue.GetHTMLURL())
+		printf("Created release issue tracker #%d: %s\n", issue.GetNumber(), issue.GetHTMLURL())
 		return nil
 	}
 
 	updatedBody, changed := mergeReleaseIssueBody(existing.GetBody(), cfg.CurrentRelease, prURLs)
 	if !changed {
-		fmt.Printf("Release issue tracker already up to date: #%d %s\n", existing.GetNumber(), existing.GetHTMLURL())
+		printf("Release issue tracker already up to date: #%d %s\n", existing.GetNumber(), existing.GetHTMLURL())
 		return nil
 	}
 
@@ -94,9 +94,9 @@ func EnsureReleaseIssueTracker(cfg *ReleaseConfig, workflowPRs []*github.PullReq
 		return err
 	}
 	if err := gh.AddLabels(owner, repo, existing.GetNumber(), []string{"release"}); err != nil {
-		fmt.Printf("Warning: failed to ensure release label on issue #%d: %v\n", existing.GetNumber(), err)
+		printf("Warning: failed to ensure release label on issue #%d: %v\n", existing.GetNumber(), err)
 	}
-	fmt.Printf("Updated release issue tracker #%d: %s\n", existing.GetNumber(), existing.GetHTMLURL())
+	printf("Updated release issue tracker #%d: %s\n", existing.GetNumber(), existing.GetHTMLURL())
 	return nil
 }
 

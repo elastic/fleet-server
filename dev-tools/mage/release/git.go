@@ -64,7 +64,7 @@ func (g *GitRepo) CreateBranch(branchName string) error {
 		return err
 	}
 	if exists {
-		fmt.Printf("Branch already exists: %s\n", branchName)
+		printf("Branch already exists: %s\n", branchName)
 		return nil
 	}
 
@@ -81,7 +81,7 @@ func (g *GitRepo) CreateBranch(branchName string) error {
 		return fmt.Errorf("failed to create branch %s: %w", branchName, err)
 	}
 
-	fmt.Printf("Created branch: %s\n", branchName)
+	printf("Created branch: %s\n", branchName)
 	return nil
 }
 
@@ -111,7 +111,7 @@ func (g *GitRepo) EnsureBranch(branchName string) error {
 		if err := g.repo.Storer.SetReference(localRef); err != nil {
 			return fmt.Errorf("failed to create local branch %s from origin: %w", branchName, err)
 		}
-		fmt.Printf("Created local branch from origin: %s\n", branchName)
+		printf("Created local branch from origin: %s\n", branchName)
 		return g.CheckoutBranch(branchName)
 	}
 	if !errors.Is(err, plumbing.ErrReferenceNotFound) {
@@ -128,7 +128,7 @@ func (g *GitRepo) EnsureBranch(branchName string) error {
 func (g *GitRepo) CheckoutBranch(branchName string) error {
 	currentBranch, err := g.GetCurrentBranch()
 	if err == nil && currentBranch == branchName {
-		fmt.Printf("Already on branch: %s\n", branchName)
+		printf("Already on branch: %s\n", branchName)
 		return nil
 	}
 
@@ -144,7 +144,7 @@ func (g *GitRepo) CheckoutBranch(branchName string) error {
 		return fmt.Errorf("failed to checkout branch %s: %w", branchName, err)
 	}
 
-	fmt.Printf("Checked out branch: %s\n", branchName)
+	printf("Checked out branch: %s\n", branchName)
 	return nil
 }
 
@@ -160,7 +160,7 @@ func (g *GitRepo) CommitAll(message, authorName, authorEmail string) (bool, erro
 		return false, fmt.Errorf("failed to get status: %w", err)
 	}
 	if status.IsClean() {
-		fmt.Println("No changes to commit")
+		println("No changes to commit")
 		return false, nil
 	}
 
@@ -180,7 +180,7 @@ func (g *GitRepo) CommitAll(message, authorName, authorEmail string) (bool, erro
 		return false, fmt.Errorf("failed to commit: %w", err)
 	}
 
-	fmt.Printf("Created commit: %s\n", commit.String())
+	printf("Created commit: %s\n", commit.String())
 	return true, nil
 }
 
@@ -325,7 +325,7 @@ func (g *GitRepo) Push(remoteName string) error {
 		return err
 	}
 
-	fmt.Printf("Pushing branch %s to remote origin via git CLI...\n", currentBranch)
+	printf("Pushing branch %s to remote origin via git CLI...\n", currentBranch)
 
 	ctx, cancel := context.WithTimeout(context.Background(), pushTimeout)
 	defer cancel()
@@ -344,7 +344,7 @@ func (g *GitRepo) Push(remoteName string) error {
 		return fmt.Errorf("failed to push: %w: %s", err, strings.TrimSpace(string(output)))
 	}
 
-	fmt.Printf("Pushed branch %s to remote: origin\n", currentBranch)
+	printf("Pushed branch %s to remote: origin\n", currentBranch)
 	return nil
 }
 
@@ -390,7 +390,7 @@ func (g *GitRepo) SetRemoteURL(remoteName, url string) error {
 		if err != nil {
 			return fmt.Errorf("failed to create remote: %w", err)
 		}
-		fmt.Printf("Created remote %s: %s\n", remoteName, url)
+		printf("Created remote %s: %s\n", remoteName, url)
 		return nil
 	} else if err != nil {
 		return fmt.Errorf("failed to get remote: %w", err)
@@ -412,6 +412,6 @@ func (g *GitRepo) SetRemoteURL(remoteName, url string) error {
 		return fmt.Errorf("failed to recreate remote: %w", err)
 	}
 
-	fmt.Printf("Updated remote %s: %s\n", remoteName, url)
+	printf("Updated remote %s: %s\n", remoteName, url)
 	return nil
 }

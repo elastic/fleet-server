@@ -69,8 +69,10 @@ func (gh *GitHubClient) CreatePR(opts PROptions) (*github.PullRequest, error) {
 		return nil, err
 	}
 	if found {
-		fmt.Printf("Open PR already exists #%d: %s\n", existingPR.GetNumber(), existingPR.GetHTMLURL())
-		gh.ensurePRLabels(opts.Owner, opts.Repo, existingPR.GetNumber(), opts.Labels)
+		printf("Open PR already exists #%d: %s\n", existingPR.GetNumber(), existingPR.GetHTMLURL())
+		if err := gh.ensurePRLabels(opts.Owner, opts.Repo, existingPR.GetNumber(), opts.Labels); err != nil {
+			return nil, err
+		}
 		return existingPR, nil
 	}
 
@@ -96,14 +98,16 @@ func (gh *GitHubClient) CreatePR(opts PROptions) (*github.PullRequest, error) {
 			}
 			_, _, err = gh.client.PullRequests.RequestReviewers(gh.ctx, opts.Owner, opts.Repo, pr.GetNumber(), reviewersReq)
 			if err != nil {
-				fmt.Printf("Warning: failed to add reviewers: %v\n", err)
+				printf("Warning: failed to add reviewers: %v\n", err)
 			}
 		}
 	}
 
-	gh.ensurePRLabels(opts.Owner, opts.Repo, pr.GetNumber(), opts.Labels)
+	if err := gh.ensurePRLabels(opts.Owner, opts.Repo, pr.GetNumber(), opts.Labels); err != nil {
+		return nil, err
+	}
 
-	fmt.Printf("Created PR #%d: %s\n", pr.GetNumber(), pr.GetHTMLURL())
+	printf("Created PR #%d: %s\n", pr.GetNumber(), pr.GetHTMLURL())
 	return pr, nil
 }
 
@@ -279,20 +283,21 @@ var mergeLabelDefs = map[string]struct {
 	},
 }
 
-func (gh *GitHubClient) ensurePRLabels(owner, repo string, number int, labels []string) {
+func (gh *GitHubClient) ensurePRLabels(owner, repo string, number int, labels []string) error {
 	if len(labels) == 0 {
-		return
+		return nil
 	}
 	for _, label := range labels {
 		if def, ok := mergeLabelDefs[label]; ok {
 			if err := gh.EnsureLabel(owner, repo, label, def.Color, def.Description); err != nil {
-				fmt.Printf("Warning: failed to ensure label %q: %v\n", label, err)
+				return fmt.Errorf("failed to ensure label %q on #%d: %w", label, number, err)
 			}
 		}
 	}
 	if err := gh.AddLabels(owner, repo, number, labels); err != nil {
-		fmt.Printf("Warning: failed to add labels: %v\n", err)
+		return fmt.Errorf("failed to add labels on #%d: %w", number, err)
 	}
+	return nil
 }
 
 // EnsureLabel creates a repository label if it does not already exist.
@@ -313,7 +318,7 @@ func (gh *GitHubClient) EnsureLabel(owner, repo, name, color, description string
 	if err != nil {
 		return fmt.Errorf("failed to create label %q: %w", name, err)
 	}
-	fmt.Printf("Created label %q\n", name)
+	printf("Created label %q\n", name)
 	return nil
 }
 
@@ -324,7 +329,7 @@ func (gh *GitHubClient) AddLabels(owner, repo string, number int, labels []strin
 		return fmt.Errorf("failed to add labels: %w", err)
 	}
 
-	fmt.Printf("Added labels to #%d: %v\n", number, labels)
+	printf("Added labels to #%d: %v\n", number, labels)
 	return nil
 }
 

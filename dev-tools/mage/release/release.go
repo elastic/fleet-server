@@ -89,7 +89,7 @@ func UpdateVersion(newVersion string) error {
 	contentStr := string(content)
 	alreadyAtVersion := regexp.MustCompile(`const\s+DefaultVersion\s*=\s*"` + regexp.QuoteMeta(newVersion) + `"`)
 	if alreadyAtVersion.MatchString(contentStr) {
-		fmt.Printf("Version already set to %s in %s\n", newVersion, versionFile)
+		printf("Version already set to %s in %s\n", newVersion, versionFile)
 		return nil
 	}
 
@@ -102,6 +102,6 @@ func UpdateVersion(newVersion string) error {
 		return fmt.Errorf("failed to write %s: %w", versionFile, err)
 	}
 
-	fmt.Printf("Updated version to %s in %s\n", newVersion, versionFile)
+	printf("Updated version to %s in %s\n", newVersion, versionFile)
 	return nil
 }
