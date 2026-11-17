@@ -7,6 +7,7 @@ package api
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -14,6 +15,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/rs/zerolog"
 	"go.elastic.co/apm/v2"
@@ -25,6 +27,8 @@ import (
 
 const (
 	defaultKeyName        = "default.pgp"
+	customKeyName         = "custom.json"
+	upstreamFetchTimeout  = 30 * time.Second
 	defaultKeyPermissions = 0o0600
 )
 
@@ -34,18 +38,32 @@ var (
 	ErrUpstreamStatus = errors.New("upstream http server status error")
 )
 
+type customKey struct {
+	URL string `json:"url"`
+	Key []byte `json:"key"`
+}
+
 type PGPRetrieverT struct {
 	bulker bulk.Bulk
 	cache  cache.Cache
 	cfg    config.PGP
 }
 
-func NewPGPRetrieverT(cfg *config.Server, bulker bulk.Bulk, c cache.Cache) *PGPRetrieverT {
-	return &PGPRetrieverT{
+func NewPGPRetrieverT(ctx context.Context, cfg *config.Server, bulker bulk.Bulk, c cache.Cache) *PGPRetrieverT {
+	pt := &PGPRetrieverT{
 		bulker: bulker,
 		cache:  c,
 		cfg:    cfg.PGP,
 	}
+	if cfg.PGP.UpstreamURL != config.DefaultPGPUpstreamURL {
+		if _, err := pt.getPGPFromDir(ctx, customKeyName); err != nil {
+			if _, err := pt.FetchCustomKey(ctx); err != nil {
+				zlog := zerolog.Ctx(ctx)
+				zlog.Error().Err(err).Str("url", pt.cfg.UpstreamURL).Msg("Failed to fetch custom PGP key")
+			}
+		}
+	}
+	return pt
 }
 
 func (pt *PGPRetrieverT) handlePGPKey(zlog zerolog.Logger, w http.ResponseWriter, r *http.Request, _, _, _ int) error {
@@ -80,11 +98,25 @@ func (pt *PGPRetrieverT) getPGPKey(ctx context.Context, zlog zerolog.Logger) ([]
 	span.Context.SetLabel("key", key)
 	defer span.End()
 
+	if pt.cfg.UpstreamURL != config.DefaultPGPUpstreamURL {
+		key = filepath.Join(pt.cfg.Dir, customKeyName)
+		span.Context.SetLabel("key", key)
+		if p, ok := pt.cache.GetPGPKey(pt.cfg.UpstreamURL); ok {
+			return p, nil
+		}
+		p, err := pt.getPGPFromDir(ctx, customKeyName)
+		if err != nil {
+			return pt.FetchCustomKey(ctx)
+		}
+		pt.cache.SetPGPKey(pt.cfg.UpstreamURL, p)
+		return p, nil
+	}
+
 	p, ok := pt.cache.GetPGPKey(key)
 	if ok {
 		return p, nil
 	}
-	p, err := pt.getPGPFromDir(ctx, key)
+	p, err := pt.getPGPFromDir(ctx, defaultKeyName)
 
 	// successfully retrieved from disk
 	if err == nil {
@@ -107,13 +139,33 @@ func (pt *PGPRetrieverT) getPGPKey(ctx context.Context, zlog zerolog.Logger) ([]
 	return p, nil
 }
 
+// FetchCustomKey fetches the PGP key from the configured upstream URL and
+// writes it to disk and the cache.
+func (pt *PGPRetrieverT) FetchCustomKey(ctx context.Context) ([]byte, error) {
+	zlog := zerolog.Ctx(ctx)
+	p, err := pt.getPGPFromUpstream(ctx)
+	if err != nil {
+		return nil, err
+	}
+	stored, err := json.Marshal(customKey{URL: pt.cfg.UpstreamURL, Key: p})
+	if err != nil {
+		return nil, err
+	}
+	pt.writeKeyToDir(ctx, *zlog, filepath.Join(pt.cfg.Dir, customKeyName), stored)
+	pt.cache.SetPGPKey(pt.cfg.UpstreamURL, p)
+	return p, nil
+}
+
 // getPGPFromDir will return the PGP contents if found in the directory
 //
 // Key contents are only returned if the key has valid permission bits.
-func (pt *PGPRetrieverT) getPGPFromDir(ctx context.Context, key string) ([]byte, error) {
+// For the custom key, a stored URL that does not match the configured URL
+// returns fs.ErrNotExist.
+func (pt *PGPRetrieverT) getPGPFromDir(ctx context.Context, keyName string) ([]byte, error) {
 	span, _ := apm.StartSpan(ctx, "getPGPFromDir", "process")
 	defer span.End()
 
+	key := filepath.Join(pt.cfg.Dir, keyName)
 	stat, err := os.Stat(key)
 	if err != nil {
 		return nil, err
@@ -121,7 +173,15 @@ func (pt *PGPRetrieverT) getPGPFromDir(ctx context.Context, key string) ([]byte,
 	if stat.Mode().Perm() != defaultKeyPermissions { // TODO determine what permission bits we want to check
 		return nil, ErrPGPPermissions
 	}
-	return os.ReadFile(key)
+	p, err := os.ReadFile(key)
+	if err != nil || keyName != customKeyName {
+		return p, err
+	}
+	var stored customKey
+	if err := json.Unmarshal(p, &stored); err != nil || stored.URL != pt.cfg.UpstreamURL {
+		return nil, fs.ErrNotExist
+	}
+	return stored.Key, nil
 }
 
 // getPGPFromUpstream returns the PGP key contentents from the key specified in the upstream URL.
@@ -129,8 +189,11 @@ func (pt *PGPRetrieverT) getPGPFromUpstream(ctx context.Context) ([]byte, error)
 	span, ctx := apm.StartSpan(ctx, "getPGPFromUpstream", "process")
 	defer span.End()
 
+	fetchCtx, cancel := context.WithTimeout(ctx, upstreamFetchTimeout)
+	defer cancel()
+
 	// NOTE: If we are concerned about this making too many requests we can add a lock, or use something like sync.Once
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, pt.cfg.UpstreamURL, nil)
+	req, err := http.NewRequestWithContext(fetchCtx, http.MethodGet, pt.cfg.UpstreamURL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -168,11 +231,31 @@ func (pt *PGPRetrieverT) writeKeyToDir(ctx context.Context, zlog zerolog.Logger,
 		}
 	}
 
-	err = os.WriteFile(fullPath, p, defaultKeyPermissions)
+	err = writeFileAtomic(fullPath, p, defaultKeyPermissions)
 	if err != nil {
 		zlog.Error().Err(err).Str("path", fullPath).Msg("Unable to write file.")
 		return
 	}
 	zlog.Info().Str("path", fullPath).Msg("Key written to storage.")
 
+}
+
+func writeFileAtomic(path string, p []byte, perm os.FileMode) error {
+	tmp, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".tmp-*")
+	if err != nil {
+		return err
+	}
+	defer func() { _ = os.Remove(tmp.Name()) }()
+	if err := tmp.Chmod(perm); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if _, err := tmp.Write(p); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmp.Name(), path)
 }

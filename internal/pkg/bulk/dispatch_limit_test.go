@@ -8,6 +8,7 @@ import (
 	"context"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -47,6 +48,14 @@ func TestDispatchRejectsWhenLimitReached(t *testing.T) {
 
 	require.ErrorIs(t, resp.err, ErrTooManyBulkDispatches)
 
+	// MSearch counts its searches against the same limit.
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	items, err := b.MSearch(ctx, []MultiOp{{Index: testIndex, Body: []byte(`{}`)}})
+	require.ErrorIs(t, err, ErrTooManyBulkDispatches)
+	require.Nil(t, items)
+	require.Equal(t, limit, b.pendingBulkDispatches.Load(), "a rejected MSearch releases its pending dispatches")
+
 	// Clean up: drain the channel to unblock the goroutines.
 	for range limit {
 		<-b.ch // remove the filler items
@@ -78,6 +87,20 @@ func TestDispatchSucceedsWhenBelowLimit(t *testing.T) {
 
 			resp := b.dispatch(context.Background(), blk)
 			require.NoError(t, resp.err)
+
+			// MSearch is one pending dispatch even when it sends more searches than the limit.
+			ops := make([]MultiOp, limit+1)
+			for i := range ops {
+				ops[i] = MultiOp{Index: testIndex, Body: []byte(`{}`)}
+			}
+			go func() {
+				for range ops {
+					item := <-b.ch
+					item.ch <- respT{idx: item.idx}
+				}
+			}()
+			_, err = b.MSearch(t.Context(), ops)
+			require.NoError(t, err)
 
 			require.Equal(t, int64(0), b.pendingBulkDispatches.Load())
 		})

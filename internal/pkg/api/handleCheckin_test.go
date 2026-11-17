@@ -33,6 +33,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
+	monitormock "github.com/elastic/fleet-server/v7/internal/pkg/monitor/mock"
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
@@ -371,7 +372,7 @@ func TestFilterActions(t *testing.T) {
 			ActionID: "9012",
 			Type:     "RESTART",
 		}, {
-			ActionID: "9013",
+			ActionID: "3456",
 			Type:     "UNINSTALL",
 		}},
 		resp: []model.Action{{
@@ -384,7 +385,7 @@ func TestFilterActions(t *testing.T) {
 			ActionID: "9012",
 			Type:     "RESTART",
 		}, {
-			ActionID: "9013",
+			ActionID: "3456",
 			Type:     "UNINSTALL",
 		}},
 	}, {
@@ -2017,7 +2018,7 @@ func TestProcessPolicyRemoteESServiceTokenSecretPaths(t *testing.T) {
 		},
 	}
 
-	action, _, err := processPolicy(t.Context(), logger, bulker, agent, pp, nil)
+	action, _, err := processPolicy(t.Context(), logger, bulker, agent, pp, true, nil)
 	require.NoError(t, err)
 
 	pc, err := action.Data.AsActionPolicyChange()
@@ -2047,11 +2048,13 @@ func TestProcessPolicyPrunesAgentPinnedInputsSecretPaths(t *testing.T) {
   "inputs": [
     {
       "id": "pinned-elsewhere",
+      "type": "synthetics/http",
       "condition": "${agent.id} == 'agent2'",
       "secrets": {"pw": {"id": "P0"}}
     },
     {
       "id": "mixed",
+      "type": "synthetics/browser",
       "secrets": {"pw": {"id": "P1"}},
       "streams": [
         {"id": "s0", "condition": "${agent.id} == 'agent2'", "secrets": {"tok": {"id": "T0"}}},
@@ -2091,23 +2094,41 @@ func TestProcessPolicyPrunesAgentPinnedInputsSecretPaths(t *testing.T) {
 		},
 	}
 
-	action, _, err := processPolicy(t.Context(), logger, bulker, agent, pp, nil)
-	require.NoError(t, err)
-	pc, err := action.Data.AsActionPolicyChange()
-	require.NoError(t, err)
+	t.Run("enabled", func(t *testing.T) {
+		action, _, err := processPolicy(t.Context(), logger, bulker, agent, pp.Clone(), true, nil)
+		require.NoError(t, err)
+		pc, err := action.Data.AsActionPolicyChange()
+		require.NoError(t, err)
 
-	require.Len(t, pc.Policy.Inputs, 1)
-	assert.Equal(t, "mixed", pc.Policy.Inputs[0]["id"])
-	assert.ElementsMatch(t, []string{"inputs.0.pw", "inputs.0.streams.0.tok"}, pc.Policy.SecretPaths)
+		require.Len(t, pc.Policy.Inputs, 1)
+		assert.Equal(t, "mixed", pc.Policy.Inputs[0]["id"])
+		assert.ElementsMatch(t, []string{"inputs.0.pw", "inputs.0.streams.0.tok"}, pc.Policy.SecretPaths)
 
-	input := pc.Policy.Inputs[0]
-	assert.Equal(t, "P1_value", input["pw"])
-	streams, ok := input["streams"].([]any)
-	require.True(t, ok)
-	require.Len(t, streams, 1)
-	stream, ok := streams[0].(map[string]any)
-	require.True(t, ok)
-	assert.Equal(t, "T1_value", stream["tok"])
+		input := pc.Policy.Inputs[0]
+		assert.Equal(t, "P1_value", input["pw"])
+		streams, ok := input["streams"].([]any)
+		require.True(t, ok)
+		require.Len(t, streams, 1)
+		stream, ok := streams[0].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "T1_value", stream["tok"])
+	})
+
+	// feature_flags.evaluate_conditions.agent_id: false delivers every input.
+	t.Run("disabled", func(t *testing.T) {
+		action, _, err := processPolicy(t.Context(), logger, bulker, agent, pp.Clone(), false, nil)
+		require.NoError(t, err)
+		pc, err := action.Data.AsActionPolicyChange()
+		require.NoError(t, err)
+
+		require.Len(t, pc.Policy.Inputs, 2)
+		assert.Equal(t, "pinned-elsewhere", pc.Policy.Inputs[0]["id"])
+		assert.Equal(t, "mixed", pc.Policy.Inputs[1]["id"])
+		streams, ok := pc.Policy.Inputs[1]["streams"].([]any)
+		require.True(t, ok)
+		assert.Len(t, streams, 2)
+		assert.ElementsMatch(t, []string{"inputs.0.pw", "inputs.1.pw", "inputs.1.streams.0.tok", "inputs.1.streams.1.tok"}, pc.Policy.SecretPaths)
+	})
 }
 
 // TestProcessPolicyAgentTags ensures that processPolicy injects the agent tags and records their hash
@@ -2203,7 +2224,7 @@ func TestProcessPolicyAgentTags(t *testing.T) {
 				},
 			}
 
-			action, agentUpdate, err := processPolicy(t.Context(), logger, bulker, agent, pp.Clone(), nil)
+			action, agentUpdate, err := processPolicy(t.Context(), logger, bulker, agent, pp.Clone(), true, nil)
 			require.NoError(t, err)
 			assert.Equal(t, tc.wantUpdate, agentUpdate)
 			bulker.AssertNotCalled(t, "Update", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything, mock.Anything)
@@ -2288,7 +2309,7 @@ func TestProcessPolicySecretPathsConcurrentDispatch(t *testing.T) {
 			},
 		}
 		wg.Go(func() {
-			action, _, err := processPolicy(t.Context(), logger, bulker, agent, pp.Clone(), nil)
+			action, _, err := processPolicy(t.Context(), logger, bulker, agent, pp.Clone(), true, nil)
 			if err != nil {
 				errs[a] = err
 				return
@@ -2392,7 +2413,7 @@ func TestProcessPolicyOTLPOutput(t *testing.T) {
 
 			agent := &model.Agent{ESDocument: model.ESDocument{Id: "agent1"}}
 
-			action, _, err := processPolicy(t.Context(), logger, bulker, agent, pp, nil)
+			action, _, err := processPolicy(t.Context(), logger, bulker, agent, pp, true, nil)
 			require.NoError(t, err)
 
 			pc, err := action.Data.AsActionPolicyChange()
@@ -2533,4 +2554,50 @@ func TestPrepareOTelExporters(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestFetchAgentPendingActionsReplacesSecrets(t *testing.T) {
+	const actionWithSecret = `{"action_id":"action-with-secret","type":"INPUT_ACTION","data":{"parameters":{"credential":"$co.elastic.secret{ref1}"}},"secret_references":[{"id":"ref1"}]}`
+	const actionWithoutSecret = `{"action_id":"action-without-secret","type":"INPUT_ACTION","data":{"parameters":{"credential":"plain"}}}`
+	const filteredActionWithSecret = `{"action_id":"filtered-action","type":"POLICY_CHANGE","data":{"parameters":{"credential":"$co.elastic.secret{ref1}"}},"secret_references":[{"id":"ref1"}]}`
+
+	bulker := ftesting.NewMockBulk()
+	bulker.On("Search", mock.Anything, dl.FleetActions, mock.Anything, mock.Anything).
+		Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{
+			{ID: "action-with-secret", SeqNo: 1, Source: json.RawMessage(actionWithSecret)},
+			{ID: "action-without-secret", SeqNo: 2, Source: json.RawMessage(actionWithoutSecret)},
+			{ID: "filtered-action", SeqNo: 3, Source: json.RawMessage(filteredActionWithSecret)},
+		}}}, nil).Once()
+
+	gcp := monitormock.NewMockMonitor()
+	gcp.On("GetCheckpoint").Return(sqn.SeqNo{3}).Once()
+
+	ct := &CheckinT{bulker: bulker, gcp: gcp}
+	actions, err := ct.fetchAgentPendingActions(t.Context(), sqn.SeqNo{0}, "agent1")
+	require.NoError(t, err)
+	require.Len(t, actions, 3)
+
+	var withSecret map[string]any
+	require.NoError(t, json.Unmarshal(actions[0].Data, &withSecret))
+	withSecretParams, ok := withSecret["parameters"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "ref1_value", withSecretParams["credential"])
+	assert.Empty(t, actions[0].SecretReferences)
+
+	var withoutSecret map[string]any
+	require.NoError(t, json.Unmarshal(actions[1].Data, &withoutSecret))
+	withoutSecretParams, ok := withoutSecret["parameters"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "plain", withoutSecretParams["credential"])
+	assert.Empty(t, actions[1].SecretReferences)
+
+	var filteredAction map[string]any
+	require.NoError(t, json.Unmarshal(actions[2].Data, &filteredAction))
+	filteredActionParams, ok := filteredAction["parameters"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "$co.elastic.secret{ref1}", filteredActionParams["credential"])
+	assert.Len(t, actions[2].SecretReferences, 1)
+
+	bulker.AssertExpectations(t)
+	gcp.AssertExpectations(t)
 }

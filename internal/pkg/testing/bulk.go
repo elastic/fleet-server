@@ -7,7 +7,7 @@ package testing
 import (
 	"context"
 
-	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v9"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"go.elastic.co/apm/v2"
@@ -72,6 +72,12 @@ func (m *MockBulk) MIndex(ctx context.Context, ops []bulk.MultiOp, opts ...bulk.
 func (m *MockBulk) MUpdate(ctx context.Context, ops []bulk.MultiOp, opts ...bulk.Opt) ([]bulk.BulkIndexerResponseItem, error) {
 	args := m.Called(ctx, ops, opts)
 	v, _ := args.Get(0).([]bulk.BulkIndexerResponseItem)
+	return v, args.Error(1)
+}
+
+func (m *MockBulk) MSearch(ctx context.Context, ops []bulk.MultiOp, opts ...bulk.Opt) ([]bulk.MsearchResponseItem, error) {
+	args := m.Called(ctx, ops, opts)
+	v, _ := args.Get(0).([]bulk.MsearchResponseItem)
 	return v, args.Error(1)
 }
 

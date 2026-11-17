@@ -16,9 +16,11 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-transport-go/v8/elastictransport"
-	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v9"
 	"github.com/stretchr/testify/require"
 )
+
+const testSecretID = "id1"
 
 // blockingTransport is an http.RoundTripper that blocks until gate is closed
 // and tracks how many requests are currently in-flight.
@@ -68,7 +70,7 @@ func TestReadSecretsLimitsConcurrency(t *testing.T) {
 	errs := make([]error, 2)
 
 	wg.Go(func() {
-		_, errs[0] = b.ReadSecrets(t.Context(), []string{"id1"})
+		_, errs[0] = b.ReadSecrets(t.Context(), []string{testSecretID})
 	})
 	wg.Go(func() {
 		_, errs[1] = b.ReadSecrets(t.Context(), []string{"id2"})
@@ -108,7 +110,7 @@ func TestReadSecretsContextCancelledWhileWaiting(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
-	_, err = b.ReadSecrets(ctx, []string{"id1"})
+	_, err = b.ReadSecrets(ctx, []string{testSecretID})
 	require.ErrorIs(t, err, context.Canceled)
 }
 
@@ -123,7 +125,7 @@ func TestReadSecretsNoLimitWhenZero(t *testing.T) {
 
 	require.Nil(t, b.readSecretsLimit)
 
-	_, err := b.ReadSecrets(t.Context(), []string{"id1"})
+	_, err := b.ReadSecrets(t.Context(), []string{testSecretID})
 	require.NoError(t, err)
 }
 

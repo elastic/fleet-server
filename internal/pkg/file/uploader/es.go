@@ -16,11 +16,13 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/file"
 	"github.com/elastic/fleet-server/v7/internal/pkg/file/cbor"
-	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/elastic/go-elasticsearch/v8/esapi"
+	"github.com/elastic/go-elasticsearch/v9"
+	"github.com/elastic/go-elasticsearch/v9/esapi"
 	"github.com/rs/zerolog"
 	"go.elastic.co/apm/v2"
 )
+
+const fieldID = "_id"
 
 const (
 	// integration name is substituted in
@@ -45,7 +47,7 @@ func prepareQueryChunkByBID() *dsl.Tmpl {
 func prepareQueryChunkByDoc() *dsl.Tmpl {
 	tmpl := dsl.NewTmpl()
 	root := dsl.NewRoot()
-	root.Query().Term("_id", tmpl.Bind("_id"), nil)
+	root.Query().Term(fieldID, tmpl.Bind(fieldID), nil)
 	tmpl.MustResolve(root)
 	return tmpl
 }
@@ -53,7 +55,7 @@ func prepareQueryChunkByDoc() *dsl.Tmpl {
 func prepareUpdateMetaDoc() *dsl.Tmpl {
 	tmpl := dsl.NewTmpl()
 	root := dsl.NewRoot()
-	root.Query().Term("_id", tmpl.Bind("_id"), nil)
+	root.Query().Term(fieldID, tmpl.Bind(fieldID), nil)
 	scr := root.Script()
 
 	scr.Param("source", tmpl.Bind("source"))
@@ -81,7 +83,7 @@ func UpdateFileDoc(ctx context.Context, bulker bulk.Bulk, source string, fileID 
 	client := bulker.Client()
 
 	q, err := UpdateMetaDocByID.Render(map[string]any{
-		"_id":    fileID,
+		fieldID:  fileID,
 		"status": string(status),
 		"hash":   hash,
 		"source": "ctx._source.file.Status = params.status; if(params.hash != ''){ ctx._source.transithash = ['sha256':params.hash]; }",
@@ -166,7 +168,7 @@ func DeleteChunk(ctx context.Context, bulker bulk.Bulk, source string, fileID st
 	span, ctx := apm.StartSpan(ctx, "deleteChunk", "delete_by_query")
 	defer span.End()
 	q, err := MatchChunkByDocument.Render(map[string]any{
-		"_id": fmt.Sprintf("%s.%d", fileID, chunkNum),
+		fieldID: fmt.Sprintf("%s.%d", fileID, chunkNum),
 	})
 	if err != nil {
 		return err

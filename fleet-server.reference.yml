@@ -286,6 +286,14 @@ fleet:
 #        // enable OpAMP endpoint (enabled by default)
 #        enable_opamp: true
 #
+#        // Input conditions Fleet Server evaluates before sending a policy to an agent.
+#        evaluate_conditions:
+#          // Omit Synthetics inputs and streams pinned to another agent by an exact
+#          // `${agent.id} == '<id>'` condition, which Elastic Agent discards anyway
+#          // (scalable Synthetics private locations). Inputs of any other type are
+#          // sent unchanged. Enabled by default.
+#          agent_id: true
+#
 #        // Gracefully force-unenroll agents that repeatedly check in with an invalid API key.
 #        // Step 1: POLICY_CHANGE with empty policy (agent stops all inputs).
 #        // Step 2: UNENROLL (agent disenrolls and exits).

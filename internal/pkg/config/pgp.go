@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	defaultPGPUpstreamURL   = "https://artifacts.elastic.co/GPG-KEY-elastic-agent"
+	DefaultPGPUpstreamURL   = "https://artifacts.elastic.co/GPG-KEY-elastic-agent"
 	defaultPGPDirectoryName = "elastic-agent-upgrade-keys"
 )
 
@@ -23,7 +23,7 @@ type PGP struct {
 }
 
 func (p *PGP) InitDefaults() {
-	p.UpstreamURL = defaultPGPUpstreamURL
+	p.UpstreamURL = DefaultPGPUpstreamURL
 	p.Dir = filepath.Join(retrieveExecutableDir(), defaultPGPDirectoryName)
 }
 

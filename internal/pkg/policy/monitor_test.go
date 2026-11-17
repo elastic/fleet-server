@@ -9,10 +9,14 @@ package policy
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/http"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -25,6 +29,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/semaphore"
 	"golang.org/x/time/rate"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
@@ -91,7 +96,7 @@ func TestMonitor_NewPolicy(t *testing.T) {
 
 	monitor := NewMonitor(bulker, mm, config.ServerLimits{})
 	pm := monitor.(*monitorT)
-	pm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
+	pm.policiesF = func(ctx context.Context, bulker bulk.Bulk, _ []string, opt ...dl.Option) ([]model.Policy, error) {
 		return []model.Policy{}, nil
 	}
 
@@ -168,7 +173,7 @@ func TestMonitor_SamePolicy(t *testing.T) {
 
 	monitor := NewMonitor(bulker, mm, config.ServerLimits{})
 	pm := monitor.(*monitorT)
-	pm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
+	pm.policiesF = func(ctx context.Context, bulker bulk.Bulk, _ []string, opt ...dl.Option) ([]model.Policy, error) {
 		return []model.Policy{}, nil
 	}
 
@@ -277,7 +282,7 @@ func runTestMonitor_NewPolicyExists(t *testing.T, delay time.Duration) {
 		RevisionIdx: 2,
 	}
 
-	pm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
+	pm.policiesF = func(ctx context.Context, bulker bulk.Bulk, _ []string, opt ...dl.Option) ([]model.Policy, error) {
 		return []model.Policy{policy}, nil
 	}
 
@@ -343,7 +348,7 @@ func Test_Monitor_Limit_Delay(t *testing.T) {
 
 		monitor := NewMonitor(bulker, mm, config.ServerLimits{PolicyLimit: config.Limit{Burst: 1, Interval: interval}})
 		pm := monitor.(*monitorT)
-		pm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
+		pm.policiesF = func(ctx context.Context, bulker bulk.Bulk, _ []string, opt ...dl.Option) ([]model.Policy, error) {
 			return []model.Policy{}, nil
 		}
 
@@ -441,7 +446,7 @@ func Test_Monitor_pending_sub_gets_latest_revision(t *testing.T) {
 		// the second waits in the rate limiter.
 		monitor := NewMonitor(ftesting.NewMockBulk(), mm, config.ServerLimits{PolicyLimit: config.Limit{Burst: 1, Interval: time.Hour}})
 		pm := monitor.(*monitorT)
-		pm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
+		pm.policiesF = func(ctx context.Context, bulker bulk.Bulk, _ []string, opt ...dl.Option) ([]model.Policy, error) {
 			return []model.Policy{}, nil
 		}
 
@@ -514,7 +519,7 @@ func TestMonitor_LatestRev(t *testing.T) {
 		mm := mmock.NewMockMonitor()
 		monitor := NewMonitor(bulker, mm, config.ServerLimits{})
 		pm := monitor.(*monitorT)
-		pm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
+		pm.policiesF = func(ctx context.Context, bulker bulk.Bulk, _ []string, opt ...dl.Option) ([]model.Policy, error) {
 			return nil, fmt.Errorf("policy fetch error")
 		}
 
@@ -527,7 +532,7 @@ func TestMonitor_LatestRev(t *testing.T) {
 		mm := mmock.NewMockMonitor()
 		monitor := NewMonitor(bulker, mm, config.ServerLimits{})
 		pm := monitor.(*monitorT)
-		pm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
+		pm.policiesF = func(ctx context.Context, bulker bulk.Bulk, _ []string, opt ...dl.Option) ([]model.Policy, error) {
 			return []model.Policy{}, nil
 		}
 		idx := pm.LatestRev(t.Context(), "test-id")
@@ -551,7 +556,7 @@ func TestMonitor_LatestRev(t *testing.T) {
 			Data:        policyDataDefault,
 			RevisionIdx: 2,
 		}
-		pm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
+		pm.policiesF = func(ctx context.Context, bulker bulk.Bulk, _ []string, opt ...dl.Option) ([]model.Policy, error) {
 			return []model.Policy{policy}, nil
 		}
 		idx := pm.LatestRev(t.Context(), policyId)
@@ -726,7 +731,7 @@ func Test_Monitor_repeated_events_do_not_strand_subscriber_in_rate_limiter(t *te
 			// the second waits in the rate limiter holding the popped subscriber.
 			monitor := NewMonitor(ftesting.NewMockBulk(), mm, config.ServerLimits{PolicyLimit: config.Limit{Burst: 1, Interval: time.Hour}})
 			pm := monitor.(*monitorT)
-			pm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
+			pm.policiesF = func(ctx context.Context, bulker bulk.Bulk, _ []string, opt ...dl.Option) ([]model.Policy, error) {
 				return []model.Policy{}, nil
 			}
 
@@ -783,4 +788,577 @@ func Test_Monitor_repeated_events_do_not_strand_subscriber_in_rate_limiter(t *te
 			mwg.Wait()
 		})
 	}
+}
+
+// policySearchResult builds the Elasticsearch result of the latest policies query for the given policies.
+func policySearchResult(t *testing.T, policies ...model.Policy) bulk.MsearchResponseItem {
+	t.Helper()
+	buckets := make([]es.Bucket, 0, len(policies))
+	for i, p := range policies {
+		source, err := json.Marshal(p)
+		require.NoError(t, err)
+		buckets = append(buckets, es.Bucket{
+			Key: p.PolicyID,
+			Aggregations: map[string]es.HitsT{
+				dl.FieldRevisionIdx: {Hits: []es.HitT{{ID: fmt.Sprintf("doc-%d", i), SeqNo: int64(i + 1), Source: source}}},
+			},
+		})
+	}
+	return bulk.MsearchResponseItem{
+		Status:       http.StatusOK,
+		Aggregations: map[string]es.Aggregation{dl.FieldPolicyID: {Buckets: buckets}},
+	}
+}
+
+// searchedPolicyID returns the policy a latest policies query is restricted to, or "" if the query is for all policies.
+func searchedPolicyID(t *testing.T, query []byte) string {
+	t.Helper()
+	var q struct {
+		Query *struct {
+			Bool struct {
+				Filter []struct {
+					Term struct {
+						PolicyID string `json:"policy_id"`
+					} `json:"term"`
+				} `json:"filter"`
+			} `json:"bool"`
+		} `json:"query"`
+	}
+	require.NoError(t, json.Unmarshal(query, &q))
+	if q.Query == nil || len(q.Query.Bool.Filter) != 1 {
+		return ""
+	}
+	return q.Query.Bool.Filter[0].Term.PolicyID
+}
+
+// searchedPolicyIDs returns the policy that each latest policy query of an MSearch is restricted to.
+func searchedPolicyIDs(t *testing.T, ops []bulk.MultiOp) []string {
+	t.Helper()
+	ids := make([]string, len(ops))
+	for i, op := range ops {
+		ids[i] = searchedPolicyID(t, op.Body)
+	}
+	return ids
+}
+
+func newTestPolicy(revisionIdx int64) model.Policy {
+	return model.Policy{
+		ESDocument: model.ESDocument{Id: xid.New().String(), Version: 1, SeqNo: 1},
+		PolicyID:   uuid.Must(uuid.NewV4()).String(),
+		Data: &model.PolicyData{
+			Outputs: map[string]map[string]any{
+				"default": {"type": "elasticsearch"},
+			},
+		},
+		RevisionIdx: revisionIdx,
+	}
+}
+
+func (m *monitorT) loadedPolicyIDs() []string {
+	var policyIDs []string
+	for policyID, p := range m.policies {
+		if p.pp.Policy.PolicyID != "" {
+			policyIDs = append(policyIDs, policyID)
+		}
+	}
+	return policyIDs
+}
+
+func TestMonitor_CacheMissLoadsOnlyTheRequestedPolicy(t *testing.T) {
+	tests := []struct {
+		name string
+		get  func(t *testing.T, pm *monitorT, policyID string) int64
+	}{
+		{
+			name: "LatestRev",
+			get: func(t *testing.T, pm *monitorT, policyID string) int64 {
+				return pm.LatestRev(t.Context(), policyID)
+			},
+		},
+		{
+			name: "GetPolicy",
+			get: func(t *testing.T, pm *monitorT, policyID string) int64 {
+				p, err := pm.GetPolicy(t.Context(), policyID)
+				require.NoError(t, err)
+				return p.RevisionIdx
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			p := newTestPolicy(2)
+			var mut sync.Mutex
+			var searched []string
+			bulker := ftesting.NewMockBulk()
+			bulker.On("MSearch", mock.Anything, mock.Anything, mock.Anything).
+				Run(func(args mock.Arguments) {
+					mut.Lock()
+					defer mut.Unlock()
+					searched = append(searched, searchedPolicyIDs(t, args.Get(1).([]bulk.MultiOp))...)
+				}).
+				Return([]bulk.MsearchResponseItem{policySearchResult(t, p)}, nil)
+			pm := NewMonitor(bulker, mmock.NewMockMonitor(), config.ServerLimits{}).(*monitorT)
+
+			assert.Equal(t, int64(2), tc.get(t, pm, p.PolicyID))
+
+			mut.Lock()
+			defer mut.Unlock()
+			assert.Equal(t, []string{p.PolicyID}, searched, "only the requested policy is searched for")
+			assert.Len(t, pm.policies, 1)
+
+			// The policy is cached now.
+			mut.Unlock()
+			assert.Equal(t, int64(2), tc.get(t, pm, p.PolicyID))
+			mut.Lock()
+			assert.Len(t, searched, 1, "a cached policy is not searched for again")
+		})
+	}
+}
+
+func TestMonitor_PolicyThatDidNotLoadIsLoadedOnTheNextSubscribe(t *testing.T) {
+	tests := []struct {
+		name      string
+		firstLoad func() ([]model.Policy, error)
+	}{
+		{
+			name: "the policy is not found",
+			firstLoad: func() ([]model.Policy, error) {
+				// For example the policy is not searchable yet or the index is closed.
+				return nil, nil
+			},
+		},
+		{
+			name: "the search fails",
+			firstLoad: func() ([]model.Policy, error) {
+				return nil, errors.New("search failed")
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				ms := mmock.NewMockSubscription()
+				ms.On("Output").Return((<-chan []es.HitT)(make(chan []es.HitT)))
+				mm := mmock.NewMockMonitor()
+				mm.On("Subscribe").Return(ms).Once()
+				mm.On("Unsubscribe", mock.Anything).Return().Once()
+				p := newTestPolicy(3)
+				var calls atomic.Int32
+				pm := NewMonitor(ftesting.NewMockBulk(), mm, config.ServerLimits{}).(*monitorT)
+				pm.policiesF = func(context.Context, bulk.Bulk, []string, ...dl.Option) ([]model.Policy, error) {
+					if calls.Add(1) == 1 {
+						return tc.firstLoad()
+					}
+					return []model.Policy{p}, nil
+				}
+
+				ctx, cancel := context.WithCancel(t.Context())
+				var wg sync.WaitGroup
+				var runErr error
+				wg.Go(func() { runErr = pm.Run(ctx) })
+				require.NoError(t, pm.waitStart(ctx))
+
+				first, err := pm.Subscribe("agent-1", p.PolicyID, 1)
+				require.NoError(t, err)
+				synctest.Wait() // the first load ends without the policy
+				second, err := pm.Subscribe("agent-2", p.PolicyID, 1)
+				require.NoError(t, err)
+				time.Sleep(time.Second) // let the rate limiter of the dispatches pass
+				synctest.Wait()
+
+				for _, s := range []Subscription{first, second} {
+					select {
+					case pp := <-s.Output():
+						assert.Equal(t, p.RevisionIdx, pp.Policy.RevisionIdx)
+					default:
+						assert.Fail(t, "the subscription did not get the policy")
+					}
+				}
+				cancel()
+				wg.Wait()
+				assert.NoError(t, runErr, "a failed load does not stop the monitor")
+			})
+		})
+	}
+}
+
+// policyStore is used in tests to store and search policies.
+type policyStore struct {
+	// Result of the search for each policy ID. A nil error means that the policy exists.
+	policies map[string]error
+	// IDs of the policies of each search.
+	searchedIDs [][]string
+}
+
+var (
+	errSearchFailed  = errors.New("search failed")
+	errInvalidPolicy = errors.New("invalid policy")
+)
+
+func (s *policyStore) search(_ context.Context, _ bulk.Bulk, policyIDs []string, _ ...dl.Option) ([]model.Policy, error) {
+	var policies []model.Policy
+	var errs []error
+	for _, policyID := range policyIDs {
+		err, ok := s.policies[policyID]
+		if !ok {
+			continue
+		}
+		if errors.Is(err, errInvalidPolicy) {
+			policy := newTestPolicy(1)
+			policy.PolicyID = policyID
+			policy.Data = &model.PolicyData{}
+			policies = append(policies, policy)
+			continue
+		}
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		policy := newTestPolicy(1)
+		policy.PolicyID = policyID
+		policies = append(policies, policy)
+	}
+	s.searchedIDs = append(s.searchedIDs, slices.Clone(policyIDs))
+	return policies, errors.Join(errs...)
+}
+
+func (s *policyStore) clear() {
+	s.searchedIDs = nil
+}
+
+func TestMonitor_LoadPolicies(t *testing.T) {
+	store := &policyStore{
+		policies: map[string]error{
+			"policy-a":             nil,
+			"policy-b":             nil,
+			"failed-policy":        errSearchFailed,
+			"invalid-policy":       errInvalidPolicy,
+			"missing-index-policy": es.ErrIndexNotFound,
+		},
+	}
+
+	tests := []struct {
+		name string
+		// Policies that the monitor knows from earlier subscriptions but has not loaded yet.
+		oldPolicies []string
+		// Policies that the monitor has already loaded.
+		cachedPolicies []string
+		// Policies of new subscriptions.
+		newPolicies []string
+		// Number of policies in a search.
+		batchSize int
+		// Policies that the monitor has loaded after the load.
+		wantPolicies []string
+		// IDs of the policies that the store received.
+		wantSearchedIDs []string
+		wantErr         error
+	}{
+		{
+			name:         "new policies are loaded",
+			newPolicies:  []string{"policy-a", "policy-b"},
+			wantPolicies: []string{"policy-a", "policy-b"},
+		},
+		{
+			name:         "a policy that is not in the store is not loaded",
+			newPolicies:  []string{"policy-a", "policy-not-in-store"},
+			wantPolicies: []string{"policy-a"},
+		},
+		{
+			name:        "no policy is loaded when none is in the store",
+			newPolicies: []string{"policy-not-in-store"},
+		},
+		{
+			name:        "a missing index does not return an error",
+			newPolicies: []string{"missing-index-policy"},
+		},
+		{
+			name:         "valid policies are loaded when other policies fail",
+			newPolicies:  []string{"policy-a", "failed-policy"},
+			wantPolicies: []string{"policy-a"},
+			wantErr:      errSearchFailed,
+		},
+		{
+			name:         "valid policies are loaded when another policy cannot be parsed",
+			newPolicies:  []string{"policy-a", "invalid-policy", "policy-b"},
+			wantPolicies: []string{"policy-a", "policy-b"},
+			wantErr:      ErrDefaultOutputNotFound,
+		},
+		{
+			name:            "a cached policy is not searched again",
+			cachedPolicies:  []string{"policy-a"},
+			newPolicies:     []string{"policy-a", "policy-b"},
+			wantSearchedIDs: []string{"policy-b"},
+			wantPolicies:    []string{"policy-a", "policy-b"},
+		},
+		{
+			name:            "an old policy is not loaded without a new subscription",
+			oldPolicies:     []string{"policy-b"},
+			newPolicies:     []string{"policy-a"},
+			wantSearchedIDs: []string{"policy-a"},
+			wantPolicies:    []string{"policy-a"},
+		},
+		{
+			name:            "an old policy is loaded after a new subscription",
+			oldPolicies:     []string{"policy-b"},
+			newPolicies:     []string{"policy-b"},
+			wantSearchedIDs: []string{"policy-b"},
+			wantPolicies:    []string{"policy-b"},
+		},
+		{
+			name:         "policies are searched in batches of the batch size",
+			newPolicies:  []string{"policy-a", "policy-b"},
+			batchSize:    1,
+			wantPolicies: []string{"policy-a", "policy-b"},
+		},
+		{
+			name:         "valid policies are loaded when another batch fails",
+			newPolicies:  []string{"policy-a", "failed-policy"},
+			batchSize:    1,
+			wantPolicies: []string{"policy-a"},
+			wantErr:      errSearchFailed,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			policies := make(map[string]policyT)
+			for _, policyID := range tc.cachedPolicies {
+				policies[policyID] = policyT{pp: ParsedPolicy{Policy: model.Policy{PolicyID: policyID, RevisionIdx: 1}}}
+			}
+			// Policies of earlier subscriptions are in the monitor without data and they are not queued.
+			for _, policyID := range tc.oldPolicies {
+				policies[policyID] = policyT{head: makeHead()}
+			}
+			// Subscribe adds an empty entry and queues the policy for the next load.
+			loadQ := make(map[string]struct{})
+			for _, policyID := range tc.newPolicies {
+				if _, ok := policies[policyID]; !ok {
+					policies[policyID] = policyT{head: makeHead()}
+				}
+				loadQ[policyID] = struct{}{}
+			}
+
+			batchSize := defaultPolicySearchBatchSize
+			if tc.batchSize > 0 {
+				batchSize = tc.batchSize
+			}
+
+			pm := &monitorT{
+				bulker:        ftesting.NewMockBulk(),
+				searches:      semaphore.NewWeighted(int64(batchSize)),
+				searchesBatch: batchSize,
+				policiesF:     store.search,
+				policies:      policies,
+				loadQ:         loadQ,
+			}
+
+			t.Cleanup(store.clear)
+			err := pm.loadPolicies(t.Context())
+			if tc.wantErr == nil {
+				require.NoError(t, err)
+			} else {
+				require.ErrorIs(t, err, tc.wantErr)
+			}
+
+			// Only the expected policies are searched.
+			searchedIDs := slices.Concat(store.searchedIDs...)
+			if len(tc.wantSearchedIDs) > 0 {
+				assert.ElementsMatch(t, tc.wantSearchedIDs, searchedIDs)
+			}
+
+			// The expected policies are loaded.
+			assert.ElementsMatch(t, tc.wantPolicies, pm.loadedPolicyIDs())
+
+			// The searches are split in batches of the batch size.
+			wantBatches := (len(searchedIDs) + batchSize - 1) / batchSize
+			assert.Len(t, store.searchedIDs, wantBatches)
+		})
+	}
+}
+
+func TestMonitor_PoliciesInFlightAreLimited(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		release := make(chan struct{})
+		var mut sync.Mutex
+		var searching, maxSearching int
+		pm := NewMonitor(ftesting.NewMockBulk(), mmock.NewMockMonitor(), config.ServerLimits{}).(*monitorT)
+		pm.policiesF = func(_ context.Context, _ bulk.Bulk, policyIDs []string, _ ...dl.Option) ([]model.Policy, error) {
+			mut.Lock()
+			searching += len(policyIDs)
+			maxSearching = max(maxSearching, searching)
+			mut.Unlock()
+			<-release
+			mut.Lock()
+			searching -= len(policyIDs)
+			mut.Unlock()
+			return nil, nil
+		}
+		for i := range defaultPolicySearchBatchSize + 10 {
+			_, err := pm.Subscribe(fmt.Sprintf("agent-%d", i), fmt.Sprintf("policy-%d", i), 1)
+			require.NoError(t, err)
+		}
+
+		var wg sync.WaitGroup
+		wg.Go(func() { assert.NoError(t, pm.loadPolicies(t.Context())) })
+		synctest.Wait()
+		for i := range 10 {
+			wg.Go(func() { pm.LatestRev(t.Context(), fmt.Sprintf("other-%d", i)) })
+		}
+		synctest.Wait() // the single loads wait for the batch load
+
+		mut.Lock()
+		assert.Equal(t, defaultPolicySearchBatchSize, searching)
+		mut.Unlock()
+		close(release)
+		wg.Wait()
+		assert.Equal(t, defaultPolicySearchBatchSize, maxSearching)
+	})
+}
+
+func TestMonitor_ConcurrentCacheMissesShareLoads(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		a, b := newTestPolicy(2), newTestPolicy(5)
+		release := make(chan struct{})
+		var mut sync.Mutex
+		var searched []string
+		pm := NewMonitor(ftesting.NewMockBulk(), mmock.NewMockMonitor(), config.ServerLimits{}).(*monitorT)
+		pm.policiesF = func(_ context.Context, _ bulk.Bulk, policyIDs []string, _ ...dl.Option) ([]model.Policy, error) {
+			mut.Lock()
+			searched = append(searched, policyIDs...)
+			mut.Unlock()
+			<-release
+			var policies []model.Policy
+			for _, policy := range []model.Policy{a, b} {
+				if slices.Contains(policyIDs, policy.PolicyID) {
+					policies = append(policies, policy)
+				}
+			}
+			return policies, nil
+		}
+
+		const callersA, callersB = 5, 3
+		revsA := make([]int64, callersA)
+		revsB := make([]int64, callersB)
+		var wg sync.WaitGroup
+		for i := range revsA {
+			wg.Go(func() { revsA[i] = pm.LatestRev(t.Context(), a.PolicyID) })
+		}
+		for i := range revsB {
+			wg.Go(func() { revsB[i] = pm.LatestRev(t.Context(), b.PolicyID) })
+		}
+		// Every caller is now waiting for a load to finish.
+		synctest.Wait()
+		mut.Lock()
+		assert.ElementsMatch(t, []string{a.PolicyID, b.PolicyID}, searched, "one search per policy, not one per caller")
+		mut.Unlock()
+
+		close(release)
+		wg.Wait()
+
+		for _, rev := range revsA {
+			assert.Equal(t, int64(2), rev)
+		}
+		for _, rev := range revsB {
+			assert.Equal(t, int64(5), rev)
+		}
+	})
+}
+
+func TestMonitor_CallersDoNotFailWithTheCancellationOfTheCallerThatStartedTheLoad(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		p := newTestPolicy(3)
+		release := make(chan struct{})
+		var calls atomic.Int32
+		pm := NewMonitor(ftesting.NewMockBulk(), mmock.NewMockMonitor(), config.ServerLimits{}).(*monitorT)
+		pm.policiesF = func(ctx context.Context, _ bulk.Bulk, _ []string, _ ...dl.Option) ([]model.Policy, error) {
+			calls.Add(1)
+			// Like MSearch, return when the context of the load ends.
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-release:
+				return []model.Policy{p}, nil
+			}
+		}
+
+		leaderCtx, cancelLeader := context.WithCancel(t.Context())
+		var wg sync.WaitGroup
+		var leaderRev, followerRev int64
+		wg.Go(func() { leaderRev = pm.LatestRev(leaderCtx, p.PolicyID) })
+		synctest.Wait()
+		wg.Go(func() { followerRev = pm.LatestRev(t.Context(), p.PolicyID) })
+		synctest.Wait() // the follower waits for the load started by the leader
+
+		cancelLeader()
+		synctest.Wait()
+		close(release)
+		wg.Wait()
+
+		assert.Equal(t, int64(0), leaderRev, "the caller that gave up gets no revision")
+		assert.Equal(t, int64(3), followerRev, "the caller that joined the load gets the revision of the same load")
+		assert.Equal(t, int32(1), calls.Load(), "the load goes on when the caller that started it gives up")
+	})
+}
+
+func TestMonitor_LoadEndsWhenTheMonitorStops(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ms := mmock.NewMockSubscription()
+		ms.On("Output").Return((<-chan []es.HitT)(make(chan []es.HitT)))
+		mm := mmock.NewMockMonitor()
+		mm.On("Subscribe").Return(ms).Once()
+		mm.On("Unsubscribe", mock.Anything).Return().Once()
+		pm := NewMonitor(ftesting.NewMockBulk(), mm, config.ServerLimits{}).(*monitorT)
+		pm.policiesF = func(ctx context.Context, _ bulk.Bulk, _ []string, _ ...dl.Option) ([]model.Policy, error) {
+			// Like a search that a stopped bulker never answers.
+			<-ctx.Done()
+			return nil, ctx.Err()
+		}
+
+		ctx, cancel := context.WithCancel(t.Context())
+		var wg sync.WaitGroup
+		wg.Go(func() { assert.NoError(t, pm.Run(ctx)) })
+		require.NoError(t, pm.waitStart(ctx))
+		var rev int64
+		wg.Go(func() { rev = pm.LatestRev(t.Context(), "policy") })
+		synctest.Wait() // the load waits for its search
+
+		cancel()
+		wg.Wait()
+		assert.Zero(t, rev, "the load ends without a revision when the monitor stops")
+	})
+}
+
+func TestMonitor_CallerStopsWaitingForASharedLoadWhenItsContextEnds(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		p := newTestPolicy(3)
+		release := make(chan struct{})
+		pm := NewMonitor(ftesting.NewMockBulk(), mmock.NewMockMonitor(), config.ServerLimits{}).(*monitorT)
+		pm.policiesF = func(context.Context, bulk.Bulk, []string, ...dl.Option) ([]model.Policy, error) {
+			// A slow load that does not observe the context of the callers.
+			<-release
+			return []model.Policy{p}, nil
+		}
+
+		var wg sync.WaitGroup
+		var leaderRev int64
+		wg.Go(func() { leaderRev = pm.LatestRev(t.Context(), p.PolicyID) })
+		synctest.Wait()
+
+		followerCtx, cancelFollower := context.WithCancel(t.Context())
+		followerDone := make(chan int64, 1)
+		wg.Go(func() { followerDone <- pm.LatestRev(followerCtx, p.PolicyID) })
+		synctest.Wait() // the follower waits for the load started by the leader
+
+		cancelFollower()
+		synctest.Wait()
+		select {
+		case rev := <-followerDone:
+			assert.Equal(t, int64(0), rev, "the follower stops waiting without a revision")
+		default:
+			assert.Fail(t, "the follower is still waiting for the load although its context ended")
+		}
+
+		close(release)
+		wg.Wait()
+		assert.Equal(t, int64(3), leaderRev, "the load goes on for the caller that still waits for it")
+	})
 }

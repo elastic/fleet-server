@@ -33,7 +33,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v9"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/api"
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
@@ -572,7 +572,7 @@ func TestServerInstrumentation(t *testing.T) {
 				}
 				return
 			}
-			Err = err //nolint:ineffassign,staticcheck // ugly work around for error checking
+			Err = err //nolint:ineffassign // ugly work around for error checking
 			// retry after wait or cancel
 			select {
 			case <-ctx.Done():

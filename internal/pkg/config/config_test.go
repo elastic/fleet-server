@@ -585,3 +585,17 @@ func TestConfigFromEnv(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "test-val", c.Output.Elasticsearch.ServiceToken)
 }
+
+func TestEvaluateConditionsFeatureFlag(t *testing.T) {
+	for file, want := range map[string]bool{
+		"input.yml":                              true,
+		"input-evaluate-conditions-disabled.yml": false,
+	} {
+		t.Run(file, func(t *testing.T) {
+			cfg, err := LoadFile(filepath.Join("testdata", file))
+			require.NoError(t, err)
+			require.Len(t, cfg.Inputs, 1)
+			assert.Equal(t, want, cfg.Inputs[0].Server.Features.EvaluateConditions.AgentID)
+		})
+	}
+}

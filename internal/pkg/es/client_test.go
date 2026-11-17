@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -25,13 +26,21 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
+	backoff "github.com/cenkalti/backoff/v7"
+	"github.com/elastic/beats/v7/pkg/transport/tlscommon"
 	"github.com/elastic/elastic-transport-go/v8/elastictransport"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/testing/certs"
-	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/elastic/go-elasticsearch/v8/esapi"
+	"github.com/elastic/go-elasticsearch/v9"
+	"github.com/elastic/go-elasticsearch/v9/esapi"
 	"github.com/stretchr/testify/require"
+)
+
+const (
+	testHTTP  = "http"
+	testHTTPS = "https"
+	testOpGet = "Get"
+	testESURL = "https://es.example"
 )
 
 var enabled bool = true
@@ -60,7 +69,7 @@ func TestClientCerts(t *testing.T) {
 		client, err := NewClient(t.Context(), &config.Config{
 			Output: config.Output{
 				Elasticsearch: config.Elasticsearch{
-					Protocol: "https",
+					Protocol: testHTTPS,
 					Hosts:    []string{server.URL},
 					TLS: &tlscommon.Config{
 						Enabled: &enabled,
@@ -105,7 +114,7 @@ func TestClientCerts(t *testing.T) {
 		client, err := NewClient(t.Context(), &config.Config{
 			Output: config.Output{
 				Elasticsearch: config.Elasticsearch{
-					Protocol: "https",
+					Protocol: testHTTPS,
 					Hosts:    []string{server.URL},
 					TLS: &tlscommon.Config{
 						Enabled: &enabled,
@@ -155,7 +164,7 @@ func TestClientCerts(t *testing.T) {
 		client, err := NewClient(t.Context(), &config.Config{
 			Output: config.Output{
 				Elasticsearch: config.Elasticsearch{
-					Protocol: "https",
+					Protocol: testHTTPS,
 					Hosts:    []string{server.URL},
 					TLS: &tlscommon.Config{
 						Enabled: &enabled,
@@ -193,7 +202,7 @@ func TestConnectionTLS(t *testing.T) {
 	cfg := &config.Config{
 		Output: config.Output{
 			Elasticsearch: config.Elasticsearch{
-				Protocol: "https",
+				Protocol: testHTTPS,
 				Hosts:    []string{server.URL},
 				TLS: &tlscommon.Config{
 					Enabled: &enabled,
@@ -298,8 +307,8 @@ func TestIsTLSHandshakeError(t *testing.T) {
 		{
 			name: "wrapped via *url.Error (mirrors net/http transport)",
 			err: &url.Error{
-				Op:  "Get",
-				URL: "https://es.example",
+				Op:  testOpGet,
+				URL: testESURL,
 				Err: certErr,
 			},
 			want: true,
@@ -307,8 +316,8 @@ func TestIsTLSHandshakeError(t *testing.T) {
 		{
 			name: "doubly wrapped (fmt.Errorf around *url.Error)",
 			err: fmt.Errorf("retry: %w", &url.Error{
-				Op:  "Get",
-				URL: "https://es.example",
+				Op:  testOpGet,
+				URL: testESURL,
 				Err: certErr,
 			}),
 			want: true,
@@ -326,7 +335,7 @@ func TestDefaultRetryOnError(t *testing.T) {
 	certErr := &tls.CertificateVerificationError{
 		Err: errors.New("x509: certificate signed by unknown authority"),
 	}
-	wrappedCertErr := &url.Error{Op: "Get", URL: "https://es.example", Err: certErr}
+	wrappedCertErr := &url.Error{Op: testOpGet, URL: testESURL, Err: certErr}
 
 	// defaultOptions wires the retryOnError predicate that combines ECONNREFUSED,
 	// ECONNRESET, and TLS handshake errors.  Verify each case using an actual client
@@ -461,7 +470,7 @@ func minimalESCfg() *config.Config {
 	return &config.Config{
 		Output: config.Output{
 			Elasticsearch: config.Elasticsearch{
-				Protocol:       "http",
+				Protocol:       testHTTP,
 				Hosts:          []string{"localhost:9200"},
 				Timeout:        90 * time.Second,
 				MaxConnPerHost: 128,
@@ -576,7 +585,7 @@ func TestNewClientRetryWithMockES(t *testing.T) {
 	defer server.Close()
 
 	cfg := &config.Config{Output: config.Output{Elasticsearch: config.Elasticsearch{
-		Protocol:       "http",
+		Protocol:       testHTTP,
 		Hosts:          []string{server.URL},
 		Timeout:        90 * time.Second,
 		MaxConnPerHost: 128,
@@ -592,4 +601,76 @@ func TestNewClientRetryWithMockES(t *testing.T) {
 	_, err = FetchESVersion(t.Context(), client)
 	require.NoError(t, err, "expected eventual success after 503 retries")
 	require.Equal(t, failUntil+1, callCount, "expected 2 failures + 1 success")
+}
+
+// TestExponentialBackoffFromAttemptSchedule pins the delay schedule: each
+// attempt's delay must fall within the randomization band around the
+// 1.5x-growth interval, capped at maxRetryBackoff.
+func TestExponentialBackoffFromAttemptSchedule(t *testing.T) {
+	expected := float64(initialRetryBackoff)
+	for attempt := 1; attempt <= 12; attempt++ {
+		if attempt > 1 {
+			expected = min(expected*1.5, float64(maxRetryBackoff))
+		}
+		lo := time.Duration(expected * (1 - randomizationFactor))
+		hi := time.Duration(expected * (1 + randomizationFactor))
+		for range 50 {
+			d := exponentialBackoffFromAttempt(attempt)
+			require.GreaterOrEqual(t, d, lo, "attempt %d", attempt)
+			require.LessOrEqual(t, d, hi, "attempt %d", attempt)
+		}
+	}
+}
+
+// TestRetryBackoffConcurrent drives concurrent failing requests through a
+// client using WithBackoff and the default backoff; run with -race to catch
+// shared mutable backoff state.
+func TestRetryBackoffConcurrent(t *testing.T) {
+	tmpl := backoff.NewExponentialBackOff()
+	tmpl.InitialInterval = time.Millisecond
+	tmpl.MaxInterval = 5 * time.Millisecond
+
+	cases := []struct {
+		name    string
+		retries int
+		extra   []ConfigOption
+	}{
+		// Uses the production backoff callback wired by defaultOptions; one
+		// retry keeps the real ~500ms delay short.
+		{name: "default", retries: 1},
+		{name: "WithBackoff", retries: 3, extra: []ConfigOption{WithBackoff(tmpl)}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			rt := roundTripFunc(func(_ *http.Request) (*http.Response, error) { return nil, syscall.ECONNREFUSED })
+			cfg := minimalESCfg()
+			cfg.Output.Elasticsearch.MaxRetries = tc.retries
+			opts := append([]ConfigOption{
+				{rtWrap: func(_ http.RoundTripper) http.RoundTripper { return rt }},
+			}, tc.extra...)
+			client, err := NewClient(t.Context(), cfg, false, opts...)
+			require.NoError(t, err)
+
+			var wg sync.WaitGroup
+			for range 16 {
+				wg.Go(func() {
+					req, _ := http.NewRequestWithContext(t.Context(), "GET", "http://localhost:9200/", nil)
+					_, _ = client.Perform(req) //nolint:bodyclose // error path
+				})
+			}
+			wg.Wait()
+		})
+	}
+}
+
+// TestExponentialBackoffDelayOverflow verifies large intervals clamp to the
+// maximum Duration instead of overflowing to a negative (immediate) delay.
+func TestExponentialBackoffDelayOverflow(t *testing.T) {
+	maxD := time.Duration(math.MaxInt64)
+	for range 100 {
+		d := exponentialBackoffDelay(1, maxD, maxD, backoff.DefaultMultiplier, backoff.DefaultRandomizationFactor)
+		require.Positive(t, d)
+		d = exponentialBackoffDelay(50, maxD, maxD, backoff.DefaultMultiplier, backoff.DefaultRandomizationFactor)
+		require.Positive(t, d)
+	}
 }

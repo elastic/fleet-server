@@ -24,7 +24,7 @@ import (
 	"github.com/rs/zerolog"
 	"go.elastic.co/apm/v2"
 
-	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v9"
 )
 
 const (
@@ -101,7 +101,7 @@ type simpleMonitorT struct {
 }
 
 // Option is a functional configuration option.
-type Option func(SimpleMonitor)
+type Option func(*simpleMonitorT)
 
 // NewSimple creates new SimpleMonitor.
 func NewSimple(index string, esCli, monCli *elasticsearch.Client, opts ...Option) (SimpleMonitor, error) {
@@ -139,53 +139,43 @@ func NewSimple(index string, esCli, monCli *elasticsearch.Client, opts ...Option
 
 // WithFetchSize sets the fetch size of the monitor.
 func WithFetchSize(fetchSize int) Option {
-	return func(m SimpleMonitor) {
-		if sm, ok := m.(*simpleMonitorT); ok && fetchSize > 0 {
-			sm.fetchSize = fetchSize
+	return func(m *simpleMonitorT) {
+		if fetchSize > 0 {
+			m.fetchSize = fetchSize
 		}
 	}
 }
 
 // WithPollTimeout sets the global checkpoint polling timeout
 func WithPollTimeout(to time.Duration) Option {
-	return func(m SimpleMonitor) {
-		if sm, ok := m.(*simpleMonitorT); ok {
-			sm.pollTimeout = to
-		}
+	return func(m *simpleMonitorT) {
+		m.pollTimeout = to
 	}
 }
 
 // WithExpiration adds the expiration field to the monitor query.
 func WithExpiration(withExpiration bool) Option {
-	return func(m SimpleMonitor) {
-		if sm, ok := m.(*simpleMonitorT); ok {
-			sm.withExpiration = withExpiration
-		}
+	return func(m *simpleMonitorT) {
+		m.withExpiration = withExpiration
 	}
 }
 
 // WithReadyChan allows to pass the channel that will signal when monitor is ready.
 func WithReadyChan(readyCh chan error) Option {
-	return func(m SimpleMonitor) {
-		if sm, ok := m.(*simpleMonitorT); ok {
-			sm.readyCh = readyCh
-		}
+	return func(m *simpleMonitorT) {
+		m.readyCh = readyCh
 	}
 }
 
 func WithAPMTracer(tracer *apm.Tracer) Option {
-	return func(m SimpleMonitor) {
-		if sm, ok := m.(*simpleMonitorT); ok {
-			sm.tracer = tracer
-		}
+	return func(m *simpleMonitorT) {
+		m.tracer = tracer
 	}
 }
 
 func WithDebounceTime(dur time.Duration) Option {
-	return func(m SimpleMonitor) {
-		if sm, ok := m.(*simpleMonitorT); ok {
-			sm.debounceTime = dur
-		}
+	return func(m *simpleMonitorT) {
+		m.debounceTime = dur
 	}
 }
 
@@ -436,8 +426,8 @@ func (m *simpleMonitorT) search(ctx context.Context, tmpl *dsl.Tmpl, params map[
 
 	res, err := m.esCli.FleetSearch(
 		m.index,
+		bytes.NewBuffer(query),
 		m.esCli.FleetSearch.WithContext(ctx),
-		m.esCli.FleetSearch.WithBody(bytes.NewBuffer(query)),
 		m.esCli.FleetSearch.WithWaitForCheckpoints(seqNos.String()),
 	)
 	if err != nil {

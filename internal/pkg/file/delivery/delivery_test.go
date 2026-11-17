@@ -21,12 +21,14 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/file"
 	itesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
-	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v9"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
+
+const fieldBID = "bid"
 
 // cbor decoding and encoding tools can be helpful for examining or changing the test data here
 // https://cbor.me/ may be helpful in verifying the shapes of the data
@@ -118,7 +120,7 @@ func TestLocateChunks(t *testing.T) {
 					Index:  "",
 					Source: []byte(""),
 					Fields: map[string]any{
-						"bid": []any{baseID},
+						fieldBID: []any{baseID},
 					},
 				},
 				{
@@ -126,8 +128,8 @@ func TestLocateChunks(t *testing.T) {
 					Index:  "",
 					Source: []byte(""),
 					Fields: map[string]any{
-						"bid":  []any{baseID},
-						"last": []any{true},
+						fieldBID: []any{baseID},
+						"last":   []any{true},
 					},
 				},
 			},

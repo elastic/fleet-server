@@ -23,7 +23,7 @@ import (
 
 	"go.elastic.co/apm/v2"
 
-	"github.com/elastic/elastic-agent-libs/str"
+	"github.com/elastic/beats/v7/pkg/str"
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
@@ -34,7 +34,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/rollback"
 	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
-	"github.com/elastic/go-elasticsearch/v8/esapi"
+	"github.com/elastic/go-elasticsearch/v9/esapi"
 
 	"github.com/gofrs/uuid/v5"
 	"github.com/hashicorp/go-version"
@@ -376,6 +376,8 @@ func (et *EnrollerT) _enroll(
 		}
 
 		agent.Active = true
+		agent.UninstallPending = false
+		agent.UninstallPendingSince = ""
 		agent.Namespaces = namespaces
 		agent.LocalMetadata = localMeta
 		agent.AccessAPIKeyID = accessAPIKey.ID
@@ -403,12 +405,22 @@ func (et *EnrollerT) _enroll(
 			dl.FieldAuditUnenrolledReason: nil,
 			dl.FieldUnenrolledAt:          nil,
 			dl.FieldUnenrolledReason:      nil,
+			// clear pending-uninstall state: a re-enrolled agent is active again and
+			// must receive its policy and actions normally.
+			dl.FieldUninstallPending:      false,
+			dl.FieldUninstallPendingSince: nil,
 			dl.FieldUpdatedAt:             now.UTC().Format(time.RFC3339),
 		}
 		// stamp upgraded_at so Kibana's version-specific policy assignment task will re-evaluate this agent
 		if req.ReplaceToken != nil && *req.ReplaceToken != "" && prevVer != "" && prevVer != ver {
 			doc[dl.FieldUpgradedAt] = now.UTC().Format(time.RFC3339)
 		}
+
+		// Note: a pending-uninstall agent's output keys were invalidated and their
+		// doc fields cleared when the UNENROLL was acked (handleUninstallPending),
+		// so re-enrollment needs no special output handling here: the cleared
+		// key with its kept PermissionsHash triggers the check-in recovery guard,
+		// which forces a policy resend that regenerates the output keys.
 		err = dl.UpdateAgent(ctx, et.bulker, agentID, doc, bulk.WithRefresh())
 		if err != nil {
 			return nil, err
