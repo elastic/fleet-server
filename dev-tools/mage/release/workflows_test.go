@@ -5,32 +5,22 @@
 package release
 
 import (
-	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestLabelHelpers(t *testing.T) {
-	if got := backportLabel("9.6"); got != "backport-9.6" {
-		t.Fatalf("backportLabel = %q", got)
-	}
+	require.Equal(t, "backport-9.6", backportLabel("9.6"))
 
 	labels := prAMainLabels("9.6")
-	if !contains(labels, mergeLabelFFDay) || !contains(labels, "backport-9.6") {
-		t.Fatalf("prAMainLabels = %v", labels)
-	}
-	if contains(labels, mergeLabelAfterImages) {
-		t.Fatal("PR-A must not include merge:3-after-images (PR-C omitted)")
-	}
+	require.True(t, contains(labels, mergeLabelFFDay))
+	require.True(t, contains(labels, "backport-9.6"))
+	require.False(t, contains(labels, mergeLabelAfterImages), "PR-A must not include merge:3-after-images (PR-C omitted)")
 
-	if !contains(prBReleaseLabels(), mergeLabelAfterBranch) {
-		t.Fatal("PR-B missing merge:2-after-branch")
-	}
-	if !contains(patchVersionBumpLabels(), mergeLabelAfterRelease) {
-		t.Fatal("patch bump labels missing merge:4-after-release")
-	}
-	if contains(patchVersionBumpLabels(), "docs") {
-		t.Fatal("patch bump must not include docs label")
-	}
+	require.True(t, contains(prBReleaseLabels(), mergeLabelAfterBranch))
+	require.True(t, contains(patchVersionBumpLabels(), mergeLabelAfterRelease))
+	require.False(t, contains(patchVersionBumpLabels(), "docs"), "patch bump must not include docs label")
 }
 
 func TestPRBodiesMentionFleetScope(t *testing.T) {
@@ -43,19 +33,11 @@ func TestPRBodiesMentionFleetScope(t *testing.T) {
 		ReleaseBranch:           "9.6",
 	}
 
-	if !strings.Contains(prAMainBody(cfg), "version/version.go") {
-		t.Fatal("PR-A body missing version.go mention")
-	}
-	if !strings.Contains(prBReleaseBody(cfg), "no docs/test-env") {
-		t.Fatal("PR-B body should note missing docs/test-env")
-	}
+	require.Contains(t, prAMainBody(cfg), "version/version.go")
+	require.Contains(t, prBReleaseBody(cfg), "no docs/test-env")
 	body := patchVersionBumpBody(cfg)
-	if !strings.Contains(body, "to 9.6.1") {
-		t.Fatal("patch bump body missing landing version 9.6.1")
-	}
-	if strings.Contains(body, "Merge after the release of") {
-		t.Fatal("patch bump body must not park with Merge-after-release wording")
-	}
+	require.Contains(t, body, "to 9.6.1")
+	require.NotContains(t, body, "Merge after the release of")
 }
 
 func contains(ss []string, want string) bool {

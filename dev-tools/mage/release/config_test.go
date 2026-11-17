@@ -6,148 +6,44 @@ package release
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/require"
+
+	devtools "github.com/elastic/fleet-server/v7/dev-tools/mage"
 )
 
-func TestInferLatestRelease(t *testing.T) {
-	tests := []struct {
-		name    string
-		current string
-		want    string
-		wantErr bool
-	}{
-		{name: "patch release", current: "9.6.2", want: "9.6.1"},
-		{name: "x.y.0 returns empty", current: "9.6.0", want: ""},
-		{name: "invalid version", current: "9.6", wantErr: true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := inferLatestRelease(tt.current)
-			if (err != nil) != tt.wantErr {
-				t.Fatalf("inferLatestRelease() error = %v, wantErr %v", err, tt.wantErr)
-			}
-			if got != tt.want {
-				t.Fatalf("inferLatestRelease() = %q, want %q", got, tt.want)
-			}
-		})
-	}
+func TestValidateReleaseConfig(t *testing.T) {
+	require.Error(t, ValidateReleaseConfig(&ReleaseConfig{DryRun: true, LatestRelease: "9.4.0"}))
+	require.Error(t, ValidateReleaseConfig(&ReleaseConfig{CurrentRelease: "9.5.0", LatestRelease: "9.4.0"}))
+	require.NoError(t, ValidateReleaseConfig(&ReleaseConfig{
+		CurrentRelease: "9.5.0",
+		LatestRelease:  "9.4.0",
+		DryRun:         true,
+	}))
 }
 
-func TestInferNextRelease(t *testing.T) {
-	got, err := inferNextRelease("9.6.0")
-	if err != nil {
-		t.Fatalf("inferNextRelease() failed: %v", err)
+func TestEnsureLatestRelease(t *testing.T) {
+	orig := fetchLatestReleaseBefore
+	t.Cleanup(func() { fetchLatestReleaseBefore = orig })
+	fetchLatestReleaseBefore = func(token, owner, repo, current string) (string, error) {
+		return "9.4.3", nil
 	}
-	if got != "9.6.1" {
-		t.Fatalf("inferNextRelease() = %q, want 9.6.1", got)
-	}
+
+	cfg := &ReleaseConfig{CurrentRelease: "9.5.0", DryRun: true}
+	require.NoError(t, EnsureLatestRelease(cfg))
+	require.Equal(t, "9.4.3", cfg.LatestRelease)
+
+	cfg.LatestRelease = "9.4.0"
+	require.NoError(t, EnsureLatestRelease(cfg))
+	require.Equal(t, "9.4.0", cfg.LatestRelease)
 }
 
-func TestInferNextProjectMinorVersion(t *testing.T) {
-	got, err := inferNextProjectMinorVersion("9.6.0")
-	if err != nil {
-		t.Fatalf("inferNextProjectMinorVersion() failed: %v", err)
-	}
-	if got != "9.7.0" {
-		t.Fatalf("inferNextProjectMinorVersion() = %q, want 9.7.0", got)
-	}
-}
-
-func TestLoadConfigFromEnv(t *testing.T) {
-	tests := []struct {
-		name      string
-		envVars   map[string]string
-		wantErr   bool
-		wantCheck func(*testing.T, *ReleaseConfig)
-	}{
-		{
-			name: "defaults applied",
-			envVars: map[string]string{
-				"CURRENT_RELEASE": "9.6.0",
-			},
-			wantErr: false,
-			wantCheck: func(t *testing.T, cfg *ReleaseConfig) {
-				if cfg.ReleaseBranch != "9.6" {
-					t.Errorf("ReleaseBranch = %s, want 9.6", cfg.ReleaseBranch)
-				}
-				if cfg.NextRelease != "9.6.1" {
-					t.Errorf("NextRelease = %s, want 9.6.1", cfg.NextRelease)
-				}
-				if cfg.NextProjectMinorVersion != "9.7.0" {
-					t.Errorf("NextProjectMinorVersion = %s, want 9.7.0", cfg.NextProjectMinorVersion)
-				}
-				if cfg.ProjectOwner != "elastic" {
-					t.Errorf("ProjectOwner = %s, want elastic", cfg.ProjectOwner)
-				}
-				if cfg.ProjectRepo != "fleet-server" {
-					t.Errorf("ProjectRepo = %s, want fleet-server", cfg.ProjectRepo)
-				}
-				if cfg.DryRun {
-					t.Error("DryRun should be false by default")
-				}
-			},
-		},
-		{
-			name: "dry run only with literal true",
-			envVars: map[string]string{
-				"CURRENT_RELEASE": "9.6.0",
-				"DRY_RUN":         "true",
-			},
-			wantCheck: func(t *testing.T, cfg *ReleaseConfig) {
-				if !cfg.DryRun {
-					t.Error("DryRun should be true")
-				}
-			},
-		},
-		{
-			name: "dry run rejects 1",
-			envVars: map[string]string{
-				"CURRENT_RELEASE": "9.6.0",
-				"DRY_RUN":         "1",
-			},
-			wantCheck: func(t *testing.T, cfg *ReleaseConfig) {
-				if cfg.DryRun {
-					t.Error("DryRun should be false for DRY_RUN=1")
-				}
-			},
-		},
-		{
-			name:    "missing CURRENT_RELEASE",
-			envVars: map[string]string{},
-			wantErr: true,
-		},
-	}
-
-	releaseEnvKeys := []string{
-		"BASE_BRANCH",
-		"CURRENT_RELEASE",
-		"DRY_RUN",
-		"GITHUB_TOKEN",
-		"GIT_AUTHOR_EMAIL",
-		"GIT_AUTHOR_NAME",
-		"PROJECT_OWNER",
-		"PROJECT_REPO",
-		"PROJECT_REVIEWERS",
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Clear only release-related keys. os.Clearenv() would drop PATH and
-			// break later tests that shell out to git for Push.
-			for _, key := range releaseEnvKeys {
-				t.Setenv(key, "")
-			}
-			for k, v := range tt.envVars {
-				t.Setenv(k, v)
-			}
-
-			cfg, err := LoadConfigFromEnv()
-			if (err != nil) != tt.wantErr {
-				t.Fatalf("LoadConfigFromEnv() error = %v, wantErr %v", err, tt.wantErr)
-			}
-			if !tt.wantErr && tt.wantCheck != nil {
-				tt.wantCheck(t, cfg)
-			}
-		})
-	}
+func TestLoadReleaseSettings(t *testing.T) {
+	t.Setenv("CURRENT_RELEASE", "9.5.0")
+	t.Setenv("DRY_RUN", "true")
+	settings, err := devtools.LoadReleaseSettings()
+	require.NoError(t, err)
+	require.NoError(t, settings.RequireRelease())
+	require.Equal(t, "9.5.0", settings.CurrentRelease)
+	require.True(t, settings.DryRun)
 }

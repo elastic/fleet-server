@@ -4,25 +4,25 @@ Operator reference for `dev-tools/mage/release/`. Release managers should start 
 
 ## Mage targets
 
-| Target | CLI command | Purpose |
-|---|---|---|
-| `mage release:ensureIssueTracker` | `ensure-issue-tracker` | Create/update release checklist issue |
-| `mage release:runMajorMinor` | `run-major-minor` | Feature freeze: release branch + PR-A/B (no next-patch) |
-| `mage release:runPatch` | `run-patch` | Patch: post-release bump to `CURRENT_RELEASE` |
-| `mage release:updateMergify` | `update-mergify` | Append backport rule |
-| `mage release:updateVersion` | `update-version` | Update `version/version.go` only |
+| Target | Purpose |
+|---|---|
+| `mage release:ensureIssueTracker` | Create/update release checklist issue |
+| `mage release:runMajorMinor` | Feature freeze: release branch + PR-A/B (no next-patch) |
+| `mage release:runPatch` | Patch: post-release bump to `CURRENT_RELEASE` |
+| `mage release:updateMergify` | Append backport rule |
+| `mage release:updateVersion` | Update `version/version.go` only |
 
 There is **no** `runNextRelease` target; version bumps after a patch release are opened only by `runPatch` (not `runMajorMinor`).
 
 ## Architecture
 
-- Nested Go module keeps `go-git` / `go-github` out of the root `go.mod` / `NOTICE.txt`.
-- Root mage wrappers call `go run -C dev-tools/mage/release ./cmd/fleet-release …` with `FLEET_SERVER_REPO_ROOT` set.
+- Release tooling lives in the root module (`github.com/elastic/fleet-server/v7`), same pattern as elastic-agent.
+- Settings load via `dev-tools/mage.LoadReleaseSettings`; mage targets call package functions directly.
 - File allowlist: only `version/version.go` and `.mergify.yml`.
 
 ## Alignment with beats / elastic-agent
 
-Shared process: merge-timing labels, idempotent branches/PRs, issue tracker, nested module.
+Shared process: merge-timing labels, idempotent branches/PRs, issue tracker, root-module release package.
 Patch `CURRENT_RELEASE` is the version to land (`NEW_VERSION`); the release branch must already be at the previous patch.
 
 Fleet Server differences (from former `fleet-server.mak`):

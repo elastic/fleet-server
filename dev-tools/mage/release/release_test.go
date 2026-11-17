@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestUpdateVersion(t *testing.T) {
@@ -65,9 +67,7 @@ func TestUpdateVersion(t *testing.T) {
 			tmpDir := t.TempDir()
 			versionDir := filepath.Join(tmpDir, "version")
 			err := os.Mkdir(versionDir, 0o755)
-			if err != nil {
-				t.Fatalf("failed to create version dir: %v", err)
-			}
+			require.NoError(t, err)
 
 			versionFile := filepath.Join(versionDir, "version.go")
 			initialContent := `// Copyright header
@@ -77,17 +77,13 @@ package version
 ` + tt.initial + `
 `
 			err = os.WriteFile(versionFile, []byte(initialContent), 0o644)
-			if err != nil {
-				t.Fatalf("failed to write initial file: %v", err)
-			}
+			require.NoError(t, err)
 
 			origDir, _ := os.Getwd()
 			defer func() {
 				_ = os.Chdir(origDir)
 			}()
-			if err := os.Chdir(tmpDir); err != nil {
-				t.Fatalf("failed to change to temp directory: %v", err)
-			}
+			require.NoError(t, os.Chdir(tmpDir))
 
 			err = UpdateVersion(tt.newVersion)
 
@@ -98,9 +94,7 @@ package version
 
 			if !tt.wantErr {
 				content, err := os.ReadFile(versionFile)
-				if err != nil {
-					t.Fatalf("failed to read updated file: %v", err)
-				}
+				require.NoError(t, err)
 
 				if !strings.Contains(string(content), tt.wantContent) {
 					t.Errorf("UpdateVersion() content = %s, want to contain %s", string(content), tt.wantContent)
@@ -114,9 +108,7 @@ func TestUpdateVersionIdempotent(t *testing.T) {
 	tmpDir := t.TempDir()
 	versionDir := filepath.Join(tmpDir, "version")
 	err := os.Mkdir(versionDir, 0o755)
-	if err != nil {
-		t.Fatalf("failed to create version dir: %v", err)
-	}
+	require.NoError(t, err)
 
 	versionFile := filepath.Join(versionDir, "version.go")
 	initialContent := `package version
@@ -124,37 +116,25 @@ func TestUpdateVersionIdempotent(t *testing.T) {
 const DefaultVersion = "9.4.0"
 `
 	err = os.WriteFile(versionFile, []byte(initialContent), 0o644)
-	if err != nil {
-		t.Fatalf("failed to write initial file: %v", err)
-	}
+	require.NoError(t, err)
 
 	origDir, _ := os.Getwd()
 	defer func() {
 		_ = os.Chdir(origDir)
 	}()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("failed to change to temp directory: %v", err)
-	}
+	require.NoError(t, os.Chdir(tmpDir))
 
 	err = UpdateVersion("9.5.0")
-	if err != nil {
-		t.Fatalf("first UpdateVersion() failed: %v", err)
-	}
+	require.NoError(t, err)
 
 	content1, err := os.ReadFile(versionFile)
-	if err != nil {
-		t.Fatalf("failed to read file after first update: %v", err)
-	}
+	require.NoError(t, err)
 
 	err = UpdateVersion("9.5.0")
-	if err != nil {
-		t.Fatalf("second UpdateVersion() failed: %v", err)
-	}
+	require.NoError(t, err)
 
 	content2, err := os.ReadFile(versionFile)
-	if err != nil {
-		t.Fatalf("failed to read file after second update: %v", err)
-	}
+	require.NoError(t, err)
 
 	if string(content1) != string(content2) {
 		t.Error("UpdateVersion() is not idempotent - content changed on second run")
@@ -176,27 +156,19 @@ func TestUpdateMergify(t *testing.T) {
           - "9.3"
 `
 	err := os.WriteFile(mergifyFile, []byte(initialContent), 0o644)
-	if err != nil {
-		t.Fatalf("failed to write initial file: %v", err)
-	}
+	require.NoError(t, err)
 
 	origDir, _ := os.Getwd()
 	defer func() {
 		_ = os.Chdir(origDir)
 	}()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("failed to change to temp directory: %v", err)
-	}
+	require.NoError(t, os.Chdir(tmpDir))
 
 	err = UpdateMergify("9.5.0")
-	if err != nil {
-		t.Fatalf("UpdateMergify() failed: %v", err)
-	}
+	require.NoError(t, err)
 
 	content, err := os.ReadFile(mergifyFile)
-	if err != nil {
-		t.Fatalf("failed to read updated file: %v", err)
-	}
+	require.NoError(t, err)
 
 	contentStr := string(content)
 	if !strings.Contains(contentStr, "backport patches to 9.5 branch") {
@@ -222,29 +194,21 @@ func TestUpdateMergifyIdempotent(t *testing.T) {
           - "9.5"
 `
 	err := os.WriteFile(mergifyFile, []byte(initialContent), 0o644)
-	if err != nil {
-		t.Fatalf("failed to write initial file: %v", err)
-	}
+	require.NoError(t, err)
 
 	origDir, _ := os.Getwd()
 	defer func() {
 		_ = os.Chdir(origDir)
 	}()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("failed to change to temp directory: %v", err)
-	}
+	require.NoError(t, os.Chdir(tmpDir))
 
 	err = UpdateMergify("9.5.0")
-	if err != nil {
-		t.Fatalf("first UpdateMergify() failed: %v", err)
-	}
+	require.NoError(t, err)
 
 	content1, _ := os.ReadFile(mergifyFile)
 
 	err = UpdateMergify("9.5.0")
-	if err != nil {
-		t.Fatalf("second UpdateMergify() failed: %v", err)
-	}
+	require.NoError(t, err)
 
 	content2, _ := os.ReadFile(mergifyFile)
 
@@ -268,27 +232,19 @@ func TestUpdateMergifyDoesNotFalseMatchVersionPrefix(t *testing.T) {
           - "9.10"
 `
 	err := os.WriteFile(mergifyFile, []byte(initialContent), 0o644)
-	if err != nil {
-		t.Fatalf("failed to write initial file: %v", err)
-	}
+	require.NoError(t, err)
 
 	origDir, _ := os.Getwd()
 	defer func() {
 		_ = os.Chdir(origDir)
 	}()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("failed to change to temp directory: %v", err)
-	}
+	require.NoError(t, os.Chdir(tmpDir))
 
 	err = UpdateMergify("9.1.0")
-	if err != nil {
-		t.Fatalf("UpdateMergify() failed: %v", err)
-	}
+	require.NoError(t, err)
 
 	content, err := os.ReadFile(mergifyFile)
-	if err != nil {
-		t.Fatalf("failed to read updated file: %v", err)
-	}
+	require.NoError(t, err)
 	contentStr := string(content)
 	if !strings.Contains(contentStr, "backport patches to 9.1 branch") {
 		t.Errorf("UpdateMergify() should add rule for 9.1 when only 9.10 exists; got:\n%s", contentStr)
@@ -306,16 +262,12 @@ func TestUpdateMergifyRejectsNonNumericVersion(t *testing.T) {
 	mergifyFile := filepath.Join(tmpDir, ".mergify.yml")
 	initialContent := `pull_request_rules: []
 `
-	if err := os.WriteFile(mergifyFile, []byte(initialContent), 0o644); err != nil {
-		t.Fatalf("failed to write initial file: %v", err)
-	}
+	require.NoError(t, os.WriteFile(mergifyFile, []byte(initialContent), 0o644))
 	origDir, _ := os.Getwd()
 	defer func() {
 		_ = os.Chdir(origDir)
 	}()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("failed to change to temp directory: %v", err)
-	}
+	require.NoError(t, os.Chdir(tmpDir))
 	if err := UpdateMergify("9.foo.0"); err == nil {
 		t.Fatal("UpdateMergify(9.foo.0) expected error")
 	}

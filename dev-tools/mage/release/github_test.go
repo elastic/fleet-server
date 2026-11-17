@@ -14,6 +14,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/google/go-github/v68/github"
 )
 
@@ -25,9 +27,7 @@ func newTestGitHubClient(t *testing.T, handler http.Handler) *GitHubClient {
 
 	client := github.NewClient(server.Client())
 	baseURL, err := url.Parse(server.URL + "/")
-	if err != nil {
-		t.Fatalf("failed to parse test server URL: %v", err)
-	}
+	require.NoError(t, err)
 	client.BaseURL = baseURL
 	client.UploadURL = baseURL
 
@@ -79,9 +79,7 @@ func TestCreatePRIdempotent(t *testing.T) {
 	}
 
 	pr, err := ghClient.CreatePR(opts)
-	if err != nil {
-		t.Fatalf("CreatePR() error = %v", err)
-	}
+	require.NoError(t, err)
 
 	if pr.GetNumber() != 42 {
 		t.Errorf("CreatePR() number = %d, want 42", pr.GetNumber())
@@ -91,9 +89,7 @@ func TestCreatePRIdempotent(t *testing.T) {
 	}
 
 	pr2, err := ghClient.CreatePR(opts)
-	if err != nil {
-		t.Fatalf("CreatePR() second call error = %v", err)
-	}
+	require.NoError(t, err)
 	if pr2.GetNumber() != pr.GetNumber() {
 		t.Errorf("CreatePR() second call number = %d, want %d", pr2.GetNumber(), pr.GetNumber())
 	}
@@ -126,9 +122,7 @@ func TestLatestReleaseBeforeUsesReleasesWhenPresent(t *testing.T) {
 
 	ghClient := newTestGitHubClient(t, handler)
 	got, err := ghClient.LatestReleaseBefore("elastic", "fleet-server", "9.6.0")
-	if err != nil {
-		t.Fatalf("LatestReleaseBefore() error = %v", err)
-	}
+	require.NoError(t, err)
 	if got != "9.5.1" {
 		t.Errorf("LatestReleaseBefore() = %q, want 9.5.1", got)
 	}
@@ -162,9 +156,7 @@ func TestLatestReleaseBeforeFallsBackToTagsWhenReleasesEmpty(t *testing.T) {
 
 	ghClient := newTestGitHubClient(t, handler)
 	got, err := ghClient.LatestReleaseBefore("elastic", "fleet-server", "9.6.0")
-	if err != nil {
-		t.Fatalf("LatestReleaseBefore() error = %v", err)
-	}
+	require.NoError(t, err)
 	if got != "9.4.4" {
 		t.Errorf("LatestReleaseBefore() = %q, want 9.4.4", got)
 	}
@@ -205,9 +197,7 @@ func TestCreatePRCreatesWhenNoneExists(t *testing.T) {
 		Base:  "main",
 		Body:  "body",
 	})
-	if err != nil {
-		t.Fatalf("CreatePR() error = %v", err)
-	}
+	require.NoError(t, err)
 	if pr.GetNumber() != 99 {
 		t.Errorf("CreatePR() number = %d, want 99", pr.GetNumber())
 	}
@@ -276,9 +266,7 @@ func TestCreatePRRequestsTeamReviewers(t *testing.T) {
 		Body:      "body",
 		Reviewers: []string{"elastic/elastic-agent-control-plane", "alice"},
 	})
-	if err != nil {
-		t.Fatalf("CreatePR() error = %v", err)
-	}
+	require.NoError(t, err)
 	if len(reviewersBody.Reviewers) != 1 || reviewersBody.Reviewers[0] != "alice" {
 		t.Errorf("Reviewers = %v, want [alice]", reviewersBody.Reviewers)
 	}

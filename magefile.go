@@ -46,6 +46,8 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
+	devtools "github.com/elastic/fleet-server/v7/dev-tools/mage"
+	"github.com/elastic/fleet-server/v7/dev-tools/mage/release"
 	"github.com/elastic/fleet-server/v7/version"
 )
 
@@ -467,7 +469,7 @@ func Generate() error {
 
 // Headers ensures files have copyright headers.
 func (Check) Headers() error {
-	return sh.Run("go", "tool", "-modfile", filepath.Join("dev-tools", "go.mod"), "github.com/elastic/go-licenser", "-license", "Elasticv2")
+	return sh.Run("go", "tool", "-modfile", filepath.Join("dev-tools", "tools", "go.mod"), "github.com/elastic/go-licenser", "-license", "Elasticv2")
 }
 
 // Notice generates the NOTICE.txt and NOTICE-fips.txt files.
@@ -532,7 +534,7 @@ func genNotice(fips bool) error {
 	listArgs = append(listArgs, mods...)
 	listCmd := exec.Command("go", listArgs...)
 
-	detectorCmd := exec.Command("go", "tool", "-modfile", filepath.Join("dev-tools", "go.mod"), "go.elastic.co/go-licence-detector",
+	detectorCmd := exec.Command("go", "tool", "-modfile", filepath.Join("dev-tools", "tools", "go.mod"), "go.elastic.co/go-licence-detector",
 		"-includeIndirect",
 		"-rules", filepath.Join("dev-tools", "notice", "rules.json"),
 		"-overrides", filepath.Join("dev-tools", "notice", "overrides.json"),
@@ -622,7 +624,7 @@ func (Check) NoChanges() error {
 
 // Imports runs goimports to reorder imports.
 func (Check) Imports() error {
-	return sh.Run("go", "tool", "-modfile", filepath.Join("dev-tools", "go.mod"), "golang.org/x/tools/cmd/goimports", "-w", ".")
+	return sh.Run("go", "tool", "-modfile", filepath.Join("dev-tools", "tools", "go.mod"), "golang.org/x/tools/cmd/goimports", "-w", ".")
 }
 
 // Ci runs CI related checks - runs generate, imports, fix, checkHeaders, notice, checkNoChanges.
@@ -1714,7 +1716,7 @@ func (Test) JunitReport() error {
 		var output bytes.Buffer
 		var stderr bytes.Buffer
 
-		cmd := exec.Command("go", "tool", "-modfile", filepath.Join("dev-tools", "go.mod"), "github.com/jstemmer/go-junit-report/v2")
+		cmd := exec.Command("go", "tool", "-modfile", filepath.Join("dev-tools", "tools", "go.mod"), "github.com/jstemmer/go-junit-report/v2")
 		cmd.Stdin = srcFile
 		cmd.Stdout = &output
 		cmd.Stderr = &stderr
@@ -1776,7 +1778,7 @@ func (Test) Benchstat() error {
 	args := []string{
 		"tool",
 		"-modfile",
-		filepath.Join("dev-tools", "go.mod"),
+		filepath.Join("dev-tools", "tools", "go.mod"),
 		"golang.org/x/perf/cmd/benchstat",
 		base,
 	}
@@ -2487,43 +2489,54 @@ func (Test) CloudE2ERun() error {
 	return err
 }
 
-const releaseToolDir = "dev-tools/mage/release"
-
-// runReleaseTool invokes the nested-module CLI with the Fleet Server repo as cwd.
-func runReleaseTool(args ...string) error {
-	root, err := os.Getwd()
+// loadReleaseConfig loads release settings and requires CURRENT_RELEASE for workflows.
+func loadReleaseConfig() (*release.ReleaseConfig, error) {
+	settings, err := devtools.LoadReleaseSettings()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	env := map[string]string{"FLEET_SERVER_REPO_ROOT": root}
-	cmdArgs := append([]string{"run", "-C", releaseToolDir, "./cmd/fleet-release"}, args...)
-	return sh.RunWithV(env, "go", cmdArgs...)
+	if err := settings.RequireRelease(); err != nil {
+		return nil, err
+	}
+	return settings, nil
 }
 
 // UpdateVersion updates the version in version/version.go.
 func (Release) UpdateVersion(version string) error {
-	return runReleaseTool("update-version", version)
+	return release.UpdateVersion(version)
 }
 
 // UpdateMergify adds a new backport rule to .mergify.yml.
 func (Release) UpdateMergify(version string) error {
-	return runReleaseTool("update-mergify", version)
+	return release.UpdateMergify(version)
 }
 
 // RunMajorMinor orchestrates the major/minor release workflow after feature freeze.
 // Set DRY_RUN=true to preview changes without pushing.
 func (Release) RunMajorMinor() error {
-	return runReleaseTool("run-major-minor")
+	cfg, err := loadReleaseConfig()
+	if err != nil {
+		return err
+	}
+	return release.RunMajorMinorRelease(cfg)
 }
 
 // RunPatch orchestrates the complete patch release workflow.
 // Set DRY_RUN=true to preview changes without pushing.
 func (Release) RunPatch() error {
-	return runReleaseTool("run-patch")
+	cfg, err := loadReleaseConfig()
+	if err != nil {
+		return err
+	}
+	return release.RunPatchRelease(cfg)
 }
 
 // EnsureIssueTracker creates or updates the Fleet Server release checklist issue for
 // CURRENT_RELEASE, linking related PRs labeled "release".
 func (Release) EnsureIssueTracker() error {
-	return runReleaseTool("ensure-issue-tracker")
+	cfg, err := loadReleaseConfig()
+	if err != nil {
+		return err
+	}
+	return release.EnsureReleaseIssueTracker(cfg, nil)
 }

@@ -21,7 +21,7 @@ mage release:runMajorMinor
 export CURRENT_RELEASE="9.6.1"   # release branch must still be at 9.6.0
 mage release:runPatch
 
-go test -C dev-tools/mage/release ./... -count=1
+go test ./dev-tools/mage/... -count=1
 ```
 
 Use plain `X.Y.Z` semver for `CURRENT_RELEASE` (no `-test` or `-SNAPSHOT` suffixes).
@@ -80,23 +80,23 @@ Derived (not env-overridable): `NEXT_RELEASE` (patch+1), `NEXT_PROJECT_MINOR_VER
 ## Package layout
 
 ```
-dev-tools/mage/release/
-├── cmd/fleet-release/   # nested-module CLI
-├── go.mod / go.sum      # isolates go-git / go-github
-├── config.go
-├── release.go
-├── mergify.go
-├── workflows.go
-├── git.go / github.go / issue.go / version.go
-└── README.md
+dev-tools/mage/
+├── release_settings.go   # ReleaseSettings + env load (root module)
+└── release/
+    ├── config.go         # type alias + Validate/EnsureLatestRelease
+    ├── release.go
+    ├── mergify.go
+    ├── workflows.go
+    ├── git.go / github.go / issue.go / version.go
+    └── README.md
 ```
 
-Root `mage release:*` targets invoke `go run -C dev-tools/mage/release ./cmd/fleet-release …`.
+Root `mage release:*` targets call the release package directly (same root `go.mod`).
 
 ## Testing
 
 ```bash
-cd dev-tools/mage/release && go test ./... -count=1
+go test ./dev-tools/mage/... -count=1
 ```
 
 Discard local workflow changes after review with `git reset --hard HEAD`.

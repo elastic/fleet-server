@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/google/go-github/v68/github"
 )
 
@@ -158,9 +160,7 @@ func TestEnsureReleaseIssueTrackerDryRun(t *testing.T) {
 		DryRun:         true,
 	}
 	pr := &github.PullRequest{HTMLURL: github.Ptr("https://github.com/elastic/fleet-server/pull/99")}
-	if err := EnsureReleaseIssueTracker(cfg, []*github.PullRequest{pr}); err != nil {
-		t.Fatalf("dry-run ensureIssueTracker should not call GitHub: %v", err)
-	}
+	require.NoError(t, EnsureReleaseIssueTracker(cfg, []*github.PullRequest{pr}))
 }
 
 func TestWarnEnsureReleaseIssueTrackerDoesNotPanicOnError(t *testing.T) {

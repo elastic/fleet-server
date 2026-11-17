@@ -13,6 +13,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -24,9 +26,7 @@ import (
 func convertLocalBranchToRemoteOnly(t *testing.T, g *GitRepo, branchName string) {
 	t.Helper()
 
-	if err := g.CheckoutBranch("master"); err != nil {
-		t.Fatalf("CheckoutBranch(master) failed: %v", err)
-	}
+	require.NoError(t, g.CheckoutBranch("master"))
 
 	localRef, err := g.repo.Reference(plumbing.NewBranchReferenceName(branchName), true)
 	if err != nil {
@@ -50,25 +50,17 @@ func createTestGitRepo(t *testing.T) (*GitRepo, string) {
 	tmpDir := t.TempDir()
 
 	repo, err := git.PlainInit(tmpDir, false)
-	if err != nil {
-		t.Fatalf("failed to init repo: %v", err)
-	}
+	require.NoError(t, err)
 
 	w, err := repo.Worktree()
-	if err != nil {
-		t.Fatalf("failed to get worktree: %v", err)
-	}
+	require.NoError(t, err)
 
 	testFile := filepath.Join(tmpDir, "README.md")
 	err = os.WriteFile(testFile, []byte("# Test Repo"), 0o644)
-	if err != nil {
-		t.Fatalf("failed to write test file: %v", err)
-	}
+	require.NoError(t, err)
 
 	_, err = w.Add("README.md")
-	if err != nil {
-		t.Fatalf("failed to add file: %v", err)
-	}
+	require.NoError(t, err)
 
 	_, err = w.Commit("Initial commit", &git.CommitOptions{
 		Author: &object.Signature{
@@ -76,9 +68,7 @@ func createTestGitRepo(t *testing.T) (*GitRepo, string) {
 			Email: "test@example.com",
 		},
 	})
-	if err != nil {
-		t.Fatalf("failed to create initial commit: %v", err)
-	}
+	require.NoError(t, err)
 
 	return &GitRepo{repo: repo, path: tmpDir}, tmpDir
 }
@@ -90,49 +80,33 @@ func TestEnsureBranchFrom(t *testing.T) {
 	defer func() {
 		_ = os.Chdir(origDir)
 	}()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("failed to change to temp directory: %v", err)
-	}
+	require.NoError(t, os.Chdir(tmpDir))
 
-	if err := gitRepo.EnsureBranchFrom("master", "9.6"); err != nil {
-		t.Fatalf("EnsureBranchFrom() failed: %v", err)
-	}
+	require.NoError(t, gitRepo.EnsureBranchFrom("master", "9.6"))
 
 	branch, err := gitRepo.GetCurrentBranch()
-	if err != nil {
-		t.Fatalf("GetCurrentBranch() failed: %v", err)
-	}
+	require.NoError(t, err)
 	if branch != "9.6" {
 		t.Fatalf("expected branch 9.6, got %s", branch)
 	}
 
-	if err := gitRepo.EnsureBranchFrom("master", "9.6"); err != nil {
-		t.Fatalf("second EnsureBranchFrom() failed: %v", err)
-	}
+	require.NoError(t, gitRepo.EnsureBranchFrom("master", "9.6"))
 }
 
 func TestEnsureBranchFromRemoteOnlyBase(t *testing.T) {
 	gitRepo, _ := createTestGitRepo(t)
-	if err := gitRepo.CreateBranch("9.5"); err != nil {
-		t.Fatalf("CreateBranch(9.5) failed: %v", err)
-	}
+	require.NoError(t, gitRepo.CreateBranch("9.5"))
 	convertLocalBranchToRemoteOnly(t, gitRepo, "9.5")
 
 	exists, err := gitRepo.BranchExists("9.5")
-	if err != nil {
-		t.Fatalf("BranchExists failed: %v", err)
-	}
+	require.NoError(t, err)
 	if exists {
 		t.Fatal("expected 9.5 to exist only as a remote-tracking branch")
 	}
 
-	if err := gitRepo.EnsureBranchFrom("9.5", "patch-release-9.5.1"); err != nil {
-		t.Fatalf("EnsureBranchFrom() with remote-only base failed: %v", err)
-	}
+	require.NoError(t, gitRepo.EnsureBranchFrom("9.5", "patch-release-9.5.1"))
 	branch, err := gitRepo.GetCurrentBranch()
-	if err != nil {
-		t.Fatalf("GetCurrentBranch() failed: %v", err)
-	}
+	require.NoError(t, err)
 	if branch != "patch-release-9.5.1" {
 		t.Fatalf("expected branch patch-release-9.5.1, got %s", branch)
 	}
@@ -140,56 +114,38 @@ func TestEnsureBranchFromRemoteOnlyBase(t *testing.T) {
 
 func TestEnsureBranchFromRemoteOnlyTarget(t *testing.T) {
 	gitRepo, tmpDir := createTestGitRepo(t)
-	if err := gitRepo.CreateBranch("prep-branch"); err != nil {
-		t.Fatalf("CreateBranch(prep-branch) failed: %v", err)
-	}
-	if err := gitRepo.CheckoutBranch("prep-branch"); err != nil {
-		t.Fatalf("CheckoutBranch(prep-branch) failed: %v", err)
-	}
+	require.NoError(t, gitRepo.CreateBranch("prep-branch"))
+	require.NoError(t, gitRepo.CheckoutBranch("prep-branch"))
 
 	w, err := gitRepo.repo.Worktree()
-	if err != nil {
-		t.Fatalf("Worktree failed: %v", err)
-	}
+	require.NoError(t, err)
 	marker := filepath.Join(tmpDir, "prep.txt")
-	if err := os.WriteFile(marker, []byte("prep tip"), 0o644); err != nil {
-		t.Fatalf("WriteFile failed: %v", err)
-	}
-	if _, err := w.Add("prep.txt"); err != nil {
+	require.NoError(t, os.WriteFile(marker, []byte("prep tip"), 0o644))
+	if _, err = w.Add("prep.txt"); err != nil {
 		t.Fatalf("Add failed: %v", err)
 	}
 	prepHash, err := w.Commit("prep tip commit", &git.CommitOptions{
 		Author: &object.Signature{Name: "Test User", Email: "test@example.com"},
 	})
-	if err != nil {
-		t.Fatalf("Commit failed: %v", err)
-	}
+	require.NoError(t, err)
 
 	convertLocalBranchToRemoteOnly(t, gitRepo, "prep-branch")
 
 	exists, err := gitRepo.BranchExists("prep-branch")
-	if err != nil {
-		t.Fatalf("BranchExists failed: %v", err)
-	}
+	require.NoError(t, err)
 	if exists {
 		t.Fatal("expected prep-branch to exist only as a remote-tracking branch")
 	}
 
-	if err := gitRepo.EnsureBranchFrom("master", "prep-branch"); err != nil {
-		t.Fatalf("EnsureBranchFrom() with remote-only target failed: %v", err)
-	}
+	require.NoError(t, gitRepo.EnsureBranchFrom("master", "prep-branch"))
 	branch, err := gitRepo.GetCurrentBranch()
-	if err != nil {
-		t.Fatalf("GetCurrentBranch() failed: %v", err)
-	}
+	require.NoError(t, err)
 	if branch != "prep-branch" {
 		t.Fatalf("expected branch prep-branch, got %s", branch)
 	}
 
 	head, err := gitRepo.repo.Head()
-	if err != nil {
-		t.Fatalf("Head() failed: %v", err)
-	}
+	require.NoError(t, err)
 	if head.Hash() != prepHash {
 		t.Fatalf("expected HEAD %s (remote prep tip), got %s", prepHash, head.Hash())
 	}
@@ -199,9 +155,7 @@ func TestCommitAllNoChanges(t *testing.T) {
 	gitRepo, _ := createTestGitRepo(t)
 
 	committed, err := gitRepo.CommitAll("Empty commit", "Test Author", "test@example.com")
-	if err != nil {
-		t.Errorf("CommitAll() with no changes error = %v", err)
-	}
+	require.NoError(t, err)
 	if committed {
 		t.Error("CommitAll() should not commit when there are no changes")
 	}
@@ -212,19 +166,13 @@ func TestSetRemoteURLIdempotent(t *testing.T) {
 	remoteURL := "https://github.com/test/repo.git"
 
 	err := gitRepo.SetRemoteURL("origin", remoteURL)
-	if err != nil {
-		t.Fatalf("first SetRemoteURL() failed: %v", err)
-	}
+	require.NoError(t, err)
 
 	err = gitRepo.SetRemoteURL("origin", remoteURL)
-	if err != nil {
-		t.Fatalf("second SetRemoteURL() failed: %v", err)
-	}
+	require.NoError(t, err)
 
 	remote, err := gitRepo.repo.Remote("origin")
-	if err != nil {
-		t.Fatalf("failed to get remote: %v", err)
-	}
+	require.NoError(t, err)
 	if len(remote.Config().URLs) == 0 || remote.Config().URLs[0] != remoteURL {
 		t.Errorf("SetRemoteURL() URL = %v, want %s", remote.Config().URLs, remoteURL)
 	}
@@ -269,9 +217,7 @@ func TestGitHTTPSAuthExtraHeader(t *testing.T) {
 		t.Fatalf("gitHTTPSAuthExtraHeader() = %q, want prefix %q", got, wantPrefix)
 	}
 	decoded, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(got, wantPrefix))
-	if err != nil {
-		t.Fatalf("decode auth payload: %v", err)
-	}
+	require.NoError(t, err)
 	if string(decoded) != "x-access-token:test-token" {
 		t.Fatalf("auth payload = %q, want %q", decoded, "x-access-token:test-token")
 	}
@@ -340,21 +286,13 @@ func TestPushToLocalRemote(t *testing.T) {
 		t.Fatalf("failed to init bare remote: %v", err)
 	}
 	remoteURL := "file://" + bareDir
-	if err := gitRepo.SetRemoteURL("origin", remoteURL); err != nil {
-		t.Fatalf("SetRemoteURL() error = %v", err)
-	}
+	require.NoError(t, gitRepo.SetRemoteURL("origin", remoteURL))
 
 	branch := "release-9.6"
-	if err := gitRepo.CreateBranch(branch); err != nil {
-		t.Fatalf("CreateBranch() error = %v", err)
-	}
-	if err := gitRepo.CheckoutBranch(branch); err != nil {
-		t.Fatalf("CheckoutBranch() error = %v", err)
-	}
+	require.NoError(t, gitRepo.CreateBranch(branch))
+	require.NoError(t, gitRepo.CheckoutBranch(branch))
 
-	if err := gitRepo.Push("origin"); err != nil {
-		t.Fatalf("Push() error = %v", err)
-	}
+	require.NoError(t, gitRepo.Push("origin"))
 
 	remoteHeads := runGitOutput(t, workDir, "ls-remote", "--heads", "origin", branch)
 	if !strings.Contains(remoteHeads, "refs/heads/"+branch) {
@@ -434,16 +372,10 @@ func TestIsTokenPushRemoteURL(t *testing.T) {
 func TestEnsureHTTPSRemote(t *testing.T) {
 	t.Run("rewrites ssh to https", func(t *testing.T) {
 		gitRepo, _ := createTestGitRepo(t)
-		if err := gitRepo.SetRemoteURL("origin", "git@github.com:elastic/fleet-server.git"); err != nil {
-			t.Fatalf("SetRemoteURL() error = %v", err)
-		}
-		if err := gitRepo.ensureHTTPSRemote("origin"); err != nil {
-			t.Fatalf("ensureHTTPSRemote() error = %v", err)
-		}
+		require.NoError(t, gitRepo.SetRemoteURL("origin", "git@github.com:elastic/fleet-server.git"))
+		require.NoError(t, gitRepo.ensureHTTPSRemote("origin"))
 		remote, err := gitRepo.repo.Remote("origin")
-		if err != nil {
-			t.Fatalf("Remote() error = %v", err)
-		}
+		require.NoError(t, err)
 		want := "https://github.com/elastic/fleet-server.git"
 		if got := remote.Config().URLs[0]; got != want {
 			t.Errorf("origin URL = %q, want %q", got, want)
@@ -452,24 +384,16 @@ func TestEnsureHTTPSRemote(t *testing.T) {
 
 	t.Run("preserves fetch refspecs", func(t *testing.T) {
 		gitRepo, _ := createTestGitRepo(t)
-		if err := gitRepo.SetRemoteURL("origin", "git@github.com:elastic/fleet-server.git"); err != nil {
-			t.Fatalf("SetRemoteURL() error = %v", err)
-		}
+		require.NoError(t, gitRepo.SetRemoteURL("origin", "git@github.com:elastic/fleet-server.git"))
 		before, err := gitRepo.repo.Remote("origin")
-		if err != nil {
-			t.Fatalf("Remote() error = %v", err)
-		}
+		require.NoError(t, err)
 		beforeFetch := append([]config.RefSpec(nil), before.Config().Fetch...)
 		if len(beforeFetch) == 0 {
 			t.Fatal("expected default fetch refspecs before rewrite")
 		}
-		if err := gitRepo.ensureHTTPSRemote("origin"); err != nil {
-			t.Fatalf("ensureHTTPSRemote() error = %v", err)
-		}
+		require.NoError(t, gitRepo.ensureHTTPSRemote("origin"))
 		after, err := gitRepo.repo.Remote("origin")
-		if err != nil {
-			t.Fatalf("Remote() after rewrite error = %v", err)
-		}
+		require.NoError(t, err)
 		if got := after.Config().Fetch; len(got) != len(beforeFetch) {
 			t.Fatalf("fetch refspecs = %#v, want %#v", got, beforeFetch)
 		}
@@ -482,9 +406,7 @@ func TestEnsureHTTPSRemote(t *testing.T) {
 
 	t.Run("rejects non-github remote", func(t *testing.T) {
 		gitRepo, _ := createTestGitRepo(t)
-		if err := gitRepo.SetRemoteURL("origin", "git@gitlab.com:group/repo.git"); err != nil {
-			t.Fatalf("SetRemoteURL() error = %v", err)
-		}
+		require.NoError(t, gitRepo.SetRemoteURL("origin", "git@gitlab.com:group/repo.git"))
 		err := gitRepo.ensureHTTPSRemote("origin")
 		if err == nil {
 			t.Fatal("ensureHTTPSRemote() expected error for non-GitHub remote")
@@ -496,9 +418,7 @@ func TestEnsureHTTPSRemote(t *testing.T) {
 
 	t.Run("rejects arbitrary https host", func(t *testing.T) {
 		gitRepo, _ := createTestGitRepo(t)
-		if err := gitRepo.SetRemoteURL("origin", "https://evil.example/elastic/fleet-server.git"); err != nil {
-			t.Fatalf("SetRemoteURL() error = %v", err)
-		}
+		require.NoError(t, gitRepo.SetRemoteURL("origin", "https://evil.example/elastic/fleet-server.git"))
 		err := gitRepo.ensureHTTPSRemote("origin")
 		if err == nil {
 			t.Fatal("ensureHTTPSRemote() expected error for non-GitHub HTTPS remote")

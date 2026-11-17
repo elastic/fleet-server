@@ -7,6 +7,7 @@ package release
 import (
 	"fmt"
 
+	devtools "github.com/elastic/fleet-server/v7/dev-tools/mage"
 	"github.com/google/go-github/v68/github"
 )
 
@@ -89,7 +90,11 @@ type workflowPRResult struct {
 func RunMajorMinorRelease(cfg *ReleaseConfig) error {
 	fmt.Println("=== Starting Major/Minor Release Workflow ===")
 
-	if err := cfg.Validate(); err != nil {
+	if err := EnsureLatestRelease(cfg); err != nil {
+		return err
+	}
+
+	if err := ValidateReleaseConfig(cfg); err != nil {
 		return err
 	}
 
@@ -318,7 +323,11 @@ func ensureMajorMinorCurrentReleaseMatchesBase(repo *GitRepo, cfg *ReleaseConfig
 func RunPatchRelease(cfg *ReleaseConfig) error {
 	fmt.Println("=== Starting Patch Release Workflow ===")
 
-	if err := cfg.Validate(); err != nil {
+	if err := EnsureLatestRelease(cfg); err != nil {
+		return err
+	}
+
+	if err := ValidateReleaseConfig(cfg); err != nil {
 		return err
 	}
 
@@ -332,7 +341,11 @@ func RunPatchRelease(cfg *ReleaseConfig) error {
 	}
 
 	if cfg.ReleaseBranch == "" {
-		cfg.ReleaseBranch = inferReleaseBranch(cfg.CurrentRelease)
+		parsed, err := devtools.ParseReleaseVersion(cfg.CurrentRelease)
+		if err != nil {
+			return err
+		}
+		cfg.ReleaseBranch = devtools.InferReleaseBranch(parsed)
 	}
 
 	if err := ensurePatchBranchReadyForBump(repo, cfg); err != nil {
@@ -369,10 +382,11 @@ func RunPatchRelease(cfg *ReleaseConfig) error {
 }
 
 func ensurePatchBranchReadyForBump(repo *GitRepo, cfg *ReleaseConfig) error {
-	prev, err := inferLatestRelease(cfg.CurrentRelease)
+	parsed, err := devtools.ParseReleaseVersion(cfg.CurrentRelease)
 	if err != nil {
 		return err
 	}
+	prev := devtools.InferLatestRelease(parsed)
 	if prev == "" {
 		return fmt.Errorf(
 			"prepare-next-patch requires CURRENT_RELEASE with patch > 0 (got %s)",
