@@ -28,6 +28,7 @@ type optionsT struct {
 	hasSpanLink        bool
 	DedupeKey          string
 	RefreshIndex       string
+	FlushAfter         int
 }
 
 type Opt func(*optionsT)
@@ -72,6 +73,14 @@ func WithDedupeKey(key, refreshIndex string) Opt {
 	return func(opt *optionsT) {
 		opt.DedupeKey = key
 		opt.RefreshIndex = refreshIndex
+	}
+}
+
+// WithFlushAfter flushes the queues as soon as n operations with this option are queued, instead
+// of at the end of the flush interval.
+func WithFlushAfter(n int) Opt {
+	return func(opt *optionsT) {
+		opt.FlushAfter = n
 	}
 }
 
