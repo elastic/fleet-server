@@ -461,13 +461,11 @@ func TestEnrollWithAgentIDExistingPendingUninstallClearsPending(t *testing.T) {
 	source := fmt.Sprintf(`{"active":true,"uninstall_pending":true,"agent":{"id":"1234","version":"8.9.0"},"type":"PERMANENT","policy_id":"%s","replace_token":"%s",`+
 		`"outputs":{"default":{"type":"elasticsearch","api_key":"","api_key_id":"","permissions_hash":"oldhash"}}}`, policyID, replaceHash)
 	bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{
-		HitsT: es.HitsT{
-			Hits: []es.HitT{{
-				ID:     "1234",
-				Index:  dl.FleetAgents,
-				Source: []byte(source),
-			}},
-		},
+		Hits: []es.HitT{{
+			ID:     "1234",
+			Index:  dl.FleetAgents,
+			Source: []byte(source),
+		}},
 	}, nil)
 	bulker.On("APIKeyRead", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(
 		&apikey.APIKeyMetadata{ID: "1234"}, nil)

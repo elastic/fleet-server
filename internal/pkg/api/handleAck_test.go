@@ -377,7 +377,7 @@ func TestHandleAckEvents(t *testing.T) {
 			// would not match and fail.
 			name: "unenroll action from uninstallable agent enters pending-uninstall and keeps credentials",
 			agent: &model.Agent{
-				ESDocument:     model.ESDocument{Id: "ab12dcd8-bde0-4045-92dc-c4b27668d735"},
+				Id:             "ab12dcd8-bde0-4045-92dc-c4b27668d735",
 				Agent:          &model.AgentMetadata{Version: "8.0.0"},
 				AccessAPIKeyID: "access-key-id",
 				LocalMetadata:  json.RawMessage(`{"elastic":{"agent":{"uninstallable":true}}}`),
@@ -398,11 +398,10 @@ func TestHandleAckEvents(t *testing.T) {
 			res: newAckResponse(false, []AckResponseItem{newAckResponseItem(http.StatusOK)}),
 			bulker: func(t *testing.T) *ftesting.MockBulk {
 				m := ftesting.NewMockBulk()
-				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "2b12dcd8-bde0-4045-92dc-c4b27668d733")), mock.Anything).Return(&es.ResultT{HitsT: es.HitsT{
+				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "2b12dcd8-bde0-4045-92dc-c4b27668d733")), mock.Anything).Return(&es.ResultT{
 					Hits: []es.HitT{{
 						Source: []byte(`{"action_id":"2b12dcd8-bde0-4045-92dc-c4b27668d733","type":"UNENROLL"}`),
-					}},
-				}}, nil)
+					}}}, nil)
 				m.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
 				// Only the output key is invalidated; the access key is kept so the
 				// agent can still receive the follow-up UNINSTALL. The exact-match on
@@ -436,7 +435,7 @@ func TestHandleAckEvents(t *testing.T) {
 			// uninstall_pending_since.
 			name: "duplicate unenroll ack does not overwrite uninstall_pending_since",
 			agent: &model.Agent{
-				ESDocument:       model.ESDocument{Id: "ab12dcd8-bde0-4045-92dc-c4b27668d735"},
+				Id:               "ab12dcd8-bde0-4045-92dc-c4b27668d735",
 				Agent:            &model.AgentMetadata{Version: "8.0.0"},
 				AccessAPIKeyID:   "access-key-id",
 				LocalMetadata:    json.RawMessage(`{"elastic":{"agent":{"uninstallable":true}}}`),
@@ -458,11 +457,10 @@ func TestHandleAckEvents(t *testing.T) {
 			res: newAckResponse(false, []AckResponseItem{newAckResponseItem(http.StatusOK)}),
 			bulker: func(t *testing.T) *ftesting.MockBulk {
 				m := ftesting.NewMockBulk()
-				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "2b12dcd8-bde0-4045-92dc-c4b27668d733")), mock.Anything).Return(&es.ResultT{HitsT: es.HitsT{
+				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "2b12dcd8-bde0-4045-92dc-c4b27668d733")), mock.Anything).Return(&es.ResultT{
 					Hits: []es.HitT{{
 						Source: []byte(`{"action_id":"2b12dcd8-bde0-4045-92dc-c4b27668d733","type":"UNENROLL"}`),
-					}},
-				}}, nil)
+					}}}, nil)
 				m.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
 				// Output keys are already cleared, so there is nothing to invalidate:
 				// an APIKeyInvalidate call would be unexpected and fail the test.
@@ -487,7 +485,7 @@ func TestHandleAckEvents(t *testing.T) {
 			// unmatched and fail the test.
 			name: "batch with unenroll and terminal uninstall takes terminal path only",
 			agent: &model.Agent{
-				ESDocument:    model.ESDocument{Id: "ab12dcd8-bde0-4045-92dc-c4b27668d735"},
+				Id:            "ab12dcd8-bde0-4045-92dc-c4b27668d735",
 				Agent:         &model.AgentMetadata{Version: "8.0.0"},
 				LocalMetadata: json.RawMessage(`{"elastic":{"agent":{"uninstallable":true}}}`),
 			},
@@ -498,16 +496,14 @@ func TestHandleAckEvents(t *testing.T) {
 			res: newAckResponse(false, []AckResponseItem{newAckResponseItem(http.StatusOK), newAckResponseItem(http.StatusOK)}),
 			bulker: func(t *testing.T) *ftesting.MockBulk {
 				m := ftesting.NewMockBulk()
-				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "1b12dcd8-bde0-4045-92dc-c4b27668d731")), mock.Anything).Return(&es.ResultT{HitsT: es.HitsT{
+				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "1b12dcd8-bde0-4045-92dc-c4b27668d731")), mock.Anything).Return(&es.ResultT{
 					Hits: []es.HitT{{
 						Source: []byte(`{"action_id":"1b12dcd8-bde0-4045-92dc-c4b27668d731","type":"UNENROLL"}`),
-					}},
-				}}, nil)
-				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "2b12dcd8-bde0-4045-92dc-c4b27668d733")), mock.Anything).Return(&es.ResultT{HitsT: es.HitsT{
+					}}}, nil)
+				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "2b12dcd8-bde0-4045-92dc-c4b27668d733")), mock.Anything).Return(&es.ResultT{
 					Hits: []es.HitT{{
 						Source: []byte(`{"action_id":"2b12dcd8-bde0-4045-92dc-c4b27668d733","type":"UNINSTALL"}`),
-					}},
-				}}, nil)
+					}}}, nil)
 				m.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
 				// Only the terminal (deactivating) update is allowed. A pending update
 				// (uninstall_pending without active) would not match and fail. The
@@ -531,8 +527,8 @@ func TestHandleAckEvents(t *testing.T) {
 			// invalidation path was taken instead of pending-uninstall.
 			name: "unenroll action from legacy agent invalidates api key",
 			agent: &model.Agent{
-				ESDocument: model.ESDocument{Id: "ab12dcd8-bde0-4045-92dc-c4b27668d735"},
-				Agent:      &model.AgentMetadata{Version: "8.0.0"},
+				Id:    "ab12dcd8-bde0-4045-92dc-c4b27668d735",
+				Agent: &model.AgentMetadata{Version: "8.0.0"},
 			},
 			events: []AckRequest_Events_Item{{
 				json.RawMessage(`{
@@ -542,11 +538,10 @@ func TestHandleAckEvents(t *testing.T) {
 			res: newAckResponse(false, []AckResponseItem{newAckResponseItem(http.StatusOK)}),
 			bulker: func(t *testing.T) *ftesting.MockBulk {
 				m := ftesting.NewMockBulk()
-				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "2b12dcd8-bde0-4045-92dc-c4b27668d733")), mock.Anything).Return(&es.ResultT{HitsT: es.HitsT{
+				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "2b12dcd8-bde0-4045-92dc-c4b27668d733")), mock.Anything).Return(&es.ResultT{
 					Hits: []es.HitT{{
 						Source: []byte(`{"action_id":"2b12dcd8-bde0-4045-92dc-c4b27668d733","type":"UNENROLL"}`),
-					}},
-				}}, nil)
+					}}}, nil)
 				m.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
 				m.On("Update", mock.Anything, mock.Anything, mock.Anything,
 					mock.MatchedBy(func(body []byte) bool {
