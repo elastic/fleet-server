@@ -75,7 +75,7 @@ func EnsureReleaseIssueTracker(cfg *ReleaseConfig, workflowPRs []*github.PullReq
 	}
 
 	if !found {
-		body := buildReleaseIssueBody(cfg.CurrentRelease, isMajorMinorRelease(cfg.CurrentRelease), prURLs, nil)
+		body := buildReleaseIssueBody(isMajorMinorRelease(cfg.CurrentRelease), prURLs, nil)
 		issue, err := gh.CreateIssue(owner, repo, title, body, []string{"release"})
 		if err != nil {
 			return err
@@ -164,9 +164,9 @@ func extractPRCheckboxes(body string) map[string]bool {
 	return out
 }
 
-func buildReleaseIssueBody(version string, majorMinor bool, prURLs []string, checked map[string]bool) string {
+func buildReleaseIssueBody(majorMinor bool, prURLs []string, checked map[string]bool) string {
 	var b strings.Builder
-	b.WriteString(fmt.Sprintf("Global tracker: %s\n\n", globalReleaseTrackerURL))
+	fmt.Fprintf(&b, "Global tracker: %s\n\n", globalReleaseTrackerURL)
 	b.WriteString("# Release Checklist\n\n")
 	b.WriteString("Checklist for the Fleet Server release process. The Fleet Server and Beats release documentation can be reviewed ")
 	b.WriteString("[here](https://github.com/elastic/ingest-dev/blob/main/fleet-platform/releases.md).\n\n")
@@ -209,7 +209,7 @@ func formatPRChecklist(prURLs []string, checked map[string]bool) string {
 		if checked != nil && checked[u] {
 			mark = "x"
 		}
-		b.WriteString(fmt.Sprintf("- [%s] %s\n", mark, u))
+		fmt.Fprintf(&b, "- [%s] %s\n", mark, u)
 	}
 	return b.String()
 }
@@ -221,7 +221,7 @@ func mergeReleaseIssueBody(existingBody, version string, prURLs []string) (strin
 	allURLs := mergePRURLs(prURLs, keys(existingChecked))
 
 	if strings.TrimSpace(existingBody) == "" {
-		return buildReleaseIssueBody(version, isMajorMinorRelease(version), allURLs, existingChecked), true
+		return buildReleaseIssueBody(isMajorMinorRelease(version), allURLs, existingChecked), true
 	}
 
 	body := existingBody

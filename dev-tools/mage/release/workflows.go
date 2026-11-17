@@ -11,10 +11,19 @@ import (
 	"github.com/google/go-github/v68/github"
 )
 
+// Shared PR label names (match vault-bot / beats / elastic-agent release PRs).
+const (
+	labelDocs           = "docs"
+	labelInProgress     = "in progress"
+	labelRelease        = "release"
+	labelSkipChangelog  = "skip-changelog"
+	labelTeamAutomation = "Team:Automation"
+)
+
 // PR label sets match vault-bot / beats / elastic-agent release PRs.
 var (
-	releasePRLabels   = []string{"release", "Team:Automation", "skip-changelog"}
-	ffReleasePRLabels = []string{"release", "docs", "in progress", "Team:Automation", "skip-changelog"}
+	releasePRLabels   = []string{labelRelease, labelTeamAutomation, labelSkipChangelog}
+	ffReleasePRLabels = []string{labelRelease, labelDocs, labelInProgress, labelTeamAutomation, labelSkipChangelog}
 )
 
 // Feature-freeze merge-timing labels (number = RM merge order).
@@ -30,7 +39,7 @@ func backportLabel(releaseBranch string) string {
 }
 
 func prAMainLabels(releaseBranch string) []string {
-	return []string{"release", "impact:critical", backportLabel(releaseBranch), "skip-changelog", "Team:Automation", mergeLabelFFDay}
+	return []string{labelRelease, "impact:critical", backportLabel(releaseBranch), labelSkipChangelog, labelTeamAutomation, mergeLabelFFDay}
 }
 
 func prBReleaseLabels() []string {
@@ -197,41 +206,37 @@ func prepMainBackportAndVersion(repo *GitRepo, cfg *ReleaseConfig) (workflowPR, 
 }
 
 func prepFFRelease(repo *GitRepo, cfg *ReleaseConfig) (workflowPR, error) {
-	branch := fmt.Sprintf("ff-release-%s", cfg.CurrentRelease)
-	printf("\n--- Preparing PR-B: ff-release %s on %s ---\n", cfg.CurrentRelease, cfg.ReleaseBranch)
-
-	if err := repo.EnsureBranchFrom(cfg.ReleaseBranch, branch); err != nil {
-		return workflowPR{}, err
-	}
-	if err := UpdateVersion(cfg.CurrentRelease); err != nil {
-		return workflowPR{}, err
-	}
-	commitMsg := fmt.Sprintf("[Release][%s] ff-release: update versions %s", cfg.CurrentRelease, cfg.CurrentRelease)
-	if _, err := repo.CommitAll(commitMsg, cfg.GitAuthorName, cfg.GitAuthorEmail); err != nil {
-		return workflowPR{}, err
-	}
-
-	return workflowPR{
-		branch: branch,
-		base:   cfg.ReleaseBranch,
-		opts: PROptions{
-			Owner:     cfg.ProjectOwner,
-			Repo:      cfg.ProjectRepo,
-			Title:     fmt.Sprintf("[Release][%s] ff-release: update versions %s", cfg.CurrentRelease, cfg.CurrentRelease),
-			Head:      branch,
-			Base:      cfg.ReleaseBranch,
-			Body:      prBReleaseBody(cfg),
-			Reviewers: cfg.ProjectReviewers,
-			Labels:    prBReleaseLabels(),
-		},
-	}, nil
+	title := fmt.Sprintf("[Release][%s] ff-release: update versions %s", cfg.CurrentRelease, cfg.CurrentRelease)
+	return prepReleaseBranchVersionPR(
+		repo,
+		cfg,
+		fmt.Sprintf("ff-release-%s", cfg.CurrentRelease),
+		fmt.Sprintf("\n--- Preparing PR-B: ff-release %s on %s ---\n", cfg.CurrentRelease, cfg.ReleaseBranch),
+		title,
+		prBReleaseBody(cfg),
+		prBReleaseLabels(),
+	)
 }
 
 // prepPatchVersionBump prepares the post-release version bump to CURRENT_RELEASE.
 // Matches ingest-dev prepare-next-patch. Used only by RunPatchRelease.
 func prepPatchVersionBump(repo *GitRepo, cfg *ReleaseConfig) (workflowPR, error) {
-	branch := fmt.Sprintf("update-version-%s", cfg.CurrentRelease)
-	printf("\n--- Preparing patch version bump to %s on %s ---\n", cfg.CurrentRelease, cfg.ReleaseBranch)
+	title := fmt.Sprintf("[Release][%s] Update version to %s", cfg.CurrentRelease, cfg.CurrentRelease)
+	return prepReleaseBranchVersionPR(
+		repo,
+		cfg,
+		fmt.Sprintf("update-version-%s", cfg.CurrentRelease),
+		fmt.Sprintf("\n--- Preparing patch version bump to %s on %s ---\n", cfg.CurrentRelease, cfg.ReleaseBranch),
+		title,
+		patchVersionBumpBody(cfg),
+		patchVersionBumpLabels(),
+	)
+}
+
+// prepReleaseBranchVersionPR creates a branch from the release branch, bumps version.go,
+// and returns the PR options for finalize.
+func prepReleaseBranchVersionPR(repo *GitRepo, cfg *ReleaseConfig, branch, logLine, title, body string, labels []string) (workflowPR, error) {
+	printf("%s", logLine)
 
 	if err := repo.EnsureBranchFrom(cfg.ReleaseBranch, branch); err != nil {
 		return workflowPR{}, err
@@ -239,8 +244,7 @@ func prepPatchVersionBump(repo *GitRepo, cfg *ReleaseConfig) (workflowPR, error)
 	if err := UpdateVersion(cfg.CurrentRelease); err != nil {
 		return workflowPR{}, err
 	}
-	commitMsg := fmt.Sprintf("[Release][%s] Update version to %s", cfg.CurrentRelease, cfg.CurrentRelease)
-	if _, err := repo.CommitAll(commitMsg, cfg.GitAuthorName, cfg.GitAuthorEmail); err != nil {
+	if _, err := repo.CommitAll(title, cfg.GitAuthorName, cfg.GitAuthorEmail); err != nil {
 		return workflowPR{}, err
 	}
 
@@ -250,12 +254,12 @@ func prepPatchVersionBump(repo *GitRepo, cfg *ReleaseConfig) (workflowPR, error)
 		opts: PROptions{
 			Owner:     cfg.ProjectOwner,
 			Repo:      cfg.ProjectRepo,
-			Title:     fmt.Sprintf("[Release][%s] Update version to %s", cfg.CurrentRelease, cfg.CurrentRelease),
+			Title:     title,
 			Head:      branch,
 			Base:      cfg.ReleaseBranch,
-			Body:      patchVersionBumpBody(cfg),
+			Body:      body,
 			Reviewers: cfg.ProjectReviewers,
-			Labels:    patchVersionBumpLabels(),
+			Labels:    labels,
 		},
 	}, nil
 }

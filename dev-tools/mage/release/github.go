@@ -214,6 +214,11 @@ func (gh *GitHubClient) findPRByExactTitle(owner, repo, base, title string) (*gi
 	return nil, false, nil
 }
 
+const (
+	prStateOpen    = "open"
+	prStateUnknown = "unknown"
+)
+
 // pickRelatedPR prefers open PRs, then merged, then other closed PRs.
 func pickRelatedPR(prs []*github.PullRequest) *github.PullRequest {
 	var open, merged, closed *github.PullRequest
@@ -222,7 +227,7 @@ func pickRelatedPR(prs []*github.PullRequest) *github.PullRequest {
 			continue
 		}
 		switch {
-		case pr.GetState() == "open":
+		case pr.GetState() == prStateOpen:
 			if open == nil {
 				open = pr
 			}
@@ -248,14 +253,14 @@ func pickRelatedPR(prs []*github.PullRequest) *github.PullRequest {
 // prDisplayState returns a short state label for workflow summaries.
 func prDisplayState(pr *github.PullRequest) string {
 	if pr == nil {
-		return "unknown"
+		return prStateUnknown
 	}
 	if pr.GetMerged() || pr.MergedAt != nil {
 		return "merged"
 	}
 	state := pr.GetState()
 	if state == "" {
-		return "unknown"
+		return prStateUnknown
 	}
 	return state
 }
@@ -482,44 +487,59 @@ func (gh *GitHubClient) LatestReleaseBefore(owner, repo, currentVersion string) 
 }
 
 func (gh *GitHubClient) listReleaseVersions(owner, repo string) ([]string, error) {
-	var versions []string
-	opts := &github.ListOptions{PerPage: 100}
-	for {
-		releases, resp, err := gh.client.Repositories.ListReleases(gh.ctx, owner, repo, opts)
-		if err != nil {
-			return nil, fmt.Errorf("failed to list releases for %s/%s: %w", owner, repo, err)
-		}
-		for _, rel := range releases {
-			tag := rel.GetTagName()
-			if tag == "" {
-				continue
-			}
-			versions = append(versions, tag)
-		}
-		if resp.NextPage == 0 {
-			break
-		}
-		opts.Page = resp.NextPage
-	}
-	return versions, nil
+	return gh.listVersionRefs(owner, repo, false)
 }
 
 func (gh *GitHubClient) listTagVersions(owner, repo string) ([]string, error) {
+	return gh.listVersionRefs(owner, repo, true)
+}
+
+func (gh *GitHubClient) listVersionRefs(owner, repo string, fromTags bool) ([]string, error) {
+	kind := "releases"
+	if fromTags {
+		kind = "tags"
+	}
+	return gh.collectPagedNames(owner, repo, kind, func(opts *github.ListOptions) ([]string, *github.Response, error) {
+		if fromTags {
+			tags, resp, err := gh.client.Repositories.ListTags(gh.ctx, owner, repo, opts)
+			if err != nil {
+				return nil, resp, err
+			}
+			names := make([]string, 0, len(tags))
+			for _, tag := range tags {
+				if name := tag.GetName(); name != "" {
+					names = append(names, name)
+				}
+			}
+			return names, resp, nil
+		}
+		releases, resp, err := gh.client.Repositories.ListReleases(gh.ctx, owner, repo, opts)
+		if err != nil {
+			return nil, resp, err
+		}
+		names := make([]string, 0, len(releases))
+		for _, rel := range releases {
+			if tag := rel.GetTagName(); tag != "" {
+				names = append(names, tag)
+			}
+		}
+		return names, resp, nil
+	})
+}
+
+func (gh *GitHubClient) collectPagedNames(
+	owner, repo, kind string,
+	page func(opts *github.ListOptions) ([]string, *github.Response, error),
+) ([]string, error) {
 	var versions []string
 	opts := &github.ListOptions{PerPage: 100}
 	for {
-		tags, resp, err := gh.client.Repositories.ListTags(gh.ctx, owner, repo, opts)
+		names, resp, err := page(opts)
 		if err != nil {
-			return nil, fmt.Errorf("failed to list tags for %s/%s: %w", owner, repo, err)
+			return nil, fmt.Errorf("failed to list %s for %s/%s: %w", kind, owner, repo, err)
 		}
-		for _, tag := range tags {
-			name := tag.GetName()
-			if name == "" {
-				continue
-			}
-			versions = append(versions, name)
-		}
-		if resp.NextPage == 0 {
+		versions = append(versions, names...)
+		if resp == nil || resp.NextPage == 0 {
 			break
 		}
 		opts.Page = resp.NextPage

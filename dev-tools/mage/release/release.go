@@ -12,7 +12,10 @@ import (
 	"strings"
 )
 
-const versionGoPath = "version/version.go"
+const (
+	versionGoPath  = "version/version.go"
+	mergifyYMLPath = ".mergify.yml"
+)
 
 var defaultVersionPattern = regexp.MustCompile(`const DefaultVersion = "([^"]+)"`)
 
@@ -47,7 +50,7 @@ func validateRepoRelativePath(path string) (string, error) {
 
 func isReleaseWritablePath(path string) bool {
 	switch filepath.ToSlash(path) {
-	case versionGoPath, ".mergify.yml":
+	case versionGoPath, mergifyYMLPath:
 		return true
 	default:
 		return false

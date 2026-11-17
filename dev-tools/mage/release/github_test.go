@@ -19,6 +19,12 @@ import (
 	"github.com/google/go-github/v68/github"
 )
 
+const (
+	testAPIPullsPath    = "/repos/elastic/fleet-server/pulls"
+	testAPIReleasesPath = "/repos/elastic/fleet-server/releases"
+	testAPITagsPath     = "/repos/elastic/fleet-server/tags"
+)
+
 func newTestGitHubClient(t *testing.T, handler http.Handler) *GitHubClient {
 	t.Helper()
 
@@ -53,12 +59,12 @@ func TestCreatePRIdempotent(t *testing.T) {
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
-		case r.Method == http.MethodGet && r.URL.Path == "/repos/elastic/fleet-server/pulls":
+		case r.Method == http.MethodGet && r.URL.Path == testAPIPullsPath:
 			w.Header().Set("Content-Type", "application/json")
 			if err := json.NewEncoder(w).Encode([]*github.PullRequest{existingPR}); err != nil {
 				t.Errorf("failed to encode PR list response: %v", err)
 			}
-		case r.Method == http.MethodPost && r.URL.Path == "/repos/elastic/fleet-server/pulls":
+		case r.Method == http.MethodPost && r.URL.Path == testAPIPullsPath:
 			createCalls++
 			w.WriteHeader(http.StatusUnprocessableEntity)
 			_, _ = fmt.Fprint(w, `{"message":"Validation Failed","errors":[{"message":"A pull request already exists for elastic:9.5."}]}`)
@@ -101,7 +107,7 @@ func TestCreatePRIdempotent(t *testing.T) {
 func TestLatestReleaseBeforeUsesReleasesWhenPresent(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
-		case r.Method == http.MethodGet && r.URL.Path == "/repos/elastic/fleet-server/releases":
+		case r.Method == http.MethodGet && r.URL.Path == testAPIReleasesPath:
 			w.Header().Set("Content-Type", "application/json")
 			releases := []*github.RepositoryRelease{
 				{TagName: github.Ptr("v9.5.1")},
@@ -111,7 +117,7 @@ func TestLatestReleaseBeforeUsesReleasesWhenPresent(t *testing.T) {
 			if err := json.NewEncoder(w).Encode(releases); err != nil {
 				t.Errorf("failed to encode releases: %v", err)
 			}
-		case r.Method == http.MethodGet && r.URL.Path == "/repos/elastic/fleet-server/tags":
+		case r.Method == http.MethodGet && r.URL.Path == testAPITagsPath:
 			t.Errorf("ListTags should not be called when releases exist")
 			http.NotFound(w, r)
 		default:
@@ -131,12 +137,12 @@ func TestLatestReleaseBeforeUsesReleasesWhenPresent(t *testing.T) {
 func TestLatestReleaseBeforeFallsBackToTagsWhenReleasesEmpty(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
-		case r.Method == http.MethodGet && r.URL.Path == "/repos/elastic/fleet-server/releases":
+		case r.Method == http.MethodGet && r.URL.Path == testAPIReleasesPath:
 			w.Header().Set("Content-Type", "application/json")
 			if err := json.NewEncoder(w).Encode([]*github.RepositoryRelease{}); err != nil {
 				t.Errorf("failed to encode empty releases: %v", err)
 			}
-		case r.Method == http.MethodGet && r.URL.Path == "/repos/elastic/fleet-server/tags":
+		case r.Method == http.MethodGet && r.URL.Path == testAPITagsPath:
 			w.Header().Set("Content-Type", "application/json")
 			tags := []*github.RepositoryTag{
 				{Name: github.Ptr("v9.4.4")},
@@ -171,12 +177,12 @@ func TestCreatePRCreatesWhenNoneExists(t *testing.T) {
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
-		case r.Method == http.MethodGet && r.URL.Path == "/repos/elastic/fleet-server/pulls":
+		case r.Method == http.MethodGet && r.URL.Path == testAPIPullsPath:
 			w.Header().Set("Content-Type", "application/json")
 			if err := json.NewEncoder(w).Encode([]*github.PullRequest{}); err != nil {
 				t.Errorf("failed to encode empty PR list response: %v", err)
 			}
-		case r.Method == http.MethodPost && r.URL.Path == "/repos/elastic/fleet-server/pulls":
+		case r.Method == http.MethodPost && r.URL.Path == testAPIPullsPath:
 			createCalls++
 			w.Header().Set("Content-Type", "application/json")
 			if err := json.NewEncoder(w).Encode(newPR); err != nil {
@@ -232,12 +238,12 @@ func TestCreatePRRequestsTeamReviewers(t *testing.T) {
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
-		case r.Method == http.MethodGet && r.URL.Path == "/repos/elastic/fleet-server/pulls":
+		case r.Method == http.MethodGet && r.URL.Path == testAPIPullsPath:
 			w.Header().Set("Content-Type", "application/json")
 			if err := json.NewEncoder(w).Encode([]*github.PullRequest{}); err != nil {
 				t.Errorf("failed to encode empty PR list response: %v", err)
 			}
-		case r.Method == http.MethodPost && r.URL.Path == "/repos/elastic/fleet-server/pulls":
+		case r.Method == http.MethodPost && r.URL.Path == testAPIPullsPath:
 			w.Header().Set("Content-Type", "application/json")
 			if err := json.NewEncoder(w).Encode(newPR); err != nil {
 				t.Errorf("failed to encode create PR response: %v", err)

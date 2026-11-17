@@ -10,17 +10,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestLabelHelpers(t *testing.T) {
-	require.Equal(t, "backport-9.6", backportLabel("9.6"))
+const (
+	testBaseBranch    = "main"
+	testReleaseBranch = "9.6"
+)
 
-	labels := prAMainLabels("9.6")
+func TestLabelHelpers(t *testing.T) {
+	require.Equal(t, "backport-"+testReleaseBranch, backportLabel(testReleaseBranch))
+
+	labels := prAMainLabels(testReleaseBranch)
 	require.True(t, contains(labels, mergeLabelFFDay))
-	require.True(t, contains(labels, "backport-9.6"))
+	require.True(t, contains(labels, "backport-"+testReleaseBranch))
 	require.False(t, contains(labels, mergeLabelAfterImages), "PR-A must not include merge:3-after-images (PR-C omitted)")
 
 	require.True(t, contains(prBReleaseLabels(), mergeLabelAfterBranch))
 	require.True(t, contains(patchVersionBumpLabels(), mergeLabelAfterRelease))
-	require.False(t, contains(patchVersionBumpLabels(), "docs"), "patch bump must not include docs label")
+	require.False(t, contains(patchVersionBumpLabels(), labelDocs), "patch bump must not include docs label")
 }
 
 func TestPRBodiesMentionFleetScope(t *testing.T) {
@@ -29,8 +34,8 @@ func TestPRBodiesMentionFleetScope(t *testing.T) {
 		LatestRelease:           "9.6.0",
 		NextRelease:             "9.6.2",
 		NextProjectMinorVersion: "9.7.0",
-		BaseBranch:              "main",
-		ReleaseBranch:           "9.6",
+		BaseBranch:              testBaseBranch,
+		ReleaseBranch:           testReleaseBranch,
 	}
 
 	require.Contains(t, prAMainBody(cfg), "version/version.go")

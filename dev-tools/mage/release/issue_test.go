@@ -43,7 +43,7 @@ func TestVersionMentioned(t *testing.T) {
 }
 
 func TestBuildReleaseIssueBodyMajorMinorSection(t *testing.T) {
-	minorBody := buildReleaseIssueBody("9.5.0", true, nil, nil)
+	minorBody := buildReleaseIssueBody(true, nil, nil)
 	if !strings.Contains(minorBody, "### Only For Major/Minor Releases") {
 		t.Fatal("minor release body should include major/minor section")
 	}
@@ -54,7 +54,7 @@ func TestBuildReleaseIssueBodyMajorMinorSection(t *testing.T) {
 		t.Fatal("body should link fleet-server release label")
 	}
 
-	patchBody := buildReleaseIssueBody("9.5.1", false, nil, nil)
+	patchBody := buildReleaseIssueBody(false, nil, nil)
 	if strings.Contains(patchBody, "### Only For Major/Minor Releases") {
 		t.Fatal("patch body should omit major/minor section")
 	}

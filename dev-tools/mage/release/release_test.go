@@ -13,6 +13,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	testDefaultVersion940 = `const DefaultVersion = "9.4.0"`
+	testDefaultVersion950 = `const DefaultVersion = "9.5.0"`
+	testVersion940        = "9.4.0"
+	testVersion950        = "9.5.0"
+	testVersionXY         = "9.5"
+)
+
 func TestUpdateVersion(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -23,40 +31,40 @@ func TestUpdateVersion(t *testing.T) {
 	}{
 		{
 			name:        "update version successfully",
-			initial:     `const DefaultVersion = "9.4.0"`,
-			newVersion:  "9.5.0",
+			initial:     testDefaultVersion940,
+			newVersion:  testVersion950,
 			wantErr:     false,
-			wantContent: `const DefaultVersion = "9.5.0"`,
+			wantContent: testDefaultVersion950,
 		},
 		{
 			name:        "update with different spacing",
 			initial:     `const  DefaultVersion  =  "9.4.0"`,
-			newVersion:  "9.5.0",
+			newVersion:  testVersion950,
 			wantErr:     false,
 			wantContent: `const  DefaultVersion  =  "9.5.0"`,
 		},
 		{
 			name:        "canonicalize v-prefix",
-			initial:     `const DefaultVersion = "9.4.0"`,
+			initial:     testDefaultVersion940,
 			newVersion:  "v9.5.0",
 			wantErr:     false,
-			wantContent: `const DefaultVersion = "9.5.0"`,
+			wantContent: testDefaultVersion950,
 		},
 		{
 			name:       "reject X.Y",
-			initial:    `const DefaultVersion = "9.4.0"`,
-			newVersion: "9.5",
+			initial:    testDefaultVersion940,
+			newVersion: testVersionXY,
 			wantErr:    true,
 		},
 		{
 			name:       "reject quote injection",
-			initial:    `const DefaultVersion = "9.4.0"`,
+			initial:    testDefaultVersion940,
 			newVersion: `9.5.0"; evil := "x`,
 			wantErr:    true,
 		},
 		{
 			name:       "reject empty",
-			initial:    `const DefaultVersion = "9.4.0"`,
+			initial:    testDefaultVersion940,
 			newVersion: "",
 			wantErr:    true,
 		},
@@ -76,14 +84,10 @@ package version
 
 ` + tt.initial + `
 `
-			err = os.WriteFile(versionFile, []byte(initialContent), 0o644)
+			err = os.WriteFile(versionFile, []byte(initialContent), 0o600)
 			require.NoError(t, err)
 
-			origDir, _ := os.Getwd()
-			defer func() {
-				_ = os.Chdir(origDir)
-			}()
-			require.NoError(t, os.Chdir(tmpDir))
+			t.Chdir(tmpDir)
 
 			err = UpdateVersion(tt.newVersion)
 
@@ -115,14 +119,10 @@ func TestUpdateVersionIdempotent(t *testing.T) {
 
 const DefaultVersion = "9.4.0"
 `
-	err = os.WriteFile(versionFile, []byte(initialContent), 0o644)
+	err = os.WriteFile(versionFile, []byte(initialContent), 0o600)
 	require.NoError(t, err)
 
-	origDir, _ := os.Getwd()
-	defer func() {
-		_ = os.Chdir(origDir)
-	}()
-	require.NoError(t, os.Chdir(tmpDir))
+	t.Chdir(tmpDir)
 
 	err = UpdateVersion("9.5.0")
 	require.NoError(t, err)
@@ -155,14 +155,10 @@ func TestUpdateMergify(t *testing.T) {
         branches:
           - "9.3"
 `
-	err := os.WriteFile(mergifyFile, []byte(initialContent), 0o644)
+	err := os.WriteFile(mergifyFile, []byte(initialContent), 0o600)
 	require.NoError(t, err)
 
-	origDir, _ := os.Getwd()
-	defer func() {
-		_ = os.Chdir(origDir)
-	}()
-	require.NoError(t, os.Chdir(tmpDir))
+	t.Chdir(tmpDir)
 
 	err = UpdateMergify("9.5.0")
 	require.NoError(t, err)
@@ -193,14 +189,10 @@ func TestUpdateMergifyIdempotent(t *testing.T) {
         branches:
           - "9.5"
 `
-	err := os.WriteFile(mergifyFile, []byte(initialContent), 0o644)
+	err := os.WriteFile(mergifyFile, []byte(initialContent), 0o600)
 	require.NoError(t, err)
 
-	origDir, _ := os.Getwd()
-	defer func() {
-		_ = os.Chdir(origDir)
-	}()
-	require.NoError(t, os.Chdir(tmpDir))
+	t.Chdir(tmpDir)
 
 	err = UpdateMergify("9.5.0")
 	require.NoError(t, err)
@@ -231,14 +223,10 @@ func TestUpdateMergifyDoesNotFalseMatchVersionPrefix(t *testing.T) {
         branches:
           - "9.10"
 `
-	err := os.WriteFile(mergifyFile, []byte(initialContent), 0o644)
+	err := os.WriteFile(mergifyFile, []byte(initialContent), 0o600)
 	require.NoError(t, err)
 
-	origDir, _ := os.Getwd()
-	defer func() {
-		_ = os.Chdir(origDir)
-	}()
-	require.NoError(t, os.Chdir(tmpDir))
+	t.Chdir(tmpDir)
 
 	err = UpdateMergify("9.1.0")
 	require.NoError(t, err)
@@ -262,12 +250,8 @@ func TestUpdateMergifyRejectsNonNumericVersion(t *testing.T) {
 	mergifyFile := filepath.Join(tmpDir, ".mergify.yml")
 	initialContent := `pull_request_rules: []
 `
-	require.NoError(t, os.WriteFile(mergifyFile, []byte(initialContent), 0o644))
-	origDir, _ := os.Getwd()
-	defer func() {
-		_ = os.Chdir(origDir)
-	}()
-	require.NoError(t, os.Chdir(tmpDir))
+	require.NoError(t, os.WriteFile(mergifyFile, []byte(initialContent), 0o600))
+	t.Chdir(tmpDir)
 	if err := UpdateMergify("9.foo.0"); err == nil {
 		t.Fatal("UpdateMergify(9.foo.0) expected error")
 	}

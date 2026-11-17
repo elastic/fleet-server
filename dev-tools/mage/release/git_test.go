@@ -56,7 +56,7 @@ func createTestGitRepo(t *testing.T) (*GitRepo, string) {
 	require.NoError(t, err)
 
 	testFile := filepath.Join(tmpDir, "README.md")
-	err = os.WriteFile(testFile, []byte("# Test Repo"), 0o644)
+	err = os.WriteFile(testFile, []byte("# Test Repo"), 0o600)
 	require.NoError(t, err)
 
 	_, err = w.Add("README.md")
@@ -76,11 +76,7 @@ func createTestGitRepo(t *testing.T) (*GitRepo, string) {
 func TestEnsureBranchFrom(t *testing.T) {
 	gitRepo, tmpDir := createTestGitRepo(t)
 
-	origDir, _ := os.Getwd()
-	defer func() {
-		_ = os.Chdir(origDir)
-	}()
-	require.NoError(t, os.Chdir(tmpDir))
+	t.Chdir(tmpDir)
 
 	require.NoError(t, gitRepo.EnsureBranchFrom("master", "9.6"))
 
@@ -120,7 +116,7 @@ func TestEnsureBranchFromRemoteOnlyTarget(t *testing.T) {
 	w, err := gitRepo.repo.Worktree()
 	require.NoError(t, err)
 	marker := filepath.Join(tmpDir, "prep.txt")
-	require.NoError(t, os.WriteFile(marker, []byte("prep tip"), 0o644))
+	require.NoError(t, os.WriteFile(marker, []byte("prep tip"), 0o600))
 	if _, err = w.Add("prep.txt"); err != nil {
 		t.Fatalf("Add failed: %v", err)
 	}
@@ -201,9 +197,8 @@ func TestIsReleaseWritablePath(t *testing.T) {
 	if !isReleaseWritablePath("version/version.go") {
 		t.Fatal("version/version.go should be writable")
 	}
-	if !isReleaseWritablePath("version\\version.go") && false {
-		// Windows path form is normalized via filepath.ToSlash in isReleaseWritablePath callers;
-		// direct backslash input is not required for allowlist.
+	if !isReleaseWritablePath(".mergify.yml") {
+		t.Fatal(".mergify.yml should be writable")
 	}
 	if isReleaseWritablePath("main.go") {
 		t.Fatal("main.go should not be writable")

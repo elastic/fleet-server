@@ -5,7 +5,6 @@
 package mage
 
 import (
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -60,22 +59,10 @@ func TestLoadReleaseSettingsFromEnv(t *testing.T) {
 		"PROJECT_REPO",
 		"PROJECT_REVIEWERS",
 	}
-	original := make(map[string]string, len(keys))
 	for _, key := range keys {
-		original[key] = os.Getenv(key)
-		os.Unsetenv(key)
+		t.Setenv(key, "")
 	}
-	t.Cleanup(func() {
-		for key, val := range original {
-			if val == "" {
-				os.Unsetenv(key)
-			} else {
-				os.Setenv(key, val)
-			}
-		}
-	})
-
-	os.Setenv("CURRENT_RELEASE", "9.6.0")
+	t.Setenv("CURRENT_RELEASE", "9.6.0")
 
 	s, err := LoadReleaseSettings()
 	require.NoError(t, err)

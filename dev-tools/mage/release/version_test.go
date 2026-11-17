@@ -10,15 +10,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const testInvalidFooPatch = "9.foo.0"
+
 func TestSelectLatestReleaseBefore(t *testing.T) {
-	versions := []string{"9.4.0", "9.4.3", "9.5.0", "v9.3.2", "8.19.1", "not-a-version"}
-	got, err := selectLatestReleaseBefore(versions, "9.5.0")
+	versions := []string{testVersion940, "9.4.3", testVersion950, "v9.3.2", "8.19.1", "not-a-version"}
+	got, err := selectLatestReleaseBefore(versions, testVersion950)
 	require.NoError(t, err)
 	require.Equal(t, "9.4.3", got)
 }
 
 func TestParseSemverRejectsSignedComponents(t *testing.T) {
-	for _, version := range []string{"-1.0.0", "+9.6.0", "9.-1.0", "9.6.+1", "9.foo.0"} {
+	for _, version := range []string{"-1.0.0", "+9.6.0", "9.-1.0", "9.6.+1", testInvalidFooPatch} {
 		_, err := parseSemver(version)
 		require.Error(t, err, "parseSemver(%q) expected error", version)
 	}
@@ -28,15 +30,15 @@ func TestParseSemverRejectsSignedComponents(t *testing.T) {
 }
 
 func TestBranchVersionFromRelease(t *testing.T) {
-	got, err := branchVersionFromRelease("9.5.0")
+	got, err := branchVersionFromRelease(testVersion950)
 	require.NoError(t, err)
-	require.Equal(t, "9.5", got)
+	require.Equal(t, testVersionXY, got)
 
-	got, err = branchVersionFromRelease("9.5")
+	got, err = branchVersionFromRelease(testVersionXY)
 	require.NoError(t, err)
-	require.Equal(t, "9.5", got)
+	require.Equal(t, testVersionXY, got)
 
-	for _, version := range []string{"9.foo", "9.foo.0", "-1.2", "9.+1.0"} {
+	for _, version := range []string{"9.foo", testInvalidFooPatch, "-1.2", "9.+1.0"} {
 		_, err := branchVersionFromRelease(version)
 		require.Error(t, err, "branchVersionFromRelease(%q) expected error", version)
 	}

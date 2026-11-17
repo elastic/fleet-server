@@ -13,7 +13,7 @@ import (
 
 // UpdateMergify adds a new backport rule to .mergify.yml.
 func UpdateMergify(version string) error {
-	mergifyFile := ".mergify.yml"
+	mergifyFile := mergifyYMLPath
 
 	content, err := os.ReadFile(mergifyFile)
 	if err != nil {
