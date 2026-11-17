@@ -372,7 +372,7 @@ func TestFilterActions(t *testing.T) {
 			ActionID: "9012",
 			Type:     "RESTART",
 		}, {
-			ActionID: "9013",
+			ActionID: "3456",
 			Type:     "UNINSTALL",
 		}},
 		resp: []model.Action{{
@@ -385,7 +385,7 @@ func TestFilterActions(t *testing.T) {
 			ActionID: "9012",
 			Type:     "RESTART",
 		}, {
-			ActionID: "9013",
+			ActionID: "3456",
 			Type:     "UNINSTALL",
 		}},
 	}, {
