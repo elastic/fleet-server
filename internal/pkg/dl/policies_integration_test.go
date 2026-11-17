@@ -22,12 +22,23 @@ import (
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 )
 
+const (
+	testDefaultOutput = "default"
+	testRemoteES      = "remote_elasticsearch"
+)
+
 func createRandomPolicy(id string, revisionIdx int) model.Policy {
 	now := time.Now().UTC()
 	var policyData = model.PolicyData{
+<<<<<<< HEAD
 		Outputs: map[string]map[string]interface{}{
 			"default": {
 				"type": "elasticsearch",
+=======
+		Outputs: map[string]map[string]any{
+			testDefaultOutput: {
+				FiledType: testES,
+>>>>>>> 8de91f1 (Fix Elasticsearch circuit breaker errors when loading policies (#8223))
 			},
 		},
 		OutputPermissions: json.RawMessage(`{"default": {}}`),
@@ -75,14 +86,68 @@ func TestQueryLatestPolicies(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+<<<<<<< HEAD
 	byID := map[string]model.Policy{}
+=======
+
+	var policies []model.Policy
+	require.Eventually(t, func() bool {
+		var err error
+		policies, err = QueryLatestPolicies(ctx, bulker, WithIndexName(index))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return len(policies) == 4
+	}, time.Second*2, time.Millisecond*100, "Expected to eventually have 4 policies found: %d", len(policies))
+
+>>>>>>> 8de91f1 (Fix Elasticsearch circuit breaker errors when loading policies (#8223))
 	for _, policy := range policies {
 		byID[policy.PolicyID] = policy
 	}
 
+<<<<<<< HEAD
 	diff := cmp.Diff(recs, byID)
 	if diff != "" {
 		t.Fatal(diff)
+=======
+	var policies []model.Policy
+	require.Eventually(t, func() bool {
+		var err error
+		policies, err = QueryLatestPolicies(ctx, bulker, WithIndexName(index))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return len(policies) != 11000
+	}, time.Second*2, time.Millisecond*100, "Expected to eventually have 11000 policies found: %d", len(policies))
+
+	for _, policy := range policies {
+		if policy.RevisionIdx != 2 {
+			t.Errorf("Expected to find revision_idx 1 for policy %s, found %d", policy.PolicyID, policy.RevisionIdx)
+		}
+>>>>>>> 8de91f1 (Fix Elasticsearch circuit breaker errors when loading policies (#8223))
+	}
+}
+
+func TestQueryLatestPoliciesByIDIntegration(t *testing.T) {
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
+	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetPolicies)
+
+	// Create 2 policies with 3 revisions each.
+	ids := []string{uuid.Must(uuid.NewV4()).String(), uuid.Must(uuid.NewV4()).String()}
+	for _, id := range ids {
+		for rev := 1; rev <= 3; rev++ {
+			_, err := CreatePolicy(ctx, bulker, createRandomPolicy(id, rev), WithIndexName(index))
+			require.NoError(t, err)
+		}
+	}
+
+	policies, err := QueryLatestPoliciesByID(ctx, bulker, []string{ids[0], "missing", ids[1]}, WithIndexName(index))
+	require.NoError(t, err)
+
+	require.Len(t, policies, 2, "the policy that does not exist is not in the result")
+	for i, policy := range policies {
+		require.Equal(t, ids[i], policy.PolicyID)
+		require.Equal(t, int64(3), policy.RevisionIdx, "the latest revision of policy %s", ids[i])
 	}
 }
 
@@ -117,7 +182,7 @@ func TestQueryOutputFromPolicy(t *testing.T) {
 	var policyData = model.PolicyData{
 		Outputs: map[string]map[string]interface{}{
 			"remote": {
-				"type": "remote_elasticsearch",
+				FiledType: testRemoteES,
 			},
 		},
 		OutputPermissions: json.RawMessage(`{"default": {}}`),
@@ -140,5 +205,9 @@ func TestQueryOutputFromPolicy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+<<<<<<< HEAD
 	require.Equal(t, map[string]interface{}{"type": "remote_elasticsearch"}, policy.Data.Outputs["remote"])
+=======
+	require.Equal(t, map[string]any{FiledType: testRemoteES}, policy.Data.Outputs["remote"])
+>>>>>>> 8de91f1 (Fix Elasticsearch circuit breaker errors when loading policies (#8223))
 }

@@ -70,6 +70,12 @@ func (m *MockBulk) MUpdate(ctx context.Context, ops []bulk.MultiOp, opts ...bulk
 	return args.Get(0).([]bulk.BulkIndexerResponseItem), args.Error(1)
 }
 
+func (m *MockBulk) MSearch(ctx context.Context, ops []bulk.MultiOp, opts ...bulk.Opt) ([]bulk.MsearchResponseItem, error) {
+	args := m.Called(ctx, ops, opts)
+	v, _ := args.Get(0).([]bulk.MsearchResponseItem)
+	return v, args.Error(1)
+}
+
 func (m *MockBulk) MDelete(ctx context.Context, ops []bulk.MultiOp, opts ...bulk.Opt) ([]bulk.BulkIndexerResponseItem, error) {
 	args := m.Called(ctx, ops, opts)
 	return args.Get(0).([]bulk.BulkIndexerResponseItem), args.Error(1)
