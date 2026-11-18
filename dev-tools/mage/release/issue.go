@@ -32,7 +32,7 @@ func warnEnsureReleaseIssueTracker(cfg *ReleaseConfig, workflowPRs []*github.Pul
 }
 
 // EnsureReleaseIssueTracker creates or updates the Fleet Server release checklist issue for
-// cfg.CurrentRelease. It links related Fleet Server PRs (workflow PRs plus open/merged PRs
+// cfg.NextRelease. It links related Fleet Server PRs (workflow PRs plus open/merged PRs
 // with label "release" that mention the same version). Updates are idempotent: missing
 // PR links are appended; existing checklist and checkbox state are preserved.
 // Standalone mage release:ensureIssueTracker surfaces errors; runMajorMinor/runPatch
@@ -41,11 +41,11 @@ func EnsureReleaseIssueTracker(cfg *ReleaseConfig, workflowPRs []*github.PullReq
 	if cfg == nil {
 		return fmt.Errorf("release config is required")
 	}
-	if cfg.CurrentRelease == "" {
-		return fmt.Errorf("CURRENT_RELEASE is required")
+	if cfg.NextRelease == "" {
+		return fmt.Errorf("NEXT_RELEASE is required")
 	}
 
-	title := releaseIssueTitle(cfg.CurrentRelease)
+	title := releaseIssueTitle(cfg.NextRelease)
 	seedURLs := prURLsFromPullRequests(workflowPRs)
 
 	if cfg.DryRun {
@@ -63,9 +63,9 @@ func EnsureReleaseIssueTracker(cfg *ReleaseConfig, workflowPRs []*github.PullReq
 	owner := cfg.ProjectOwner
 	repo := cfg.ProjectRepo
 
-	discovered, err := gh.listReleaseLabeledPRsForVersion(owner, repo, cfg.CurrentRelease)
+	discovered, err := gh.listReleaseLabeledPRsForVersion(owner, repo, cfg.NextRelease)
 	if err != nil {
-		return fmt.Errorf("discover release-labeled PRs for %s: %w", cfg.CurrentRelease, err)
+		return fmt.Errorf("discover release-labeled PRs for %s: %w", cfg.NextRelease, err)
 	}
 	prURLs := mergePRURLs(seedURLs, prURLsFromPullRequests(discovered))
 
@@ -75,7 +75,7 @@ func EnsureReleaseIssueTracker(cfg *ReleaseConfig, workflowPRs []*github.PullReq
 	}
 
 	if !found {
-		body := buildReleaseIssueBody(isMajorMinorRelease(cfg.CurrentRelease), prURLs, nil)
+		body := buildReleaseIssueBody(isMajorMinorRelease(cfg.NextRelease), prURLs, nil)
 		issue, err := gh.createIssue(owner, repo, title, body, []string{labelRelease})
 		if err != nil {
 			return err
@@ -84,7 +84,7 @@ func EnsureReleaseIssueTracker(cfg *ReleaseConfig, workflowPRs []*github.PullReq
 		return nil
 	}
 
-	updatedBody, changed := mergeReleaseIssueBody(existing.GetBody(), cfg.CurrentRelease, prURLs)
+	updatedBody, changed := mergeReleaseIssueBody(existing.GetBody(), cfg.NextRelease, prURLs)
 	if changed {
 		if err := gh.updateIssueBody(owner, repo, existing.GetNumber(), updatedBody); err != nil {
 			return err

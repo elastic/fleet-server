@@ -14,11 +14,11 @@ import (
 
 func TestValidateReleaseConfig(t *testing.T) {
 	require.Error(t, validateReleaseConfig(&ReleaseConfig{DryRun: true, LatestRelease: testVersion940}))
-	require.Error(t, validateReleaseConfig(&ReleaseConfig{CurrentRelease: testVersion950, LatestRelease: testVersion940}))
+	require.Error(t, validateReleaseConfig(&ReleaseConfig{NextRelease: testVersion950, LatestRelease: testVersion940}))
 	require.NoError(t, validateReleaseConfig(&ReleaseConfig{
-		CurrentRelease: testVersion950,
-		LatestRelease:  testVersion940,
-		DryRun:         true,
+		NextRelease:   testVersion950,
+		LatestRelease: testVersion940,
+		DryRun:        true,
 	}))
 }
 
@@ -29,7 +29,7 @@ func TestEnsureLatestRelease(t *testing.T) {
 		return testVersion943, nil
 	}
 
-	cfg := &ReleaseConfig{CurrentRelease: testVersion950, DryRun: true}
+	cfg := &ReleaseConfig{NextRelease: testVersion950, DryRun: true}
 	require.NoError(t, ensureLatestRelease(cfg))
 	require.Equal(t, testVersion943, cfg.LatestRelease)
 
@@ -39,11 +39,11 @@ func TestEnsureLatestRelease(t *testing.T) {
 }
 
 func TestLoadReleaseSettings(t *testing.T) {
-	t.Setenv("CURRENT_RELEASE", testVersion950)
+	t.Setenv("NEXT_RELEASE", testVersion950)
 	t.Setenv("DRY_RUN", "true")
 	settings, err := devtools.LoadReleaseSettings()
 	require.NoError(t, err)
 	require.NoError(t, settings.RequireRelease())
-	require.Equal(t, testVersion950, settings.CurrentRelease)
+	require.Equal(t, testVersion950, settings.NextRelease)
 	require.True(t, settings.DryRun)
 }

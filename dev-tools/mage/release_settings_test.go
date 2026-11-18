@@ -35,12 +35,6 @@ func TestInferLatestRelease(t *testing.T) {
 	}
 }
 
-func TestInferNextRelease(t *testing.T) {
-	parsed, err := ParseReleaseVersion("9.6.0")
-	require.NoError(t, err)
-	require.Equal(t, "9.6.1", InferNextRelease(parsed))
-}
-
 func TestInferNextProjectMinorVersion(t *testing.T) {
 	parsed, err := ParseReleaseVersion("9.6.0")
 	require.NoError(t, err)
@@ -50,7 +44,7 @@ func TestInferNextProjectMinorVersion(t *testing.T) {
 func TestLoadReleaseSettingsFromEnv(t *testing.T) {
 	keys := []string{
 		"BASE_BRANCH",
-		"CURRENT_RELEASE",
+		"NEXT_RELEASE",
 		"DRY_RUN",
 		"GITHUB_TOKEN",
 		"GIT_AUTHOR_EMAIL",
@@ -62,13 +56,12 @@ func TestLoadReleaseSettingsFromEnv(t *testing.T) {
 	for _, key := range keys {
 		t.Setenv(key, "")
 	}
-	t.Setenv("CURRENT_RELEASE", "9.6.0")
+	t.Setenv("NEXT_RELEASE", "9.6.0")
 
 	s, err := LoadReleaseSettings()
 	require.NoError(t, err)
-	require.Equal(t, "9.6.0", s.CurrentRelease)
+	require.Equal(t, "9.6.0", s.NextRelease)
 	require.Equal(t, "9.6", s.ReleaseBranch)
-	require.Equal(t, "9.6.1", s.NextRelease)
 	require.Equal(t, "main", s.BaseBranch)
 	require.Equal(t, "elastic", s.ProjectOwner)
 	require.Equal(t, "fleet-server", s.ProjectRepo)
@@ -79,7 +72,7 @@ func TestLoadReleaseSettingsFromEnv(t *testing.T) {
 }
 
 func TestLoadReleaseSettingsDryRun(t *testing.T) {
-	t.Setenv("CURRENT_RELEASE", "9.6.0")
+	t.Setenv("NEXT_RELEASE", "9.6.0")
 	t.Setenv("DRY_RUN", "true")
 	s, err := LoadReleaseSettings()
 	require.NoError(t, err)
@@ -91,7 +84,7 @@ func TestLoadReleaseSettingsDryRun(t *testing.T) {
 	require.False(t, s.DryRun)
 }
 
-func TestRequireReleaseMissingCurrent(t *testing.T) {
+func TestRequireReleaseMissingNext(t *testing.T) {
 	s := defaultReleaseSettings()
 	require.Error(t, s.RequireRelease())
 }

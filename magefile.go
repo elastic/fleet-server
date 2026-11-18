@@ -2489,7 +2489,7 @@ func (Test) CloudE2ERun() error {
 	return err
 }
 
-// loadReleaseConfig loads release settings and requires CURRENT_RELEASE for workflows.
+// loadReleaseConfig loads release settings and requires NEXT_RELEASE for workflows.
 func loadReleaseConfig() (*release.ReleaseConfig, error) {
 	settings, err := devtools.LoadReleaseSettings()
 	if err != nil {
@@ -2532,7 +2532,7 @@ func (Release) RunPatch() error {
 }
 
 // EnsureIssueTracker creates or updates the Fleet Server release checklist issue for
-// CURRENT_RELEASE, linking related PRs labeled "release".
+// NEXT_RELEASE, linking related PRs labeled "release".
 func (Release) EnsureIssueTracker() error {
 	cfg, err := loadReleaseConfig()
 	if err != nil {

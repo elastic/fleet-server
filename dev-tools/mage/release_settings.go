@@ -13,12 +13,11 @@ import (
 )
 
 // ReleaseSettings holds configuration for release automation (feature freeze / patch).
-// CURRENT_RELEASE is optional during general loads; release targets call RequireRelease()
+// NEXT_RELEASE is optional during general loads; release targets call RequireRelease()
 // before running workflows.
 type ReleaseSettings struct {
-	CurrentRelease          string
-	LatestRelease           string
 	NextRelease             string
+	LatestRelease           string
 	NextProjectMinorVersion string
 	NextProjectMinorBranch  string
 
@@ -45,10 +44,10 @@ func LoadReleaseSettings() (*ReleaseSettings, error) {
 	return s, nil
 }
 
-// RequireRelease ensures CURRENT_RELEASE was provided so inferred release fields are set.
+// RequireRelease ensures NEXT_RELEASE was provided so inferred release fields are set.
 func (s *ReleaseSettings) RequireRelease() error {
-	if s.CurrentRelease == "" {
-		return fmt.Errorf("CURRENT_RELEASE environment variable is required")
+	if s.NextRelease == "" {
+		return fmt.Errorf("NEXT_RELEASE environment variable is required")
 	}
 	return nil
 }
@@ -66,7 +65,7 @@ func defaultReleaseSettings() *ReleaseSettings {
 }
 
 // loadFromEnv overrides release settings from environment variables.
-// When CURRENT_RELEASE is unset, non-version fields may still be overridden; inferred
+// When NEXT_RELEASE is unset, non-version fields may still be overridden; inferred
 // version fields remain empty so unrelated mage targets keep working.
 func (s *ReleaseSettings) loadFromEnv() error {
 	if v := os.Getenv("BASE_BRANCH"); v != "" {
@@ -94,23 +93,22 @@ func (s *ReleaseSettings) loadFromEnv() error {
 		s.ProjectReviewers = strings.Split(v, ",")
 	}
 
-	currentRelease := os.Getenv("CURRENT_RELEASE")
-	if currentRelease == "" {
+	nextRelease := os.Getenv("NEXT_RELEASE")
+	if nextRelease == "" {
 		return nil
 	}
 
-	return s.populateFromCurrent(currentRelease)
+	return s.populateFromNext(nextRelease)
 }
 
-func (s *ReleaseSettings) populateFromCurrent(currentRelease string) error {
-	parsed, err := ParseReleaseVersion(currentRelease)
+func (s *ReleaseSettings) populateFromNext(nextRelease string) error {
+	parsed, err := ParseReleaseVersion(nextRelease)
 	if err != nil {
 		return err
 	}
 
-	s.CurrentRelease = parsed.String()
+	s.NextRelease = parsed.String()
 	s.LatestRelease = InferLatestRelease(parsed)
-	s.NextRelease = InferNextRelease(parsed)
 	s.ReleaseBranch = InferReleaseBranch(parsed)
 	s.NextProjectMinorVersion = InferNextProjectMinorVersion(parsed)
 	s.NextProjectMinorBranch = InferNextProjectMinorBranch(parsed)
@@ -127,9 +125,9 @@ func (v ReleaseVersion) String() string {
 }
 
 // ParseReleaseVersion parses a release version string as major.minor.patch with no
-// prerelease or build metadata (e.g. CURRENT_RELEASE=9.5.0).
-func ParseReleaseVersion(currentRelease string) (ReleaseVersion, error) {
-	v, err := parseStrictReleaseVersion(currentRelease)
+// prerelease or build metadata (e.g. NEXT_RELEASE=9.5.0).
+func ParseReleaseVersion(nextRelease string) (ReleaseVersion, error) {
+	v, err := parseStrictReleaseVersion(nextRelease)
 	if err != nil {
 		return ReleaseVersion{}, err
 	}
@@ -138,39 +136,39 @@ func ParseReleaseVersion(currentRelease string) (ReleaseVersion, error) {
 
 // parseStrictReleaseVersion uses beats/v7/pkg/version (same API as the old
 // elastic-agent-libs/version package) and rejects signed components and
-// prerelease/build metadata so CURRENT_RELEASE stays plain X.Y.Z.
-func parseStrictReleaseVersion(currentRelease string) (*libversion.V, error) {
-	version := strings.TrimPrefix(strings.TrimSpace(currentRelease), "v")
+// prerelease/build metadata so NEXT_RELEASE stays plain X.Y.Z.
+func parseStrictReleaseVersion(nextRelease string) (*libversion.V, error) {
+	version := strings.TrimPrefix(strings.TrimSpace(nextRelease), "v")
 	if version == "" {
-		return nil, fmt.Errorf("invalid version format: %s (expected major.minor.patch)", currentRelease)
+		return nil, fmt.Errorf("invalid version format: %s (expected major.minor.patch)", nextRelease)
 	}
 	if strings.ContainsAny(version, "-+") {
-		return nil, fmt.Errorf("invalid version format: %s (expected major.minor.patch without prerelease/build metadata)", currentRelease)
+		return nil, fmt.Errorf("invalid version format: %s (expected major.minor.patch without prerelease/build metadata)", nextRelease)
 	}
 	parts := strings.Split(version, ".")
 	if len(parts) != 3 {
-		return nil, fmt.Errorf("invalid version format: %s (expected major.minor.patch)", currentRelease)
+		return nil, fmt.Errorf("invalid version format: %s (expected major.minor.patch)", nextRelease)
 	}
 	for _, part := range parts {
 		if part == "" || strings.HasPrefix(part, "-") || strings.HasPrefix(part, "+") {
-			return nil, fmt.Errorf("invalid version format: %s (expected major.minor.patch)", currentRelease)
+			return nil, fmt.Errorf("invalid version format: %s (expected major.minor.patch)", nextRelease)
 		}
 		for _, r := range part {
 			if r < '0' || r > '9' {
-				return nil, fmt.Errorf("invalid version format: %s (expected major.minor.patch)", currentRelease)
+				return nil, fmt.Errorf("invalid version format: %s (expected major.minor.patch)", nextRelease)
 			}
 		}
 	}
 
 	v, err := libversion.New(version)
 	if err != nil {
-		return nil, fmt.Errorf("invalid version format: %s (expected major.minor.patch): %w", currentRelease, err)
+		return nil, fmt.Errorf("invalid version format: %s (expected major.minor.patch): %w", nextRelease, err)
 	}
 	if v.Meta != "" {
-		return nil, fmt.Errorf("invalid version format: %s (expected major.minor.patch without prerelease/build metadata)", currentRelease)
+		return nil, fmt.Errorf("invalid version format: %s (expected major.minor.patch without prerelease/build metadata)", nextRelease)
 	}
 	if v.Major < 0 || v.Minor < 0 || v.Bugfix < 0 {
-		return nil, fmt.Errorf("invalid version format: %s (expected major.minor.patch)", currentRelease)
+		return nil, fmt.Errorf("invalid version format: %s (expected major.minor.patch)", nextRelease)
 	}
 	return v, nil
 }
@@ -182,11 +180,6 @@ func InferLatestRelease(v ReleaseVersion) string {
 		return ""
 	}
 	return ReleaseVersion{Major: v.Major, Minor: v.Minor, Patch: v.Patch - 1}.String()
-}
-
-// InferNextRelease returns the next patch version (patch + 1).
-func InferNextRelease(v ReleaseVersion) string {
-	return ReleaseVersion{Major: v.Major, Minor: v.Minor, Patch: v.Patch + 1}.String()
 }
 
 // InferReleaseBranch returns the major.minor release branch name.

@@ -8,7 +8,7 @@ Operator reference for `dev-tools/mage/release/`. Release managers should start 
 |---|---|
 | `mage release:ensureIssueTracker` | Create/update release checklist issue |
 | `mage release:runMajorMinor` | Feature freeze: release branch + PR-A/B (no next-patch) |
-| `mage release:runPatch` | Patch: post-release bump to `CURRENT_RELEASE` |
+| `mage release:runPatch` | Patch: post-release bump to `NEXT_RELEASE` |
 | `mage release:updateMergify` | Append backport rule |
 | `mage release:updateVersion` | Update `version/version.go` only |
 
@@ -23,7 +23,7 @@ There is **no** `runNextRelease` target; version bumps after a patch release are
 ## Alignment with beats / elastic-agent
 
 Shared process: merge-timing labels, idempotent branches/PRs, issue tracker, root-module release package.
-Patch `CURRENT_RELEASE` is the version to land (`NEW_VERSION`); the release branch must already be at the previous patch.
+Patch `NEXT_RELEASE` is the version to land (`NEW_VERSION`); the release branch must already be at the previous patch.
 
 Fleet Server differences (from former `fleet-server.mak`):
 
@@ -34,7 +34,7 @@ Fleet Server differences (from former `fleet-server.mak`):
 
 ```bash
 export PROJECT_OWNER="$USER"
-export CURRENT_RELEASE="$(grep DefaultVersion version/version.go | sed -E 's/.*"([^"]+)".*/\1/')"
+export NEXT_RELEASE="$(grep DefaultVersion version/version.go | sed -E 's/.*"([^"]+)".*/\1/')"
 export DRY_RUN=true
 export GITHUB_TOKEN="$(gh auth token)"
 

@@ -11,9 +11,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestRequireFeatureFreezeCurrentRelease(t *testing.T) {
-	require.NoError(t, requireFeatureFreezeCurrentRelease(&ReleaseConfig{CurrentRelease: testVersion960}))
-	err := requireFeatureFreezeCurrentRelease(&ReleaseConfig{CurrentRelease: testVersion961})
+func TestRequireFeatureFreezeNextRelease(t *testing.T) {
+	require.NoError(t, requireFeatureFreezeNextRelease(&ReleaseConfig{NextRelease: testVersion960}))
+	err := requireFeatureFreezeNextRelease(&ReleaseConfig{NextRelease: testVersion961})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "patch 0")
 }
@@ -33,9 +33,8 @@ func TestLabelHelpers(t *testing.T) {
 
 func TestPRBodiesMentionFleetScope(t *testing.T) {
 	cfg := &ReleaseConfig{
-		CurrentRelease:          testVersion961,
+		NextRelease:             testVersion961,
 		LatestRelease:           testVersion960,
-		NextRelease:             "9.6.2",
 		NextProjectMinorVersion: "9.7.0",
 		BaseBranch:              testBaseBranch,
 		ReleaseBranch:           testReleaseBranch,

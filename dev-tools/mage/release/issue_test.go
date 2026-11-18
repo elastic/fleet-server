@@ -156,8 +156,8 @@ func TestMergeReleaseIssueBodyAddsTrackerWhenMissing(t *testing.T) {
 
 func TestEnsureReleaseIssueTrackerDryRun(t *testing.T) {
 	cfg := &ReleaseConfig{
-		CurrentRelease: "9.4.1",
-		DryRun:         true,
+		NextRelease: "9.4.1",
+		DryRun:      true,
 	}
 	pr := &github.PullRequest{HTMLURL: new("https://github.com/elastic/fleet-server/pull/99")}
 	require.NoError(t, EnsureReleaseIssueTracker(cfg, []*github.PullRequest{pr}))

@@ -50,24 +50,24 @@ func patchVersionBumpLabels() []string {
 	return append(append([]string{}, releasePRLabels...), mergeLabelAfterRelease)
 }
 
-// requireFeatureFreezeCurrentRelease ensures CURRENT_RELEASE is an X.Y.0 version.
+// requireFeatureFreezeNextRelease ensures NEXT_RELEASE is an X.Y.0 version.
 // Patch bumps belong in RunPatchRelease.
-func requireFeatureFreezeCurrentRelease(cfg *ReleaseConfig) error {
-	parsed, err := parseSemver(cfg.CurrentRelease)
+func requireFeatureFreezeNextRelease(cfg *ReleaseConfig) error {
+	parsed, err := parseSemver(cfg.NextRelease)
 	if err != nil {
 		return err
 	}
 	if parsed.patch != 0 {
 		return fmt.Errorf(
-			"runMajorMinor requires CURRENT_RELEASE with patch 0 (got %s); use mage release:runPatch for patch bumps",
-			cfg.CurrentRelease,
+			"runMajorMinor requires NEXT_RELEASE with patch 0 (got %s); use mage release:runPatch for patch bumps",
+			cfg.NextRelease,
 		)
 	}
 	return nil
 }
 
 func checkRequirements(cfg *ReleaseConfig) error {
-	parsed, err := parseSemver(cfg.CurrentRelease)
+	parsed, err := parseSemver(cfg.NextRelease)
 	if err != nil {
 		return err
 	}
@@ -123,7 +123,7 @@ func RunMajorMinorRelease(cfg *ReleaseConfig) error {
 		return err
 	}
 
-	if err := requireFeatureFreezeCurrentRelease(cfg); err != nil {
+	if err := requireFeatureFreezeNextRelease(cfg); err != nil {
 		return err
 	}
 
@@ -136,7 +136,7 @@ func RunMajorMinorRelease(cfg *ReleaseConfig) error {
 		return err
 	}
 
-	if err := ensureMajorMinorCurrentReleaseMatchesBase(repo, cfg); err != nil {
+	if err := ensureMajorMinorNextReleaseMatchesBase(repo, cfg); err != nil {
 		return err
 	}
 
@@ -192,7 +192,7 @@ func RunMajorMinorRelease(cfg *ReleaseConfig) error {
 }
 
 func prepMainBackportAndVersion(repo *gitRepo, cfg *ReleaseConfig) (workflowPR, error) {
-	branch := fmt.Sprintf("ff-prep-main-%s", cfg.CurrentRelease)
+	branch := fmt.Sprintf("ff-prep-main-%s", cfg.NextRelease)
 	printf("\n--- Preparing PR-A: backport rule + version %s on %s ---\n", cfg.NextProjectMinorVersion, cfg.BaseBranch)
 
 	if err := repo.ensureBranchFrom(cfg.BaseBranch, branch); err != nil {
@@ -204,7 +204,7 @@ func prepMainBackportAndVersion(repo *gitRepo, cfg *ReleaseConfig) (workflowPR, 
 	if err := UpdateVersion(cfg.NextProjectMinorVersion); err != nil {
 		return workflowPR{}, err
 	}
-	commitMsg := fmt.Sprintf("[Release][%s] Prepare main for %s and mergify backport-%s", cfg.CurrentRelease, cfg.NextProjectMinorVersion, cfg.ReleaseBranch)
+	commitMsg := fmt.Sprintf("[Release][%s] Prepare main for %s and mergify backport-%s", cfg.NextRelease, cfg.NextProjectMinorVersion, cfg.ReleaseBranch)
 	if _, err := repo.commitAll(commitMsg, cfg.GitAuthorName, cfg.GitAuthorEmail); err != nil {
 		return workflowPR{}, err
 	}
@@ -215,7 +215,7 @@ func prepMainBackportAndVersion(repo *gitRepo, cfg *ReleaseConfig) (workflowPR, 
 		opts: prOptions{
 			Owner:     cfg.ProjectOwner,
 			Repo:      cfg.ProjectRepo,
-			Title:     fmt.Sprintf("[Release][%s] Prepare main for %s and mergify backport-%s", cfg.CurrentRelease, cfg.NextProjectMinorVersion, cfg.ReleaseBranch),
+			Title:     fmt.Sprintf("[Release][%s] Prepare main for %s and mergify backport-%s", cfg.NextRelease, cfg.NextProjectMinorVersion, cfg.ReleaseBranch),
 			Head:      branch,
 			Base:      cfg.BaseBranch,
 			Body:      prAMainBody(cfg),
@@ -226,27 +226,27 @@ func prepMainBackportAndVersion(repo *gitRepo, cfg *ReleaseConfig) (workflowPR, 
 }
 
 func prepFFRelease(repo *gitRepo, cfg *ReleaseConfig) (workflowPR, error) {
-	title := fmt.Sprintf("[Release][%s] ff-release: update versions %s", cfg.CurrentRelease, cfg.CurrentRelease)
+	title := fmt.Sprintf("[Release][%s] ff-release: update versions %s", cfg.NextRelease, cfg.NextRelease)
 	return prepReleaseBranchVersionPR(
 		repo,
 		cfg,
-		fmt.Sprintf("ff-release-%s", cfg.CurrentRelease),
-		fmt.Sprintf("\n--- Preparing PR-B: ff-release %s on %s ---\n", cfg.CurrentRelease, cfg.ReleaseBranch),
+		fmt.Sprintf("ff-release-%s", cfg.NextRelease),
+		fmt.Sprintf("\n--- Preparing PR-B: ff-release %s on %s ---\n", cfg.NextRelease, cfg.ReleaseBranch),
 		title,
 		prBReleaseBody(cfg),
 		prBReleaseLabels(),
 	)
 }
 
-// prepPatchVersionBump prepares the post-release version bump to CURRENT_RELEASE.
+// prepPatchVersionBump prepares the post-release version bump to NEXT_RELEASE.
 // Matches ingest-dev prepare-next-patch. Used only by RunPatchRelease.
 func prepPatchVersionBump(repo *gitRepo, cfg *ReleaseConfig) (workflowPR, error) {
-	title := fmt.Sprintf("[Release][%s] Update version to %s", cfg.CurrentRelease, cfg.CurrentRelease)
+	title := fmt.Sprintf("[Release][%s] Update version to %s", cfg.NextRelease, cfg.NextRelease)
 	return prepReleaseBranchVersionPR(
 		repo,
 		cfg,
-		fmt.Sprintf("update-version-%s", cfg.CurrentRelease),
-		fmt.Sprintf("\n--- Preparing patch version bump to %s on %s ---\n", cfg.CurrentRelease, cfg.ReleaseBranch),
+		fmt.Sprintf("update-version-%s", cfg.NextRelease),
+		fmt.Sprintf("\n--- Preparing patch version bump to %s on %s ---\n", cfg.NextRelease, cfg.ReleaseBranch),
 		title,
 		patchVersionBumpBody(cfg),
 		patchVersionBumpLabels(),
@@ -261,7 +261,7 @@ func prepReleaseBranchVersionPR(repo *gitRepo, cfg *ReleaseConfig, branch, logLi
 	if err := repo.ensureBranchFrom(cfg.ReleaseBranch, branch); err != nil {
 		return workflowPR{}, err
 	}
-	if err := UpdateVersion(cfg.CurrentRelease); err != nil {
+	if err := UpdateVersion(cfg.NextRelease); err != nil {
 		return workflowPR{}, err
 	}
 	if _, err := repo.commitAll(title, cfg.GitAuthorName, cfg.GitAuthorEmail); err != nil {
@@ -293,7 +293,7 @@ Prepares %s for the %s feature freeze.
 - Bumps version/version.go to %s (next minor)
 
 **Merge:** before release branch work is finalized.
-`, cfg.CurrentRelease, cfg.BaseBranch, cfg.CurrentRelease, cfg.ReleaseBranch, backportLabel(cfg.ReleaseBranch), cfg.NextProjectMinorVersion)
+`, cfg.NextRelease, cfg.BaseBranch, cfg.NextRelease, cfg.ReleaseBranch, backportLabel(cfg.ReleaseBranch), cfg.NextProjectMinorVersion)
 }
 
 func prBReleaseBody(cfg *ReleaseConfig) string {
@@ -304,7 +304,7 @@ Feature-freeze release branch updates for %s (version/version.go).
 Fleet Server has no docs/test-env updates in this step.
 
 **Merge:** as soon as the %s branch exists.
-`, cfg.CurrentRelease, cfg.CurrentRelease, cfg.ReleaseBranch)
+`, cfg.NextRelease, cfg.NextRelease, cfg.ReleaseBranch)
 }
 
 func patchVersionBumpBody(cfg *ReleaseConfig) string {
@@ -315,10 +315,10 @@ Post-release version bump on %s to %s (ingest-dev prepare-next-patch).
 - Bumps version/version.go to %s
 
 **Merge:** after the patch release job opens this PR (merge promptly).
-`, cfg.CurrentRelease, cfg.ReleaseBranch, cfg.CurrentRelease, cfg.CurrentRelease)
+`, cfg.NextRelease, cfg.ReleaseBranch, cfg.NextRelease, cfg.NextRelease)
 }
 
-func ensureMajorMinorCurrentReleaseMatchesBase(repo *gitRepo, cfg *ReleaseConfig) error {
+func ensureMajorMinorNextReleaseMatchesBase(repo *gitRepo, cfg *ReleaseConfig) error {
 	base := cfg.BaseBranch
 	if base == "" {
 		base = "main"
@@ -330,19 +330,19 @@ func ensureMajorMinorCurrentReleaseMatchesBase(repo *gitRepo, cfg *ReleaseConfig
 	if err != nil {
 		return err
 	}
-	if branchVersion != cfg.CurrentRelease {
+	if branchVersion != cfg.NextRelease {
 		return fmt.Errorf(
-			"CURRENT_RELEASE=%s does not match version on %s (%s in version/version.go); "+
-				"set CURRENT_RELEASE to the version already on %s (the minor being feature-frozen)",
-			cfg.CurrentRelease, base, branchVersion, base,
+			"NEXT_RELEASE=%s does not match version on %s (%s in version/version.go); "+
+				"set NEXT_RELEASE to the version already on %s (the minor being feature-frozen)",
+			cfg.NextRelease, base, branchVersion, base,
 		)
 	}
-	printf("Verified CURRENT_RELEASE=%s matches %s on branch %s\n", cfg.CurrentRelease, branchVersion, base)
+	printf("Verified NEXT_RELEASE=%s matches %s on branch %s\n", cfg.NextRelease, branchVersion, base)
 	return nil
 }
 
 // RunPatchRelease executes the post-release patch bump on an existing release branch.
-// CURRENT_RELEASE is the version to land (NEW_VERSION from version-bump), matching
+// NEXT_RELEASE is the version to land (NEW_VERSION from version-bump), matching
 // ingest-dev prepare-next-patch. Docs stay off this path.
 func RunPatchRelease(cfg *ReleaseConfig) error {
 	println("=== Starting Patch Release Workflow ===")
@@ -361,7 +361,7 @@ func RunPatchRelease(cfg *ReleaseConfig) error {
 	}
 
 	if cfg.ReleaseBranch == "" {
-		parsed, err := devtools.ParseReleaseVersion(cfg.CurrentRelease)
+		parsed, err := devtools.ParseReleaseVersion(cfg.NextRelease)
 		if err != nil {
 			return err
 		}
@@ -402,15 +402,15 @@ func RunPatchRelease(cfg *ReleaseConfig) error {
 }
 
 func ensurePatchBranchReadyForBump(repo *gitRepo, cfg *ReleaseConfig) error {
-	parsed, err := devtools.ParseReleaseVersion(cfg.CurrentRelease)
+	parsed, err := devtools.ParseReleaseVersion(cfg.NextRelease)
 	if err != nil {
 		return err
 	}
 	prev := devtools.InferLatestRelease(parsed)
 	if prev == "" {
 		return fmt.Errorf(
-			"prepare-next-patch requires CURRENT_RELEASE with patch > 0 (got %s)",
-			cfg.CurrentRelease,
+			"prepare-next-patch requires NEXT_RELEASE with patch > 0 (got %s)",
+			cfg.NextRelease,
 		)
 	}
 	cfg.LatestRelease = prev
@@ -425,20 +425,20 @@ func ensurePatchBranchReadyForBump(repo *gitRepo, cfg *ReleaseConfig) error {
 	if err != nil {
 		return err
 	}
-	if branchVersion == cfg.CurrentRelease {
+	if branchVersion == cfg.NextRelease {
 		return fmt.Errorf(
-			"CURRENT_RELEASE=%s is already on branch %s; nothing to bump",
-			cfg.CurrentRelease, cfg.ReleaseBranch,
+			"NEXT_RELEASE=%s is already on branch %s; nothing to bump",
+			cfg.NextRelease, cfg.ReleaseBranch,
 		)
 	}
 	if branchVersion != prev {
 		return fmt.Errorf(
-			"CURRENT_RELEASE=%s expects version %s on branch %s (got %s in version/version.go); "+
-				"set CURRENT_RELEASE to the version to land (NEW_VERSION from version-bump)",
-			cfg.CurrentRelease, prev, cfg.ReleaseBranch, branchVersion,
+			"NEXT_RELEASE=%s expects version %s on branch %s (got %s in version/version.go); "+
+				"set NEXT_RELEASE to the version to land (NEW_VERSION from version-bump)",
+			cfg.NextRelease, prev, cfg.ReleaseBranch, branchVersion,
 		)
 	}
-	printf("Verified branch %s is at %s; will bump to CURRENT_RELEASE=%s\n", cfg.ReleaseBranch, branchVersion, cfg.CurrentRelease)
+	printf("Verified branch %s is at %s; will bump to NEXT_RELEASE=%s\n", cfg.ReleaseBranch, branchVersion, cfg.NextRelease)
 	return nil
 }
 

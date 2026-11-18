@@ -10,25 +10,25 @@ and `.mergify.yml`.
 
 ```bash
 export PROJECT_OWNER="your-user"
-export CURRENT_RELEASE="9.6.0"   # must already match version/version.go on main
+export NEXT_RELEASE="9.6.0"   # must already match version/version.go on main
 export GITHUB_TOKEN=$(gh auth token)
 export DRY_RUN=true
 
 # Feature freeze
 mage release:runMajorMinor
 
-# Patch: CURRENT_RELEASE is the version to land (NEW_VERSION)
-export CURRENT_RELEASE="9.6.1"   # release branch must still be at 9.6.0
+# Patch: NEXT_RELEASE is the version to land (NEW_VERSION)
+export NEXT_RELEASE="9.6.1"   # release branch must still be at 9.6.0
 mage release:runPatch
 
 go test ./dev-tools/mage/... -count=1
 ```
 
-Use plain `X.Y.Z` semver for `CURRENT_RELEASE` (no `-test` or `-SNAPSHOT` suffixes).
+Use plain `X.Y.Z` semver for `NEXT_RELEASE` (no `-test` or `-SNAPSHOT` suffixes).
 
 ## Feature freeze (`mage release:runMajorMinor`)
 
-`CURRENT_RELEASE` is the version **already on** `main` (the line being frozen).
+`NEXT_RELEASE` is the version **already on** `main` (the line being frozen).
 
 | Slot | Branch → base | Changes | Merge label |
 |---|---|---|---|
@@ -41,7 +41,7 @@ Next-patch bumps are **not** opened here; use `mage release:runPatch`.
 
 ## Patch (`mage release:runPatch`)
 
-`CURRENT_RELEASE` is the version to land (`NEW_VERSION` from version-bump). The
+`NEXT_RELEASE` is the version to land (`NEW_VERSION` from version-bump). The
 release branch must already be at the previous patch. Docs stay off this path.
 
 | Slot | Branch → base | Changes | Merge label |
@@ -52,7 +52,7 @@ release branch must already be at the previous patch. Docs stay off this path.
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `CURRENT_RELEASE` | yes | — | FF: version on base; patch: version to land (`NEW_VERSION`) |
+| `NEXT_RELEASE` | yes | — | FF: version on base; patch: version to land (`NEW_VERSION`) |
 | `GITHUB_TOKEN` | yes (unless dry run) | — | GitHub API token |
 | `DRY_RUN` | no | `false` | Only `true` enables dry run |
 | `BASE_BRANCH` | no | `main` | Base branch for feature freeze |
@@ -60,7 +60,7 @@ release branch must already be at the previous patch. Docs stay off this path.
 | `PROJECT_REPO` | no | `fleet-server` | GitHub repository |
 | `PROJECT_REVIEWERS` | no | `elastic/elastic-agent-control-plane` | PR reviewers |
 
-Derived (not env-overridable): `NEXT_RELEASE` (patch+1), `NEXT_PROJECT_MINOR_VERSION` (minor+1), `RELEASE_BRANCH` (`X.Y`), `LATEST_RELEASE` (patch−1 from `CURRENT_RELEASE`; empty when patch is 0).
+Derived (not env-overridable): `NEXT_PROJECT_MINOR_VERSION` (minor+1), `RELEASE_BRANCH` (`X.Y`), `LATEST_RELEASE` (patch−1 from `NEXT_RELEASE`; empty when patch is 0).
 
 ## Files updated
 
