@@ -137,7 +137,8 @@ func TestUpdateMergify(t *testing.T) {
 	tmpDir := t.TempDir()
 	mergifyFile := filepath.Join(tmpDir, ".mergify.yml")
 
-	initialContent := `pull_request_rules:
+	initialContent := `# keep this operator comment
+pull_request_rules:
   - name: backport patches to 9.3 branch
     conditions:
       - merged
@@ -164,6 +165,9 @@ func TestUpdateMergify(t *testing.T) {
 	}
 	if !strings.Contains(contentStr, "9.3") {
 		t.Error("UpdateMergify() removed existing rules")
+	}
+	if !strings.Contains(contentStr, "# keep this operator comment") {
+		t.Error("UpdateMergify() dropped existing YAML comments")
 	}
 }
 

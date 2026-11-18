@@ -73,6 +73,13 @@ func createTestGitRepo(t *testing.T) (*gitRepo, string) {
 	return &gitRepo{repo: repo, path: tmpDir}, tmpDir
 }
 
+func TestEnsureExistingBranchRequiresRemoteOrLocal(t *testing.T) {
+	gitRepo, _ := createTestGitRepo(t)
+	err := gitRepo.ensureExistingBranch("9.6")
+	require.Error(t, err)
+	require.ErrorIs(t, err, errBranchNotFound)
+}
+
 func TestEnsureBranchFrom(t *testing.T) {
 	gitRepo, tmpDir := createTestGitRepo(t)
 

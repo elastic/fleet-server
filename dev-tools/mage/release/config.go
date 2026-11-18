@@ -16,7 +16,7 @@ type ReleaseConfig = devtools.ReleaseSettings
 // fetchLatestReleaseBefore looks up the previous published release from GitHub.
 // Tests may replace this to avoid network calls.
 var fetchLatestReleaseBefore = func(token, owner, repo, current string) (string, error) {
-	return newgitHubClient(token).latestReleaseBefore(owner, repo, current)
+	return newGitHubClient(token).latestReleaseBefore(owner, repo, current)
 }
 
 const (

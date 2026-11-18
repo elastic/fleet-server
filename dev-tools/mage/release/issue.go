@@ -59,7 +59,7 @@ func EnsureReleaseIssueTracker(cfg *ReleaseConfig, workflowPRs []*github.PullReq
 		return fmt.Errorf("GITHUB_TOKEN is required to ensure the release issue tracker")
 	}
 
-	gh := newgitHubClient(cfg.GitHubToken)
+	gh := newGitHubClient(cfg.GitHubToken)
 	owner := cfg.ProjectOwner
 	repo := cfg.ProjectRepo
 
@@ -85,18 +85,18 @@ func EnsureReleaseIssueTracker(cfg *ReleaseConfig, workflowPRs []*github.PullReq
 	}
 
 	updatedBody, changed := mergeReleaseIssueBody(existing.GetBody(), cfg.CurrentRelease, prURLs)
-	if !changed {
+	if changed {
+		if err := gh.updateIssueBody(owner, repo, existing.GetNumber(), updatedBody); err != nil {
+			return err
+		}
+		printf("Updated release issue tracker #%d: %s\n", existing.GetNumber(), existing.GetHTMLURL())
+	} else {
 		printf("Release issue tracker already up to date: #%d %s\n", existing.GetNumber(), existing.GetHTMLURL())
-		return nil
 	}
 
-	if err := gh.updateIssueBody(owner, repo, existing.GetNumber(), updatedBody); err != nil {
-		return err
-	}
 	if err := gh.addLabels(owner, repo, existing.GetNumber(), []string{labelRelease}); err != nil {
-		printf("Warning: failed to ensure release label on issue #%d: %v\n", existing.GetNumber(), err)
+		return fmt.Errorf("ensure release label on issue #%d: %w", existing.GetNumber(), err)
 	}
-	printf("Updated release issue tracker #%d: %s\n", existing.GetNumber(), existing.GetHTMLURL())
 	return nil
 }
 

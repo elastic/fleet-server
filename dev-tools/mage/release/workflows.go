@@ -156,7 +156,7 @@ func RunMajorMinorRelease(cfg *ReleaseConfig) error {
 		return err
 	}
 
-	gh := newgitHubClient(cfg.GitHubToken)
+	gh := newGitHubClient(cfg.GitHubToken)
 	results, err := finalizeWorkflowPRs(repo, gh, cfg.GitHubToken, branchesToFinalize)
 	if err != nil {
 		return err
@@ -368,7 +368,7 @@ func RunPatchRelease(cfg *ReleaseConfig) error {
 		return nil
 	}
 
-	gh := newgitHubClient(cfg.GitHubToken)
+	gh := newGitHubClient(cfg.GitHubToken)
 	results, err := finalizeWorkflowPRs(repo, gh, cfg.GitHubToken, branchesToFinalize)
 	if err != nil {
 		return err
@@ -395,8 +395,11 @@ func ensurePatchBranchReadyForBump(repo *gitRepo, cfg *ReleaseConfig) error {
 	}
 	cfg.LatestRelease = prev
 
-	if err := repo.ensureBranch(cfg.ReleaseBranch); err != nil {
-		return err
+	if err := repo.ensureExistingBranch(cfg.ReleaseBranch); err != nil {
+		return fmt.Errorf(
+			"release branch %s must already exist locally or on origin (patch bump does not create it): %w",
+			cfg.ReleaseBranch, err,
+		)
 	}
 	branchVersion, err := readFleetVersion()
 	if err != nil {

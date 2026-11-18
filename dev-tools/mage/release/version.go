@@ -6,47 +6,59 @@ package release
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
+
+	libversion "github.com/elastic/elastic-agent-libs/version"
 )
 
-type semver struct {
+type releaseSemver struct {
 	major, minor, patch int
 }
 
-func parseSemver(version string) (semver, error) {
-	version = strings.TrimPrefix(strings.TrimSpace(version), "v")
-	parts := strings.Split(version, ".")
-	if len(parts) != 3 {
-		return semver{}, fmt.Errorf("invalid version format: %s (expected major.minor.patch)", version)
-	}
-	major, err := parseUnsignedComponent(parts[0])
+func parseSemver(version string) (releaseSemver, error) {
+	v, err := parseStrictReleaseVersion(version)
 	if err != nil {
-		return semver{}, fmt.Errorf("invalid major version: %s", parts[0])
+		return releaseSemver{}, err
 	}
-	minor, err := parseUnsignedComponent(parts[1])
-	if err != nil {
-		return semver{}, fmt.Errorf("invalid minor version: %s", parts[1])
-	}
-	patch, err := parseUnsignedComponent(parts[2])
-	if err != nil {
-		return semver{}, fmt.Errorf("invalid patch version: %s", parts[2])
-	}
-	return semver{major: major, minor: minor, patch: patch}, nil
+	return releaseSemver{major: v.Major, minor: v.Minor, patch: v.Bugfix}, nil
 }
 
-// parseUnsignedComponent parses a non-negative decimal integer without a sign
-// prefix. strconv.Atoi accepts "+" / "-" which must not pass as release versions.
-func parseUnsignedComponent(s string) (int, error) {
-	if s == "" || strings.HasPrefix(s, "-") || strings.HasPrefix(s, "+") {
-		return 0, fmt.Errorf("invalid unsigned integer: %q", s)
+// parseStrictReleaseVersion uses elastic-agent-libs/version and rejects signed
+// components and prerelease/build metadata so release versions stay plain X.Y.Z.
+func parseStrictReleaseVersion(raw string) (*libversion.V, error) {
+	version := strings.TrimPrefix(strings.TrimSpace(raw), "v")
+	if version == "" {
+		return nil, fmt.Errorf("invalid version format: %s (expected major.minor.patch)", raw)
 	}
-	for _, r := range s {
-		if r < '0' || r > '9' {
-			return 0, fmt.Errorf("invalid unsigned integer: %q", s)
+	if strings.ContainsAny(version, "-+") {
+		return nil, fmt.Errorf("invalid version format: %s (expected major.minor.patch without prerelease/build metadata)", raw)
+	}
+	parts := strings.Split(version, ".")
+	if len(parts) != 3 {
+		return nil, fmt.Errorf("invalid version format: %s (expected major.minor.patch)", raw)
+	}
+	for _, part := range parts {
+		if part == "" || strings.HasPrefix(part, "-") || strings.HasPrefix(part, "+") {
+			return nil, fmt.Errorf("invalid version format: %s (expected major.minor.patch)", raw)
+		}
+		for _, r := range part {
+			if r < '0' || r > '9' {
+				return nil, fmt.Errorf("invalid version format: %s (expected major.minor.patch)", raw)
+			}
 		}
 	}
-	return strconv.Atoi(s)
+
+	v, err := libversion.New(version)
+	if err != nil {
+		return nil, fmt.Errorf("invalid version format: %s (expected major.minor.patch): %w", raw, err)
+	}
+	if v.Meta != "" {
+		return nil, fmt.Errorf("invalid version format: %s (expected major.minor.patch without prerelease/build metadata)", raw)
+	}
+	if v.Major < 0 || v.Minor < 0 || v.Bugfix < 0 {
+		return nil, fmt.Errorf("invalid version format: %s (expected major.minor.patch)", raw)
+	}
+	return v, nil
 }
 
 // branchVersionFromRelease returns the X.Y branch name from an X.Y or X.Y.Z
@@ -58,18 +70,23 @@ func branchVersionFromRelease(version string) (string, error) {
 		return "", fmt.Errorf("invalid version format: %s (expected X.Y or X.Y.Z)", version)
 	}
 	for _, part := range parts {
-		if _, err := parseUnsignedComponent(part); err != nil {
+		if part == "" || strings.HasPrefix(part, "-") || strings.HasPrefix(part, "+") {
 			return "", fmt.Errorf("invalid version format: %s (expected X.Y or X.Y.Z)", version)
+		}
+		for _, r := range part {
+			if r < '0' || r > '9' {
+				return "", fmt.Errorf("invalid version format: %s (expected X.Y or X.Y.Z)", version)
+			}
 		}
 	}
 	return fmt.Sprintf("%s.%s", parts[0], parts[1]), nil
 }
 
-func (v semver) String() string {
+func (v releaseSemver) String() string {
 	return fmt.Sprintf("%d.%d.%d", v.major, v.minor, v.patch)
 }
 
-func (v semver) less(other semver) bool {
+func (v releaseSemver) less(other releaseSemver) bool {
 	if v.major != other.major {
 		return v.major < other.major
 	}
@@ -86,7 +103,7 @@ func selectLatestReleaseBefore(versions []string, currentVersion string) (string
 		return "", err
 	}
 
-	var best *semver
+	var best *releaseSemver
 	for _, raw := range versions {
 		candidate, err := parseSemver(raw)
 		if err != nil {

@@ -7,8 +7,9 @@ package mage
 import (
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
+
+	libversion "github.com/elastic/elastic-agent-libs/version"
 )
 
 // ReleaseSettings holds configuration for release automation (feature freeze / patch).
@@ -128,36 +129,49 @@ func (v ReleaseVersion) String() string {
 // ParseReleaseVersion parses a release version string as major.minor.patch with no
 // prerelease or build metadata (e.g. CURRENT_RELEASE=9.5.0).
 func ParseReleaseVersion(currentRelease string) (ReleaseVersion, error) {
-	version := strings.TrimPrefix(strings.TrimSpace(currentRelease), "v")
-	parts := strings.Split(version, ".")
-	if len(parts) != 3 {
-		return ReleaseVersion{}, fmt.Errorf("invalid version format: %s (expected major.minor.patch)", currentRelease)
-	}
-	major, err := parseUnsignedComponent(parts[0])
+	v, err := parseStrictReleaseVersion(currentRelease)
 	if err != nil {
-		return ReleaseVersion{}, fmt.Errorf("invalid major version: %s", parts[0])
+		return ReleaseVersion{}, err
 	}
-	minor, err := parseUnsignedComponent(parts[1])
-	if err != nil {
-		return ReleaseVersion{}, fmt.Errorf("invalid minor version: %s", parts[1])
-	}
-	patch, err := parseUnsignedComponent(parts[2])
-	if err != nil {
-		return ReleaseVersion{}, fmt.Errorf("invalid patch version: %s", parts[2])
-	}
-	return ReleaseVersion{Major: major, Minor: minor, Patch: patch}, nil
+	return ReleaseVersion{Major: v.Major, Minor: v.Minor, Patch: v.Bugfix}, nil
 }
 
-func parseUnsignedComponent(s string) (int, error) {
-	if s == "" || strings.HasPrefix(s, "-") || strings.HasPrefix(s, "+") {
-		return 0, fmt.Errorf("invalid unsigned integer: %q", s)
+// parseStrictReleaseVersion uses elastic-agent-libs/version and rejects signed
+// components and prerelease/build metadata so CURRENT_RELEASE stays plain X.Y.Z.
+func parseStrictReleaseVersion(currentRelease string) (*libversion.V, error) {
+	version := strings.TrimPrefix(strings.TrimSpace(currentRelease), "v")
+	if version == "" {
+		return nil, fmt.Errorf("invalid version format: %s (expected major.minor.patch)", currentRelease)
 	}
-	for _, r := range s {
-		if r < '0' || r > '9' {
-			return 0, fmt.Errorf("invalid unsigned integer: %q", s)
+	if strings.ContainsAny(version, "-+") {
+		return nil, fmt.Errorf("invalid version format: %s (expected major.minor.patch without prerelease/build metadata)", currentRelease)
+	}
+	parts := strings.Split(version, ".")
+	if len(parts) != 3 {
+		return nil, fmt.Errorf("invalid version format: %s (expected major.minor.patch)", currentRelease)
+	}
+	for _, part := range parts {
+		if part == "" || strings.HasPrefix(part, "-") || strings.HasPrefix(part, "+") {
+			return nil, fmt.Errorf("invalid version format: %s (expected major.minor.patch)", currentRelease)
+		}
+		for _, r := range part {
+			if r < '0' || r > '9' {
+				return nil, fmt.Errorf("invalid version format: %s (expected major.minor.patch)", currentRelease)
+			}
 		}
 	}
-	return strconv.Atoi(s)
+
+	v, err := libversion.New(version)
+	if err != nil {
+		return nil, fmt.Errorf("invalid version format: %s (expected major.minor.patch): %w", currentRelease, err)
+	}
+	if v.Meta != "" {
+		return nil, fmt.Errorf("invalid version format: %s (expected major.minor.patch without prerelease/build metadata)", currentRelease)
+	}
+	if v.Major < 0 || v.Minor < 0 || v.Bugfix < 0 {
+		return nil, fmt.Errorf("invalid version format: %s (expected major.minor.patch)", currentRelease)
+	}
+	return v, nil
 }
 
 // InferLatestRelease calculates the previous release version (patch - 1).

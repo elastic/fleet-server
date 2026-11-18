@@ -97,6 +97,23 @@ func (g *gitRepo) ensureBranchFrom(baseBranch, branchName string) error {
 
 // ensureBranch checks out an existing local or remote branch, or creates it from HEAD.
 func (g *gitRepo) ensureBranch(branchName string) error {
+	if err := g.ensureExistingBranch(branchName); err == nil {
+		return nil
+	} else if !errors.Is(err, errBranchNotFound) {
+		return err
+	}
+
+	if err := g.createBranch(branchName); err != nil {
+		return err
+	}
+	return g.checkoutBranch(branchName)
+}
+
+var errBranchNotFound = errors.New("branch not found locally or on origin")
+
+// ensureExistingBranch checks out a branch that already exists locally or as
+// origin/<name>. It does not create a branch from HEAD when the ref is missing.
+func (g *gitRepo) ensureExistingBranch(branchName string) error {
 	exists, err := g.branchExists(branchName)
 	if err != nil {
 		return err
@@ -117,11 +134,7 @@ func (g *gitRepo) ensureBranch(branchName string) error {
 	if !errors.Is(err, plumbing.ErrReferenceNotFound) {
 		return fmt.Errorf("failed to check remote branch %s: %w", branchName, err)
 	}
-
-	if err := g.createBranch(branchName); err != nil {
-		return err
-	}
-	return g.checkoutBranch(branchName)
+	return fmt.Errorf("%w: %s", errBranchNotFound, branchName)
 }
 
 // checkoutBranch checks out an existing branch.

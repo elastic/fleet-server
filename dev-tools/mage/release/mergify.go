@@ -7,11 +7,11 @@ package release
 import (
 	"fmt"
 	"os"
-
-	"gopkg.in/yaml.v3"
+	"strings"
 )
 
 // UpdateMergify adds a new backport rule to .mergify.yml.
+// It appends the rule as text so existing comments and formatting are preserved.
 func UpdateMergify(version string) error {
 	mergifyFile := mergifyYMLPath
 
@@ -20,50 +20,32 @@ func UpdateMergify(version string) error {
 		return fmt.Errorf("failed to read %s: %w", mergifyFile, err)
 	}
 
-	var config map[string]any
-	if err := yaml.Unmarshal(content, &config); err != nil {
-		return fmt.Errorf("failed to parse %s: %w", mergifyFile, err)
-	}
-
 	branchVersion, err := branchVersionFromRelease(version)
 	if err != nil {
 		return err
 	}
 
-	rules, ok := config["pull_request_rules"].([]any)
-	if !ok {
-		return fmt.Errorf("pull_request_rules not found or invalid format")
-	}
-
-	label := fmt.Sprintf("backport-%s", branchVersion)
-	if mergifyHasBackportRule(rules, branchVersion, label) {
+	labelCondition := fmt.Sprintf("label=backport-%s", branchVersion)
+	if mergifyHasExactLabelCondition(string(content), labelCondition) {
 		printf("Backport rule for %s already exists\n", branchVersion)
 		return nil
 	}
 
-	newRule := map[string]any{
-		"name": fmt.Sprintf("backport patches to %s branch", branchVersion),
-		"conditions": []any{
-			prStateMerged,
-			fmt.Sprintf("label=%s", label),
-		},
-		"actions": map[string]any{
-			"backport": map[string]any{
-				"branches": []any{branchVersion},
-			},
-		},
-	}
+	ruleName := fmt.Sprintf("backport patches to %s branch", branchVersion)
+	newRule := fmt.Sprintf(`  - name: %s
+    conditions:
+      - %s
+      - %s
+    actions:
+      backport:
+        branches:
+          - "%s"
+`, ruleName, prStateMerged, labelCondition, branchVersion)
 
-	rules = append(rules, newRule)
-	config["pull_request_rules"] = rules
+	trimmed := strings.TrimRight(string(content), "\n")
+	updated := trimmed + "\n" + newRule
 
-	output, err := yaml.Marshal(config)
-	if err != nil {
-		return fmt.Errorf("failed to marshal YAML: %w", err)
-	}
-
-	err = writeRepoFile(mergifyFile, output)
-	if err != nil {
+	if err := writeRepoFile(mergifyFile, []byte(updated)); err != nil {
 		return fmt.Errorf("failed to write %s: %w", mergifyFile, err)
 	}
 
@@ -71,45 +53,21 @@ func UpdateMergify(version string) error {
 	return nil
 }
 
-// mergifyHasBackportRule reports whether pull_request_rules already contains a
-// backport rule for branchVersion. Matching is exact (label condition, rule name,
-// or backport branch) so prefixes like "9.1" do not match "9.10".
-func mergifyHasBackportRule(rules []any, branchVersion, label string) bool {
-	labelCond := fmt.Sprintf("label=%s", label)
-	expectedName := fmt.Sprintf("backport patches to %s branch", branchVersion)
-
-	for _, rule := range rules {
-		ruleMap, ok := rule.(map[string]any)
-		if !ok {
-			continue
+// mergifyHasExactLabelCondition reports whether content already contains
+// labelCondition as a full token (so label=backport-9.1 does not match
+// label=backport-9.10).
+func mergifyHasExactLabelCondition(content, labelCondition string) bool {
+	for start := 0; start < len(content); {
+		i := strings.Index(content[start:], labelCondition)
+		if i < 0 {
+			return false
 		}
-		if name, ok := ruleMap["name"].(string); ok && name == expectedName {
+		abs := start + i
+		end := abs + len(labelCondition)
+		if end == len(content) || content[end] < '0' || content[end] > '9' {
 			return true
 		}
-		if conditions, ok := ruleMap["conditions"].([]any); ok {
-			for _, c := range conditions {
-				if s, ok := c.(string); ok && s == labelCond {
-					return true
-				}
-			}
-		}
-		actions, ok := ruleMap["actions"].(map[string]any)
-		if !ok {
-			continue
-		}
-		backport, ok := actions["backport"].(map[string]any)
-		if !ok {
-			continue
-		}
-		branches, ok := backport["branches"].([]any)
-		if !ok {
-			continue
-		}
-		for _, b := range branches {
-			if s, ok := b.(string); ok && s == branchVersion {
-				return true
-			}
-		}
+		start = abs + 1
 	}
 	return false
 }

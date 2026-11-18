@@ -33,9 +33,9 @@ type prOptions struct {
 	Labels    []string
 }
 
-// newgitHubClient creates a new GitHub API client.
+// newGitHubClient creates a new GitHub API client.
 // An empty token uses unauthenticated public API access (sufficient for reading public releases).
-func newgitHubClient(token string) *gitHubClient {
+func newGitHubClient(token string) *gitHubClient {
 	ctx := context.Background()
 	var httpClient *http.Client
 	if token != "" {
