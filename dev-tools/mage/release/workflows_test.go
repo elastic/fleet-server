@@ -12,8 +12,8 @@ import (
 )
 
 func TestRequireFeatureFreezeCurrentRelease(t *testing.T) {
-	require.NoError(t, requireFeatureFreezeCurrentRelease(&ReleaseConfig{CurrentRelease: "9.6.0"}))
-	err := requireFeatureFreezeCurrentRelease(&ReleaseConfig{CurrentRelease: "9.6.1"})
+	require.NoError(t, requireFeatureFreezeCurrentRelease(&ReleaseConfig{CurrentRelease: testVersion960}))
+	err := requireFeatureFreezeCurrentRelease(&ReleaseConfig{CurrentRelease: testVersion961})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "patch 0")
 }
@@ -33,8 +33,8 @@ func TestLabelHelpers(t *testing.T) {
 
 func TestPRBodiesMentionFleetScope(t *testing.T) {
 	cfg := &ReleaseConfig{
-		CurrentRelease:          "9.6.1",
-		LatestRelease:           "9.6.0",
+		CurrentRelease:          testVersion961,
+		LatestRelease:           testVersion960,
 		NextRelease:             "9.6.2",
 		NextProjectMinorVersion: "9.7.0",
 		BaseBranch:              testBaseBranch,
@@ -44,7 +44,7 @@ func TestPRBodiesMentionFleetScope(t *testing.T) {
 	require.Contains(t, prAMainBody(cfg), "version/version.go")
 	require.Contains(t, prBReleaseBody(cfg), "no docs/test-env")
 	body := patchVersionBumpBody(cfg)
-	require.Contains(t, body, "to 9.6.1")
+	require.Contains(t, body, "to "+testVersion961)
 	require.NotContains(t, body, "Merge after the release of")
 }
 

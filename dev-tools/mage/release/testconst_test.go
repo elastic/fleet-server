@@ -29,5 +29,7 @@ const (
 	testVersion940        = "9.4.0"
 	testVersion943        = "9.4.3"
 	testVersion950        = "9.5.0"
+	testVersion960        = "9.6.0"
+	testVersion961        = "9.6.1"
 	testVersionXY         = "9.5"
 )
