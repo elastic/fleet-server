@@ -172,13 +172,36 @@ func (m *monitorT) Run(ctx context.Context) error {
 	var wg sync.WaitGroup
 	defer wg.Wait()
 	defer dCancel()
+	wg.Go(func() { m.runLoader(dCtx) })
 	wg.Go(func() { m.runDispatcher(dCtx) })
 
 	close(m.startCh)
 
 	for {
-		m.log.Trace().Msg("policy monitor loop start")
+		m.log.Trace().Msg("policy monitor notification loop start")
 		select {
+		case <-ctx.Done():
+			return nil
+		case hits := <-s.Output(): // TODO would be nice to attach transaction IDs to hits, but would likely need a bigger refactor.
+			m.log.Trace().Int("hits", len(hits)).Msg("policy monitor hits from sub")
+			trans, tCtx := m.startTrans(ctx, "output policies")
+			err := m.processHits(tCtx, hits)
+			endTrans(trans)
+			if err != nil {
+				return err
+			}
+			m.kickDeploy()
+		}
+	}
+}
+
+// runLoader loads queued policies and signals the dispatcher after each load.
+func (m *monitorT) runLoader(ctx context.Context) {
+	for {
+		m.log.Trace().Msg("policy monitor loader loop start")
+		select {
+		case <-ctx.Done():
+			return
 		case <-m.kickCh:
 			m.log.Trace().Msg("policy monitor kicked")
 			trans, tCtx := m.startTrans(ctx, "initial policies")
@@ -189,17 +212,6 @@ func (m *monitorT) Run(ctx context.Context) error {
 				m.log.Error().Err(err).Msg("unable to load policies")
 			}
 			m.kickDeploy()
-		case hits := <-s.Output(): // TODO would be nice to attach transaction IDs to hits, but would likely need a bigger refactor.
-			m.log.Trace().Int("hits", len(hits)).Msg("policy monitor hits from sub")
-			trans, tCtx := m.startTrans(ctx, "output policies")
-			err := m.processHits(tCtx, hits)
-			endTrans(trans)
-			if err != nil {
-				return err
-			}
-			m.kickDeploy()
-		case <-ctx.Done():
-			return nil
 		}
 	}
 }
@@ -547,6 +559,11 @@ func (m *monitorT) updatePolicy(ctx context.Context, pp *ParsedPolicy) bool {
 		}
 		m.policies[newPolicy.PolicyID] = p
 		zlog.Info().Str(ecs.PolicyID, newPolicy.PolicyID).Msg("New policy found on update and added")
+		return false
+	}
+
+	// A newer revision can arrive while this policy is parsed.
+	if newPolicy.RevisionIdx <= p.pp.Policy.RevisionIdx {
 		return false
 	}
 
