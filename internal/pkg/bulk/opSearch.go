@@ -8,7 +8,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
@@ -63,6 +65,83 @@ func (b *Bulker) Search(ctx context.Context, index string, body []byte, opts ...
 		return nil, fmt.Errorf("unable to cast response as type *MsearchResponseItem, detected type: %T", resp.data)
 	}
 	return &es.ResultT{HitsT: r.Hits, Aggregations: r.Aggregations}, nil
+}
+
+// MSearch runs one search per op and returns the response items in the order of ops.
+func (b *Bulker) MSearch(ctx context.Context, ops []MultiOp, opts ...Opt) ([]MsearchResponseItem, error) {
+	if len(ops) == 0 {
+		return nil, nil
+	}
+	if len(ops) > math.MaxInt32 {
+		return nil, errors.New("too many searches")
+	}
+	// One MSearch call is one pending dispatch whatever the number of searches it sends.
+	if limit := b.opts.maxPendingBulkDispatches; limit > 0 {
+		pending := b.pendingBulkDispatches.Add(1)
+		defer b.pendingBulkDispatches.Add(-1)
+		if pending > limit {
+			zerolog.Ctx(ctx).Warn().
+				Str("mod", kModBulk).
+				Str("action", ActionSearch.String()).
+				Int64("pending", pending).
+				Int64("limit", limit).
+				Msg("Bulk dispatch rejected: too many pending")
+			return nil, ErrTooManyBulkDispatches
+		}
+	}
+
+	span, ctx := apm.StartSpan(ctx, bulkSpanNames[ActionSearch], "bulker")
+	defer span.End()
+	opt := b.parseOpts(opts...)
+	if tx := apm.TransactionFromContext(ctx); tx != nil {
+		tCtx := tx.TraceContext()
+		opt.spanLink = apm.SpanLink{Trace: tCtx.Trace, Span: tCtx.Span}
+		opt.hasSpanLink = true
+	}
+	action := ActionSearch
+	if len(opt.WaitForCheckpoints) > 0 {
+		action = ActionFleetSearch
+	}
+
+	// Contract is that consumer never blocks so must preallocate.
+	ch := make(chan respT, len(ops))
+	blks := make([]bulkT, len(ops))
+	for i, op := range ops {
+		blk := &blks[i]
+		blk.action = action
+		blk.ch = ch
+		blk.idx = int32(i)
+		blk.spanLink = opt.spanLink
+		blk.hasSpanLink = opt.hasSpanLink
+		blk.flushAfter = opt.FlushAfter
+		if err := b.writeMsearchMeta(&blk.buf, op.Index, opt.Indices, opt.WaitForCheckpoints, opt.IgnoreUnavailable); err != nil {
+			return nil, err
+		}
+		if err := b.writeMsearchBody(&blk.buf, op.Body); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := b.multiDispatch(ctx, blks); err != nil {
+		return nil, err
+	}
+
+	var requestErr error
+	items := make([]MsearchResponseItem, len(ops))
+	for range ops {
+		select {
+		case r := <-ch:
+			if r.err != nil && r.data == nil {
+				requestErr = r.err
+			}
+			if r.data != nil {
+				items[r.idx] = *r.data.(*MsearchResponseItem) //nolint:errcheck // response data type is guaranteed by the bulk engine
+			}
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+	return items, requestErr
 }
 
 func (b *Bulker) writeMsearchMeta(buf *Buf, index string, moreIndices []string, checkpoints []int64, ignoreUnavailble bool) error {

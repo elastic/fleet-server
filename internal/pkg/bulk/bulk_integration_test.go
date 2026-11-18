@@ -21,6 +21,12 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
+const (
+	typeInvalidIndexName = "invalid_index_name_exception"
+	typeDocumentParsing  = "document_parsing_exception"
+	nameInvalidUTF8      = "Invalid utf-8"
+)
+
 func TestBulkCreate(t *testing.T) {
 	ctx := t.Context()
 
@@ -57,7 +63,7 @@ func TestBulkCreate(t *testing.T) {
 			Index: "",
 			Err: es.ErrElastic{
 				Status: 400,
-				Type:   "invalid_index_name_exception",
+				Type:   typeInvalidIndexName,
 			},
 		},
 		{
@@ -65,7 +71,7 @@ func TestBulkCreate(t *testing.T) {
 			Index: string([]byte{0xe8, 0xb1, 0x86, 0xe8, 0x85, 0x90}),
 		},
 		{
-			Name:  "Invalid utf-8",
+			Name:  nameInvalidUTF8,
 			Index: string([]byte{0xfe, 0xfe, 0xff, 0xff}),
 			Err: es.ErrElastic{
 				Status: 400,
@@ -77,7 +83,7 @@ func TestBulkCreate(t *testing.T) {
 			Index: "UPPERCASE",
 			Err: es.ErrElastic{
 				Status: 400,
-				Type:   "invalid_index_name_exception",
+				Type:   typeInvalidIndexName,
 			},
 		},
 		{
@@ -85,7 +91,7 @@ func TestBulkCreate(t *testing.T) {
 			Index: "_nope",
 			Err: es.ErrElastic{
 				Status: 400,
-				Type:   "invalid_index_name_exception",
+				Type:   typeInvalidIndexName,
 			},
 		},
 	}
@@ -147,15 +153,15 @@ func TestBulkCreateBody(t *testing.T) {
 			[]byte(`{"overflow": 99999999999999999999}`),
 			es.ErrElastic{
 				Status: 400,
-				Type:   "document_parsing_exception",
+				Type:   typeDocumentParsing,
 			},
 		},
 		{
-			"Invalid utf-8",
+			nameInvalidUTF8,
 			[]byte{0x7b, 0x22, 0x6f, 0x6b, 0x22, 0x3a, 0x22, 0xfe, 0xfe, 0xff, 0xff, 0x22, 0x7d}, // {"ok":"${BADUTF8}"}
 			es.ErrElastic{
 				Status: 400,
-				Type:   "document_parsing_exception",
+				Type:   typeDocumentParsing,
 			},
 		},
 	}
@@ -212,8 +218,8 @@ func TestBulkUpdate(t *testing.T) {
 	}
 
 	// Update
-	nVal := "funkycoldmedina"
-	fields := UpdateFields{"kwval": nVal}
+	nVal := testKWValue
+	fields := UpdateFields{testKWField: nVal}
 	data, err := fields.Marshal()
 	if err != nil {
 		t.Fatal(err)
@@ -273,6 +279,52 @@ func TestBulkSearch(t *testing.T) {
 
 	diff := cmp.Diff(sample, dst3)
 	if diff != "" {
+		t.Fatal(diff)
+	}
+}
+
+func TestBulkMSearch(t *testing.T) {
+	ctx := t.Context()
+	ctx = testlog.SetLogger(t).WithContext(ctx)
+
+	index, bulker := SetupIndexWithBulk(ctx, t, testPolicy)
+
+	samples := []testT{NewRandomSample(), NewRandomSample()}
+	for _, sample := range samples {
+		_, err := bulker.Create(ctx, index, "", sample.marshal(t), WithRefresh())
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Search
+	kwvals := []string{samples[0].KWVal, "missing", samples[1].KWVal}
+	ops := make([]MultiOp, len(kwvals))
+	for i, kwval := range kwvals {
+		ops[i] = MultiOp{
+			Index: index,
+			Body:  fmt.Appendf(nil, `{"query": { "term": {"kwval": "%s"}}}`, kwval),
+		}
+	}
+
+	items, err := bulker.MSearch(ctx, ops)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := make([][]testT, len(items))
+	for i, item := range items {
+		for _, hit := range item.Hits.Hits {
+			var dst testT
+			if err := json.Unmarshal(hit.Source, &dst); err != nil {
+				t.Fatal(err)
+			}
+			got[i] = append(got[i], dst)
+		}
+	}
+	// Each item is the result of the search at the same index.
+	want := [][]testT{{samples[0]}, nil, {samples[1]}}
+	if diff := cmp.Diff(want, got); diff != "" {
 		t.Fatal(diff)
 	}
 }
@@ -395,7 +447,7 @@ func benchmarkCRUD(n int, b *testing.B) {
 
 	index, bulker := SetupIndexWithBulk(ctx, b, testPolicy, WithFlushThresholdCount(n))
 
-	fieldUpdate := UpdateFields{"kwval": "funkycoldmedina"}
+	fieldUpdate := UpdateFields{testKWField: testKWValue}
 	fieldData, err := fieldUpdate.Marshal()
 	if err != nil {
 		b.Fatal(err)
