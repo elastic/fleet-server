@@ -8,7 +8,7 @@ require (
 	github.com/docker/go-units v0.5.0
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261113003147-28a0da4deef0
 	github.com/elastic/elastic-agent-client/v7 v7.21.0
-	github.com/elastic/go-elasticsearch/v8 v8.19.7
+	github.com/elastic/go-elasticsearch/v9 v9.5.3
 	github.com/elastic/go-ucfg v0.9.2
 	github.com/fxamacker/cbor/v2 v2.9.6
 	github.com/go-chi/chi/v5 v5.4.0
