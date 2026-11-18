@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
 	"strings"
 
 	"github.com/google/go-github/v68/github"
@@ -51,15 +50,6 @@ func NewGitHubClient(token string) *GitHubClient {
 		client: github.NewClient(httpClient),
 		ctx:    ctx,
 	}
-}
-
-// NewGitHubClientFromEnv creates a GitHub client using GITHUB_TOKEN env var.
-func NewGitHubClientFromEnv() (*GitHubClient, error) {
-	token := os.Getenv("GITHUB_TOKEN")
-	if token == "" {
-		return nil, fmt.Errorf("GITHUB_TOKEN environment variable not set")
-	}
-	return NewGitHubClient(token), nil
 }
 
 // CreatePR creates a pull request, or returns an existing open PR with the same head and base.

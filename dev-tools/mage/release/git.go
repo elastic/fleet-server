@@ -307,10 +307,9 @@ func gitPushEnv(baseEnv []string, token string) []string {
 // Push pushes the current branch to the remote.
 // It uses the git CLI (not go-git) so Buildkite reference clones can pack and
 // upload objects from shared mirrors; go-git Push hangs in that layout.
-func (g *GitRepo) Push(remoteName string) error {
-	token := os.Getenv("GITHUB_TOKEN")
+func (g *GitRepo) Push(remoteName, token string) error {
 	if token == "" {
-		return fmt.Errorf("GITHUB_TOKEN environment variable is required for pushing")
+		return fmt.Errorf("GitHub token is required for pushing")
 	}
 	if remoteName != "origin" {
 		return fmt.Errorf("unsupported remote %q; release push only supports origin", remoteName)

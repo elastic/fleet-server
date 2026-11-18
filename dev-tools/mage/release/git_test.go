@@ -248,22 +248,20 @@ func TestGitPushEnv(t *testing.T) {
 
 func TestPushRequiresToken(t *testing.T) {
 	gitRepo, _ := createTestGitRepo(t)
-	t.Setenv("GITHUB_TOKEN", "")
 
-	err := gitRepo.Push("origin")
+	err := gitRepo.Push("origin", "")
 	if err == nil {
-		t.Fatal("Push() should fail without GITHUB_TOKEN")
+		t.Fatal("Push() should fail without a token")
 	}
-	if !strings.Contains(err.Error(), "GITHUB_TOKEN") {
-		t.Fatalf("Push() error = %v, want GITHUB_TOKEN mention", err)
+	if !strings.Contains(err.Error(), "token") {
+		t.Fatalf("Push() error = %v, want token mention", err)
 	}
 }
 
 func TestPushRequiresOriginRemote(t *testing.T) {
 	gitRepo, _ := createTestGitRepo(t)
-	t.Setenv("GITHUB_TOKEN", "test-token")
 
-	err := gitRepo.Push("upstream")
+	err := gitRepo.Push("upstream", "test-token")
 	if err == nil {
 		t.Fatal("Push() should reject non-origin remotes")
 	}
@@ -274,7 +272,6 @@ func TestPushRequiresOriginRemote(t *testing.T) {
 
 func TestPushToLocalRemote(t *testing.T) {
 	gitRepo, workDir := createTestGitRepo(t)
-	t.Setenv("GITHUB_TOKEN", "test-token")
 
 	bareDir := t.TempDir()
 	if _, err := git.PlainInit(bareDir, true); err != nil {
@@ -287,7 +284,7 @@ func TestPushToLocalRemote(t *testing.T) {
 	require.NoError(t, gitRepo.CreateBranch(branch))
 	require.NoError(t, gitRepo.CheckoutBranch(branch))
 
-	require.NoError(t, gitRepo.Push("origin"))
+	require.NoError(t, gitRepo.Push("origin", "test-token"))
 
 	remoteHeads := runGitOutput(t, workDir, "ls-remote", "--heads", "origin", branch)
 	if !strings.Contains(remoteHeads, "refs/heads/"+branch) {

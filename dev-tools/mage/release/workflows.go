@@ -152,12 +152,12 @@ func RunMajorMinorRelease(cfg *ReleaseConfig) error {
 	if err := repo.CheckoutBranch(releaseBranch); err != nil {
 		return err
 	}
-	if err := repo.Push("origin"); err != nil {
+	if err := repo.Push("origin", cfg.GitHubToken); err != nil {
 		return err
 	}
 
 	gh := NewGitHubClient(cfg.GitHubToken)
-	results, err := finalizeWorkflowPRs(repo, gh, branchesToFinalize)
+	results, err := finalizeWorkflowPRs(repo, gh, cfg.GitHubToken, branchesToFinalize)
 	if err != nil {
 		return err
 	}
@@ -369,7 +369,7 @@ func RunPatchRelease(cfg *ReleaseConfig) error {
 	}
 
 	gh := NewGitHubClient(cfg.GitHubToken)
-	results, err := finalizeWorkflowPRs(repo, gh, branchesToFinalize)
+	results, err := finalizeWorkflowPRs(repo, gh, cfg.GitHubToken, branchesToFinalize)
 	if err != nil {
 		return err
 	}
@@ -419,10 +419,10 @@ func ensurePatchBranchReadyForBump(repo *GitRepo, cfg *ReleaseConfig) error {
 	return nil
 }
 
-func finalizeWorkflowPRs(repo *GitRepo, gh *GitHubClient, items []workflowPR) ([]workflowPRResult, error) {
+func finalizeWorkflowPRs(repo *GitRepo, gh *GitHubClient, token string, items []workflowPR) ([]workflowPRResult, error) {
 	results := make([]workflowPRResult, 0, len(items))
 	for i, item := range items {
-		pr, err := finalizePR(repo, gh, item.branch, item.base, item.opts)
+		pr, err := finalizePR(repo, gh, token, item.branch, item.base, item.opts)
 		if err != nil {
 			return results, fmt.Errorf("failed to finalize PR %d/%d: %w", i+1, len(items), err)
 		}
@@ -460,7 +460,7 @@ func formatWorkflowPRLine(index int, result workflowPRResult) string {
 // finalizePR pushes a branch when it has new commits and creates or reuses an open PR.
 // When the branch has nothing new to push, it still resolves a related open or merged PR
 // so workflow summaries always list every expected slot.
-func finalizePR(repo *GitRepo, gh *GitHubClient, branchName, baseBranch string, opts PROptions) (*github.PullRequest, error) {
+func finalizePR(repo *GitRepo, gh *GitHubClient, token, branchName, baseBranch string, opts PROptions) (*github.PullRequest, error) {
 	if err := repo.CheckoutBranch(branchName); err != nil {
 		return nil, err
 	}
@@ -493,7 +493,7 @@ func finalizePR(repo *GitRepo, gh *GitHubClient, branchName, baseBranch string, 
 		return nil, nil
 	}
 
-	if err := repo.Push("origin"); err != nil {
+	if err := repo.Push("origin", token); err != nil {
 		return nil, err
 	}
 
