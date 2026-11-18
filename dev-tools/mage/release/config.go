@@ -16,7 +16,7 @@ type ReleaseConfig = devtools.ReleaseSettings
 // fetchLatestReleaseBefore looks up the previous published release from GitHub.
 // Tests may replace this to avoid network calls.
 var fetchLatestReleaseBefore = func(token, owner, repo, current string) (string, error) {
-	return NewGitHubClient(token).LatestReleaseBefore(owner, repo, current)
+	return newgitHubClient(token).latestReleaseBefore(owner, repo, current)
 }
 
 const (
@@ -24,8 +24,8 @@ const (
 	releasesLookupRepo  = "fleet-server"
 )
 
-// EnsureLatestRelease sets LatestRelease when unset by querying fleet-server releases/tags.
-func EnsureLatestRelease(c *ReleaseConfig) error {
+// ensureLatestRelease sets LatestRelease when unset by querying fleet-server releases/tags.
+func ensureLatestRelease(c *ReleaseConfig) error {
 	if c.LatestRelease != "" {
 		return nil
 	}
@@ -42,8 +42,8 @@ func EnsureLatestRelease(c *ReleaseConfig) error {
 	return nil
 }
 
-// ValidateReleaseConfig checks if the configuration is valid for release workflows.
-func ValidateReleaseConfig(c *ReleaseConfig) error {
+// validateReleaseConfig checks if the configuration is valid for release workflows.
+func validateReleaseConfig(c *ReleaseConfig) error {
 	if c.CurrentRelease == "" {
 		return fmt.Errorf("CurrentRelease is required")
 	}

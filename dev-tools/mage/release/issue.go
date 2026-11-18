@@ -59,24 +59,24 @@ func EnsureReleaseIssueTracker(cfg *ReleaseConfig, workflowPRs []*github.PullReq
 		return fmt.Errorf("GITHUB_TOKEN is required to ensure the release issue tracker")
 	}
 
-	gh := NewGitHubClient(cfg.GitHubToken)
+	gh := newgitHubClient(cfg.GitHubToken)
 	owner := cfg.ProjectOwner
 	repo := cfg.ProjectRepo
 
-	discovered, err := gh.ListReleaseLabeledPRsForVersion(owner, repo, cfg.CurrentRelease)
+	discovered, err := gh.listReleaseLabeledPRsForVersion(owner, repo, cfg.CurrentRelease)
 	if err != nil {
 		return fmt.Errorf("discover release-labeled PRs for %s: %w", cfg.CurrentRelease, err)
 	}
 	prURLs := mergePRURLs(seedURLs, prURLsFromPullRequests(discovered))
 
-	existing, found, err := gh.FindIssueByTitle(owner, repo, title)
+	existing, found, err := gh.findIssueByTitle(owner, repo, title)
 	if err != nil {
 		return err
 	}
 
 	if !found {
 		body := buildReleaseIssueBody(isMajorMinorRelease(cfg.CurrentRelease), prURLs, nil)
-		issue, err := gh.CreateIssue(owner, repo, title, body, []string{labelRelease})
+		issue, err := gh.createIssue(owner, repo, title, body, []string{labelRelease})
 		if err != nil {
 			return err
 		}
@@ -90,10 +90,10 @@ func EnsureReleaseIssueTracker(cfg *ReleaseConfig, workflowPRs []*github.PullReq
 		return nil
 	}
 
-	if err := gh.UpdateIssueBody(owner, repo, existing.GetNumber(), updatedBody); err != nil {
+	if err := gh.updateIssueBody(owner, repo, existing.GetNumber(), updatedBody); err != nil {
 		return err
 	}
-	if err := gh.AddLabels(owner, repo, existing.GetNumber(), []string{labelRelease}); err != nil {
+	if err := gh.addLabels(owner, repo, existing.GetNumber(), []string{labelRelease}); err != nil {
 		printf("Warning: failed to ensure release label on issue #%d: %v\n", existing.GetNumber(), err)
 	}
 	printf("Updated release issue tracker #%d: %s\n", existing.GetNumber(), existing.GetHTMLURL())

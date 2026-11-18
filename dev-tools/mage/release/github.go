@@ -6,7 +6,6 @@ package release
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -15,14 +14,14 @@ import (
 	"golang.org/x/oauth2"
 )
 
-// GitHubClient wraps the GitHub API client.
-type GitHubClient struct {
+// gitHubClient wraps the GitHub API client.
+type gitHubClient struct {
 	client *github.Client
 	ctx    context.Context
 }
 
-// PROptions holds options for creating a pull request.
-type PROptions struct {
+// prOptions holds options for creating a pull request.
+type prOptions struct {
 	Owner     string
 	Repo      string
 	Title     string
@@ -34,9 +33,9 @@ type PROptions struct {
 	Labels    []string
 }
 
-// NewGitHubClient creates a new GitHub API client.
+// newgitHubClient creates a new GitHub API client.
 // An empty token uses unauthenticated public API access (sufficient for reading public releases).
-func NewGitHubClient(token string) *GitHubClient {
+func newgitHubClient(token string) *gitHubClient {
 	ctx := context.Background()
 	var httpClient *http.Client
 	if token != "" {
@@ -46,15 +45,15 @@ func NewGitHubClient(token string) *GitHubClient {
 		httpClient = oauth2.NewClient(ctx, ts)
 	}
 
-	return &GitHubClient{
+	return &gitHubClient{
 		client: github.NewClient(httpClient),
 		ctx:    ctx,
 	}
 }
 
-// CreatePR creates a pull request, or returns an existing open PR with the same head and base.
-func (gh *GitHubClient) CreatePR(opts PROptions) (*github.PullRequest, error) {
-	existingPR, found, err := gh.FindOpenPR(opts.Owner, opts.Repo, opts.Head, opts.Base)
+// createPR creates a pull request, or returns an existing open PR with the same head and base.
+func (gh *gitHubClient) createPR(opts prOptions) (*github.PullRequest, error) {
+	existingPR, found, err := gh.findOpenPR(opts.Owner, opts.Repo, opts.Head, opts.Base)
 	if err != nil {
 		return nil, err
 	}
@@ -122,8 +121,8 @@ func splitPRReviewers(reviewers []string) (users, teams []string) {
 	return users, teams
 }
 
-// FindOpenPR returns an open pull request for the given head and base branches, if one exists.
-func (gh *GitHubClient) FindOpenPR(owner, repo, head, base string) (*github.PullRequest, bool, error) {
+// findOpenPR returns an open pull request for the given head and base branches, if one exists.
+func (gh *gitHubClient) findOpenPR(owner, repo, head, base string) (*github.PullRequest, bool, error) {
 	prs, err := gh.listPRsByHeadBase(owner, repo, head, base, "open")
 	if err != nil {
 		return nil, false, err
@@ -134,10 +133,10 @@ func (gh *GitHubClient) FindOpenPR(owner, repo, head, base string) (*github.Pull
 	return prs[0], true, nil
 }
 
-// FindRelatedPR returns the best matching PR for head→base (open preferred, then
+// findRelatedPR returns the best matching PR for head→base (open preferred, then
 // merged, then closed). When none match by head/base, it falls back to an exact
 // title match against the same base branch so already-merged release PRs still resolve.
-func (gh *GitHubClient) FindRelatedPR(owner, repo, head, base, title string) (*github.PullRequest, bool, error) {
+func (gh *gitHubClient) findRelatedPR(owner, repo, head, base, title string) (*github.PullRequest, bool, error) {
 	prs, err := gh.listPRsByHeadBase(owner, repo, head, base, "all")
 	if err != nil {
 		return nil, false, err
@@ -151,7 +150,7 @@ func (gh *GitHubClient) FindRelatedPR(owner, repo, head, base, title string) (*g
 	return gh.findPRByExactTitle(owner, repo, base, title)
 }
 
-func (gh *GitHubClient) listPRsByHeadBase(owner, repo, head, base, state string) ([]*github.PullRequest, error) {
+func (gh *gitHubClient) listPRsByHeadBase(owner, repo, head, base, state string) ([]*github.PullRequest, error) {
 	headQuery := head
 	if !strings.Contains(head, ":") {
 		headQuery = fmt.Sprintf("%s:%s", owner, head)
@@ -171,7 +170,7 @@ func (gh *GitHubClient) listPRsByHeadBase(owner, repo, head, base, state string)
 	return prs, nil
 }
 
-func (gh *GitHubClient) findPRByExactTitle(owner, repo, base, title string) (*github.PullRequest, bool, error) {
+func (gh *gitHubClient) findPRByExactTitle(owner, repo, base, title string) (*github.PullRequest, bool, error) {
 	query := fmt.Sprintf(`repo:%s/%s is:pr base:%s "%s" in:title`, owner, repo, base, title)
 	result, _, err := gh.client.Search.Issues(gh.ctx, query, &github.SearchOptions{
 		Sort:  searchSortUpdated,
@@ -281,25 +280,25 @@ var mergeLabelDefs = map[string]struct {
 	},
 }
 
-func (gh *GitHubClient) ensurePRLabels(owner, repo string, number int, labels []string) error {
+func (gh *gitHubClient) ensurePRLabels(owner, repo string, number int, labels []string) error {
 	if len(labels) == 0 {
 		return nil
 	}
 	for _, label := range labels {
 		if def, ok := mergeLabelDefs[label]; ok {
-			if err := gh.EnsureLabel(owner, repo, label, def.Color, def.Description); err != nil {
+			if err := gh.ensureLabel(owner, repo, label, def.Color, def.Description); err != nil {
 				return fmt.Errorf("failed to ensure label %q on #%d: %w", label, number, err)
 			}
 		}
 	}
-	if err := gh.AddLabels(owner, repo, number, labels); err != nil {
+	if err := gh.addLabels(owner, repo, number, labels); err != nil {
 		return fmt.Errorf("failed to add labels on #%d: %w", number, err)
 	}
 	return nil
 }
 
-// EnsureLabel creates a repository label if it does not already exist.
-func (gh *GitHubClient) EnsureLabel(owner, repo, name, color, description string) error {
+// ensureLabel creates a repository label if it does not already exist.
+func (gh *gitHubClient) ensureLabel(owner, repo, name, color, description string) error {
 	_, resp, err := gh.client.Issues.GetLabel(gh.ctx, owner, repo, name)
 	if err == nil {
 		return nil
@@ -320,8 +319,8 @@ func (gh *GitHubClient) EnsureLabel(owner, repo, name, color, description string
 	return nil
 }
 
-// AddLabels adds labels to a pull request or issue.
-func (gh *GitHubClient) AddLabels(owner, repo string, number int, labels []string) error {
+// addLabels adds labels to a pull request or issue.
+func (gh *gitHubClient) addLabels(owner, repo string, number int, labels []string) error {
 	_, _, err := gh.client.Issues.AddLabelsToIssue(gh.ctx, owner, repo, number, labels)
 	if err != nil {
 		return fmt.Errorf("failed to add labels: %w", err)
@@ -331,8 +330,8 @@ func (gh *GitHubClient) AddLabels(owner, repo string, number int, labels []strin
 	return nil
 }
 
-// FindIssueByTitle finds an issue with an exact title match (open preferred over closed).
-func (gh *GitHubClient) FindIssueByTitle(owner, repo, title string) (*github.Issue, bool, error) {
+// findIssueByTitle finds an issue with an exact title match (open preferred over closed).
+func (gh *gitHubClient) findIssueByTitle(owner, repo, title string) (*github.Issue, bool, error) {
 	query := fmt.Sprintf(`repo:%s/%s is:issue in:title "%s"`, owner, repo, title)
 	result, _, err := gh.client.Search.Issues(gh.ctx, query, &github.SearchOptions{
 		Sort:  searchSortUpdated,
@@ -366,8 +365,8 @@ func (gh *GitHubClient) FindIssueByTitle(owner, repo, title string) (*github.Iss
 	return nil, false, nil
 }
 
-// CreateIssue creates a repository issue with the given labels.
-func (gh *GitHubClient) CreateIssue(owner, repo, title, body string, labels []string) (*github.Issue, error) {
+// createIssue creates a repository issue with the given labels.
+func (gh *gitHubClient) createIssue(owner, repo, title, body string, labels []string) (*github.Issue, error) {
 	req := &github.IssueRequest{
 		Title: new(title),
 		Body:  new(body),
@@ -382,8 +381,8 @@ func (gh *GitHubClient) CreateIssue(owner, repo, title, body string, labels []st
 	return issue, nil
 }
 
-// UpdateIssueBody replaces the body of an existing issue.
-func (gh *GitHubClient) UpdateIssueBody(owner, repo string, number int, body string) error {
+// updateIssueBody replaces the body of an existing issue.
+func (gh *gitHubClient) updateIssueBody(owner, repo string, number int, body string) error {
 	_, _, err := gh.client.Issues.Edit(gh.ctx, owner, repo, number, &github.IssueRequest{
 		Body: new(body),
 	})
@@ -393,9 +392,9 @@ func (gh *GitHubClient) UpdateIssueBody(owner, repo string, number int, body str
 	return nil
 }
 
-// ListReleaseLabeledPRsForVersion returns Fleet Server PRs with label "release" whose title
+// listReleaseLabeledPRsForVersion returns Fleet Server PRs with label "release" whose title
 // mentions the exact version. Open and recently updated closed/merged PRs are included.
-func (gh *GitHubClient) ListReleaseLabeledPRsForVersion(owner, repo, version string) ([]*github.PullRequest, error) {
+func (gh *gitHubClient) listReleaseLabeledPRsForVersion(owner, repo, version string) ([]*github.PullRequest, error) {
 	query := fmt.Sprintf(`repo:%s/%s is:pr label:release "%s"`, owner, repo, version)
 	opts := &github.SearchOptions{
 		Sort:  searchSortUpdated,
@@ -439,33 +438,10 @@ func (gh *GitHubClient) ListReleaseLabeledPRsForVersion(owner, repo, version str
 	return prs, nil
 }
 
-// GetDefaultBranch gets the default branch for a repository.
-func (gh *GitHubClient) GetDefaultBranch(owner, repo string) (string, error) {
-	repository, _, err := gh.client.Repositories.Get(gh.ctx, owner, repo)
-	if err != nil {
-		return "", fmt.Errorf("failed to get repository: %w", err)
-	}
-
-	return repository.GetDefaultBranch(), nil
-}
-
-// BranchExists checks if a branch exists in the remote repository.
-func (gh *GitHubClient) BranchExists(owner, repo, branch string) (bool, error) {
-	_, _, err := gh.client.Repositories.GetBranch(gh.ctx, owner, repo, branch, 0)
-	if err != nil {
-		var ghErr *github.ErrorResponse
-		if errors.As(err, &ghErr) && ghErr.Response != nil && ghErr.Response.StatusCode == 404 {
-			return false, nil
-		}
-		return false, fmt.Errorf("failed to check branch: %w", err)
-	}
-	return true, nil
-}
-
-// LatestReleaseBefore returns the highest published release version with the same major
+// latestReleaseBefore returns the highest published release version with the same major
 // that is strictly less than currentVersion (e.g. current 9.5.0 → 9.4.3).
 // When the repo has no GitHub Releases, it falls back to git tags (fleet-server's usual case).
-func (gh *GitHubClient) LatestReleaseBefore(owner, repo, currentVersion string) (string, error) {
+func (gh *gitHubClient) latestReleaseBefore(owner, repo, currentVersion string) (string, error) {
 	versions, err := gh.listReleaseVersions(owner, repo)
 	if err != nil {
 		return "", err
@@ -479,15 +455,15 @@ func (gh *GitHubClient) LatestReleaseBefore(owner, repo, currentVersion string) 
 	return selectLatestReleaseBefore(versions, currentVersion)
 }
 
-func (gh *GitHubClient) listReleaseVersions(owner, repo string) ([]string, error) {
+func (gh *gitHubClient) listReleaseVersions(owner, repo string) ([]string, error) {
 	return gh.listVersionRefs(owner, repo, false)
 }
 
-func (gh *GitHubClient) listTagVersions(owner, repo string) ([]string, error) {
+func (gh *gitHubClient) listTagVersions(owner, repo string) ([]string, error) {
 	return gh.listVersionRefs(owner, repo, true)
 }
 
-func (gh *GitHubClient) listVersionRefs(owner, repo string, fromTags bool) ([]string, error) {
+func (gh *gitHubClient) listVersionRefs(owner, repo string, fromTags bool) ([]string, error) {
 	kind := "releases"
 	if fromTags {
 		kind = "tags"
@@ -520,7 +496,7 @@ func (gh *GitHubClient) listVersionRefs(owner, repo string, fromTags bool) ([]st
 	})
 }
 
-func (gh *GitHubClient) collectPagedNames(
+func (gh *gitHubClient) collectPagedNames(
 	owner, repo, kind string,
 	page func(opts *github.ListOptions) ([]string, *github.Response, error),
 ) ([]string, error) {

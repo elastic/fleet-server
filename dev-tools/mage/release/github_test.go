@@ -25,7 +25,7 @@ const (
 	testAPITagsPath     = "/repos/elastic/fleet-server/tags"
 )
 
-func newTestGitHubClient(t *testing.T, handler http.Handler) *GitHubClient {
+func newTestGitHubClient(t *testing.T, handler http.Handler) *gitHubClient {
 	t.Helper()
 
 	server := httptest.NewServer(handler)
@@ -37,7 +37,7 @@ func newTestGitHubClient(t *testing.T, handler http.Handler) *GitHubClient {
 	client.BaseURL = baseURL
 	client.UploadURL = baseURL
 
-	return &GitHubClient{
+	return &gitHubClient{
 		client: client,
 		ctx:    context.Background(),
 	}
@@ -75,7 +75,7 @@ func TestCreatePRIdempotent(t *testing.T) {
 	})
 
 	ghClient := newTestGitHubClient(t, handler)
-	opts := PROptions{
+	opts := prOptions{
 		Owner: releasesLookupOwner,
 		Repo:  releasesLookupRepo,
 		Title: "[Release][9.5.0] Prepare release branch",
@@ -84,23 +84,23 @@ func TestCreatePRIdempotent(t *testing.T) {
 		Body:  "Release PR body",
 	}
 
-	pr, err := ghClient.CreatePR(opts)
+	pr, err := ghClient.createPR(opts)
 	require.NoError(t, err)
 
 	if pr.GetNumber() != 42 {
-		t.Errorf("CreatePR() number = %d, want 42", pr.GetNumber())
+		t.Errorf("createPR() number = %d, want 42", pr.GetNumber())
 	}
 	if createCalls != 0 {
-		t.Errorf("CreatePR() called create API %d times, want 0", createCalls)
+		t.Errorf("createPR() called create API %d times, want 0", createCalls)
 	}
 
-	pr2, err := ghClient.CreatePR(opts)
+	pr2, err := ghClient.createPR(opts)
 	require.NoError(t, err)
 	if pr2.GetNumber() != pr.GetNumber() {
-		t.Errorf("CreatePR() second call number = %d, want %d", pr2.GetNumber(), pr.GetNumber())
+		t.Errorf("createPR() second call number = %d, want %d", pr2.GetNumber(), pr.GetNumber())
 	}
 	if createCalls != 0 {
-		t.Errorf("CreatePR() called create API %d times after second call, want 0", createCalls)
+		t.Errorf("createPR() called create API %d times after second call, want 0", createCalls)
 	}
 }
 
@@ -127,10 +127,10 @@ func TestLatestReleaseBeforeUsesReleasesWhenPresent(t *testing.T) {
 	})
 
 	ghClient := newTestGitHubClient(t, handler)
-	got, err := ghClient.LatestReleaseBefore(releasesLookupOwner, releasesLookupRepo, "9.6.0")
+	got, err := ghClient.latestReleaseBefore(releasesLookupOwner, releasesLookupRepo, "9.6.0")
 	require.NoError(t, err)
 	if got != "9.5.1" {
-		t.Errorf("LatestReleaseBefore() = %q, want 9.5.1", got)
+		t.Errorf("latestReleaseBefore() = %q, want 9.5.1", got)
 	}
 }
 
@@ -161,10 +161,10 @@ func TestLatestReleaseBeforeFallsBackToTagsWhenReleasesEmpty(t *testing.T) {
 	})
 
 	ghClient := newTestGitHubClient(t, handler)
-	got, err := ghClient.LatestReleaseBefore(releasesLookupOwner, releasesLookupRepo, "9.6.0")
+	got, err := ghClient.latestReleaseBefore(releasesLookupOwner, releasesLookupRepo, "9.6.0")
 	require.NoError(t, err)
 	if got != "9.4.4" {
-		t.Errorf("LatestReleaseBefore() = %q, want 9.4.4", got)
+		t.Errorf("latestReleaseBefore() = %q, want 9.4.4", got)
 	}
 }
 
@@ -195,7 +195,7 @@ func TestCreatePRCreatesWhenNoneExists(t *testing.T) {
 	})
 
 	ghClient := newTestGitHubClient(t, handler)
-	pr, err := ghClient.CreatePR(PROptions{
+	pr, err := ghClient.createPR(prOptions{
 		Owner: releasesLookupOwner,
 		Repo:  releasesLookupRepo,
 		Title: "New release PR",
@@ -205,10 +205,10 @@ func TestCreatePRCreatesWhenNoneExists(t *testing.T) {
 	})
 	require.NoError(t, err)
 	if pr.GetNumber() != 99 {
-		t.Errorf("CreatePR() number = %d, want 99", pr.GetNumber())
+		t.Errorf("createPR() number = %d, want 99", pr.GetNumber())
 	}
 	if createCalls != 1 {
-		t.Errorf("CreatePR() called create API %d times, want 1", createCalls)
+		t.Errorf("createPR() called create API %d times, want 1", createCalls)
 	}
 }
 
@@ -263,7 +263,7 @@ func TestCreatePRRequestsTeamReviewers(t *testing.T) {
 	})
 
 	ghClient := newTestGitHubClient(t, handler)
-	_, err := ghClient.CreatePR(PROptions{
+	_, err := ghClient.createPR(prOptions{
 		Owner:     releasesLookupOwner,
 		Repo:      releasesLookupRepo,
 		Title:     "Release PR",

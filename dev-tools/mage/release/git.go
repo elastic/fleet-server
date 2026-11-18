@@ -26,27 +26,27 @@ const (
 	pushTimeout = 10 * time.Minute
 )
 
-// GitRepo wraps go-git Repository with helper methods.
-type GitRepo struct {
+// gitRepo wraps go-git Repository with helper methods.
+type gitRepo struct {
 	repo *git.Repository
 	path string
 }
 
-// OpenRepo opens a git repository at the specified path.
-func OpenRepo(path string) (*GitRepo, error) {
+// openRepo opens a git repository at the specified path.
+func openRepo(path string) (*gitRepo, error) {
 	repo, err := git.PlainOpen(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open repository: %w", err)
 	}
 
-	return &GitRepo{
+	return &gitRepo{
 		repo: repo,
 		path: path,
 	}, nil
 }
 
-// BranchExists reports whether a local branch exists.
-func (g *GitRepo) BranchExists(branchName string) (bool, error) {
+// branchExists reports whether a local branch exists.
+func (g *gitRepo) branchExists(branchName string) (bool, error) {
 	_, err := g.repo.Reference(plumbing.NewBranchReferenceName(branchName), true)
 	if err == nil {
 		return true, nil
@@ -57,9 +57,9 @@ func (g *GitRepo) BranchExists(branchName string) (bool, error) {
 	return false, fmt.Errorf("failed to check branch %s: %w", branchName, err)
 }
 
-// CreateBranch creates a new branch from the current HEAD.
-func (g *GitRepo) CreateBranch(branchName string) error {
-	exists, err := g.BranchExists(branchName)
+// createBranch creates a new branch from the current HEAD.
+func (g *gitRepo) createBranch(branchName string) error {
+	exists, err := g.branchExists(branchName)
 	if err != nil {
 		return err
 	}
@@ -85,24 +85,24 @@ func (g *GitRepo) CreateBranch(branchName string) error {
 	return nil
 }
 
-// EnsureBranchFrom checks out baseBranch (creating a local branch from origin when
+// ensureBranchFrom checks out baseBranch (creating a local branch from origin when
 // needed), then ensures branchName exists — reusing a local or origin/<branchName>
 // tip when present, otherwise creating it from the current base tip.
-func (g *GitRepo) EnsureBranchFrom(baseBranch, branchName string) error {
-	if err := g.EnsureBranch(baseBranch); err != nil {
+func (g *gitRepo) ensureBranchFrom(baseBranch, branchName string) error {
+	if err := g.ensureBranch(baseBranch); err != nil {
 		return fmt.Errorf("failed to checkout base branch %s: %w", baseBranch, err)
 	}
-	return g.EnsureBranch(branchName)
+	return g.ensureBranch(branchName)
 }
 
-// EnsureBranch checks out an existing local or remote branch, or creates it from HEAD.
-func (g *GitRepo) EnsureBranch(branchName string) error {
-	exists, err := g.BranchExists(branchName)
+// ensureBranch checks out an existing local or remote branch, or creates it from HEAD.
+func (g *gitRepo) ensureBranch(branchName string) error {
+	exists, err := g.branchExists(branchName)
 	if err != nil {
 		return err
 	}
 	if exists {
-		return g.CheckoutBranch(branchName)
+		return g.checkoutBranch(branchName)
 	}
 
 	remoteRef, err := g.repo.Reference(plumbing.NewRemoteReferenceName("origin", branchName), true)
@@ -112,21 +112,21 @@ func (g *GitRepo) EnsureBranch(branchName string) error {
 			return fmt.Errorf("failed to create local branch %s from origin: %w", branchName, err)
 		}
 		printf("Created local branch from origin: %s\n", branchName)
-		return g.CheckoutBranch(branchName)
+		return g.checkoutBranch(branchName)
 	}
 	if !errors.Is(err, plumbing.ErrReferenceNotFound) {
 		return fmt.Errorf("failed to check remote branch %s: %w", branchName, err)
 	}
 
-	if err := g.CreateBranch(branchName); err != nil {
+	if err := g.createBranch(branchName); err != nil {
 		return err
 	}
-	return g.CheckoutBranch(branchName)
+	return g.checkoutBranch(branchName)
 }
 
-// CheckoutBranch checks out an existing branch.
-func (g *GitRepo) CheckoutBranch(branchName string) error {
-	currentBranch, err := g.GetCurrentBranch()
+// checkoutBranch checks out an existing branch.
+func (g *gitRepo) checkoutBranch(branchName string) error {
+	currentBranch, err := g.getCurrentBranch()
 	if err == nil && currentBranch == branchName {
 		printf("Already on branch: %s\n", branchName)
 		return nil
@@ -148,8 +148,8 @@ func (g *GitRepo) CheckoutBranch(branchName string) error {
 	return nil
 }
 
-// CommitAll stages all changes and creates a commit.
-func (g *GitRepo) CommitAll(message, authorName, authorEmail string) (bool, error) {
+// commitAll stages all changes and creates a commit.
+func (g *gitRepo) commitAll(message, authorName, authorEmail string) (bool, error) {
 	w, err := g.repo.Worktree()
 	if err != nil {
 		return false, fmt.Errorf("failed to get worktree: %w", err)
@@ -184,9 +184,9 @@ func (g *GitRepo) CommitAll(message, authorName, authorEmail string) (bool, erro
 	return true, nil
 }
 
-// HasCommitsAheadOf reports whether HEAD has commits not reachable from baseBranch.
+// hasCommitsAheadOf reports whether HEAD has commits not reachable from baseBranch.
 // Behind/equal: merge-base is HEAD → not ahead. Ahead/diverged: merge-base is not HEAD.
-func (g *GitRepo) HasCommitsAheadOf(baseBranch string) (bool, error) {
+func (g *gitRepo) hasCommitsAheadOf(baseBranch string) (bool, error) {
 	headRef, err := g.repo.Head()
 	if err != nil {
 		return false, fmt.Errorf("failed to get HEAD: %w", err)
@@ -251,7 +251,7 @@ func githubHTTPSPushURL(remoteURL string) (string, bool) {
 }
 
 // ensureHTTPSRemote rewrites an SSH GitHub remote to HTTPS when needed.
-func (g *GitRepo) ensureHTTPSRemote(remoteName string) error {
+func (g *gitRepo) ensureHTTPSRemote(remoteName string) error {
 	remote, err := g.repo.Remote(remoteName)
 	if err != nil {
 		return fmt.Errorf("failed to get remote %s: %w", remoteName, err)
@@ -268,7 +268,7 @@ func (g *GitRepo) ensureHTTPSRemote(remoteName string) error {
 	if !rewritten {
 		return nil
 	}
-	if err := g.SetRemoteURL(remoteName, httpsURL); err != nil {
+	if err := g.setRemoteURL(remoteName, httpsURL); err != nil {
 		return fmt.Errorf("failed to set HTTPS remote for token push: %w", err)
 	}
 	return nil
@@ -304,10 +304,10 @@ func gitPushEnv(baseEnv []string, token string) []string {
 	)
 }
 
-// Push pushes the current branch to the remote.
+// push pushes the current branch to the remote.
 // It uses the git CLI (not go-git) so Buildkite reference clones can pack and
-// upload objects from shared mirrors; go-git Push hangs in that layout.
-func (g *GitRepo) Push(remoteName, token string) error {
+// upload objects from shared mirrors; go-git push hangs in that layout.
+func (g *gitRepo) push(remoteName, token string) error {
 	if token == "" {
 		return fmt.Errorf("GitHub token is required for pushing")
 	}
@@ -319,7 +319,7 @@ func (g *GitRepo) Push(remoteName, token string) error {
 		return err
 	}
 
-	currentBranch, err := g.GetCurrentBranch()
+	currentBranch, err := g.getCurrentBranch()
 	if err != nil {
 		return err
 	}
@@ -347,8 +347,8 @@ func (g *GitRepo) Push(remoteName, token string) error {
 	return nil
 }
 
-// GetCurrentBranch returns the name of the current branch.
-func (g *GitRepo) GetCurrentBranch() (string, error) {
+// getCurrentBranch returns the name of the current branch.
+func (g *gitRepo) getCurrentBranch() (string, error) {
 	headRef, err := g.repo.Head()
 	if err != nil {
 		return "", fmt.Errorf("failed to get HEAD: %w", err)
@@ -361,8 +361,8 @@ func (g *GitRepo) GetCurrentBranch() (string, error) {
 	return headRef.Name().Short(), nil
 }
 
-// IsClean checks if the working directory is clean.
-func (g *GitRepo) IsClean() (bool, error) {
+// isClean checks if the working directory is clean.
+func (g *gitRepo) isClean() (bool, error) {
 	w, err := g.repo.Worktree()
 	if err != nil {
 		return false, fmt.Errorf("failed to get worktree: %w", err)
@@ -376,10 +376,10 @@ func (g *GitRepo) IsClean() (bool, error) {
 	return status.IsClean(), nil
 }
 
-// SetRemoteURL sets the URL for a remote.
+// setRemoteURL sets the URL for a remote.
 // When the remote already exists, fetch refspecs are preserved so later
 // git fetch origin keeps working after an SSH→HTTPS rewrite.
-func (g *GitRepo) SetRemoteURL(remoteName, url string) error {
+func (g *gitRepo) setRemoteURL(remoteName, url string) error {
 	remote, err := g.repo.Remote(remoteName)
 	if errors.Is(err, git.ErrRemoteNotFound) {
 		_, err = g.repo.CreateRemote(&config.RemoteConfig{

@@ -19,8 +19,8 @@ const (
 
 var defaultVersionPattern = regexp.MustCompile(`const DefaultVersion = "([^"]+)"`)
 
-// ReadFleetVersion returns DefaultVersion from version/version.go.
-func ReadFleetVersion() (string, error) {
+// readFleetVersion returns DefaultVersion from version/version.go.
+func readFleetVersion() (string, error) {
 	content, err := os.ReadFile(versionGoPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to read %s: %w", versionGoPath, err)

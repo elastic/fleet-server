@@ -13,9 +13,9 @@ import (
 )
 
 func TestValidateReleaseConfig(t *testing.T) {
-	require.Error(t, ValidateReleaseConfig(&ReleaseConfig{DryRun: true, LatestRelease: testVersion940}))
-	require.Error(t, ValidateReleaseConfig(&ReleaseConfig{CurrentRelease: testVersion950, LatestRelease: testVersion940}))
-	require.NoError(t, ValidateReleaseConfig(&ReleaseConfig{
+	require.Error(t, validateReleaseConfig(&ReleaseConfig{DryRun: true, LatestRelease: testVersion940}))
+	require.Error(t, validateReleaseConfig(&ReleaseConfig{CurrentRelease: testVersion950, LatestRelease: testVersion940}))
+	require.NoError(t, validateReleaseConfig(&ReleaseConfig{
 		CurrentRelease: testVersion950,
 		LatestRelease:  testVersion940,
 		DryRun:         true,
@@ -30,11 +30,11 @@ func TestEnsureLatestRelease(t *testing.T) {
 	}
 
 	cfg := &ReleaseConfig{CurrentRelease: testVersion950, DryRun: true}
-	require.NoError(t, EnsureLatestRelease(cfg))
+	require.NoError(t, ensureLatestRelease(cfg))
 	require.Equal(t, testVersion943, cfg.LatestRelease)
 
 	cfg.LatestRelease = testVersion940
-	require.NoError(t, EnsureLatestRelease(cfg))
+	require.NoError(t, ensureLatestRelease(cfg))
 	require.Equal(t, testVersion940, cfg.LatestRelease)
 }
 
