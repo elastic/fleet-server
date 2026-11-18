@@ -11,12 +11,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-<<<<<<< HEAD
-=======
 	"net/http"
-	"runtime"
 	"slices"
->>>>>>> 8de91f1 (Fix Elasticsearch circuit breaker errors when loading policies (#8223))
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -438,164 +434,6 @@ func Test_Monitor_Limit_Delay(t *testing.T) {
 	})
 }
 
-<<<<<<< HEAD
-=======
-// Test_Monitor_pending_sub_gets_latest_revision ensures that a subscriber waiting in the rate
-// limiter when a new revision arrives receives the new revision, not the one that was current
-// when it was popped from the pending queue.
-func Test_Monitor_pending_sub_gets_latest_revision(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-		ctx = testlog.SetLogger(t).WithContext(ctx)
-
-		chHitT := make(chan []es.HitT, 2)
-		defer close(chHitT)
-		ms := mmock.NewMockSubscription()
-		ms.On("Output").Return((<-chan []es.HitT)(chHitT))
-		mm := mmock.NewMockMonitor()
-		mm.On("Subscribe").Return(ms).Once()
-		mm.On("Unsubscribe", mock.Anything).Return().Once()
-
-		// Burst of 1 and a long interval: the first subscriber is dispatched immediately,
-		// the second waits in the rate limiter.
-		monitor := NewMonitor(ftesting.NewMockBulk(), mm, config.ServerLimits{PolicyLimit: config.Limit{Burst: 1, Interval: time.Hour}})
-		pm := monitor.(*monitorT)
-		pm.policiesF = func(ctx context.Context, bulker bulk.Bulk, _ []string, opt ...dl.Option) ([]model.Policy, error) {
-			return []model.Policy{}, nil
-		}
-
-		var mwg sync.WaitGroup
-		mwg.Go(func() { _ = monitor.Run(ctx) })
-		require.NoError(t, pm.waitStart(ctx))
-
-		policyID := uuid.Must(uuid.NewV4()).String()
-		pm.mut.Lock()
-		pm.policies[policyID] = policyT{head: makeHead()}
-		pm.mut.Unlock()
-
-		subs := make([]Subscription, 2)
-		for i := range subs {
-			sub, err := monitor.Subscribe(uuid.Must(uuid.NewV4()).String(), policyID, 0)
-			require.NoError(t, err)
-			defer monitor.Unsubscribe(sub)
-			subs[i] = sub
-		}
-
-		rId := xid.New().String()
-		hit := func(seqNo, revisionIdx int64) []es.HitT {
-			policyData, err := json.Marshal(&model.Policy{
-				ESDocument:     model.ESDocument{Id: rId, Version: 1, SeqNo: seqNo},
-				PolicyID:       policyID,
-				CoordinatorIdx: 1,
-				Data:           policyDataDefault,
-				RevisionIdx:    revisionIdx,
-			})
-			require.NoError(t, err)
-			return []es.HitT{{ID: rId, SeqNo: seqNo, Version: 1, Source: policyData}}
-		}
-
-		// Revision 1 reaches the first subscriber; the second waits in the limiter.
-		chHitT <- hit(1, 1)
-		select {
-		case p := <-subs[0].Output():
-			require.Equal(t, int64(1), p.Policy.RevisionIdx)
-		case <-time.After(time.Minute):
-			require.Fail(t, "first subscriber was not dispatched")
-		}
-		synctest.Wait()
-
-		// Revision 2 arrives while the second subscriber is waiting for the limiter.
-		chHitT <- hit(2, 2)
-
-		select {
-		case p := <-subs[1].Output():
-			require.Equal(t, int64(2), p.Policy.RevisionIdx, "waiting subscriber must receive the latest revision")
-		case <-time.After(2 * time.Hour):
-			require.Fail(t, "second subscriber was never dispatched")
-		}
-		synctest.Wait()
-		require.Empty(t, subs[1].Output(), "second subscriber must receive exactly one revision")
-
-		cancel()
-		mwg.Wait()
-	})
-}
-
-func TestMonitor_LatestRev(t *testing.T) {
-	t.Run("empty policy id", func(t *testing.T) {
-		pm := &monitorT{}
-		idx := pm.LatestRev(t.Context(), "")
-		assert.Equal(t, int64(0), idx)
-	})
-
-	t.Run("policy load error", func(t *testing.T) {
-		bulker := ftesting.NewMockBulk()
-		mm := mmock.NewMockMonitor()
-		monitor := NewMonitor(bulker, mm, config.ServerLimits{})
-		pm := monitor.(*monitorT)
-		pm.policiesF = func(ctx context.Context, bulker bulk.Bulk, _ []string, opt ...dl.Option) ([]model.Policy, error) {
-			return nil, fmt.Errorf("policy fetch error")
-		}
-
-		idx := pm.LatestRev(t.Context(), "test-id")
-		assert.Equal(t, int64(0), idx)
-	})
-
-	t.Run("policy not found", func(t *testing.T) {
-		bulker := ftesting.NewMockBulk()
-		mm := mmock.NewMockMonitor()
-		monitor := NewMonitor(bulker, mm, config.ServerLimits{})
-		pm := monitor.(*monitorT)
-		pm.policiesF = func(ctx context.Context, bulker bulk.Bulk, _ []string, opt ...dl.Option) ([]model.Policy, error) {
-			return []model.Policy{}, nil
-		}
-		idx := pm.LatestRev(t.Context(), "test-id")
-		assert.Equal(t, int64(0), idx)
-	})
-
-	t.Run("policy found after load", func(t *testing.T) {
-		bulker := ftesting.NewMockBulk()
-		mm := mmock.NewMockMonitor()
-		monitor := NewMonitor(bulker, mm, config.ServerLimits{})
-		pm := monitor.(*monitorT)
-		policyId := uuid.Must(uuid.NewV4()).String()
-		rId := xid.New().String()
-		policy := model.Policy{
-			ESDocument: model.ESDocument{
-				Id:      rId,
-				Version: 1,
-				SeqNo:   1,
-			},
-			PolicyID:    policyId,
-			Data:        policyDataDefault,
-			RevisionIdx: 2,
-		}
-		pm.policiesF = func(ctx context.Context, bulker bulk.Bulk, _ []string, opt ...dl.Option) ([]model.Policy, error) {
-			return []model.Policy{policy}, nil
-		}
-		idx := pm.LatestRev(t.Context(), policyId)
-		assert.Equal(t, int64(2), idx)
-	})
-
-	t.Run("policy found", func(t *testing.T) {
-		pm := &monitorT{
-			policies: map[string]policyT{
-				"test-id": policyT{
-					pp: ParsedPolicy{
-						Policy: model.Policy{
-							RevisionIdx: 1,
-						},
-					},
-				},
-			},
-		}
-		idx := pm.LatestRev(t.Context(), "test-id")
-		assert.Equal(t, int64(1), idx)
-	})
-}
-
->>>>>>> 8de91f1 (Fix Elasticsearch circuit breaker errors when loading policies (#8223))
 // TestUpdatePolicy_NewerRevisionIsApplied verifies that updatePolicy stores an
 // incoming document and returns true when its revision_idx is greater than the
 // cached revision.
@@ -723,92 +561,6 @@ func TestMonitor_ProcessHitsSharesStrings(t *testing.T) {
 	assert.Same(t, unsafe.StringData(a), unsafe.StringData(b), "policies from one set of hits share the query")
 }
 
-<<<<<<< HEAD
-=======
-// Test_Monitor_repeated_events_do_not_strand_subscriber_in_rate_limiter sends a burst of events
-// while a subscriber waits in the rate limiter and ensures the subscriber still gets its policy.
-// Events must not start overlapping dispatchers, since each can miss a subscriber the other
-// holds between popping it from pendingQ and sending to it. Overlapping dispatchers show up as a
-// stranded subscriber when the test runs with few CPUs, e.g. -cpu=1.
-func Test_Monitor_repeated_events_do_not_strand_subscriber_in_rate_limiter(t *testing.T) {
-	for range 25 {
-		synctest.Test(t, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-			ctx = testlog.SetLogger(t).WithContext(ctx)
-
-			chHitT := make(chan []es.HitT, 1)
-			defer close(chHitT)
-			ms := mmock.NewMockSubscription()
-			ms.On("Output").Return((<-chan []es.HitT)(chHitT))
-			mm := mmock.NewMockMonitor()
-			mm.On("Subscribe").Return(ms).Once()
-			mm.On("Unsubscribe", mock.Anything).Return().Once()
-
-			// Burst of 1 and a long interval: the first subscriber is dispatched immediately,
-			// the second waits in the rate limiter holding the popped subscriber.
-			monitor := NewMonitor(ftesting.NewMockBulk(), mm, config.ServerLimits{PolicyLimit: config.Limit{Burst: 1, Interval: time.Hour}})
-			pm := monitor.(*monitorT)
-			pm.policiesF = func(ctx context.Context, bulker bulk.Bulk, _ []string, opt ...dl.Option) ([]model.Policy, error) {
-				return []model.Policy{}, nil
-			}
-
-			var mwg sync.WaitGroup
-			mwg.Go(func() { _ = monitor.Run(ctx) })
-			require.NoError(t, pm.waitStart(ctx))
-
-			policyID := uuid.Must(uuid.NewV4()).String()
-			pm.mut.Lock()
-			pm.policies[policyID] = policyT{head: makeHead()}
-			pm.mut.Unlock()
-
-			subs := make([]Subscription, 2)
-			for i := range subs {
-				sub, err := monitor.Subscribe(uuid.Must(uuid.NewV4()).String(), policyID, 0)
-				require.NoError(t, err)
-				defer monitor.Unsubscribe(sub)
-				subs[i] = sub
-			}
-
-			rId := xid.New().String()
-			policy := model.Policy{
-				ESDocument:     model.ESDocument{Id: rId, Version: 1, SeqNo: 1},
-				PolicyID:       policyID,
-				CoordinatorIdx: 1,
-				Data:           policyDataDefault,
-				RevisionIdx:    1,
-			}
-			policyData, err := json.Marshal(&policy)
-			require.NoError(t, err)
-			chHitT <- []es.HitT{{ID: rId, SeqNo: 1, Version: 1, Source: policyData}}
-
-			select {
-			case <-subs[0].Output():
-			case <-time.After(time.Minute):
-				require.Fail(t, "first subscriber was not dispatched")
-			}
-			synctest.Wait() // the dispatcher holds subs[1], rate waiting
-
-			// Fire events back to back, without waiting for the run loop to settle between them.
-			for range 50 {
-				pm.kickLoad()
-				runtime.Gosched()
-			}
-
-			select {
-			case p := <-subs[1].Output():
-				require.Equal(t, int64(1), p.Policy.RevisionIdx)
-			case <-time.After(2 * time.Hour):
-				require.Fail(t, "second subscriber was stranded in pendingQ")
-			}
-
-			cancel()
-			mwg.Wait()
-		})
-	}
-}
-
->>>>>>> 8de91f1 (Fix Elasticsearch circuit breaker errors when loading policies (#8223))
 // policySearchResult builds the Elasticsearch result of the latest policies query for the given policies.
 func policySearchResult(t *testing.T, policies ...model.Policy) bulk.MsearchResponseItem {
 	t.Helper()
@@ -873,7 +625,6 @@ func newTestPolicy(revisionIdx int64) model.Policy {
 	}
 }
 
-<<<<<<< HEAD
 // revisionOf returns the revision of the policy as the monitor reports it, or 0 if it cannot be loaded.
 func revisionOf(ctx context.Context, pm *monitorT, policyID string) int64 {
 	p, err := pm.GetPolicy(ctx, policyID)
@@ -881,7 +632,8 @@ func revisionOf(ctx context.Context, pm *monitorT, policyID string) int64 {
 		return 0
 	}
 	return p.RevisionIdx
-=======
+}
+
 func (m *monitorT) loadedPolicyIDs() []string {
 	var policyIDs []string
 	for policyID, p := range m.policies {
@@ -890,7 +642,6 @@ func (m *monitorT) loadedPolicyIDs() []string {
 		}
 	}
 	return policyIDs
->>>>>>> 8de91f1 (Fix Elasticsearch circuit breaker errors when loading policies (#8223))
 }
 
 func TestMonitor_CacheMissLoadsOnlyTheRequestedPolicy(t *testing.T) {
@@ -1224,7 +975,7 @@ func TestMonitor_PoliciesInFlightAreLimited(t *testing.T) {
 		wg.Go(func() { assert.NoError(t, pm.loadPolicies(t.Context())) })
 		synctest.Wait()
 		for i := range 10 {
-			wg.Go(func() { pm.LatestRev(t.Context(), fmt.Sprintf("other-%d", i)) })
+			wg.Go(func() { revisionOf(t.Context(), pm, fmt.Sprintf("other-%d", i)) })
 		}
 		synctest.Wait() // the single loads wait for the batch load
 
@@ -1341,7 +1092,7 @@ func TestMonitor_LoadEndsWhenTheMonitorStops(t *testing.T) {
 		wg.Go(func() { assert.NoError(t, pm.Run(ctx)) })
 		require.NoError(t, pm.waitStart(ctx))
 		var rev int64
-		wg.Go(func() { rev = pm.LatestRev(t.Context(), "policy") })
+		wg.Go(func() { rev = revisionOf(t.Context(), pm, "policy") })
 		synctest.Wait() // the load waits for its search
 
 		cancel()
@@ -1385,37 +1136,3 @@ func TestMonitor_CallerStopsWaitingForASharedLoadWhenItsContextEnds(t *testing.T
 		assert.Equal(t, int64(3), leaderRev, "the load goes on for the caller that still waits for it")
 	})
 }
-<<<<<<< HEAD
-
-func TestMonitor_SharedLoadFailureIsReturnedToAllCallersWhileTheirContextsAreAlive(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		p := newTestPolicy(3)
-		release := make(chan struct{})
-		var calls atomic.Int32
-		pm := NewMonitor(ftesting.NewMockBulk(), mmock.NewMockMonitor(), config.ServerLimits{}).(*monitorT)
-		pm.policyF = func(context.Context, bulk.Bulk, ...dl.Option) ([]model.Policy, error) {
-			calls.Add(1)
-			<-release
-			// A timeout of the request to Elasticsearch: the contexts of the callers are not done.
-			return nil, fmt.Errorf("search: %w", context.DeadlineExceeded)
-		}
-
-		const callers = 3
-		revs := make([]int64, callers)
-		var wg sync.WaitGroup
-		wg.Go(func() { revs[0] = revisionOf(t.Context(), pm, p.PolicyID) })
-		synctest.Wait()
-		for i := 1; i < callers; i++ {
-			wg.Go(func() { revs[i] = revisionOf(t.Context(), pm, p.PolicyID) })
-		}
-		synctest.Wait() // all callers wait for the same load
-
-		close(release)
-		wg.Wait()
-
-		assert.Equal(t, int32(1), calls.Load(), "a failure that is not a caller giving up is not retried")
-		assert.Equal(t, make([]int64, callers), revs, "no caller gets a revision")
-	})
-}
-=======
->>>>>>> 8de91f1 (Fix Elasticsearch circuit breaker errors when loading policies (#8223))

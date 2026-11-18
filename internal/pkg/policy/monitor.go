@@ -180,23 +180,14 @@ LOOP:
 		select {
 		case <-m.kickCh:
 			m.log.Trace().Msg("policy monitor kicked")
-<<<<<<< HEAD
 			if m.bulker.HasTracer() {
 				trans = m.bulker.StartTransaction("initial policies", "policy_monitor")
 				iCtx = apm.ContextWithTransaction(ctx, trans)
-=======
-			trans, tCtx := m.startTrans(ctx, "initial policies")
-			err := m.loadPolicies(tCtx)
-			endTrans(trans)
-			if err != nil && ctx.Err() == nil {
-				// The next Subscribe for a policy that did not load kicks a new load.
-				m.log.Error().Err(err).Msg("unable to load policies")
->>>>>>> 8de91f1 (Fix Elasticsearch circuit breaker errors when loading policies (#8223))
 			}
 
-			if err := m.loadPolicies(iCtx); err != nil {
-				endTrans(trans)
-				return err
+			if err := m.loadPolicies(iCtx); err != nil && ctx.Err() == nil {
+				// The next Subscribe for a policy that did not load kicks a new load.
+				m.log.Error().Err(err).Msg("unable to load policies")
 			}
 			m.dispatchPending(iCtx)
 			endTrans(trans)

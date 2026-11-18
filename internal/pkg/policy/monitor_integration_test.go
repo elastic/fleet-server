@@ -15,12 +15,8 @@ import (
 	"testing"
 	"time"
 
-<<<<<<< HEAD
 	"github.com/gofrs/uuid"
-=======
-	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/assert"
->>>>>>> 8de91f1 (Fix Elasticsearch circuit breaker errors when loading policies (#8223))
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"

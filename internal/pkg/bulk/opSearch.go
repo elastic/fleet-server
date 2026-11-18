@@ -85,14 +85,9 @@ func (b *Bulker) MSearch(ctx context.Context, ops []MultiOp, opts ...Opt) ([]Mse
 		}
 	}
 
-	span, ctx := apm.StartSpan(ctx, bulkSpanNames[ActionSearch], "bulker")
+	span, ctx := apm.StartSpan(ctx, "Bulker: search", "bulker")
 	defer span.End()
-	opt := b.parseOpts(opts...)
-	if tx := apm.TransactionFromContext(ctx); tx != nil {
-		tCtx := tx.TraceContext()
-		opt.spanLink = apm.SpanLink{Trace: tCtx.Trace, Span: tCtx.Span}
-		opt.hasSpanLink = true
-	}
+	opt := b.parseOpts(append(opts, withAPMLinkedContext(ctx))...)
 	action := ActionSearch
 	if len(opt.WaitForCheckpoints) > 0 {
 		action = ActionFleetSearch
@@ -107,7 +102,6 @@ func (b *Bulker) MSearch(ctx context.Context, ops []MultiOp, opts ...Opt) ([]Mse
 		blk.ch = ch
 		blk.idx = int32(i)
 		blk.spanLink = opt.spanLink
-		blk.hasSpanLink = opt.hasSpanLink
 		blk.flushAfter = opt.FlushAfter
 		if err := b.writeMsearchMeta(&blk.buf, op.Index, opt.Indices, opt.WaitForCheckpoints, opt.IgnoreUnavailable); err != nil {
 			return nil, err

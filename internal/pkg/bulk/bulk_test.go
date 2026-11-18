@@ -468,6 +468,35 @@ func (f performFunc) Perform(req *http.Request) (*http.Response, error) {
 	return f(req)
 }
 
+// fixedTransport returns a pre-built response body on every Perform call.
+type fixedTransport struct {
+	body []byte
+}
+
+func (t *fixedTransport) Perform(*http.Request) (*http.Response, error) {
+	return &http.Response{
+		StatusCode: 200,
+		Status:     testStatus,
+		Proto:      testProto,
+		ProtoMajor: 1,
+		ProtoMinor: 1,
+		Body:       io.NopCloser(bytes.NewReader(t.body)),
+	}, nil
+}
+
+func msearchResponse(n int) []byte {
+	var buf bytes.Buffer
+	buf.WriteString(`{"responses":[`)
+	for i := range n {
+		if i > 0 {
+			buf.WriteByte(',')
+		}
+		buf.WriteString(`{"status":200,"took":1,"timed_out":false,"_shards":{"total":1,"successful":1,"skipped":0,"failed":0},"hits":{"total":{"value":0,"relation":"eq"},"hits":[]}}`)
+	}
+	buf.WriteString(`],"took":1}`)
+	return buf.Bytes()
+}
+
 func TestMSearchReturnsTheErrorOfAFailedRequest(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		requestErr := errors.New("request failed")
