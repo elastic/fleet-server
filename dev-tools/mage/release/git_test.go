@@ -425,20 +425,23 @@ func TestEnsureHTTPSRemote(t *testing.T) {
 	})
 
 	t.Run("rewrites pushurl entries", func(t *testing.T) {
-		gitRepo, _ := createTestGitRepo(t)
-		require.NoError(t, gitRepo.setRemoteURLs("origin", []string{testGitHubHTTPS, testGitHubSSH}))
+		gitRepo, tmpDir := createTestGitRepo(t)
+		require.NoError(t, gitRepo.setRemoteURL(testGitHubHTTPS))
+		require.NoError(t, gitRepo.gitConfigAdd("remote.origin.pushurl", testGitHubSSH))
 		require.NoError(t, gitRepo.ensureHTTPSRemote("origin"))
-		remote, err := gitRepo.repo.Remote("origin")
-		require.NoError(t, err)
-		got := remote.Config().URLs
-		require.Len(t, got, 2)
-		require.Equal(t, testGitHubHTTPS, got[0])
-		require.Equal(t, testGitHubHTTPS, got[1])
+
+		url := strings.TrimSpace(runGitOutput(t, tmpDir, "config", "--get-all", "remote.origin.url"))
+		push := strings.TrimSpace(runGitOutput(t, tmpDir, "config", "--get-all", "remote.origin.pushurl"))
+		require.Equal(t, testGitHubHTTPS, url)
+		require.Equal(t, testGitHubHTTPS, push)
+		// Exactly one fetch url — rewritten push destination stays under pushurl.
+		require.Equal(t, 1, len(strings.Split(url, "\n")))
 	})
 
 	t.Run("rejects untrusted pushurl", func(t *testing.T) {
 		gitRepo, _ := createTestGitRepo(t)
-		require.NoError(t, gitRepo.setRemoteURLs("origin", []string{testGitHubHTTPS, testGitLabSSH}))
+		require.NoError(t, gitRepo.setRemoteURL(testGitHubHTTPS))
+		require.NoError(t, gitRepo.gitConfigAdd("remote.origin.pushurl", testGitLabSSH))
 		err := gitRepo.ensureHTTPSRemote("origin")
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "https://github.com/")

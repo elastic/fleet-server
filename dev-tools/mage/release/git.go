@@ -264,36 +264,127 @@ func githubHTTPSPushURL(remoteURL string) (string, bool) {
 }
 
 // ensureHTTPSRemote rewrites GitHub remotes to HTTPS when needed.
-// Every configured URL is checked — go-git stores pushurl entries in URLs[1:],
-// and git push uses those for the push destination.
+// Fetch `url` and `pushurl` entries are read and written separately via the git
+// CLI so pushurl precedence is preserved (go-git's RemoteConfig flattens both
+// into URLs and marshals them all back as url keys).
 func (g *gitRepo) ensureHTTPSRemote(remoteName string) error {
-	remote, err := g.repo.Remote(remoteName)
-	if err != nil {
+	if _, err := g.repo.Remote(remoteName); err != nil {
 		return fmt.Errorf("failed to get remote %s: %w", remoteName, err)
 	}
-	urls := remote.Config().URLs
-	if len(urls) == 0 {
+
+	urls, err := g.gitConfigGetAll(fmt.Sprintf("remote.%s.url", remoteName))
+	if err != nil {
+		return err
+	}
+	pushURLs, err := g.gitConfigGetAll(fmt.Sprintf("remote.%s.pushurl", remoteName))
+	if err != nil {
+		return err
+	}
+	if len(urls) == 0 && len(pushURLs) == 0 {
 		return fmt.Errorf("remote %s has no URLs", remoteName)
 	}
 
-	newURLs := make([]string, len(urls))
+	newURLs, rewrittenURLs, err := rewriteTokenPushURLs(remoteName, urls)
+	if err != nil {
+		return err
+	}
+	newPushURLs, rewrittenPush, err := rewriteTokenPushURLs(remoteName, pushURLs)
+	if err != nil {
+		return err
+	}
+	if !rewrittenURLs && !rewrittenPush {
+		return nil
+	}
+	if err := g.replaceRemoteURLConfig(remoteName, newURLs, newPushURLs); err != nil {
+		return fmt.Errorf("failed to set HTTPS remote for token push: %w", err)
+	}
+	return nil
+}
+
+// rewriteTokenPushURLs converts each remote URL to a token-safe HTTPS form.
+func rewriteTokenPushURLs(remoteName string, urls []string) ([]string, bool, error) {
+	if len(urls) == 0 {
+		return nil, false, nil
+	}
+	out := make([]string, len(urls))
 	rewrittenAny := false
 	for i, u := range urls {
 		httpsURL, rewritten := githubHTTPSPushURL(u)
 		if !isTokenPushRemoteURL(httpsURL) {
-			return fmt.Errorf("remote %s URL %q is not https://github.com/ or file://; token push requires a trusted GitHub HTTPS remote", remoteName, u)
+			return nil, false, fmt.Errorf("remote %s URL %q is not https://github.com/ or file://; token push requires a trusted GitHub HTTPS remote", remoteName, u)
 		}
-		newURLs[i] = httpsURL
+		out[i] = httpsURL
 		if rewritten {
 			rewrittenAny = true
 		}
 	}
-	if !rewrittenAny {
-		return nil
+	return out, rewrittenAny, nil
+}
+
+func (g *gitRepo) gitConfigGetAll(key string) ([]string, error) {
+	cmd := exec.Command("git", "config", "--get-all", key)
+	cmd.Dir = g.path
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) && exitErr.ExitCode() == 1 {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("git config --get-all %s: %w: %s", key, err, strings.TrimSpace(string(out)))
 	}
-	if err := g.setRemoteURLs(remoteName, newURLs); err != nil {
-		return fmt.Errorf("failed to set HTTPS remote for token push: %w", err)
+	text := strings.TrimSuffix(string(out), "\n")
+	if text == "" {
+		return nil, nil
 	}
+	return strings.Split(text, "\n"), nil
+}
+
+func (g *gitRepo) gitConfigUnsetAll(key string) error {
+	cmd := exec.Command("git", "config", "--unset-all", key)
+	cmd.Dir = g.path
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		var exitErr *exec.ExitError
+		// Exit 5: key not found / nothing to unset.
+		if errors.As(err, &exitErr) && (exitErr.ExitCode() == 1 || exitErr.ExitCode() == 5) {
+			return nil
+		}
+		return fmt.Errorf("git config --unset-all %s: %w: %s", key, err, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
+func (g *gitRepo) gitConfigAdd(key, value string) error {
+	cmd := exec.Command("git", "config", "--add", key, value)
+	cmd.Dir = g.path
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("git config --add %s: %w: %s", key, err, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
+// replaceRemoteURLConfig rewrites remote url and pushurl keys without touching fetchspecs.
+func (g *gitRepo) replaceRemoteURLConfig(remoteName string, urls, pushURLs []string) error {
+	urlKey := fmt.Sprintf("remote.%s.url", remoteName)
+	pushKey := fmt.Sprintf("remote.%s.pushurl", remoteName)
+	if err := g.gitConfigUnsetAll(urlKey); err != nil {
+		return err
+	}
+	if err := g.gitConfigUnsetAll(pushKey); err != nil {
+		return err
+	}
+	for _, u := range urls {
+		if err := g.gitConfigAdd(urlKey, u); err != nil {
+			return err
+		}
+	}
+	for _, u := range pushURLs {
+		if err := g.gitConfigAdd(pushKey, u); err != nil {
+			return err
+		}
+	}
+	printf("Updated remote %s urls=%s pushurls=%s\n", remoteName, strings.Join(urls, ", "), strings.Join(pushURLs, ", "))
 	return nil
 }
 
