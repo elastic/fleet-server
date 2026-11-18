@@ -24,6 +24,8 @@ const (
 	// pushTimeout bounds native git push so Buildkite jobs fail fast instead of
 	// hanging until the step timeout (go-git push stalls on reference clones).
 	pushTimeout = 10 * time.Minute
+	// gitConfigTimeout bounds local git config reads/writes used when rewriting remotes.
+	gitConfigTimeout = 30 * time.Second
 )
 
 // gitRepo wraps go-git Repository with helper methods.
@@ -322,7 +324,9 @@ func rewriteTokenPushURLs(remoteName string, urls []string) ([]string, bool, err
 }
 
 func (g *gitRepo) gitConfigGetAll(key string) ([]string, error) {
-	cmd := exec.Command("git", "config", "--get-all", key)
+	ctx, cancel := context.WithTimeout(context.Background(), gitConfigTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "git", "config", "--get-all", key)
 	cmd.Dir = g.path
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -340,7 +344,9 @@ func (g *gitRepo) gitConfigGetAll(key string) ([]string, error) {
 }
 
 func (g *gitRepo) gitConfigUnsetAll(key string) error {
-	cmd := exec.Command("git", "config", "--unset-all", key)
+	ctx, cancel := context.WithTimeout(context.Background(), gitConfigTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "git", "config", "--unset-all", key)
 	cmd.Dir = g.path
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -355,7 +361,9 @@ func (g *gitRepo) gitConfigUnsetAll(key string) error {
 }
 
 func (g *gitRepo) gitConfigAdd(key, value string) error {
-	cmd := exec.Command("git", "config", "--add", key, value)
+	ctx, cancel := context.WithTimeout(context.Background(), gitConfigTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "git", "config", "--add", key, value)
 	cmd.Dir = g.path
 	out, err := cmd.CombinedOutput()
 	if err != nil {
