@@ -263,7 +263,9 @@ func githubHTTPSPushURL(remoteURL string) (string, bool) {
 	}
 }
 
-// ensureHTTPSRemote rewrites an SSH GitHub remote to HTTPS when needed.
+// ensureHTTPSRemote rewrites GitHub remotes to HTTPS when needed.
+// Every configured URL is checked — go-git stores pushurl entries in URLs[1:],
+// and git push uses those for the push destination.
 func (g *gitRepo) ensureHTTPSRemote(remoteName string) error {
 	remote, err := g.repo.Remote(remoteName)
 	if err != nil {
@@ -274,14 +276,22 @@ func (g *gitRepo) ensureHTTPSRemote(remoteName string) error {
 		return fmt.Errorf("remote %s has no URLs", remoteName)
 	}
 
-	httpsURL, rewritten := githubHTTPSPushURL(urls[0])
-	if !isTokenPushRemoteURL(httpsURL) {
-		return fmt.Errorf("remote %s URL %q is not https://github.com/ or file://; token push requires a trusted GitHub HTTPS remote", remoteName, urls[0])
+	newURLs := make([]string, len(urls))
+	rewrittenAny := false
+	for i, u := range urls {
+		httpsURL, rewritten := githubHTTPSPushURL(u)
+		if !isTokenPushRemoteURL(httpsURL) {
+			return fmt.Errorf("remote %s URL %q is not https://github.com/ or file://; token push requires a trusted GitHub HTTPS remote", remoteName, u)
+		}
+		newURLs[i] = httpsURL
+		if rewritten {
+			rewrittenAny = true
+		}
 	}
-	if !rewritten {
+	if !rewrittenAny {
 		return nil
 	}
-	if err := g.setRemoteURL(remoteName, httpsURL); err != nil {
+	if err := g.setRemoteURLs(remoteName, newURLs); err != nil {
 		return fmt.Errorf("failed to set HTTPS remote for token push: %w", err)
 	}
 	return nil
@@ -389,20 +399,28 @@ func (g *gitRepo) isClean() (bool, error) {
 	return status.IsClean(), nil
 }
 
-// setRemoteURL sets the URL for a remote.
+// setRemoteURL sets the primary URL for a remote.
+func (g *gitRepo) setRemoteURL(remoteName, url string) error {
+	return g.setRemoteURLs(remoteName, []string{url})
+}
+
+// setRemoteURLs replaces all remote URLs (fetch + pushurl entries).
 // When the remote already exists, fetch refspecs are preserved so later
 // git fetch origin keeps working after an SSH→HTTPS rewrite.
-func (g *gitRepo) setRemoteURL(remoteName, url string) error {
+func (g *gitRepo) setRemoteURLs(remoteName string, urls []string) error {
+	if len(urls) == 0 {
+		return fmt.Errorf("remote %s requires at least one URL", remoteName)
+	}
 	remote, err := g.repo.Remote(remoteName)
 	if errors.Is(err, git.ErrRemoteNotFound) {
 		_, err = g.repo.CreateRemote(&config.RemoteConfig{
 			Name: remoteName,
-			URLs: []string{url},
+			URLs: urls,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to create remote: %w", err)
 		}
-		printf("Created remote %s: %s\n", remoteName, url)
+		printf("Created remote %s: %s\n", remoteName, strings.Join(urls, ", "))
 		return nil
 	} else if err != nil {
 		return fmt.Errorf("failed to get remote: %w", err)
@@ -417,13 +435,13 @@ func (g *gitRepo) setRemoteURL(remoteName, url string) error {
 
 	_, err = g.repo.CreateRemote(&config.RemoteConfig{
 		Name:  remoteName,
-		URLs:  []string{url},
+		URLs:  urls,
 		Fetch: fetch,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to recreate remote: %w", err)
 	}
 
-	printf("Updated remote %s: %s\n", remoteName, url)
+	printf("Updated remote %s: %s\n", remoteName, strings.Join(urls, ", "))
 	return nil
 }

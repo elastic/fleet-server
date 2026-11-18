@@ -18,6 +18,16 @@ func TestRequireFeatureFreezeNextRelease(t *testing.T) {
 	require.Contains(t, err.Error(), "patch 0")
 }
 
+func TestEnsureMajorMinorNextReleaseRequiresExistingBase(t *testing.T) {
+	gitRepo, _ := createTestGitRepo(t)
+	err := ensureMajorMinorNextReleaseMatchesBase(gitRepo, &ReleaseConfig{
+		BaseBranch:  "does-not-exist",
+		NextRelease: testVersion960,
+	})
+	require.Error(t, err)
+	require.ErrorIs(t, err, errBranchNotFound)
+}
+
 func TestLabelHelpers(t *testing.T) {
 	require.Equal(t, "backport-"+testReleaseBranch, backportLabel(testReleaseBranch))
 

@@ -323,7 +323,8 @@ func ensureMajorMinorNextReleaseMatchesBase(repo *gitRepo, cfg *ReleaseConfig) e
 	if base == "" {
 		base = "main"
 	}
-	if err := repo.ensureBranch(base); err != nil {
+	// BASE_BRANCH must already exist locally or on origin — never create it from HEAD.
+	if err := repo.ensureExistingBranch(base); err != nil {
 		return err
 	}
 	branchVersion, err := readFleetVersion()

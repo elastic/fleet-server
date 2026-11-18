@@ -423,6 +423,26 @@ func TestEnsureHTTPSRemote(t *testing.T) {
 			t.Fatal("ensureHTTPSRemote() expected error for non-GitHub HTTPS remote")
 		}
 	})
+
+	t.Run("rewrites pushurl entries", func(t *testing.T) {
+		gitRepo, _ := createTestGitRepo(t)
+		require.NoError(t, gitRepo.setRemoteURLs("origin", []string{testGitHubHTTPS, testGitHubSSH}))
+		require.NoError(t, gitRepo.ensureHTTPSRemote("origin"))
+		remote, err := gitRepo.repo.Remote("origin")
+		require.NoError(t, err)
+		got := remote.Config().URLs
+		require.Len(t, got, 2)
+		require.Equal(t, testGitHubHTTPS, got[0])
+		require.Equal(t, testGitHubHTTPS, got[1])
+	})
+
+	t.Run("rejects untrusted pushurl", func(t *testing.T) {
+		gitRepo, _ := createTestGitRepo(t)
+		require.NoError(t, gitRepo.setRemoteURLs("origin", []string{testGitHubHTTPS, testGitLabSSH}))
+		err := gitRepo.ensureHTTPSRemote("origin")
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "https://github.com/")
+	})
 }
 
 func runGitOutput(t *testing.T, dir string, args ...string) string {
