@@ -168,10 +168,10 @@ func TestSetRemoteURLIdempotent(t *testing.T) {
 	gitRepo, _ := createTestGitRepo(t)
 	remoteURL := "https://github.com/test/repo.git"
 
-	err := gitRepo.setRemoteURL("origin", remoteURL)
+	err := gitRepo.setRemoteURL(remoteURL)
 	require.NoError(t, err)
 
-	err = gitRepo.setRemoteURL("origin", remoteURL)
+	err = gitRepo.setRemoteURL(remoteURL)
 	require.NoError(t, err)
 
 	remote, err := gitRepo.repo.Remote("origin")
@@ -285,7 +285,7 @@ func TestPushToLocalRemote(t *testing.T) {
 		t.Fatalf("failed to init bare remote: %v", err)
 	}
 	remoteURL := "file://" + bareDir
-	require.NoError(t, gitRepo.setRemoteURL("origin", remoteURL))
+	require.NoError(t, gitRepo.setRemoteURL(remoteURL))
 
 	branch := "release-9.6"
 	require.NoError(t, gitRepo.createBranch(branch))
@@ -371,7 +371,7 @@ func TestIsTokenPushRemoteURL(t *testing.T) {
 func TestEnsureHTTPSRemote(t *testing.T) {
 	t.Run("rewrites ssh to https", func(t *testing.T) {
 		gitRepo, _ := createTestGitRepo(t)
-		require.NoError(t, gitRepo.setRemoteURL("origin", testGitHubSSH))
+		require.NoError(t, gitRepo.setRemoteURL(testGitHubSSH))
 		require.NoError(t, gitRepo.ensureHTTPSRemote("origin"))
 		remote, err := gitRepo.repo.Remote("origin")
 		require.NoError(t, err)
@@ -383,7 +383,7 @@ func TestEnsureHTTPSRemote(t *testing.T) {
 
 	t.Run("preserves fetch refspecs", func(t *testing.T) {
 		gitRepo, _ := createTestGitRepo(t)
-		require.NoError(t, gitRepo.setRemoteURL("origin", testGitHubSSH))
+		require.NoError(t, gitRepo.setRemoteURL(testGitHubSSH))
 		before, err := gitRepo.repo.Remote("origin")
 		require.NoError(t, err)
 		beforeFetch := append([]config.RefSpec(nil), before.Config().Fetch...)
@@ -405,7 +405,7 @@ func TestEnsureHTTPSRemote(t *testing.T) {
 
 	t.Run("rejects non-github remote", func(t *testing.T) {
 		gitRepo, _ := createTestGitRepo(t)
-		require.NoError(t, gitRepo.setRemoteURL("origin", testGitLabSSH))
+		require.NoError(t, gitRepo.setRemoteURL(testGitLabSSH))
 		err := gitRepo.ensureHTTPSRemote("origin")
 		if err == nil {
 			t.Fatal("ensureHTTPSRemote() expected error for non-GitHub remote")
@@ -417,7 +417,7 @@ func TestEnsureHTTPSRemote(t *testing.T) {
 
 	t.Run("rejects arbitrary https host", func(t *testing.T) {
 		gitRepo, _ := createTestGitRepo(t)
-		require.NoError(t, gitRepo.setRemoteURL("origin", "https://evil.example/elastic/fleet-server.git"))
+		require.NoError(t, gitRepo.setRemoteURL("https://evil.example/elastic/fleet-server.git"))
 		err := gitRepo.ensureHTTPSRemote("origin")
 		if err == nil {
 			t.Fatal("ensureHTTPSRemote() expected error for non-GitHub HTTPS remote")

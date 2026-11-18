@@ -399,9 +399,9 @@ func (g *gitRepo) isClean() (bool, error) {
 	return status.IsClean(), nil
 }
 
-// setRemoteURL sets the primary URL for a remote.
-func (g *gitRepo) setRemoteURL(remoteName, url string) error {
-	return g.setRemoteURLs(remoteName, []string{url})
+// setRemoteURL sets the primary URL for origin (release push only uses origin).
+func (g *gitRepo) setRemoteURL(url string) error {
+	return g.setRemoteURLs("origin", []string{url})
 }
 
 // setRemoteURLs replaces all remote URLs (fetch + pushurl entries).
