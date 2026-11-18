@@ -9,7 +9,7 @@ import (
 	"os"
 	"strings"
 
-	libversion "github.com/elastic/elastic-agent-libs/version"
+	libversion "github.com/elastic/beats/v7/pkg/version"
 )
 
 // ReleaseSettings holds configuration for release automation (feature freeze / patch).
@@ -136,8 +136,9 @@ func ParseReleaseVersion(currentRelease string) (ReleaseVersion, error) {
 	return ReleaseVersion{Major: v.Major, Minor: v.Minor, Patch: v.Bugfix}, nil
 }
 
-// parseStrictReleaseVersion uses elastic-agent-libs/version and rejects signed
-// components and prerelease/build metadata so CURRENT_RELEASE stays plain X.Y.Z.
+// parseStrictReleaseVersion uses beats/v7/pkg/version (same API as the old
+// elastic-agent-libs/version package) and rejects signed components and
+// prerelease/build metadata so CURRENT_RELEASE stays plain X.Y.Z.
 func parseStrictReleaseVersion(currentRelease string) (*libversion.V, error) {
 	version := strings.TrimPrefix(strings.TrimSpace(currentRelease), "v")
 	if version == "" {

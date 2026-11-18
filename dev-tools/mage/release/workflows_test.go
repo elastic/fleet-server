@@ -11,6 +11,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestRequireFeatureFreezeCurrentRelease(t *testing.T) {
+	require.NoError(t, requireFeatureFreezeCurrentRelease(&ReleaseConfig{CurrentRelease: "9.6.0"}))
+	err := requireFeatureFreezeCurrentRelease(&ReleaseConfig{CurrentRelease: "9.6.1"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "patch 0")
+}
+
 func TestLabelHelpers(t *testing.T) {
 	require.Equal(t, "backport-"+testReleaseBranch, backportLabel(testReleaseBranch))
 

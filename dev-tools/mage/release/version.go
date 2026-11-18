@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"strings"
 
-	libversion "github.com/elastic/elastic-agent-libs/version"
+	libversion "github.com/elastic/beats/v7/pkg/version"
 )
 
 type releaseSemver struct {
@@ -23,8 +23,9 @@ func parseSemver(version string) (releaseSemver, error) {
 	return releaseSemver{major: v.Major, minor: v.Minor, patch: v.Bugfix}, nil
 }
 
-// parseStrictReleaseVersion uses elastic-agent-libs/version and rejects signed
-// components and prerelease/build metadata so release versions stay plain X.Y.Z.
+// parseStrictReleaseVersion uses beats/v7/pkg/version (same API as the old
+// elastic-agent-libs/version package) and rejects signed components and
+// prerelease/build metadata so release versions stay plain X.Y.Z.
 func parseStrictReleaseVersion(raw string) (*libversion.V, error) {
 	version := strings.TrimPrefix(strings.TrimSpace(raw), "v")
 	if version == "" {

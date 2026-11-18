@@ -50,6 +50,22 @@ func patchVersionBumpLabels() []string {
 	return append(append([]string{}, releasePRLabels...), mergeLabelAfterRelease)
 }
 
+// requireFeatureFreezeCurrentRelease ensures CURRENT_RELEASE is an X.Y.0 version.
+// Patch bumps belong in RunPatchRelease.
+func requireFeatureFreezeCurrentRelease(cfg *ReleaseConfig) error {
+	parsed, err := parseSemver(cfg.CurrentRelease)
+	if err != nil {
+		return err
+	}
+	if parsed.patch != 0 {
+		return fmt.Errorf(
+			"runMajorMinor requires CURRENT_RELEASE with patch 0 (got %s); use mage release:runPatch for patch bumps",
+			cfg.CurrentRelease,
+		)
+	}
+	return nil
+}
+
 func checkRequirements(cfg *ReleaseConfig) error {
 	parsed, err := parseSemver(cfg.CurrentRelease)
 	if err != nil {
@@ -104,6 +120,10 @@ func RunMajorMinorRelease(cfg *ReleaseConfig) error {
 	}
 
 	if err := validateReleaseConfig(cfg); err != nil {
+		return err
+	}
+
+	if err := requireFeatureFreezeCurrentRelease(cfg); err != nil {
 		return err
 	}
 
