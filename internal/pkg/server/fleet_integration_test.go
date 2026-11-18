@@ -32,6 +32,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/elastic/beats/v7/pkg/monitoring"
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/go-elasticsearch/v9"
 
@@ -2331,5 +2332,112 @@ func agentTagsPolicy(includeTagsInEvents bool) model.PolicyData {
 				model.FeatureIncludeTagsInEvents: map[string]any{"enabled": includeTagsInEvents},
 			},
 		},
+	}
+}
+
+// Test_RouteMonitoring makes sure that the route metrics and the request log
+// match the requests that Fleet Server receives.
+func Test_RouteMonitoring(t *testing.T) {
+	routeMetric := func(t *testing.T, name string) uint64 {
+		t.Helper()
+		v, ok := monitoring.Default.Get("http_server.routes." + name).(*monitoring.Uint)
+		require.True(t, ok, "route metric %s not found", name)
+		value := v.Get()
+		return value
+	}
+	doRequest := func(t *testing.T, ctx context.Context, srv *tserver, method, path string) (int, http.Header) {
+		t.Helper()
+		req, err := http.NewRequestWithContext(ctx, method, srv.baseURL()+path, nil)
+		require.NoError(t, err)
+		res, err := cleanhttp.DefaultClient().Do(req)
+		require.NoError(t, err)
+		defer res.Body.Close()
+		return res.StatusCode, res.Header
+	}
+
+	type route struct {
+		metric   string
+		method   string
+		path     string
+		wantCode int
+	}
+
+	tests := []struct {
+		name          string
+		opAMPEnabled  bool
+		wantOpAMPCode int
+	}{{
+		name:          "with OpAMP enabled",
+		opAMPEnabled:  true,
+		wantOpAMPCode: http.StatusUnauthorized,
+	}, {
+		name:          "with OpAMP disabled",
+		opAMPEnabled:  false,
+		wantOpAMPCode: http.StatusNotFound,
+	}}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			srv, err := startTestServer(t, t.Context(), policyData, func(cfg *config.Config) error {
+				cfg.Inputs[0].Server.Features.EnableOpAMP = tc.opAMPEnabled
+				// Allow one enroll request each hour so that the second request is rejected.
+				cfg.Inputs[0].Server.Limits.EnrollLimit = config.Limit{Interval: time.Hour, Burst: 1}
+				return nil
+			})
+			require.NoError(t, err)
+			ctx := testlog.SetLogger(t).WithContext(t.Context())
+			routes := []route{{
+				metric:   "status",
+				method:   http.MethodGet,
+				path:     "/api/status",
+				wantCode: http.StatusOK,
+			}, {
+				metric:   "opAMP",
+				method:   http.MethodPost,
+				path:     "/v1/opamp",
+				wantCode: tc.wantOpAMPCode,
+			}}
+
+			t.Run("route totals match the received requests", func(t *testing.T) {
+				const requests = 5
+				for _, r := range routes {
+					total := routeMetric(t, r.metric+".total")
+					for range requests {
+						code, _ := doRequest(t, ctx, srv, r.method, r.path)
+						require.Equal(t, r.wantCode, code, "%s %s", r.method, r.path)
+					}
+					count := routeMetric(t, r.metric+".total") - total
+					assert.Equal(t, uint64(requests), count, "%s route total", r.metric)
+				}
+			})
+
+			t.Run("every response goes through the request logger", func(t *testing.T) {
+				for _, r := range routes {
+					code, header := doRequest(t, ctx, srv, r.method, r.path)
+					require.Equal(t, r.wantCode, code, "%s %s", r.method, r.path)
+
+					requestID := header.Get(logger.HeaderRequestID)
+					assert.NotEmpty(t, requestID, "request ID of %s %s", r.method, r.path)
+				}
+			})
+
+			t.Run("rate limit rejections are counted and logged", func(t *testing.T) {
+				total := routeMetric(t, "enroll.total")
+				rejections := routeMetric(t, "enroll.limit_rate")
+				code, _ := doRequest(t, ctx, srv, http.MethodPost, "/api/fleet/agents/enroll")
+				require.NotEqual(t, http.StatusTooManyRequests, code)
+
+				code, header := doRequest(t, ctx, srv, http.MethodPost, "/api/fleet/agents/enroll")
+				require.Equal(t, http.StatusTooManyRequests, code)
+
+				requestID := header.Get(logger.HeaderRequestID)
+				assert.NotEmpty(t, requestID)
+
+				count := routeMetric(t, "enroll.total") - total
+				assert.Equal(t, uint64(2), count, "enroll route total")
+
+				rejectionCount := routeMetric(t, "enroll.limit_rate") - rejections
+				assert.Equal(t, uint64(1), rejectionCount, "enroll rate limit rejections")
+			})
+		})
 	}
 }
