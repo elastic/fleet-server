@@ -622,6 +622,7 @@ func Test_server_RouteMonitoring(t *testing.T) {
 			cfg := &config.Server{}
 			cfg.InitDefaults()
 			cfg.Features.EnableOpAMP = tc.opAMPEnabled
+			cfg.Limits.MaxConnections = 10
 			if tc.rateLimited {
 				rejectAll := config.Limit{Interval: time.Hour}
 				cfg.Limits.StatusLimit = rejectAll
@@ -645,6 +646,7 @@ func Test_server_RouteMonitoring(t *testing.T) {
 
 			total := route.stats.total.metric.Get()
 			rejections := route.stats.rateLimit.metric.Get()
+			connRejections := cntHTTPRejected.Load()
 
 			srv.handler.ServeHTTP(rec, req)
 
@@ -662,6 +664,9 @@ func Test_server_RouteMonitoring(t *testing.T) {
 
 			rejectionCount := route.stats.rateLimit.metric.Get() - rejections
 			assert.Equal(t, tc.wantRejections, rejectionCount, "rate limit rejections")
+
+			connRejectionCount := cntHTTPRejected.Load() - connRejections
+			assert.Zero(t, connRejectionCount, "connection rejections")
 		})
 	}
 }
