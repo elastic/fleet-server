@@ -165,13 +165,13 @@ func Test_Agent_Namespace_test1(t *testing.T) {
 	var policyRemoteID = uuid.Must(uuid.NewV4()).String()
 	var policyDataNamespaceTest = model.PolicyData{
 		Outputs: map[string]map[string]any{
-			tDefault: {
-				tType: kElasticsearch,
+			"default": {
+				"type": "elasticsearch",
 			},
 		},
 		OutputPermissions: json.RawMessage(`{"default": {} }`),
 		Inputs:            []map[string]any{},
-		Agent:             map[string]any{tMonitoring: map[string]string{tUseOutput: tDefault}},
+		Agent:             map[string]any{"monitoring": map[string]string{"use_output": "default"}},
 	}
 
 	_, err = dl.CreatePolicy(ctx, srv.bulker, model.Policy{
@@ -186,7 +186,7 @@ func Test_Agent_Namespace_test1(t *testing.T) {
 	}
 
 	t.Log("Create API key and enrollment key for new policy")
-	newKey, err := apikey.Create(ctx, srv.bulker.Client(), tDefault, "", "true", []byte(`{
+	newKey, err := apikey.Create(ctx, srv.bulker.Client(), "default", "", "true", []byte(`{
 	    "fleet-apikey-enroll": {
 		"cluster": [],
 		"index": [],
@@ -197,10 +197,10 @@ func Test_Agent_Namespace_test1(t *testing.T) {
 		}]
 	    }
 	}`), map[string]any{
-		tManagedBy: tFleet,
-		tManaged:   true,
-		tType:      tEnroll,
-		tPolicyID:  policyRemoteID,
+		"managed_by": "fleet",
+		"managed":    true,
+		"type":       "enroll",
+		"policy_id":  policyRemoteID,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -241,7 +241,7 @@ func Test_Agent_Namespace_test1(t *testing.T) {
 		Agents:     []string{resp.Item.Id},
 		Expiration: time.Now().Add(time.Hour * 2000).Format(time.RFC3339),
 		ActionID:   newActionID.String(),
-		Namespaces: []string{testNamespace},
+		Namespaces: []string{"test1"},
 		Type:       "SETTINGS",
 		Data:       []byte("{\"log_level\": \"debug\"}"),
 	}
@@ -255,5 +255,5 @@ func Test_Agent_Namespace_test1(t *testing.T) {
 	AgentAck(t, ctx, srvCopy, actionID, resp.Item.Id, resp.Item.AccessApiKey)
 
 	t.Log("Check action results has the correct namespace")
-	CheckActionResultsNamespace(t, ctx, srv, actionID, testNamespace)
+	CheckActionResultsNamespace(t, ctx, srv, actionID, "test1")
 }

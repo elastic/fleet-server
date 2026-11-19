@@ -106,33 +106,13 @@ func TestLocateChunks(t *testing.T) {
 		mock.Anything,
 		mock.Anything,
 	).Return(&es.ResultT{
-<<<<<<< HEAD
-		HitsT: es.HitsT{
-			Hits: []es.HitT{
-				{
-					ID:     baseID + ".0",
-					Index:  "",
-					Source: []byte(""),
-					Fields: map[string]any{
-						"bid": []any{baseID},
-					},
-				},
-				{
-					ID:     baseID + ".1",
-					Index:  "",
-					Source: []byte(""),
-					Fields: map[string]any{
-						"bid":  []any{baseID},
-						"last": []any{true},
-					},
-=======
 		Hits: []es.HitT{
 			{
 				ID:     baseID + ".0",
 				Index:  "",
 				Source: []byte(""),
 				Fields: map[string]any{
-					fieldBID: []any{baseID},
+					"bid": []any{baseID},
 				},
 			},
 			{
@@ -140,9 +120,8 @@ func TestLocateChunks(t *testing.T) {
 				Index:  "",
 				Source: []byte(""),
 				Fields: map[string]any{
-					fieldBID: []any{baseID},
-					"last":   []any{true},
->>>>>>> a937df3 (chore(deps): update Go to 1.27.4 (#8247))
+					"bid":  []any{baseID},
+					"last": []any{true},
 				},
 			},
 		},

@@ -6,7 +6,6 @@ package api
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -19,25 +18,19 @@ import (
 	"go.elastic.co/apm/v2/apmtest"
 )
 
-// Test literals shared by more than one test case.
-const (
-	testGenericError = "generic error"
-	testErrorTypeTag = "error_type" // APM label key that error.type is reported under
-)
-
 func Test_ErrorResp(t *testing.T) {
 	tests := []struct {
 		name         string
 		err          error
 		expectedTags map[string]any
 	}{{
-		name: testGenericError,
-		err:  errors.New(testGenericError),
+		name: "generic error",
+		err:  fmt.Errorf("generic error"),
 	}, {
 		name: "elastic error",
 		err:  &es.ErrElastic{},
 		expectedTags: map[string]any{
-			testErrorTypeTag: errTypeElastic,
+			"error_type": "ErrElastic",
 		},
 	}, {
 		name: "wrapped elastic error",
@@ -46,7 +39,7 @@ func Test_ErrorResp(t *testing.T) {
 		// Production code returns *es.ErrElastic, so the test wraps a pointer too.
 		err: fmt.Errorf("wrapped error: %w", error(&es.ErrElastic{})),
 		expectedTags: map[string]any{
-			testErrorTypeTag: errTypeElastic,
+			"error_type": "ErrElastic",
 		},
 	}}
 
@@ -113,7 +106,7 @@ func Test_ErrResp_Status(t *testing.T) {
 		err:    context.Canceled,
 		status: 499,
 	}, {
-		name:   testGenericError,
+		name:   "generic error",
 		err:    fmt.Errorf("some error"),
 		status: 500,
 	}, {

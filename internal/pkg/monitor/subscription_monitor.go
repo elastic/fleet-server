@@ -22,7 +22,7 @@ const (
 	defaultSubscriptionTimeout = 60 * time.Second // max amount of time subscription has to read from channel
 )
 
-var gCounter uint64
+var gCounter atomic.Uint64
 
 // Subscription is a subscription to get notified for new documents.
 type Subscription interface {
@@ -84,7 +84,7 @@ func (m *monitorT) GetCheckpoint() sqn.SeqNo {
 
 // Subscribe returns a Subscription that is used to get notified of documents.
 func (m *monitorT) Subscribe() Subscription {
-	idx := atomic.AddUint64(&gCounter, 1)
+	idx := gCounter.Add(1)
 
 	s := &subT{
 		idx: idx,
