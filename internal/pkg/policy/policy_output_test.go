@@ -374,7 +374,7 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 			Role: &RoleT{Sha2: "new-hash", Raw: TestPayload},
 		}
 		policyMap := map[string]map[string]any{"test output": {}}
-		testAgent := &model.Agent{ESDocument: model.ESDocument{Id: "agent-id"}, Outputs: map[string]*model.PolicyOutput{}}
+		testAgent := &model.Agent{Id: "agent-id", Outputs: map[string]*model.PolicyOutput{}}
 		collector := &recordingOutputSecretCandidateCollector{}
 
 		err := output.Prepare(context.Background(), logger, bulker, testAgent, policyMap,
@@ -536,8 +536,8 @@ func TestPolicyOTLPOutputPrepare(t *testing.T) {
 				outputs["test output"] = tc.existingOutput
 			}
 			testAgent := &model.Agent{
-				ESDocument: model.ESDocument{Id: "agent-id"},
-				Outputs:    outputs,
+				Id:      "agent-id",
+				Outputs: outputs,
 			}
 			output := Output{
 				Type: OutputTypeOTLP,
@@ -572,7 +572,7 @@ func TestPolicyOTLPOutputPrepareManagedToExternal(t *testing.T) {
 
 	newAgent := func() *model.Agent {
 		return &model.Agent{
-			ESDocument: model.ESDocument{Id: "agent-id"},
+			Id: "agent-id",
 			Outputs: map[string]*model.PolicyOutput{
 				"test output": {
 					Type:            OutputTypeOTLP,
@@ -618,7 +618,7 @@ func TestPolicyOTLPOutputPrepareManagedToExternal(t *testing.T) {
 		bulker.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 		agent := &model.Agent{
-			ESDocument: model.ESDocument{Id: "agent-id"},
+			Id: "agent-id",
 			Outputs: map[string]*model.PolicyOutput{
 				"test output": {
 					Type:            OutputTypeElasticsearch,
@@ -642,7 +642,7 @@ func TestPolicyOTLPOutputPrepareManagedToExternal(t *testing.T) {
 		bulker := ftesting.NewMockBulk()
 
 		agent := &model.Agent{
-			ESDocument: model.ESDocument{Id: "agent-id"},
+			Id: "agent-id",
 			Outputs: map[string]*model.PolicyOutput{
 				"test output": {
 					Type:              OutputTypeOTLP,
@@ -750,7 +750,7 @@ func TestPolicyOTLPOutputPrepareRetiresRemovedOutput(t *testing.T) {
 			bulker := ftesting.NewMockBulk()
 
 			agent := &model.Agent{
-				ESDocument: model.ESDocument{Id: "agent-id"},
+				Id: "agent-id",
 				Outputs: map[string]*model.PolicyOutput{
 					removedOutputName: {
 						Type:              OutputTypeOTLP,

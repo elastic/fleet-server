@@ -22,6 +22,7 @@ const (
 	FieldBaseID   = "bid"
 	FieldLast     = "last"
 	FieldSHA2     = "sha2"
+	FieldSize     = "size" // script field holding the length of a chunk's data
 	FieldUploadID = "upload_id"
 )
 
@@ -40,7 +41,7 @@ func prepareChunkInfo(size bool) *dsl.Tmpl {
 	root.Param("fields", []string{FieldSHA2, FieldLast, FieldBaseID})
 	if size {
 		root.Param("script_fields", map[string]any{
-			"size": map[string]any{
+			FieldSize: map[string]any{
 				"script": map[string]any{
 					"lang":   "painless",
 					"source": "params._source.data.length",
@@ -182,7 +183,7 @@ func GetChunkInfos(ctx context.Context, bulker bulk.Bulk, index string, baseID s
 		if sha2, ok = getResultsFieldString(h.Fields, FieldSHA2); opt.RequireHash && !ok {
 			return nil, fmt.Errorf("unable to retrieve %s field from chunk document", FieldSHA2)
 		}
-		if size, ok = getResultsFieldInt(h.Fields, "size"); opt.IncludeSize && !ok {
+		if size, ok = getResultsFieldInt(h.Fields, FieldSize); opt.IncludeSize && !ok {
 			return nil, errors.New("unable to retrieve size from chunk document")
 		}
 		chunkid := strings.TrimPrefix(h.ID, bid+".")

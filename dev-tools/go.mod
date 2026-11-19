@@ -1,6 +1,6 @@
 module github.com/elastic/fleet-server/dev-tools
 
-go 1.26.11
+go 1.27.4
 
 tool (
 	github.com/elastic/go-json-schema-generate/cmd/schema-generate
@@ -33,12 +33,12 @@ require (
 	github.com/vmware-labs/yaml-jsonpath v0.3.2 // indirect
 	go.elastic.co/go-licence-detector v0.11.1 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
-	golang.org/x/mod v0.42.0 // indirect
-	golang.org/x/perf v0.0.0-20261009192801-be2c69fb417e // indirect
-	golang.org/x/sync v0.24.0 // indirect
-	golang.org/x/sys v0.49.0 // indirect
-	golang.org/x/telemetry v0.0.0-20261009151841-97e8ea77aa2a // indirect
-	golang.org/x/text v0.43.0 // indirect
-	golang.org/x/tools v0.52.0 // indirect
+	golang.org/x/mod v0.43.0 // indirect
+	golang.org/x/perf v0.0.0-20261117185222-4febdb082b2c // indirect
+	golang.org/x/sync v0.25.0 // indirect
+	golang.org/x/sys v0.50.0 // indirect
+	golang.org/x/telemetry v0.0.0-20261116191925-e77a43154acb // indirect
+	golang.org/x/text v0.44.0 // indirect
+	golang.org/x/tools v0.53.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

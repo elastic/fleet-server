@@ -90,14 +90,13 @@ func TestFileDeliveryNoChunks(t *testing.T) {
 
 	fakebulk.On("Search", mock.Anything, isFileMetaSearch, mock.Anything, mock.Anything, mock.Anything).Return(
 		&es.ResultT{
-			HitsT: es.HitsT{
-				Hits: []es.HitT{
-					{
-						ID:      "X",
-						SeqNo:   1,
-						Version: 1,
-						Index:   fmt.Sprintf(delivery.FileHeaderIndexPattern, "endpoint"),
-						Source: []byte(`{
+			Hits: []es.HitT{
+				{
+					ID:      "X",
+					SeqNo:   1,
+					Version: 1,
+					Index:   fmt.Sprintf(delivery.FileHeaderIndexPattern, "endpoint"),
+					Source: []byte(`{
 							"file": {
 								"created": "2023-06-05T15:23:37.499Z",
 								"Status": "READY",
@@ -111,16 +110,13 @@ func TestFileDeliveryNoChunks(t *testing.T) {
 								"size": 256
 							}
 						}`),
-					},
 				},
 			},
 		}, nil,
 	).Once()
 	fakebulk.On("Search", mock.Anything, isFileChunkSearch, mock.Anything, mock.Anything, mock.Anything).Return(
 		&es.ResultT{
-			HitsT: es.HitsT{
-				Hits: []es.HitT{},
-			},
+			Hits: []es.HitT{},
 		}, nil,
 	)
 
@@ -134,13 +130,12 @@ func TestFileDelivery(t *testing.T) {
 
 	bulk.On("Search", mock.Anything, isFileMetaSearch, mock.Anything, mock.Anything, mock.Anything).Return(
 		&es.ResultT{
-			HitsT: es.HitsT{
-				Hits: []es.HitT{{
-					ID:      "X",
-					SeqNo:   1,
-					Version: 1,
-					Index:   fmt.Sprintf(delivery.FileHeaderIndexPattern, "endpoint"),
-					Source: []byte(`{
+			Hits: []es.HitT{{
+				ID:      "X",
+				SeqNo:   1,
+				Version: 1,
+				Index:   fmt.Sprintf(delivery.FileHeaderIndexPattern, "endpoint"),
+				Source: []byte(`{
 						"file": {
 							"created": "2023-06-05T15:23:37.499Z",
 							"Status": "READY",
@@ -154,23 +149,20 @@ func TestFileDelivery(t *testing.T) {
 							"size": 2
 						}
 					}`),
-				}},
-			},
+			}},
 		}, nil,
 	)
 	bulk.On("Search", mock.Anything, isFileChunkSearch, mock.Anything, mock.Anything, mock.Anything).Return(
 		&es.ResultT{
-			HitsT: es.HitsT{
-				Hits: []es.HitT{
-					{
-						ID:      "X.0",
-						SeqNo:   1,
-						Version: 1,
-						Index:   fmt.Sprintf(delivery.FileDataIndexPattern, "endpoint"),
-						Fields: map[string]any{
-							file.FieldBaseID: []any{"X"},
-							file.FieldLast:   []any{true},
-						},
+			Hits: []es.HitT{
+				{
+					ID:      "X.0",
+					SeqNo:   1,
+					Version: 1,
+					Index:   fmt.Sprintf(delivery.FileDataIndexPattern, "endpoint"),
+					Fields: map[string]any{
+						file.FieldBaseID: []any{"X"},
+						file.FieldLast:   []any{true},
 					},
 				},
 			},
@@ -194,13 +186,12 @@ func TestFileDeliveryMultipleChunks(t *testing.T) {
 
 	bulk.On("Search", mock.Anything, isFileMetaSearch, mock.Anything, mock.Anything, mock.Anything).Return(
 		&es.ResultT{
-			HitsT: es.HitsT{
-				Hits: []es.HitT{{
-					ID:      "X",
-					SeqNo:   1,
-					Version: 1,
-					Index:   fmt.Sprintf(delivery.FileHeaderIndexPattern, "endpoint"),
-					Source: []byte(`{
+			Hits: []es.HitT{{
+				ID:      "X",
+				SeqNo:   1,
+				Version: 1,
+				Index:   fmt.Sprintf(delivery.FileHeaderIndexPattern, "endpoint"),
+				Source: []byte(`{
 						"file": {
 							"created": "2023-06-05T15:23:37.499Z",
 							"Status": "READY",
@@ -214,32 +205,29 @@ func TestFileDeliveryMultipleChunks(t *testing.T) {
 							"size": 4
 						}
 					}`),
-				}},
-			},
+			}},
 		}, nil,
 	)
 	bulk.On("Search", mock.Anything, isFileChunkSearch, mock.Anything, mock.Anything, mock.Anything).Return(
 		&es.ResultT{
-			HitsT: es.HitsT{
-				Hits: []es.HitT{
-					{
-						ID:      "X.0",
-						SeqNo:   1,
-						Version: 1,
-						Index:   fmt.Sprintf(delivery.FileDataIndexPattern, "endpoint"),
-						Fields: map[string]any{
-							file.FieldBaseID: []any{"X"},
-						},
+			Hits: []es.HitT{
+				{
+					ID:      "X.0",
+					SeqNo:   1,
+					Version: 1,
+					Index:   fmt.Sprintf(delivery.FileDataIndexPattern, "endpoint"),
+					Fields: map[string]any{
+						file.FieldBaseID: []any{"X"},
 					},
-					{
-						ID:      "X.1",
-						SeqNo:   1,
-						Version: 1,
-						Index:   fmt.Sprintf(delivery.FileDataIndexPattern, "endpoint"),
-						Fields: map[string]any{
-							file.FieldBaseID: []any{"X"},
-							file.FieldLast:   []any{true},
-						},
+				},
+				{
+					ID:      "X.1",
+					SeqNo:   1,
+					Version: 1,
+					Index:   fmt.Sprintf(delivery.FileDataIndexPattern, "endpoint"),
+					Fields: map[string]any{
+						file.FieldBaseID: []any{"X"},
+						file.FieldLast:   []any{true},
 					},
 				},
 			},
@@ -273,13 +261,12 @@ func TestFileDeliverySetsHeaders(t *testing.T) {
 
 	bulk.On("Search", mock.Anything, isFileMetaSearch, mock.Anything, mock.Anything, mock.Anything).Return(
 		&es.ResultT{
-			HitsT: es.HitsT{
-				Hits: []es.HitT{{
-					ID:      "X",
-					SeqNo:   1,
-					Version: 1,
-					Index:   fmt.Sprintf(delivery.FileHeaderIndexPattern, "endpoint"),
-					Source: []byte(`{
+			Hits: []es.HitT{{
+				ID:      "X",
+				SeqNo:   1,
+				Version: 1,
+				Index:   fmt.Sprintf(delivery.FileHeaderIndexPattern, "endpoint"),
+				Source: []byte(`{
 						"file": {
 							"created": "2023-06-05T15:23:37.499Z",
 							"Status": "READY",
@@ -293,23 +280,20 @@ func TestFileDeliverySetsHeaders(t *testing.T) {
 							"size": 4
 						}
 					}`),
-				}},
-			},
+			}},
 		}, nil,
 	)
 	bulk.On("Search", mock.Anything, isFileChunkSearch, mock.Anything, mock.Anything, mock.Anything).Return(
 		&es.ResultT{
-			HitsT: es.HitsT{
-				Hits: []es.HitT{
-					{
-						ID:      "X.0",
-						SeqNo:   1,
-						Version: 1,
-						Index:   fmt.Sprintf(delivery.FileDataIndexPattern, "endpoint"),
-						Fields: map[string]any{
-							file.FieldBaseID: []any{"X"},
-							file.FieldLast:   []any{true},
-						},
+			Hits: []es.HitT{
+				{
+					ID:      "X.0",
+					SeqNo:   1,
+					Version: 1,
+					Index:   fmt.Sprintf(delivery.FileDataIndexPattern, "endpoint"),
+					Fields: map[string]any{
+						file.FieldBaseID: []any{"X"},
+						file.FieldLast:   []any{true},
 					},
 				},
 			},
@@ -332,13 +316,12 @@ func TestFileDeliverySetsHashWhenPresent(t *testing.T) {
 
 	bulk.On("Search", mock.Anything, isFileMetaSearch, mock.Anything, mock.Anything, mock.Anything).Return(
 		&es.ResultT{
-			HitsT: es.HitsT{
-				Hits: []es.HitT{{
-					ID:      "X",
-					SeqNo:   1,
-					Version: 1,
-					Index:   fmt.Sprintf(delivery.FileHeaderIndexPattern, "endpoint"),
-					Source: []byte(`{
+			Hits: []es.HitT{{
+				ID:      "X",
+				SeqNo:   1,
+				Version: 1,
+				Index:   fmt.Sprintf(delivery.FileHeaderIndexPattern, "endpoint"),
+				Source: []byte(`{
 						"file": {
 							"created": "2023-06-05T15:23:37.499Z",
 							"Status": "READY",
@@ -355,23 +338,20 @@ func TestFileDeliverySetsHashWhenPresent(t *testing.T) {
 							}
 						}
 					}`),
-				}},
-			},
+			}},
 		}, nil,
 	)
 	bulk.On("Search", mock.Anything, isFileChunkSearch, mock.Anything, mock.Anything, mock.Anything).Return(
 		&es.ResultT{
-			HitsT: es.HitsT{
-				Hits: []es.HitT{
-					{
-						ID:      "X.0",
-						SeqNo:   1,
-						Version: 1,
-						Index:   fmt.Sprintf(delivery.FileDataIndexPattern, "endpoint"),
-						Fields: map[string]any{
-							file.FieldBaseID: []any{"X"},
-							file.FieldLast:   []any{true},
-						},
+			Hits: []es.HitT{
+				{
+					ID:      "X.0",
+					SeqNo:   1,
+					Version: 1,
+					Index:   fmt.Sprintf(delivery.FileDataIndexPattern, "endpoint"),
+					Fields: map[string]any{
+						file.FieldBaseID: []any{"X"},
+						file.FieldLast:   []any{true},
 					},
 				},
 			},
@@ -579,17 +559,15 @@ func TestFileLibraryDeliveryAllowsValidClients(t *testing.T) {
 	)
 	bulk.On("Search", mock.Anything, dataIndex, mock.Anything, mock.Anything, mock.Anything).Return(
 		&es.ResultT{
-			HitsT: es.HitsT{
-				Hits: []es.HitT{
-					{
-						ID:      "X.0",
-						SeqNo:   1,
-						Version: 1,
-						Index:   fmt.Sprintf(delivery.LibraryFileDataIndexPattern, "endpoint", libName),
-						Fields: map[string]any{
-							file.FieldBaseID: []any{"X"},
-							file.FieldLast:   []any{true},
-						},
+			Hits: []es.HitT{
+				{
+					ID:      "X.0",
+					SeqNo:   1,
+					Version: 1,
+					Index:   fmt.Sprintf(delivery.LibraryFileDataIndexPattern, "endpoint", libName),
+					Fields: map[string]any{
+						file.FieldBaseID: []any{"X"},
+						file.FieldLast:   []any{true},
 					},
 				},
 			},
@@ -630,17 +608,15 @@ func TestFileLibraryDelivery(t *testing.T) {
 	)
 	bulk.On("Search", mock.Anything, dataIndex, mock.Anything, mock.Anything, mock.Anything).Return(
 		&es.ResultT{
-			HitsT: es.HitsT{
-				Hits: []es.HitT{
-					{
-						ID:      "X.0",
-						SeqNo:   1,
-						Version: 1,
-						Index:   fmt.Sprintf(delivery.LibraryFileDataIndexPattern, "endpoint", libName),
-						Fields: map[string]any{
-							file.FieldBaseID: []any{"X"},
-							file.FieldLast:   []any{true},
-						},
+			Hits: []es.HitT{
+				{
+					ID:      "X.0",
+					SeqNo:   1,
+					Version: 1,
+					Index:   fmt.Sprintf(delivery.LibraryFileDataIndexPattern, "endpoint", libName),
+					Fields: map[string]any{
+						file.FieldBaseID: []any{"X"},
+						file.FieldLast:   []any{true},
 					},
 				},
 			},
@@ -690,9 +666,7 @@ func prepareFileDeliveryMock(t *testing.T) (http.Handler, apiServer, *MockTransp
 			deliverer: delivery.New(mockES, fakebulk, nil),
 			authAgent: func(r *http.Request, id *string, bulker bulk.Bulk, c cache.Cache) (*model.Agent, error) {
 				return &model.Agent{
-					ESDocument: model.ESDocument{
-						Id: "foo",
-					},
+					Id: "foo",
 					Agent: &model.AgentMetadata{
 						ID: "foo",
 					},
@@ -736,13 +710,12 @@ func mockChunkedFile(tx *MockTransport, bulk *itesting.MockBulk, mockChunkSize i
 	}
 	bulk.On("Search", mock.Anything, isFileMetaSearch, mock.Anything, mock.Anything, mock.Anything).Return(
 		&es.ResultT{
-			HitsT: es.HitsT{
-				Hits: []es.HitT{{
-					ID:      fileID,
-					SeqNo:   1,
-					Version: 1,
-					Index:   fmt.Sprintf(delivery.FileHeaderIndexPattern, "endpoint"),
-					Source: fmt.Appendf(nil, `{
+			Hits: []es.HitT{{
+				ID:      fileID,
+				SeqNo:   1,
+				Version: 1,
+				Index:   fmt.Sprintf(delivery.FileHeaderIndexPattern, "endpoint"),
+				Source: fmt.Appendf(nil, `{
 						"file": {
 							"created": "2023-06-05T15:23:37.499Z",
 							"Status": "READY",
@@ -757,15 +730,12 @@ func mockChunkedFile(tx *MockTransport, bulk *itesting.MockBulk, mockChunkSize i
 							%s
 						}
 					}`, mockFileSize, chunkSizeField),
-				}},
-			},
+			}},
 		}, nil,
 	)
 	bulk.On("Search", mock.Anything, isFileChunkSearch, mock.Anything, mock.Anything, mock.Anything).Return(
 		&es.ResultT{
-			HitsT: es.HitsT{
-				Hits: chunkHits,
-			},
+			Hits: chunkHits,
 		}, nil,
 	)
 
