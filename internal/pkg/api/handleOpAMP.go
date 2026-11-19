@@ -243,8 +243,19 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 				sendCapabilities = true
 			}
 			if message.SequenceNum != uint64(agent.SequenceNum)+1 { //nolint:gosec // agent seq num will not be negative
-				// The client's sequence skipped, so this connection missed messages and needs a
-				// full report to resynchronise.
+				// agent.SequenceNum is read from ES, but updateAgent only stages the new value in the
+				// checkin bulker, which flushes on an interval (10s by default). If the agent sends
+				// another message before that flush, we read a stale value here and this check can
+				// report drift that did not happen. The flag then makes the client skip its polling
+				// interval and send again immediately, which can repeat until the flush lands
+				// (see #8187).
+				//
+				// Checking the bulker's pending queue would not help: the next message may be handled
+				// by a different Fleet Server instance.
+				//
+				// This branch has two possible causes that we cannot tell apart here: a genuine gap
+				// (a message the server never stored, so the agent's full state is worth requesting),
+				// or the stale read described above (nothing was missed, so the flag is redundant).
 				reportFullState = true
 				zlog.Debug().
 					Int64("stored_sequence", agent.SequenceNum).
