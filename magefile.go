@@ -121,7 +121,6 @@ const (
 	platformLinuxAMD64   = "linux/amd64"
 	platformLinuxARM64   = "linux/arm64"
 	platformWindowsAMD64 = "windows/amd64"
-	platformWindowsARM64 = "windows/arm64"
 
 	tagRequireFIPS = "requirefips"
 	tagIntegration = "integration"
@@ -155,25 +154,16 @@ var (
 var (
 	// platforms is the list of all supported platforms.
 	platforms = []string{
-<<<<<<< HEAD
-		"darwin/amd64",
-		"darwin/arm64",
-		"linux/amd64",
-		"linux/arm64",
-		"windows/amd64",
-	}
-	// plaformsFIPS is the list of all FIPS-capable platforms.
-	platformsFIPS = []string{
-		"linux/amd64",
-		"linux/arm64",
-=======
 		platformDarwinAMD64,
 		platformDarwinARM64,
 		platformLinuxAMD64,
 		platformLinuxARM64,
 		platformWindowsAMD64,
-		platformWindowsARM64,
->>>>>>> 73e7a81 (ci: lint all build tag sets (#8248))
+	}
+	// plaformsFIPS is the list of all FIPS-capable platforms.
+	platformsFIPS = []string{
+		platformLinuxAMD64,
+		platformLinuxARM64,
 	}
 
 	// platformsDocker is the list of all platforms that are supported by docker multiplatform builds.
@@ -719,28 +709,6 @@ func (Check) Go(ctx context.Context) error {
 	return err
 }
 
-<<<<<<< HEAD
-=======
-// Fix runs go fix ./... with all build tags used in the repo root, and testing dir.
-func (Check) Fix(ctx context.Context) error {
-	err := sh.RunV("go", "fix", "./...")
-	for _, tag := range []string{"snapshot", tagIntegration, tagRequireFIPS, "requirefips,snapshot", "requirefips,integration"} {
-		if e := sh.RunV("go", "fix", "-tags", tag, "./..."); e != nil {
-			err = errors.Join(err, e)
-		}
-	}
-	for _, tag := range []string{tagE2E, "cloude2e", "requirefips,e2e", "requirefips,cloude2e"} {
-		log.Printf("Running in testing with tags: %s", tag)
-		cmd := exec.CommandContext(ctx, "go", "fix", "-tags", tag, "./...")
-		cmd.Dir = testingDir
-		if out, e := cmd.CombinedOutput(); e != nil {
-			err = errors.Join(err, fmt.Errorf("%w: %s", e, string(out)))
-		}
-	}
-	return err
-}
-
->>>>>>> 73e7a81 (ci: lint all build tag sets (#8248))
 // getLinter ensures that the linter of the correct version is installed to GOPATH.
 func getLinter(ctx context.Context) error {
 	// exit early if linter exists with same version.
@@ -1134,12 +1102,8 @@ func (Docker) Image() error {
 	}
 	if isFIPS() {
 		dockerFile = dockerBuilderFIPS
-<<<<<<< HEAD
-		image += "-fips"
-		suffix += "-fips"
-=======
 		image += fipsSuffix
->>>>>>> 73e7a81 (ci: lint all build tag sets (#8248))
+		suffix += fipsSuffix
 	}
 	if v, ok := os.LookupEnv(envDockerImage); ok && v != "" {
 		image = v
@@ -1182,12 +1146,8 @@ func (Docker) Publish() error {
 	}
 	if isFIPS() {
 		dockerFile = dockerBuilderFIPS
-<<<<<<< HEAD
-		image += "-fips"
-		suffix += "-fips"
-=======
 		image += fipsSuffix
->>>>>>> 73e7a81 (ci: lint all build tag sets (#8248))
+		suffix += fipsSuffix
 	}
 	if v, ok := os.LookupEnv(envDockerImage); ok && v != "" {
 		image = v
@@ -1321,13 +1281,8 @@ func (Test) Unit() error {
 		args = append(args, "-run", v)
 	}
 	args = append(args, "./...")
-<<<<<<< HEAD
-	output, err := teeCommand(environMap(), "go", args...)
-	err = errors.Join(err, os.WriteFile(filepath.Join("build", "test-unit-"+runtime.GOOS+".out"), output, 0o644))
-=======
-	output, err := teeCommand(env, args...)
+	output, err := teeCommand(environMap(), args...)
 	err = errors.Join(err, os.WriteFile(filepath.Join("build", "test-unit-"+runtime.GOOS+".out"), output, 0o644)) //nolint:gosec // G306: test output, not a secret
->>>>>>> 73e7a81 (ci: lint all build tag sets (#8248))
 	return err
 }
 
@@ -1744,22 +1699,7 @@ func checkFIPSBinary(path string) error {
 		switch setting.Key {
 		case flagTags:
 			foundTags = true
-<<<<<<< HEAD
-			if !strings.Contains(setting.Value, "requirefips") {
-=======
-			requireFipsTag := false
-			fips140Tag := false
-
-			for _, tag := range strings.Split(setting.Value, ",") {
-				switch tag {
-				case tagRequireFIPS:
-					requireFipsTag = true
-				case "fips140v1.0":
-					fips140Tag = true
-				}
-			}
-			if !requireFipsTag {
->>>>>>> 73e7a81 (ci: lint all build tag sets (#8248))
+			if !strings.Contains(setting.Value, tagRequireFIPS) {
 				return fmt.Errorf("requirefips tag not found in %s", setting.Value)
 			}
 			continue
@@ -1827,12 +1767,8 @@ func (Test) JunitReport(ctx context.Context) error {
 		var output bytes.Buffer
 		var stderr bytes.Buffer
 
-<<<<<<< HEAD
-		cmd := exec.Command("go", "tool", "-modfile", filepath.Join("dev-tools", "go.mod"), "github.com/jstemmer/go-junit-report")
-=======
 		//nolint:gosec // G204: fixed tool invocation, only the modfile path is computed
-		cmd := exec.CommandContext(ctx, "go", "tool", "-modfile", filepath.Join("dev-tools", "go.mod"), "github.com/jstemmer/go-junit-report/v2")
->>>>>>> 73e7a81 (ci: lint all build tag sets (#8248))
+		cmd := exec.CommandContext(ctx, "go", "tool", "-modfile", filepath.Join("dev-tools", "go.mod"), "github.com/jstemmer/go-junit-report")
 		cmd.Stdin = srcFile
 		cmd.Stdout = &output
 		cmd.Stderr = &stderr
