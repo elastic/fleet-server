@@ -32,6 +32,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/elastic/beats/v7/pkg/monitoring"
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/go-elasticsearch/v9"
 
@@ -2014,3 +2015,419 @@ func Test_Checkin_GracefulForceUnenroll(t *testing.T) {
 		assert.Equal(t, http.StatusUnauthorized, res.StatusCode)
 	})
 }
+<<<<<<< HEAD
+=======
+
+// Test_Checkin_AgentTags checks that agents get their tags in the policy and that a tags change
+// reaches them without a new policy revision.
+func Test_Checkin_AgentTags(t *testing.T) {
+	srv, err := startTestServer(t, t.Context(), agentTagsPolicy(true))
+	require.NoError(t, err)
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
+	kibana := NewFakeKibana(srv)
+
+	agent, err := NewFakeAgent(ctx, srv, `{
+	    "type": "PERMANENT",
+	    "shared_id": "",
+	    "metadata": {
+		"user_provided": {},
+		"local": {},
+		"tags": ["b", "a", "a"]
+	    }
+	}`)
+	require.NoError(t, err)
+	rev1 := fmt.Sprintf("policy:%s:1", agent.PolicyID)
+	rev2 := fmt.Sprintf("policy:%s:2", agent.PolicyID)
+	rev3 := fmt.Sprintf("policy:%s:3", agent.PolicyID)
+
+	abHash, err := (&model.Agent{Tags: []string{"a", "b"}}).ComputeTagsHash()
+	require.NoError(t, err)
+	cHash, err := (&model.Agent{Tags: []string{"c"}}).ComputeTagsHash()
+	require.NoError(t, err)
+	dHash, err := (&model.Agent{Tags: []string{"d"}}).ComputeTagsHash()
+	require.NoError(t, err)
+
+	t.Run("agent gets its enrollment tags", func(t *testing.T) {
+		action, policy, err := agent.CheckinPolicyChange(ctx, 0)
+		require.NoError(t, err)
+		assert.Equal(t, rev1, action.Id)
+		assert.Equal(t, []any{"a", "b"}, policy.Agent["tags"])
+		assert.Equal(t, agentTagsPolicy(true).Agent["features"], policy.Agent["features"])
+
+		doc, err := dl.GetAgent(ctx, srv.bulker, agent.ID)
+		require.NoError(t, err)
+		assert.Equal(t, abHash, doc.TagsHash)
+	})
+
+	t.Run("agent gets the new tags", func(t *testing.T) {
+		err := kibana.SetAgentTags(ctx, agent.ID, "c")
+		require.NoError(t, err)
+
+		action, policy, err := agent.CheckinPolicyChange(ctx, 1)
+		require.NoError(t, err)
+		assert.Equal(t, rev1, action.Id)
+		assert.Equal(t, []any{"c"}, policy.Agent["tags"])
+
+		doc, err := dl.GetAgent(ctx, srv.bulker, agent.ID)
+		require.NoError(t, err)
+		assert.Equal(t, cHash, doc.TagsHash)
+	})
+
+	t.Run("no tag change, no new policy", func(t *testing.T) {
+		err := agent.CheckinLongPoll(ctx, 1)
+		require.NoError(t, err)
+	})
+
+	t.Run("agent gets no tags after they are removed", func(t *testing.T) {
+		err := kibana.SetAgentTags(ctx, agent.ID)
+		require.NoError(t, err)
+
+		action, policy, err := agent.CheckinPolicyChange(ctx, 1)
+		require.NoError(t, err)
+		assert.Equal(t, rev1, action.Id)
+		assert.NotContains(t, policy.Agent, "tags")
+
+		doc, err := dl.GetAgent(ctx, srv.bulker, agent.ID)
+		require.NoError(t, err)
+		assert.Empty(t, doc.TagsHash)
+	})
+
+	t.Run("policy update during a check-in still has the old tags", func(t *testing.T) {
+		type checkinResult struct {
+			action api.Action
+			policy api.PolicyData
+			err    error
+		}
+
+		agent.Message = "open check-in"
+		done := make(chan checkinResult, 1)
+		go func() {
+			action, policy, err := agent.CheckinPolicyChange(ctx, 1)
+			done <- checkinResult{action: action, policy: policy, err: err}
+		}()
+
+		// The check-in writes its message to the agent document right after it subscribes.
+		require.Eventually(t, func() bool {
+			doc, err := dl.GetAgent(ctx, srv.bulker, agent.ID)
+			return err == nil && doc.LastCheckinMessage == "open check-in"
+		}, 15*time.Second, 500*time.Millisecond, "the open check-in was not recorded")
+
+		err := kibana.SetAgentTags(ctx, agent.ID, "d")
+		require.NoError(t, err)
+		err = kibana.WritePolicy(ctx, agent.PolicyID, 2, agentTagsPolicy(true))
+		require.NoError(t, err)
+
+		result := <-done
+		agent.Message = "checkin ok"
+		require.NoError(t, result.err)
+		assert.Equal(t, rev2, result.action.Id)
+		assert.NotContains(t, result.policy.Agent, "tags")
+
+		doc, err := dl.GetAgent(ctx, srv.bulker, agent.ID)
+		require.NoError(t, err)
+		assert.Empty(t, doc.TagsHash, "the sent policy had no tags, so the stored hash must stay empty")
+	})
+
+	t.Run("agent gets the new tags on the next check-in", func(t *testing.T) {
+		action, policy, err := agent.CheckinPolicyChange(ctx, 2)
+		require.NoError(t, err)
+		assert.Equal(t, rev2, action.Id)
+		assert.Equal(t, []any{"d"}, policy.Agent["tags"])
+
+		doc, err := dl.GetAgent(ctx, srv.bulker, agent.ID)
+		require.NoError(t, err)
+		assert.Equal(t, dHash, doc.TagsHash)
+	})
+
+	t.Run("feature off, agent still gets the tags with a new policy", func(t *testing.T) {
+		err := kibana.WritePolicy(ctx, agent.PolicyID, 3, agentTagsPolicy(false))
+		require.NoError(t, err)
+
+		action, policy, err := agent.CheckinPolicyChange(ctx, 2)
+		require.NoError(t, err)
+		assert.Equal(t, rev3, action.Id)
+		assert.Equal(t, []any{"d"}, policy.Agent["tags"])
+		assert.Equal(t, agentTagsPolicy(false).Agent["features"], policy.Agent["features"])
+	})
+
+	t.Run("feature off, tag change does not send the policy again", func(t *testing.T) {
+		err := kibana.SetAgentTags(ctx, agent.ID, "e")
+		require.NoError(t, err)
+
+		err = agent.CheckinLongPoll(ctx, 3)
+		require.NoError(t, err)
+
+		doc, err := dl.GetAgent(ctx, srv.bulker, agent.ID)
+		require.NoError(t, err)
+		assert.Equal(t, dHash, doc.TagsHash, "no policy was sent, so the stored hash must not change")
+	})
+}
+
+// FakeAgent plays an enrolled Elastic Agent over the Fleet Server HTTP API.
+type FakeAgent struct {
+	srv      *tserver
+	key      string
+	ID       string
+	PolicyID string
+	Message  string
+}
+
+// NewFakeAgent enrolls an agent with the given enroll request body.
+func NewFakeAgent(ctx context.Context, srv *tserver, enrollBody string) (*FakeAgent, error) {
+	req, err := http.NewRequestWithContext(ctx, "POST", srv.baseURL()+"/api/fleet/agents/enroll", strings.NewReader(enrollBody))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "ApiKey "+srv.enrollKey)
+	req.Header.Set("User-Agent", "elastic agent "+serverVersion)
+	req.Header.Set("Content-Type", "application/json")
+	res, err := cleanhttp.DefaultClient().Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected enroll status %d", res.StatusCode)
+	}
+	var enrollResp api.EnrollResponse
+	if err := json.NewDecoder(res.Body).Decode(&enrollResp); err != nil {
+		return nil, err
+	}
+	agent, err := dl.GetAgent(ctx, srv.bulker, enrollResp.Item.Id)
+	if err != nil {
+		return nil, err
+	}
+	return &FakeAgent{
+		srv:      srv,
+		key:      enrollResp.Item.AccessApiKey,
+		ID:       enrollResp.Item.Id,
+		PolicyID: agent.PolicyID,
+		Message:  "checkin ok",
+	}, nil
+}
+
+// checkin sends a check-in that reports the policy revision the agent runs.
+func (a *FakeAgent) checkin(ctx context.Context, rev int64) (api.CheckinResponse, error) {
+	var checkinResp api.CheckinResponse
+	body, err := json.Marshal(map[string]any{
+		"status":              "online",
+		"message":             a.Message,
+		"agent_policy_id":     a.PolicyID,
+		"policy_revision_idx": rev,
+	})
+	if err != nil {
+		return checkinResp, err
+	}
+	req, err := http.NewRequestWithContext(ctx, "POST", a.srv.buildURL(a.ID, "checkin"), bytes.NewReader(body))
+	if err != nil {
+		return checkinResp, err
+	}
+	req.Header.Set("Authorization", "ApiKey "+a.key)
+	req.Header.Set("User-Agent", "elastic agent "+serverVersion)
+	req.Header.Set("Content-Type", "application/json")
+	res, err := cleanhttp.DefaultClient().Do(req)
+	if err != nil {
+		return checkinResp, err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		return checkinResp, fmt.Errorf("unexpected checkin status %d", res.StatusCode)
+	}
+	return checkinResp, json.NewDecoder(res.Body).Decode(&checkinResp)
+}
+
+// CheckinPolicyChange sends a check-in that must return a POLICY_CHANGE at once.
+func (a *FakeAgent) CheckinPolicyChange(ctx context.Context, rev int64) (api.Action, api.PolicyData, error) {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	checkinResp, err := a.checkin(ctx, rev)
+	if err != nil {
+		return api.Action{}, api.PolicyData{}, fmt.Errorf("expected a policy change at once: %w", err)
+	}
+	if len(checkinResp.Actions) != 1 {
+		return api.Action{}, api.PolicyData{}, fmt.Errorf("expected exactly one action, got %d", len(checkinResp.Actions))
+	}
+	action := checkinResp.Actions[0]
+	if action.Type != api.POLICYCHANGE {
+		return api.Action{}, api.PolicyData{}, fmt.Errorf("expected a POLICY_CHANGE action, got %s", action.Type)
+	}
+	pc, err := action.Data.AsActionPolicyChange()
+	if err != nil {
+		return api.Action{}, api.PolicyData{}, err
+	}
+	return action, pc.Policy, nil
+}
+
+// CheckinLongPoll sends a check-in that must stay open, because no action is due.
+func (a *FakeAgent) CheckinLongPoll(ctx context.Context, rev int64) error {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	checkinResp, err := a.checkin(ctx, rev)
+	if errors.Is(err, context.DeadlineExceeded) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	return fmt.Errorf("expected the checkin to long poll, got actions: %v", checkinResp.Actions)
+}
+
+// FakeKibana writes to Elasticsearch what Kibana writes for Fleet.
+type FakeKibana struct {
+	bulker bulk.Bulk
+}
+
+// NewFakeKibana returns a FakeKibana that writes through the bulker of the test server.
+func NewFakeKibana(srv *tserver) *FakeKibana {
+	return &FakeKibana{bulker: srv.bulker}
+}
+
+// SetAgentTags writes the agent tags as Kibana does.
+func (k *FakeKibana) SetAgentTags(ctx context.Context, agentID string, tags ...string) error {
+	if tags == nil {
+		tags = []string{}
+	}
+	body, err := bulk.UpdateFields{dl.FieldTags: tags}.Marshal()
+	if err != nil {
+		return err
+	}
+	return k.bulker.Update(ctx, dl.FleetAgents, agentID, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3))
+}
+
+// WritePolicy writes a new revision of the policy.
+func (k *FakeKibana) WritePolicy(ctx context.Context, policyID string, rev int64, data model.PolicyData) error {
+	_, err := dl.CreatePolicy(ctx, k.bulker, model.Policy{
+		PolicyID:           policyID,
+		RevisionIdx:        rev,
+		DefaultFleetServer: true,
+		Data:               &data,
+	})
+	return err
+}
+
+func agentTagsPolicy(includeTagsInEvents bool) model.PolicyData {
+	return model.PolicyData{
+		Outputs: map[string]map[string]any{
+			"default": {
+				"type": "elasticsearch",
+			},
+		},
+		OutputPermissions: json.RawMessage(`{"default": {}}`),
+		Inputs: []map[string]any{{
+			"type": "fleet-server",
+		}},
+		Agent: map[string]any{
+			"features": map[string]any{
+				model.FeatureIncludeTagsInEvents: map[string]any{"enabled": includeTagsInEvents},
+			},
+		},
+	}
+}
+
+// Test_RouteMonitoring makes sure that the route metrics and the request log
+// match the requests that Fleet Server receives.
+func Test_RouteMonitoring(t *testing.T) {
+	routeMetric := func(t *testing.T, name string) uint64 {
+		t.Helper()
+		v, ok := monitoring.Default.Get("http_server.routes." + name).(*monitoring.Uint)
+		require.True(t, ok, "route metric %s not found", name)
+		value := v.Get()
+		return value
+	}
+	doRequest := func(t *testing.T, ctx context.Context, srv *tserver, method, path string) (int, http.Header) {
+		t.Helper()
+		req, err := http.NewRequestWithContext(ctx, method, srv.baseURL()+path, nil)
+		require.NoError(t, err)
+		res, err := cleanhttp.DefaultClient().Do(req)
+		require.NoError(t, err)
+		defer res.Body.Close()
+		return res.StatusCode, res.Header
+	}
+
+	type route struct {
+		metric   string
+		method   string
+		path     string
+		wantCode int
+	}
+
+	tests := []struct {
+		name          string
+		opAMPEnabled  bool
+		wantOpAMPCode int
+	}{{
+		name:          "with OpAMP enabled",
+		opAMPEnabled:  true,
+		wantOpAMPCode: http.StatusUnauthorized,
+	}, {
+		name:          "with OpAMP disabled",
+		opAMPEnabled:  false,
+		wantOpAMPCode: http.StatusNotFound,
+	}}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			srv, err := startTestServer(t, t.Context(), policyData, func(cfg *config.Config) error {
+				cfg.Inputs[0].Server.Features.EnableOpAMP = tc.opAMPEnabled
+				// Allow one enroll request each hour so that the second request is rejected.
+				cfg.Inputs[0].Server.Limits.EnrollLimit = config.Limit{Interval: time.Hour, Burst: 1}
+				return nil
+			})
+			require.NoError(t, err)
+			ctx := testlog.SetLogger(t).WithContext(t.Context())
+			routes := []route{{
+				metric:   "status",
+				method:   http.MethodGet,
+				path:     "/api/status",
+				wantCode: http.StatusOK,
+			}, {
+				metric:   "opAMP",
+				method:   http.MethodPost,
+				path:     "/v1/opamp",
+				wantCode: tc.wantOpAMPCode,
+			}}
+
+			t.Run("route totals match the received requests", func(t *testing.T) {
+				const requests = 5
+				for _, r := range routes {
+					total := routeMetric(t, r.metric+".total")
+					for range requests {
+						code, _ := doRequest(t, ctx, srv, r.method, r.path)
+						require.Equal(t, r.wantCode, code, "%s %s", r.method, r.path)
+					}
+					count := routeMetric(t, r.metric+".total") - total
+					assert.Equal(t, uint64(requests), count, "%s route total", r.metric)
+				}
+			})
+
+			t.Run("every response goes through the request logger", func(t *testing.T) {
+				for _, r := range routes {
+					code, header := doRequest(t, ctx, srv, r.method, r.path)
+					require.Equal(t, r.wantCode, code, "%s %s", r.method, r.path)
+
+					requestID := header.Get(logger.HeaderRequestID)
+					assert.NotEmpty(t, requestID, "request ID of %s %s", r.method, r.path)
+				}
+			})
+
+			t.Run("rate limit rejections are counted and logged", func(t *testing.T) {
+				total := routeMetric(t, "enroll.total")
+				rejections := routeMetric(t, "enroll.limit_rate")
+				code, _ := doRequest(t, ctx, srv, http.MethodPost, "/api/fleet/agents/enroll")
+				require.NotEqual(t, http.StatusTooManyRequests, code)
+
+				code, header := doRequest(t, ctx, srv, http.MethodPost, "/api/fleet/agents/enroll")
+				require.Equal(t, http.StatusTooManyRequests, code)
+
+				requestID := header.Get(logger.HeaderRequestID)
+				assert.NotEmpty(t, requestID)
+
+				count := routeMetric(t, "enroll.total") - total
+				assert.Equal(t, uint64(2), count, "enroll route total")
+
+				rejectionCount := routeMetric(t, "enroll.limit_rate") - rejections
+				assert.Equal(t, uint64(1), rejectionCount, "enroll rate limit rejections")
+			})
+		})
+	}
+}
+>>>>>>> af0dc1e (Fix doubled route metrics and missing request logs when OpAMP is enabled (#8276))
