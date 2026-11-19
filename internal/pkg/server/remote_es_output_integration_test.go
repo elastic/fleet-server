@@ -66,7 +66,7 @@ func Checkin(t *testing.T, ctx context.Context, srv *tserver, agentID, key strin
 	actionID, ok := aIDRaw.(string)
 	require.True(t, ok, "expected action id to be string")
 
-	typeRaw := action["type"]
+	typeRaw := action[tType]
 	require.Equal(t, actionType, typeRaw)
 	if actionType != "POLICY_CHANGE" {
 		return "", actionID
@@ -80,17 +80,25 @@ func Checkin(t *testing.T, ctx context.Context, srv *tserver, agentID, key strin
 	require.True(t, ok, "expected outputs to be map")
 	var remoteAPIKey string
 	if shouldHaveRemoteES {
+<<<<<<< HEAD
 		remoteES, ok := outputs["remoteES"].(map[string]interface{})
+=======
+		remoteES, ok := outputs[tRemoteES].(map[string]any)
+>>>>>>> a937df3 (chore(deps): update Go to 1.27.4 (#8247))
 		require.True(t, ok, "expected remoteES to be map")
-		oType, ok := remoteES["type"].(string)
+		oType, ok := remoteES[tType].(string)
 		require.True(t, ok, "expected type to be string")
-		require.Equal(t, "elasticsearch", oType)
-		serviceToken := remoteES["service_token"]
+		require.Equal(t, kElasticsearch, oType)
+		serviceToken := remoteES[tServiceToken]
 		require.Equal(t, nil, serviceToken)
 		remoteAPIKey, ok = remoteES["api_key"].(string)
 		require.True(t, ok, "expected remoteAPIKey to be string")
 	}
+<<<<<<< HEAD
 	defaultOutput, ok := outputs["default"].(map[string]interface{})
+=======
+	defaultOutput, ok := outputs[tDefault].(map[string]any)
+>>>>>>> a937df3 (chore(deps): update Go to 1.27.4 (#8247))
 	require.True(t, ok, "expected default to be map")
 	defaultAPIKey, ok := defaultOutput["api_key"].(string)
 	require.True(t, ok, "expected defaultAPIKey to be string")
@@ -151,21 +159,32 @@ func Test_Agent_Remote_ES_Output(t *testing.T) {
 
 	var policyRemoteID = uuid.Must(uuid.NewV4()).String()
 	var policyDataRemoteES = model.PolicyData{
+<<<<<<< HEAD
 		Outputs: map[string]map[string]interface{}{
 			"default": {
 				"type": "elasticsearch",
+=======
+		Outputs: map[string]map[string]any{
+			tDefault: {
+				tType: kElasticsearch,
+>>>>>>> a937df3 (chore(deps): update Go to 1.27.4 (#8247))
 			},
-			"remoteES": {
-				"type":                        "remote_elasticsearch",
-				"hosts":                       []string{remoteESUrl},
-				"service_token":               os.Getenv("REMOTE_ELASTICSEARCH_SERVICE_TOKEN"),
-				"ssl.enabled":                 true,
-				"ssl.certificate_authorities": []string{getRemoteElasticsearchCa(t)},
+			tRemoteES: {
+				tType:                      tRemoteElasticsearch,
+				tHosts:                     []string{remoteESUrl},
+				tServiceToken:              os.Getenv("REMOTE_ELASTICSEARCH_SERVICE_TOKEN"),
+				tSSLEnabled:                true,
+				tSSLCertificateAuthorities: []string{getRemoteElasticsearchCa(t)},
 			},
 		},
 		OutputPermissions: json.RawMessage(`{"default": {}, "remoteES": {}}`),
+<<<<<<< HEAD
 		Inputs:            []map[string]interface{}{},
 		Agent:             map[string]interface{}{"monitoring": map[string]string{"use_output": "remoteES"}},
+=======
+		Inputs:            []map[string]any{},
+		Agent:             map[string]any{tMonitoring: map[string]string{tUseOutput: tRemoteES}},
+>>>>>>> a937df3 (chore(deps): update Go to 1.27.4 (#8247))
 	}
 
 	_, err = dl.CreatePolicy(ctx, srv.bulker, model.Policy{
@@ -180,7 +199,7 @@ func Test_Agent_Remote_ES_Output(t *testing.T) {
 
 	t.Log("Create API key and enrollment key for new policy")
 
-	newKey, err := apikey.Create(ctx, srv.bulker.Client(), "default", "", "true", []byte(`{
+	newKey, err := apikey.Create(ctx, srv.bulker.Client(), tDefault, "", "true", []byte(`{
 	    "fleet-apikey-enroll": {
 		"cluster": [],
 		"index": [],
@@ -190,18 +209,26 @@ func Test_Agent_Remote_ES_Output(t *testing.T) {
 		    "resources": ["*"]
 		}]
 	    }
+<<<<<<< HEAD
 	}`), map[string]interface{}{
 		"managed_by": "fleet",
 		"managed":    true,
 		"type":       "enroll",
 		"policy_id":  policyRemoteID,
+=======
+	}`), map[string]any{
+		tManagedBy: tFleet,
+		tManaged:   true,
+		tType:      tEnroll,
+		tPolicyID:  policyRemoteID,
+>>>>>>> a937df3 (chore(deps): update Go to 1.27.4 (#8247))
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	_, err = dl.CreateEnrollmentAPIKey(ctx, srv.bulker, model.EnrollmentAPIKey{
-		Name:     "RemoteES",
+		Name:     tRemoteESName,
 		APIKey:   newKey.Key,
 		APIKeyID: newKey.ID,
 		PolicyID: policyRemoteID,
@@ -225,7 +252,7 @@ func Test_Agent_Remote_ES_Output(t *testing.T) {
 	}()
 
 	remoteAPIKey, actionID := Checkin(t, ctx, srvCopy, resp.Item.Id, resp.Item.AccessApiKey, true, "POLICY_CHANGE")
-	apiKeyID := strings.Split(remoteAPIKey, ":")[0]
+	apiKeyID, _, _ := strings.Cut(remoteAPIKey, ":")
 
 	verifyRemoteAPIKey(t, ctx, apiKeyID, false)
 
@@ -234,9 +261,15 @@ func Test_Agent_Remote_ES_Output(t *testing.T) {
 	t.Log("Update policy to remove remote ES output")
 
 	var policyData = model.PolicyData{
+<<<<<<< HEAD
 		Outputs: map[string]map[string]interface{}{
 			"default": {
 				"type": "elasticsearch",
+=======
+		Outputs: map[string]map[string]any{
+			tDefault: {
+				tType: kElasticsearch,
+>>>>>>> a937df3 (chore(deps): update Go to 1.27.4 (#8247))
 			},
 		},
 		OutputPermissions: json.RawMessage(`{"default": {}}`),
@@ -305,21 +338,32 @@ func Test_Agent_Remote_ES_Output_ForceUnenroll(t *testing.T) {
 
 	var policyRemoteID = uuid.Must(uuid.NewV4()).String()
 	var policyDataRemoteES = model.PolicyData{
+<<<<<<< HEAD
 		Outputs: map[string]map[string]interface{}{
 			"default": {
 				"type": "elasticsearch",
+=======
+		Outputs: map[string]map[string]any{
+			tDefault: {
+				tType: kElasticsearch,
+>>>>>>> a937df3 (chore(deps): update Go to 1.27.4 (#8247))
 			},
-			"remoteES": {
-				"type":                        "remote_elasticsearch",
-				"hosts":                       []string{remoteESUrl},
-				"service_token":               os.Getenv("REMOTE_ELASTICSEARCH_SERVICE_TOKEN"),
-				"ssl.enabled":                 true,
-				"ssl.certificate_authorities": []string{getRemoteElasticsearchCa(t)},
+			tRemoteES: {
+				tType:                      tRemoteElasticsearch,
+				tHosts:                     []string{remoteESUrl},
+				tServiceToken:              os.Getenv("REMOTE_ELASTICSEARCH_SERVICE_TOKEN"),
+				tSSLEnabled:                true,
+				tSSLCertificateAuthorities: []string{getRemoteElasticsearchCa(t)},
 			},
 		},
 		OutputPermissions: json.RawMessage(`{"default": {}, "remoteES": {}}`),
+<<<<<<< HEAD
 		Inputs:            []map[string]interface{}{},
 		Agent:             map[string]interface{}{"monitoring": map[string]string{"use_output": "remoteES"}},
+=======
+		Inputs:            []map[string]any{},
+		Agent:             map[string]any{tMonitoring: map[string]string{tUseOutput: tRemoteES}},
+>>>>>>> a937df3 (chore(deps): update Go to 1.27.4 (#8247))
 	}
 
 	_, err = dl.CreatePolicy(ctx, srv.bulker, model.Policy{
@@ -334,7 +378,7 @@ func Test_Agent_Remote_ES_Output_ForceUnenroll(t *testing.T) {
 
 	t.Log("Create API key and enrollment key for new policy")
 
-	newKey, err := apikey.Create(ctx, srv.bulker.Client(), "default", "", "true", []byte(`{
+	newKey, err := apikey.Create(ctx, srv.bulker.Client(), tDefault, "", "true", []byte(`{
 	    "fleet-apikey-enroll": {
 		"cluster": [],
 		"index": [],
@@ -344,18 +388,26 @@ func Test_Agent_Remote_ES_Output_ForceUnenroll(t *testing.T) {
 		    "resources": ["*"]
 		}]
 	    }
+<<<<<<< HEAD
 	}`), map[string]interface{}{
 		"managed_by": "fleet",
 		"managed":    true,
 		"type":       "enroll",
 		"policy_id":  policyRemoteID,
+=======
+	}`), map[string]any{
+		tManagedBy: tFleet,
+		tManaged:   true,
+		tType:      tEnroll,
+		tPolicyID:  policyRemoteID,
+>>>>>>> a937df3 (chore(deps): update Go to 1.27.4 (#8247))
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	_, err = dl.CreateEnrollmentAPIKey(ctx, srv.bulker, model.EnrollmentAPIKey{
-		Name:     "RemoteES",
+		Name:     tRemoteESName,
 		APIKey:   newKey.Key,
 		APIKeyID: newKey.ID,
 		PolicyID: policyRemoteID,
@@ -379,7 +431,7 @@ func Test_Agent_Remote_ES_Output_ForceUnenroll(t *testing.T) {
 	}()
 
 	remoteAPIKey, actionID := Checkin(t, ctx, srvCopy, resp.Item.Id, resp.Item.AccessApiKey, true, "POLICY_CHANGE")
-	apiKeyID := strings.Split(remoteAPIKey, ":")[0]
+	apiKeyID, _, _ := strings.Cut(remoteAPIKey, ":")
 
 	verifyRemoteAPIKey(t, ctx, apiKeyID, false)
 
@@ -426,21 +478,32 @@ func Test_Agent_Remote_ES_Output_Unenroll(t *testing.T) {
 
 	var policyRemoteID = uuid.Must(uuid.NewV4()).String()
 	var policyDataRemoteES = model.PolicyData{
+<<<<<<< HEAD
 		Outputs: map[string]map[string]interface{}{
 			"default": {
 				"type": "elasticsearch",
+=======
+		Outputs: map[string]map[string]any{
+			tDefault: {
+				tType: kElasticsearch,
+>>>>>>> a937df3 (chore(deps): update Go to 1.27.4 (#8247))
 			},
-			"remoteES": {
-				"type":                        "remote_elasticsearch",
-				"hosts":                       []string{remoteESUrl},
-				"service_token":               os.Getenv("REMOTE_ELASTICSEARCH_SERVICE_TOKEN"),
-				"ssl.enabled":                 true,
-				"ssl.certificate_authorities": []string{getRemoteElasticsearchCa(t)},
+			tRemoteES: {
+				tType:                      tRemoteElasticsearch,
+				tHosts:                     []string{remoteESUrl},
+				tServiceToken:              os.Getenv("REMOTE_ELASTICSEARCH_SERVICE_TOKEN"),
+				tSSLEnabled:                true,
+				tSSLCertificateAuthorities: []string{getRemoteElasticsearchCa(t)},
 			},
 		},
 		OutputPermissions: json.RawMessage(`{"default": {}, "remoteES": {}}`),
+<<<<<<< HEAD
 		Inputs:            []map[string]interface{}{},
 		Agent:             map[string]interface{}{"monitoring": map[string]string{"use_output": "remoteES"}},
+=======
+		Inputs:            []map[string]any{},
+		Agent:             map[string]any{tMonitoring: map[string]string{tUseOutput: tRemoteES}},
+>>>>>>> a937df3 (chore(deps): update Go to 1.27.4 (#8247))
 	}
 
 	_, err = dl.CreatePolicy(ctx, srv.bulker, model.Policy{
@@ -455,7 +518,7 @@ func Test_Agent_Remote_ES_Output_Unenroll(t *testing.T) {
 
 	t.Log("Create API key and enrollment key for new policy")
 
-	newKey, err := apikey.Create(ctx, srv.bulker.Client(), "default", "", "true", []byte(`{
+	newKey, err := apikey.Create(ctx, srv.bulker.Client(), tDefault, "", "true", []byte(`{
 	    "fleet-apikey-enroll": {
 		"cluster": [],
 		"index": [],
@@ -465,18 +528,26 @@ func Test_Agent_Remote_ES_Output_Unenroll(t *testing.T) {
 		    "resources": ["*"]
 		}]
 	    }
+<<<<<<< HEAD
 	}`), map[string]interface{}{
 		"managed_by": "fleet",
 		"managed":    true,
 		"type":       "enroll",
 		"policy_id":  policyRemoteID,
+=======
+	}`), map[string]any{
+		tManagedBy: tFleet,
+		tManaged:   true,
+		tType:      tEnroll,
+		tPolicyID:  policyRemoteID,
+>>>>>>> a937df3 (chore(deps): update Go to 1.27.4 (#8247))
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	_, err = dl.CreateEnrollmentAPIKey(ctx, srv.bulker, model.EnrollmentAPIKey{
-		Name:     "RemoteES",
+		Name:     tRemoteESName,
 		APIKey:   newKey.Key,
 		APIKeyID: newKey.ID,
 		PolicyID: policyRemoteID,
@@ -500,7 +571,7 @@ func Test_Agent_Remote_ES_Output_Unenroll(t *testing.T) {
 	}()
 
 	remoteAPIKey, actionID := Checkin(t, ctx, srvCopy, resp.Item.Id, resp.Item.AccessApiKey, true, "POLICY_CHANGE")
-	apiKeyID := strings.Split(remoteAPIKey, ":")[0]
+	apiKeyID, _, _ := strings.Cut(remoteAPIKey, ":")
 
 	verifyRemoteAPIKey(t, ctx, apiKeyID, false)
 

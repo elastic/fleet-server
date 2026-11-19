@@ -1,6 +1,10 @@
 module github.com/elastic/fleet-server/dev-tools
 
+<<<<<<< HEAD
 go 1.26.10
+=======
+go 1.27.4
+>>>>>>> a937df3 (chore(deps): update Go to 1.27.4 (#8247))
 
 tool (
 	github.com/elastic/go-json-schema-generate/cmd/schema-generate
