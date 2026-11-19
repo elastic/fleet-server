@@ -17,7 +17,6 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
 const (
@@ -26,6 +25,10 @@ const (
 	pushTimeout = 10 * time.Minute
 	// gitConfigTimeout bounds local git config reads/writes used when rewriting remotes.
 	gitConfigTimeout = 30 * time.Second
+	// worktreeCmdTimeout bounds git checkout/status/add/commit used instead of
+	// go-git on Buildkite reference clones. go-git Status/Checkout can take tens
+	// of minutes on large trees with object alternates.
+	worktreeCmdTimeout = 10 * time.Minute
 )
 
 // gitRepo wraps go-git Repository with helper methods.
@@ -139,7 +142,16 @@ func (g *gitRepo) ensureExistingBranch(branchName string) error {
 	return fmt.Errorf("%w: %s", errBranchNotFound, branchName)
 }
 
-// checkoutBranch checks out an existing branch.
+// runGit runs git in the repository path with a deadline (Buildkite-safe).
+func (g *gitRepo) runGit(ctx context.Context, args ...string) ([]byte, error) {
+	cmd := exec.CommandContext(ctx, "git", args...)
+	cmd.Dir = g.path
+	return cmd.CombinedOutput()
+}
+
+// checkoutBranch checks out an existing branch via the git CLI.
+// go-git Checkout is avoided: with Buildkite reference clones it can take tens
+// of minutes on large trees.
 func (g *gitRepo) checkoutBranch(branchName string) error {
 	currentBranch, err := g.getCurrentBranch()
 	if err == nil && currentBranch == branchName {
@@ -147,55 +159,66 @@ func (g *gitRepo) checkoutBranch(branchName string) error {
 		return nil
 	}
 
-	w, err := g.repo.Worktree()
-	if err != nil {
-		return fmt.Errorf("failed to get worktree: %w", err)
-	}
+	ctx, cancel := context.WithTimeout(context.Background(), worktreeCmdTimeout)
+	defer cancel()
 
-	err = w.Checkout(&git.CheckoutOptions{
-		Branch: plumbing.NewBranchReferenceName(branchName),
-	})
+	output, err := g.runGit(ctx, "checkout", branchName)
 	if err != nil {
-		return fmt.Errorf("failed to checkout branch %s: %w", branchName, err)
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return fmt.Errorf("failed to checkout branch %s: timed out after %s: %w", branchName, worktreeCmdTimeout, err)
+		}
+		return fmt.Errorf("failed to checkout branch %s: %w: %s", branchName, err, strings.TrimSpace(string(output)))
 	}
 
 	printf("Checked out branch: %s\n", branchName)
 	return nil
 }
 
-// commitAll stages all changes and creates a commit.
+// commitAll stages all changes and creates a commit via the git CLI.
+// go-git AddGlob/Status/Commit are avoided for the same reference-clone cost as
+// checkoutBranch.
 func (g *gitRepo) commitAll(message, authorName, authorEmail string) (bool, error) {
-	w, err := g.repo.Worktree()
-	if err != nil {
-		return false, fmt.Errorf("failed to get worktree: %w", err)
+	ctx, cancel := context.WithTimeout(context.Background(), worktreeCmdTimeout)
+	defer cancel()
+
+	if output, err := g.runGit(ctx, "add", "-A"); err != nil {
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return false, fmt.Errorf("failed to stage changes: timed out after %s: %w", worktreeCmdTimeout, err)
+		}
+		return false, fmt.Errorf("failed to stage changes: %w: %s", err, strings.TrimSpace(string(output)))
 	}
 
-	status, err := w.Status()
+	statusOut, err := g.runGit(ctx, "status", "--porcelain")
 	if err != nil {
-		return false, fmt.Errorf("failed to get status: %w", err)
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return false, fmt.Errorf("failed to get status: timed out after %s: %w", worktreeCmdTimeout, err)
+		}
+		return false, fmt.Errorf("failed to get status: %w: %s", err, strings.TrimSpace(string(statusOut)))
 	}
-	if status.IsClean() {
+	if len(strings.TrimSpace(string(statusOut))) == 0 {
 		println("No changes to commit")
 		return false, nil
 	}
 
-	err = w.AddGlob(".")
+	commitOut, err := g.runGit(ctx,
+		"-c", "user.name="+authorName,
+		"-c", "user.email="+authorEmail,
+		"commit",
+		"--author", authorName+" <"+authorEmail+">",
+		"-m", message,
+	)
 	if err != nil {
-		return false, fmt.Errorf("failed to stage changes: %w", err)
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return false, fmt.Errorf("failed to commit: timed out after %s: %w", worktreeCmdTimeout, err)
+		}
+		return false, fmt.Errorf("failed to commit: %w: %s", err, strings.TrimSpace(string(commitOut)))
 	}
 
-	commit, err := w.Commit(message, &git.CommitOptions{
-		Author: &object.Signature{
-			Name:  authorName,
-			Email: authorEmail,
-			When:  time.Now(),
-		},
-	})
+	hashOut, err := g.runGit(ctx, "rev-parse", "HEAD")
 	if err != nil {
-		return false, fmt.Errorf("failed to commit: %w", err)
+		return false, fmt.Errorf("failed to read commit hash: %w: %s", err, strings.TrimSpace(string(hashOut)))
 	}
-
-	printf("Created commit: %s\n", commit.String())
+	printf("Created commit: %s\n", strings.TrimSpace(string(hashOut)))
 	return true, nil
 }
 
@@ -483,19 +506,21 @@ func (g *gitRepo) getCurrentBranch() (string, error) {
 	return headRef.Name().Short(), nil
 }
 
-// isClean checks if the working directory is clean.
+// isClean reports whether the working directory has no uncommitted changes.
+// Uses git status --porcelain; go-git Status is too slow on Buildkite reference
+// clones of large trees.
 func (g *gitRepo) isClean() (bool, error) {
-	w, err := g.repo.Worktree()
-	if err != nil {
-		return false, fmt.Errorf("failed to get worktree: %w", err)
-	}
+	ctx, cancel := context.WithTimeout(context.Background(), worktreeCmdTimeout)
+	defer cancel()
 
-	status, err := w.Status()
+	output, err := g.runGit(ctx, "status", "--porcelain")
 	if err != nil {
-		return false, fmt.Errorf("failed to get status: %w", err)
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return false, fmt.Errorf("failed to get status: timed out after %s: %w", worktreeCmdTimeout, err)
+		}
+		return false, fmt.Errorf("failed to get status: %w: %s", err, strings.TrimSpace(string(output)))
 	}
-
-	return status.IsClean(), nil
+	return len(strings.TrimSpace(string(output))) == 0, nil
 }
 
 // setRemoteURL sets the primary URL for origin (release push only uses origin).
