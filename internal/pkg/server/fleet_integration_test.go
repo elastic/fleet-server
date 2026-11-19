@@ -110,8 +110,7 @@ func (s *tserver) waitExit() error {
 	// FIXME: Below is a work around to net.DNSError not supporting the `Unwrap` method.
 	// It is so we can ignore errors caused by context cancelation.
 	// It can be removed when DNSError.Unwrap is added to the stdlib.
-	var dnsErr *net.DNSError
-	if errors.As(err, &dnsErr) {
+	if dnsErr, ok := errors.AsType[*net.DNSError](err); ok {
 		if strings.Contains(dnsErr.Err, "operation was canceled") {
 			return nil
 		}
