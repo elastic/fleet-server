@@ -44,20 +44,6 @@ const (
 	LogAccessAPIKeyID = ecs.AccessAPIKeyID
 )
 
-// Error names and messages returned in HTTPErrResp that are shared by more than one error.
-const (
-	errNameUnauthorized        = "Unauthorized"
-	errNameForbidden           = "Forbidden"
-	errNameBadRequest          = "BadRequest"
-	errNameAPIKeyNotFound      = "ErrAPIKeyNotFound" //nolint:gosec // G101: error name, not a credential
-	errNameRangeNotSatisfiable = "ErrRangeNotSatisfiable"
-	errNamePolicyNotFound      = "ErrPolicyNotFound"
-	errMsgFileNotFound         = "file not found"
-)
-
-// errTypeElastic is the APM error.type label value for Elasticsearch errors.
-const errTypeElastic = "ErrElastic"
-
 // BadRequestErr is used for request validation errors. These can be json
 // unmarshal errors such as json.SyntaxError, or any other input validation
 // error.
@@ -105,7 +91,7 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 			ErrAPIKeyNotEnabled,
 			HTTPErrResp{
 				http.StatusUnauthorized,
-				errNameUnauthorized,
+				"Unauthorized",
 				"ApiKey not enabled",
 				zerolog.InfoLevel,
 			},
@@ -160,7 +146,7 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 			ErrUnauthorizedArtifact,
 			HTTPErrResp{
 				http.StatusForbidden,
-				errNameForbidden,
+				"Forbidden",
 				"agent not authorized for artifact",
 				zerolog.WarnLevel,
 			},
@@ -169,7 +155,7 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 			ErrAgentPolicyIDMissing,
 			HTTPErrResp{
 				http.StatusForbidden,
-				errNameForbidden,
+				"Forbidden",
 				"agent has no policy ID",
 				zerolog.WarnLevel,
 			},
@@ -241,7 +227,7 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 			ErrUpdatingInactiveAgent,
 			HTTPErrResp{
 				http.StatusUnauthorized,
-				errNameUnauthorized,
+				"Unauthorized",
 				"Agent not active",
 				zerolog.InfoLevel,
 			},
@@ -368,7 +354,7 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 			apikey.ErrAPIKeyNotFound,
 			HTTPErrResp{
 				http.StatusUnauthorized,
-				errNameAPIKeyNotFound,
+				"ErrAPIKeyNotFound",
 				"api key not found",
 				zerolog.InfoLevel,
 			},
@@ -378,7 +364,7 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 			uploader.ErrInvalidUploadID,
 			HTTPErrResp{
 				http.StatusBadRequest,
-				errNameAPIKeyNotFound,
+				"ErrAPIKeyNotFound",
 				"active upload not found with this ID, it may be expired",
 				zerolog.InfoLevel,
 			},
@@ -525,7 +511,7 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 			HTTPErrResp{
 				http.StatusNotFound,
 				"ErrNoFile",
-				errMsgFileNotFound,
+				"file not found",
 				zerolog.InfoLevel,
 			},
 		},
@@ -533,7 +519,7 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 			ErrBadRange,
 			HTTPErrResp{
 				http.StatusRequestedRangeNotSatisfiable,
-				errNameRangeNotSatisfiable,
+				"ErrRangeNotSatisfiable",
 				"range not satisfiable",
 				zerolog.InfoLevel,
 			},
@@ -542,7 +528,7 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 			ErrMultiRangeNotSupported,
 			HTTPErrResp{
 				http.StatusRequestedRangeNotSatisfiable,
-				errNameRangeNotSatisfiable,
+				"ErrRangeNotSatisfiable",
 				"Multipart ranges not satisfiable",
 				zerolog.InfoLevel,
 			},
@@ -570,7 +556,7 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 			HTTPErrResp{
 				http.StatusNotFound,
 				"ErrFileForDeliveryNotFound",
-				errMsgFileNotFound,
+				"file not found",
 				zerolog.InfoLevel,
 			},
 		},
@@ -578,8 +564,8 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 			ErrPolicyNotFound,
 			HTTPErrResp{
 				http.StatusBadRequest,
-				errNamePolicyNotFound,
-				errNamePolicyNotFound,
+				"ErrPolicyNotFound",
+				"ErrPolicyNotFound",
 				zerolog.InfoLevel,
 			},
 		},
@@ -623,7 +609,7 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 	if _, ok := errors.AsType[*BadRequestErr](err); ok {
 		return HTTPErrResp{
 			http.StatusBadRequest,
-			errNameBadRequest,
+			"BadRequest",
 			err.Error(),
 			zerolog.ErrorLevel,
 		}
@@ -667,7 +653,7 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 	// Default
 	return HTTPErrResp{
 		StatusCode: http.StatusInternalServerError,
-		Error:      errNameBadRequest,
+		Error:      "BadRequest",
 		Message:    err.Error(),
 		Level:      zerolog.InfoLevel,
 	}
@@ -699,7 +685,7 @@ func ErrorResp(w http.ResponseWriter, r *http.Request, err error) {
 		if trans := apm.TransactionFromContext(r.Context()); trans != nil {
 			esErr := &es.ErrElastic{}
 			if errors.As(err, &esErr) {
-				trans.Context.SetLabel("error.type", errTypeElastic)
+				trans.Context.SetLabel("error.type", "ErrElastic")
 				trans.Context.SetLabel("error.details.status", esErr.Status)
 				trans.Context.SetLabel("error.details.type", esErr.Type)
 				trans.Context.SetLabel("error.details.reason", esErr.Reason)
