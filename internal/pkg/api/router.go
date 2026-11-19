@@ -20,7 +20,9 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
 )
 
-func newRouter(cfg *config.ServerLimits, si ServerInterface, tracer *apm.Tracer) http.Handler {
+const opAMPPath = "/v1/opamp"
+
+func newRouter(cfg *config.ServerLimits, si ServerInterface, tracer *apm.Tracer, opAMP http.Handler) http.Handler {
 	r := chi.NewRouter()
 	if tracer != nil {
 		r.Use(apmchiv5.Middleware(apmchiv5.WithTracer(tracer)))
@@ -31,6 +33,9 @@ func newRouter(cfg *config.ServerLimits, si ServerInterface, tracer *apm.Tracer)
 		r.Use(middleware.Throttle(cfg.MaxConnections))
 	}
 	r.Use(Limiter(cfg).middleware)
+	if opAMP != nil {
+		r.Handle(opAMPPath, opAMP)
+	}
 	return HandlerWithOptions(si, ChiServerOptions{
 		BaseRouter:       r,
 		ErrorHandlerFunc: ErrorResp,
@@ -92,7 +97,7 @@ func pathToOperation(path string) string {
 		return "getPGPKey"
 	}
 
-	if path == "/v1/opamp" {
+	if path == opAMPPath {
 		return "opamp"
 	}
 
