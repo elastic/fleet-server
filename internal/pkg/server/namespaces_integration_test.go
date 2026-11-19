@@ -164,6 +164,7 @@ func Test_Agent_Namespace_test1(t *testing.T) {
 	t.Log("Create policy with namespace test1")
 	var policyRemoteID = uuid.Must(uuid.NewV4()).String()
 	var policyDataNamespaceTest = model.PolicyData{
+<<<<<<< HEAD
 		Outputs: map[string]map[string]interface{}{
 			"default": {
 				"type": "elasticsearch",
@@ -172,6 +173,16 @@ func Test_Agent_Namespace_test1(t *testing.T) {
 		OutputPermissions: json.RawMessage(`{"default": {} }`),
 		Inputs:            []map[string]interface{}{},
 		Agent:             json.RawMessage(`{"monitoring": {"use_output":"default"}}`),
+=======
+		Outputs: map[string]map[string]any{
+			tDefault: {
+				tType: kElasticsearch,
+			},
+		},
+		OutputPermissions: json.RawMessage(`{"default": {} }`),
+		Inputs:            []map[string]any{},
+		Agent:             map[string]any{tMonitoring: map[string]string{tUseOutput: tDefault}},
+>>>>>>> a937df3 (chore(deps): update Go to 1.27.4 (#8247))
 	}
 
 	_, err = dl.CreatePolicy(ctx, srv.bulker, model.Policy{
@@ -186,7 +197,7 @@ func Test_Agent_Namespace_test1(t *testing.T) {
 	}
 
 	t.Log("Create API key and enrollment key for new policy")
-	newKey, err := apikey.Create(ctx, srv.bulker.Client(), "default", "", "true", []byte(`{
+	newKey, err := apikey.Create(ctx, srv.bulker.Client(), tDefault, "", "true", []byte(`{
 	    "fleet-apikey-enroll": {
 		"cluster": [],
 		"index": [],
@@ -196,11 +207,19 @@ func Test_Agent_Namespace_test1(t *testing.T) {
 		    "resources": ["*"]
 		}]
 	    }
+<<<<<<< HEAD
 	}`), map[string]interface{}{
 		"managed_by": "fleet",
 		"managed":    true,
 		"type":       "enroll",
 		"policy_id":  policyRemoteID,
+=======
+	}`), map[string]any{
+		tManagedBy: tFleet,
+		tManaged:   true,
+		tType:      tEnroll,
+		tPolicyID:  policyRemoteID,
+>>>>>>> a937df3 (chore(deps): update Go to 1.27.4 (#8247))
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -241,7 +260,7 @@ func Test_Agent_Namespace_test1(t *testing.T) {
 		Agents:     []string{resp.Item.Id},
 		Expiration: time.Now().Add(time.Hour * 2000).Format(time.RFC3339),
 		ActionID:   newActionID.String(),
-		Namespaces: []string{"test1"},
+		Namespaces: []string{testNamespace},
 		Type:       "SETTINGS",
 		Data:       []byte("{\"log_level\": \"debug\"}"),
 	}
@@ -255,5 +274,5 @@ func Test_Agent_Namespace_test1(t *testing.T) {
 	AgentAck(t, ctx, srvCopy, actionID, resp.Item.Id, resp.Item.AccessApiKey)
 
 	t.Log("Check action results has the correct namespace")
-	CheckActionResultsNamespace(t, ctx, srv, actionID, "test1")
+	CheckActionResultsNamespace(t, ctx, srv, actionID, testNamespace)
 }

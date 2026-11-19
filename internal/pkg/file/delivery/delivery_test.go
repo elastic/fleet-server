@@ -41,12 +41,11 @@ func TestFindFile(t *testing.T) {
 		mock.Anything,
 		mock.Anything,
 	).Return(&es.ResultT{
-		HitsT: es.HitsT{
-			Hits: []es.HitT{
-				{
-					ID:    fileID,
-					Index: fmt.Sprintf(FileHeaderIndexPattern, "endpoint"),
-					Source: []byte(`{
+		Hits: []es.HitT{
+			{
+				ID:    fileID,
+				Index: fmt.Sprintf(FileHeaderIndexPattern, "endpoint"),
+				Source: []byte(`{
 						"file": {
 							"created": "2023-06-05T15:23:37.499Z",
 							"Status": "READY",
@@ -63,7 +62,6 @@ func TestFindFile(t *testing.T) {
 							}
 						}
 					}`),
-				},
 			},
 		},
 	}, nil)
@@ -87,9 +85,7 @@ func TestFindFileHandlesNoResults(t *testing.T) {
 		mock.Anything,
 		mock.Anything,
 	).Return(&es.ResultT{
-		HitsT: es.HitsT{
-			Hits: []es.HitT{},
-		},
+		Hits: []es.HitT{},
 	}, nil)
 
 	d := New(nil, fakeBulk, -1)
@@ -109,6 +105,7 @@ func TestLocateChunks(t *testing.T) {
 		mock.Anything,
 		mock.Anything,
 	).Return(&es.ResultT{
+<<<<<<< HEAD
 		HitsT: es.HitsT{
 			Hits: []es.HitT{
 				{
@@ -127,6 +124,24 @@ func TestLocateChunks(t *testing.T) {
 						"bid":  []interface{}{baseID},
 						"last": []interface{}{true},
 					},
+=======
+		Hits: []es.HitT{
+			{
+				ID:     baseID + ".0",
+				Index:  "",
+				Source: []byte(""),
+				Fields: map[string]any{
+					fieldBID: []any{baseID},
+				},
+			},
+			{
+				ID:     baseID + ".1",
+				Index:  "",
+				Source: []byte(""),
+				Fields: map[string]any{
+					fieldBID: []any{baseID},
+					"last":   []any{true},
+>>>>>>> a937df3 (chore(deps): update Go to 1.27.4 (#8247))
 				},
 			},
 		},
@@ -149,9 +164,7 @@ func TestLocateChunksEmpty(t *testing.T) {
 		mock.Anything,
 		mock.Anything,
 	).Return(&es.ResultT{
-		HitsT: es.HitsT{
-			Hits: []es.HitT{},
-		},
+		Hits: []es.HitT{},
 	}, nil)
 
 	d := New(nil, fakeBulk, -1)

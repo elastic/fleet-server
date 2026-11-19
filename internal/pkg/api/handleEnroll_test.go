@@ -87,9 +87,7 @@ func TestEnroll(t *testing.T) {
 	et, _ := NewEnrollerT(verCon, cfg, bulker, c)
 
 	bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{
-		HitsT: es.HitsT{
-			Hits: make([]es.HitT, 0),
-		},
+		Hits: make([]es.HitT, 0),
 	}, nil)
 	bulker.On("APIKeyCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(
 		&apikey.APIKey{
@@ -126,9 +124,7 @@ func TestEnrollWithAgentID(t *testing.T) {
 	et, _ := NewEnrollerT(verCon, cfg, bulker, c)
 
 	bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{
-		HitsT: es.HitsT{
-			Hits: make([]es.HitT, 0),
-		},
+		Hits: make([]es.HitT, 0),
 	}, nil)
 	bulker.On("APIKeyCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(
 		&apikey.APIKey{
@@ -168,13 +164,11 @@ func TestEnrollWithAgentIDExistingNonActive(t *testing.T) {
 	et, _ := NewEnrollerT(verCon, cfg, bulker, c)
 
 	bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{
-		HitsT: es.HitsT{
-			Hits: []es.HitT{{
-				ID:     "1234",
-				Index:  dl.FleetAgents,
-				Source: []byte(`{"active":false,"agent":{"id":"1234","version":"8.9.0"},"type":"PERMANENT","policy_id":"1234"}`),
-			}},
-		},
+		Hits: []es.HitT{{
+			ID:     "1234",
+			Index:  dl.FleetAgents,
+			Source: []byte(`{"active":false,"agent":{"id":"1234","version":"8.9.0"},"type":"PERMANENT","policy_id":"1234"}`),
+		}},
 	}, nil)
 	bulker.On("Delete", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	bulker.On("APIKeyCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(
@@ -215,13 +209,11 @@ func TestEnrollWithAgentIDExistingActive_NotReplaceable(t *testing.T) {
 	et, _ := NewEnrollerT(verCon, cfg, bulker, c)
 
 	bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{
-		HitsT: es.HitsT{
-			Hits: []es.HitT{{
-				ID:     "1234",
-				Index:  dl.FleetAgents,
-				Source: []byte(`{"active":true,"agent":{"id":"1234","version":"8.9.0"},"type":"PERMANENT","policy_id":"1234"}`),
-			}},
-		},
+		Hits: []es.HitT{{
+			ID:     "1234",
+			Index:  dl.FleetAgents,
+			Source: []byte(`{"active":true,"agent":{"id":"1234","version":"8.9.0"},"type":"PERMANENT","policy_id":"1234"}`),
+		}},
 	}, nil)
 	_, err := et._enroll(ctx, rb, zlog, req, "1234", []string{}, "8.9.0")
 	if !errors.Is(err, ErrAgentNotReplaceable) {
@@ -258,13 +250,11 @@ func TestEnrollWithAgentIDExistingActive_InvalidReplaceToken_Missing(t *testing.
 
 	source := fmt.Sprintf(`{"active":true,"agent":{"id":"1234","version":"8.9.0"},"type":"PERMANENT","policy_id":"1234","replace_token":"%s"}`, replaceHash)
 	bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{
-		HitsT: es.HitsT{
-			Hits: []es.HitT{{
-				ID:     "1234",
-				Index:  dl.FleetAgents,
-				Source: []byte(source),
-			}},
-		},
+		Hits: []es.HitT{{
+			ID:     "1234",
+			Index:  dl.FleetAgents,
+			Source: []byte(source),
+		}},
 	}, nil)
 	_, err = et._enroll(ctx, rb, zlog, req, "1234", []string{}, "8.9.0")
 	if !errors.Is(err, ErrAgentNotReplaceable) {
@@ -303,13 +293,11 @@ func TestEnrollWithAgentIDExistingActive_InvalidReplaceToken_Mismatch(t *testing
 
 	source := fmt.Sprintf(`{"active":true,"agent":{"id":"1234","version":"8.9.0"},"type":"PERMANENT","policy_id":"1234","replace_token":"%s"}`, replaceHash)
 	bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{
-		HitsT: es.HitsT{
-			Hits: []es.HitT{{
-				ID:     "1234",
-				Index:  dl.FleetAgents,
-				Source: []byte(source),
-			}},
-		},
+		Hits: []es.HitT{{
+			ID:     "1234",
+			Index:  dl.FleetAgents,
+			Source: []byte(source),
+		}},
 	}, nil)
 	_, err = et._enroll(ctx, rb, zlog, req, "1234", []string{}, "8.9.0")
 	if !errors.Is(err, ErrAgentNotReplaceable) {
@@ -348,13 +336,11 @@ func TestEnrollWithAgentIDExistingActive_WrongPolicy(t *testing.T) {
 
 	source := fmt.Sprintf(`{"active":true,"agent":{"id":"1234","version":"8.9.0"},"type":"PERMANENT","policy_id":"1234","replace_token":"%s"}`, replaceHash)
 	bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{
-		HitsT: es.HitsT{
-			Hits: []es.HitT{{
-				ID:     "1234",
-				Index:  dl.FleetAgents,
-				Source: []byte(source),
-			}},
-		},
+		Hits: []es.HitT{{
+			ID:     "1234",
+			Index:  dl.FleetAgents,
+			Source: []byte(source),
+		}},
 	}, nil)
 	_, err = et._enroll(ctx, rb, zlog, req, "5678", []string{}, "8.9.0")
 	if !errors.Is(err, ErrAgentNotReplaceable) {
@@ -393,13 +379,11 @@ func TestEnrollWithAgentIDExistingActive(t *testing.T) {
 
 	source := fmt.Sprintf(`{"active":true,"agent":{"id":"1234","version":"8.9.0"},"type":"PERMANENT","policy_id":"1234","replace_token":"%s"}`, replaceHash)
 	bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{
-		HitsT: es.HitsT{
-			Hits: []es.HitT{{
-				ID:     "1234",
-				Index:  dl.FleetAgents,
-				Source: []byte(source),
-			}},
-		},
+		Hits: []es.HitT{{
+			ID:     "1234",
+			Index:  dl.FleetAgents,
+			Source: []byte(source),
+		}},
 	}, nil)
 	bulker.On("APIKeyRead", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(
 		&apikey.APIKeyMetadata{ID: "1234"}, nil)
@@ -419,6 +403,251 @@ func TestEnrollWithAgentIDExistingActive(t *testing.T) {
 	if resp.Item.Id != agentID {
 		t.Fatalf("agent ID should have been %s (not %s)", agentID, resp.Item.Id)
 	}
+<<<<<<< HEAD
+=======
+
+	doc := replaceUpdateDoc(t, bulker)
+	assert.Equal(t, "my-policy", doc[dl.FieldPolicyBaseID])
+	assert.NotContains(t, doc, dl.FieldUpgradedAt)
+}
+
+// TestEnrollWithAgentIDExistingPendingUninstallClearsPending verifies that
+// re-enrolling a pending-uninstall agent clears the uninstall_pending flag and
+// does NOT touch the output credentials. The output keys were already
+// invalidated and their doc fields cleared when the UNENROLL was acked
+// (handleUninstallPending); re-enrollment relies on the kept PermissionsHash and
+// the check-in recovery guard to regenerate the keys, so it must not rewrite the
+// outputs here.
+func TestEnrollWithAgentIDExistingPendingUninstallClearsPending(t *testing.T) {
+	ctx := t.Context()
+	rb := &rollback.Rollback{}
+	zlog := zerolog.Logger{}
+	agentID := "1234"
+	replaceToken := "replace_token"
+	var pbkdf2Cfg config.PBKDF2
+	pbkdf2Cfg.InitDefaults()
+	replaceHash, err := hashReplaceToken(replaceToken, pbkdf2Cfg)
+	require.NoError(t, err)
+	req := &EnrollRequest{
+		Type: "PERMANENT",
+		Id:   &agentID,
+		Metadata: EnrollMetadata{
+			UserProvided: []byte("{}"),
+			Local:        []byte("{}"),
+		},
+		ReplaceToken: &replaceToken,
+	}
+	verCon := mustBuildConstraints("8.9.0")
+	cfg := &config.Server{}
+	cfg.InitDefaults()
+	c, _ := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
+	bulker := ftesting.NewMockBulk()
+	et, _ := NewEnrollerT(verCon, cfg, bulker, c)
+
+	policyID := "my-policy"
+	// Existing pending-uninstall agent whose output key was already cleared on the
+	// unenroll ack (api_key empty, permissions_hash kept).
+	source := fmt.Sprintf(`{"active":true,"uninstall_pending":true,"agent":{"id":"1234","version":"8.9.0"},"type":"PERMANENT","policy_id":"%s","replace_token":"%s",`+
+		`"outputs":{"default":{"type":"elasticsearch","api_key":"","api_key_id":"","permissions_hash":"oldhash"}}}`, policyID, replaceHash)
+	bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{
+		Hits: []es.HitT{{
+			ID:     "1234",
+			Index:  dl.FleetAgents,
+			Source: []byte(source),
+		}},
+	}, nil)
+	bulker.On("APIKeyRead", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(
+		&apikey.APIKeyMetadata{ID: "1234"}, nil)
+	bulker.On("APIKeyInvalidate", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	bulker.On("APIKeyCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(
+		&apikey.APIKey{ID: "1234", Key: "1234"}, nil)
+	bulker.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+	resp, _ := et._enroll(ctx, rb, zlog, req, policyID, []string{}, "8.9.0")
+	require.Equal(t, "created", resp.Action, "enroll failed")
+
+	doc := replaceUpdateDoc(t, bulker)
+	// uninstall_pending and its timestamp must be cleared and the policy revision reset to 0.
+	assert.Equal(t, false, doc[dl.FieldUninstallPending])
+	assert.Nil(t, doc[dl.FieldUninstallPendingSince])
+	assert.EqualValues(t, 0, doc[dl.FieldPolicyRevisionIdx])
+	// outputs must NOT be rewritten by re-enrollment; the unenroll ack owns that.
+	assert.NotContains(t, doc, dl.FieldOutputs, "re-enroll must not rewrite outputs; clearing happens on the unenroll ack")
+}
+
+// TestEnrollWithAgentIDExistingActive_VersionedPolicy covers replace-enrollment of an
+// agent that has been reassigned to a version-specific policy variant (e.g. "my-policy#9.6")
+// by Kibana's version-specific policy assignment task. Enrollment API keys are only ever
+// bound to the base policy, so the enrolling agent presents the base policy ID while the
+// stored agent document carries the versioned one. The replace must compare base policy
+// IDs, otherwise the agent can never re-enroll after its container/pod is recreated.
+func TestEnrollWithAgentIDExistingActive_VersionedPolicy(t *testing.T) {
+	ctx := t.Context()
+	rb := &rollback.Rollback{}
+	zlog := zerolog.Logger{}
+	agentID := "1234"
+	replaceToken := "replace_token"
+	var pbkdf2Cfg config.PBKDF2
+	pbkdf2Cfg.InitDefaults()
+	replaceHash, err := hashReplaceToken(replaceToken, pbkdf2Cfg)
+	require.NoError(t, err)
+	req := &EnrollRequest{
+		Type: "PERMANENT",
+		Id:   &agentID,
+		Metadata: EnrollMetadata{
+			UserProvided: []byte("{}"),
+			Local:        []byte("{}"),
+		},
+		ReplaceToken: &replaceToken,
+	}
+	verCon := mustBuildConstraints("8.9.0")
+	cfg := &config.Server{}
+	cfg.InitDefaults()
+	c, _ := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
+	bulker := ftesting.NewMockBulk()
+	et, _ := NewEnrollerT(verCon, cfg, bulker, c)
+
+	// Agent document carries the version-specific policy ID; the enrollment key is
+	// bound to the base policy.
+	source := fmt.Sprintf(`{"active":true,"agent":{"id":"1234","version":"8.9.0"},"type":"PERMANENT","policy_id":"my-policy#9.6","replace_token":"%s"}`, replaceHash)
+	bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{
+		Hits: []es.HitT{{
+			ID:     "1234",
+			Index:  dl.FleetAgents,
+			Source: []byte(source),
+		}},
+	}, nil)
+	bulker.On("APIKeyRead", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(
+		&apikey.APIKeyMetadata{ID: "1234"}, nil)
+	bulker.On("APIKeyInvalidate", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	bulker.On("APIKeyCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(
+		&apikey.APIKey{
+			ID:  "1234",
+			Key: "1234",
+		}, nil)
+	bulker.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(
+		nil)
+	resp, err := et._enroll(ctx, rb, zlog, req, "my-policy", []string{}, "8.9.0")
+	if err != nil {
+		t.Fatalf("enroll should have succeeded for versioned policy with base enrollment key, got: %v", err)
+	}
+
+	if resp.Action != "created" {
+		t.Fatal("enroll failed")
+	}
+	if resp.Item.Id != agentID {
+		t.Fatalf("agent ID should have been %s (not %s)", agentID, resp.Item.Id)
+	}
+
+	doc := replaceUpdateDoc(t, bulker)
+	assert.Equal(t, "my-policy", doc[dl.FieldPolicyBaseID])
+	assert.NotContains(t, doc, dl.FieldUpgradedAt)
+}
+
+func TestEnrollWithAgentIDExistingActive_UpgradedAt(t *testing.T) {
+	tests := []struct {
+		name            string
+		storedVersion   string
+		enrollVersion   string
+		useReplaceToken bool
+		wantUpgradedAt  bool
+	}{
+		{
+			name:            "version change stamps upgraded_at",
+			storedVersion:   "8.9.0",
+			enrollVersion:   "9.0.0",
+			useReplaceToken: true,
+			wantUpgradedAt:  true,
+		},
+		{
+			name:            "downgrade stamps upgraded_at",
+			storedVersion:   "9.0.0",
+			enrollVersion:   "8.9.0",
+			useReplaceToken: true,
+			wantUpgradedAt:  true,
+		},
+		{
+			name:            "same version does not stamp upgraded_at",
+			storedVersion:   "8.9.0",
+			enrollVersion:   "8.9.0",
+			useReplaceToken: true,
+			wantUpgradedAt:  false,
+		},
+		{
+			name:            "enrollment-id re-enrollment without replace token does not stamp upgraded_at",
+			storedVersion:   "8.9.0",
+			enrollVersion:   "9.0.0",
+			useReplaceToken: false,
+			wantUpgradedAt:  false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := t.Context()
+			rb := &rollback.Rollback{}
+			zlog := zerolog.Logger{}
+			verCon := mustBuildConstraints("9.0.0")
+			cfg := &config.Server{}
+			cfg.InitDefaults()
+			c, _ := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
+			bulker := ftesting.NewMockBulk()
+			et, _ := NewEnrollerT(verCon, cfg, bulker, c)
+
+			var req *EnrollRequest
+			var source string
+			if tt.useReplaceToken {
+				agentID := "1234"
+				replaceToken := "replace_token"
+				var pbkdf2Cfg config.PBKDF2
+				pbkdf2Cfg.InitDefaults()
+				replaceHash, err := hashReplaceToken(replaceToken, pbkdf2Cfg)
+				require.NoError(t, err)
+				req = &EnrollRequest{
+					Type: "PERMANENT",
+					Id:   &agentID,
+					Metadata: EnrollMetadata{
+						UserProvided: []byte("{}"),
+						Local:        []byte("{}"),
+					},
+					ReplaceToken: &replaceToken,
+				}
+				source = fmt.Sprintf(`{"active":true,"agent":{"id":"1234","version":"%s"},"type":"PERMANENT","policy_id":"my-policy","replace_token":"%s"}`, tt.storedVersion, replaceHash)
+				bulker.On("APIKeyRead", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&apikey.APIKeyMetadata{ID: "1234"}, nil)
+				bulker.On("APIKeyInvalidate", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+			} else {
+				enrollmentID := "enrollment-123"
+				req = &EnrollRequest{
+					Type:         "PERMANENT",
+					EnrollmentId: &enrollmentID,
+					Metadata: EnrollMetadata{
+						UserProvided: []byte("{}"),
+						Local:        []byte("{}"),
+					},
+				}
+				// Agent found by enrollment-id has already checked in, so it is not deleted.
+				source = fmt.Sprintf(`{"active":true,"agent":{"id":"existing-id","version":"%s"},"type":"PERMANENT","policy_id":"my-policy","enrollment_id":"enrollment-123","last_checkin":"2024-01-01T00:00:00Z"}`, tt.storedVersion)
+			}
+
+			bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{
+				Hits: []es.HitT{{ID: "1234", Index: dl.FleetAgents, Source: []byte(source)}},
+			}, nil)
+			bulker.On("APIKeyCreate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&apikey.APIKey{ID: "1234", Key: "1234"}, nil)
+			bulker.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+			resp, err := et._enroll(ctx, rb, zlog, req, "my-policy", []string{}, tt.enrollVersion)
+			require.NoError(t, err)
+			assert.Equal(t, "created", resp.Action)
+
+			doc := replaceUpdateDoc(t, bulker)
+			if tt.wantUpgradedAt {
+				assert.Contains(t, doc, dl.FieldUpgradedAt)
+				assert.NotEmpty(t, doc[dl.FieldUpgradedAt])
+			} else {
+				assert.NotContains(t, doc, dl.FieldUpgradedAt)
+			}
+		})
+	}
+>>>>>>> a937df3 (chore(deps): update Go to 1.27.4 (#8247))
 }
 
 func TestEnrollerT_retrieveStaticTokenEnrollmentToken(t *testing.T) {

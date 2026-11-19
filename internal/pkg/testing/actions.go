@@ -120,9 +120,7 @@ func CreateRandomActions(opts ...CreateActionsOpt) ([]model.Action, error) {
 		expiration := timestamp.Add(c.expirationOffset)
 
 		action := model.Action{
-			ESDocument: model.ESDocument{
-				Id: xid.New().String(),
-			},
+			Id:         xid.New().String(),
 			ActionID:   uuid.Must(uuid.NewV4()).String(),
 			Timestamp:  timestamp.Format(time.RFC3339),
 			Expiration: expiration.Format(time.RFC3339),

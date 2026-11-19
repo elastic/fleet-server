@@ -263,9 +263,7 @@ func TestUploadBeginAuth(t *testing.T) {
 						return nil, ErrAgentIdentity
 					}
 					return &model.Agent{
-						ESDocument: model.ESDocument{
-							Id: tc.AgentFromAPIKey,
-						},
+						Id: tc.AgentFromAPIKey,
 						Agent: &model.AgentMetadata{
 							ID: tc.AgentFromAPIKey,
 						},
@@ -405,9 +403,7 @@ func TestChunkUploadRequiresMatchingAuth(t *testing.T) {
 						return nil, ErrAgentIdentity
 					}
 					return &model.Agent{
-						ESDocument: model.ESDocument{
-							Id: tc.AgentFromAPIKey,
-						},
+						Id: tc.AgentFromAPIKey,
 						Agent: &model.AgentMetadata{
 							ID: tc.AgentFromAPIKey,
 						},
@@ -1173,9 +1169,7 @@ func prepareUploaderMock(t *testing.T) (http.Handler, apiServer, *itesting.MockB
 			uploader:    uploader.New(es, fakebulk, c, maxFileSize, maxUploadTimer),
 			authAgent: func(r *http.Request, id *string, bulker bulk.Bulk, c cache.Cache) (*model.Agent, error) {
 				return &model.Agent{
-					ESDocument: model.ESDocument{
-						Id: "foo",
-					},
+					Id: "foo",
 					Agent: &model.AgentMetadata{
 						ID: "foo",
 					},
@@ -1227,12 +1221,10 @@ func mockUploadInfoResult(bulker *itesting.MockBulk, info file.Info) {
 		mock.Anything,
 		mock.Anything,
 	).Return(&es.ResultT{
-		HitsT: es.HitsT{
-			Hits: []es.HitT{
-				{
-					ID:     info.DocID,
-					Source: out,
-				},
+		Hits: []es.HitT{
+			{
+				ID:     info.DocID,
+				Source: out,
 			},
 		},
 	}, nil).Once()
@@ -1261,9 +1253,7 @@ func mockChunkResult(bulker *itesting.MockBulk, chunks []file.ChunkInfo) string 
 		mock.Anything,
 		mock.Anything,
 	).Return(&es.ResultT{
-		HitsT: es.HitsT{
-			Hits: results,
-		},
+		Hits: results,
 	}, nil)
 	return calcTransitHash(chunks)
 }
