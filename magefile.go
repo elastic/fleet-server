@@ -775,7 +775,7 @@ func (Build) Local() error {
 		outFile = filepath.Join("bin", binaryExe)
 
 	}
-	return sh.RunWithV(env, "go", "build", "-tags="+getTagsString(), "-gcflags="+getGCFlags(), "-ldflags="+getLDFlags(), "-o", outFile, ".")
+	return sh.RunWithV(env, "go", cmdBuild, "-tags="+getTagsString(), "-gcflags="+getGCFlags(), "-ldflags="+getLDFlags(), "-o", outFile, ".")
 }
 
 // Binary builds release binaries for the specified platforms.
@@ -2536,7 +2536,7 @@ func (Test) CloudE2ERun(ctx context.Context) error {
 
 	var b bytes.Buffer
 	w := io.MultiWriter(&b, os.Stdout)
-	cmd := exec.CommandContext(ctx, "go", "test", "-v", "-timeout", "30m", "-tags=cloude2e", "-count=1", "-p", "1", "./...")
+	cmd := exec.CommandContext(ctx, "go", cmdTest, "-v", "-timeout", "30m", "-tags=cloude2e", "-count=1", "-p", "1", "./...")
 	cmd.Dir = testingDir
 	cmd.Env = append(os.Environ(),
 		"FLEET_SERVER_URL="+fleetURL,
