@@ -2261,7 +2261,7 @@ func (Test) FipsProviderUnit() error {
 	}
 	env := environMap()
 	addFIPSEnvVars(env)
-	output, err := teeCommand(env, "go", "test", "-tags="+getTagsString(), "-v", "-race", "-coverprofile="+filepath.Join("build", "coverage-fips-provider-"+runtime.GOOS+".out"), "./...")
+	output, err := teeCommand(env, "test", "-tags="+getTagsString(), "-v", "-race", "-coverprofile="+filepath.Join("build", "coverage-fips-provider-"+runtime.GOOS+".out"), "./...")
 	err = errors.Join(err, os.WriteFile(filepath.Join("build", "test-unit-fips-provider-"+runtime.GOOS+".out"), output, 0o644)) //nolint:gosec // G306: test output, not a secret
 	return err
 }
