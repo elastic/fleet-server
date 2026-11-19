@@ -24,8 +24,6 @@ import (
 
 var ErrAuditUnenrollReason = fmt.Errorf("agent document contains audit_unenroll_reason: orphaned")
 
-const errMsgDecodeAuditUnenroll = "unable to decode audit/unenroll request"
-
 type AuditT struct {
 	cfg   *config.Server
 	bulk  bulk.Bulk
@@ -85,7 +83,7 @@ func (audit *AuditT) validateUnenrollRequest(zlog zerolog.Logger, w http.Respons
 	var req AuditUnenrollRequest
 	dec := json.NewDecoder(readCounter)
 	if err := dec.Decode(&req); err != nil {
-		return nil, &BadRequestErr{msg: errMsgDecodeAuditUnenroll, nextErr: err}
+		return nil, &BadRequestErr{msg: "unable to decode audit/unenroll request", nextErr: err}
 	}
 
 	switch req.Reason {

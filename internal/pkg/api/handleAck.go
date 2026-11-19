@@ -36,9 +36,6 @@ const (
 	TypeUpgrade  = "UPGRADE"
 )
 
-// ackResponseAction is the value of the action field in every AckResponse.
-const ackResponseAction = "acks"
-
 var (
 	ErrUpdatingInactiveAgent = errors.New("updating inactive agent")
 )
@@ -53,7 +50,7 @@ func (e *HTTPError) Error() string {
 
 func NewAckResponse(size int) AckResponse {
 	return AckResponse{
-		Action: ackResponseAction,
+		Action: "acks",
 		Errors: false,
 		Items:  make([]AckResponseItem, size),
 	}
@@ -72,7 +69,8 @@ func (a *AckResponse) SetResult(pos int, status int) {
 }
 
 func (a *AckResponse) SetError(pos int, err error) {
-	if esErr, ok := errors.AsType[*es.ErrElastic](err); ok {
+	var esErr *es.ErrElastic
+	if errors.As(err, &esErr) {
 		a.setMessage(pos, esErr.Status, esErr.Reason)
 	} else if errors.Is(err, bulk.ErrTooManyBulkDispatches) {
 		a.SetResult(pos, http.StatusTooManyRequests)
@@ -119,7 +117,8 @@ func (ack *AckT) processRequest(zlog zerolog.Logger, w http.ResponseWriter, r *h
 	span, _ := apm.StartSpan(r.Context(), "response", "write")
 	defer span.End()
 	if err != nil {
-		if herr, ok := errors.AsType[*HTTPError](err); ok {
+		var herr *HTTPError
+		if errors.As(err, &herr) {
 			w.WriteHeader(herr.Status)
 		} else {
 			// Non-HTTP error will be handled at higher level
@@ -229,7 +228,8 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 	}
 
 	setError := func(pos int, err error) {
-		if esErr, ok := errors.AsType[*es.ErrElastic](err); ok {
+		var esErr *es.ErrElastic
+		if errors.As(err, &esErr) {
 			setResult(pos, esErr.Status)
 		} else if errors.Is(err, bulk.ErrTooManyBulkDispatches) {
 			setResult(pos, http.StatusTooManyRequests)

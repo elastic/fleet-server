@@ -19,9 +19,11 @@ import (
 
 func TestHitUnmarshal(t *testing.T) {
 	action := model.Action{
-		Id:       xid.New().String(),
-		SeqNo:    2,
-		Version:  1,
+		ESDocument: model.ESDocument{
+			Id:      xid.New().String(),
+			SeqNo:   2,
+			Version: 1,
+		},
 		ActionID: uuid.Must(uuid.NewV4()).String(),
 	}
 
