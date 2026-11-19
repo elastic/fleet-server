@@ -1,0 +1,8 @@
+kind: bug-fix
+summary: Fix doubled route metrics and missing request logs when OpAMP is enabled
+description: >-
+  When the OpAMP endpoint was enabled, Fleet Server counted each API request two times in the
+  active and total route metrics. Requests that a route limit rejected did not show in the request
+  log or in APM. Fleet Server now counts each request one time and logs and traces rejected
+  requests like other responses.
+component: fleet-server
