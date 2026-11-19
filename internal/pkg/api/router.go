@@ -79,41 +79,6 @@ func Limiter(cfg *config.ServerLimits) *limiter {
 	}
 }
 
-<<<<<<< HEAD
-=======
-// admissionRecorder records whether the throttle passed a request to the next handler.
-type admissionRecorder struct {
-	http.ResponseWriter
-	admitted bool
-}
-
-// throttleWithCount limits the number of requests that the server handles at
-// the same time and counts the requests that it rejects. The autoscaler reads
-// this count as http_server.tcp_rejected_rate so a 429 from a later handler,
-// such as a route limit, is not counted.
-func throttleWithCount(limit int) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		admit := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			rec, ok := w.(*admissionRecorder)
-			if !ok {
-				next.ServeHTTP(w, r)
-				return
-			}
-			rec.admitted = true
-			next.ServeHTTP(rec.ResponseWriter, r)
-		})
-		throttled := middleware.Throttle(limit)(admit)
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			rec := &admissionRecorder{ResponseWriter: w}
-			throttled.ServeHTTP(rec, r)
-			if !rec.admitted {
-				cntHTTPRejected.Add(1)
-			}
-		})
-	}
-}
-
->>>>>>> af0dc1e (Fix doubled route metrics and missing request logs when OpAMP is enabled (#8276))
 var pgpReg = regexp.MustCompile(`\/api\/agents\/upgrades\/[0-9]+\.[0-9]+\.[0-9]+\/pgp-public-key`)
 
 // pathToOperation determines the endpoint passed on the request path.
