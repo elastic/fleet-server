@@ -51,7 +51,7 @@ import (
 
 var Default = Build.Binary
 
-// Mage only discovers aliases whose keys are string literals, so the build and test keys must not use the cmdBuild and cmdTest constants.
+// Mage only discovers aliases whose keys are string literals.
 var Aliases = map[string]interface{}{
 	"build":   Build.Binary, //nolint:goconst // mage requires string-literal alias keys
 	"release": Build.Release,
