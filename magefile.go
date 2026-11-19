@@ -1774,12 +1774,8 @@ func (Test) JunitReport(ctx context.Context) error {
 		var output bytes.Buffer
 		var stderr bytes.Buffer
 
-<<<<<<< HEAD
-		cmd := exec.Command("go", "tool", "-modfile", filepath.Join("dev-tools", "go.mod"), "github.com/jstemmer/go-junit-report")
-=======
 		//nolint:gosec // G204: fixed tool invocation, only the modfile path is computed
-		cmd := exec.CommandContext(ctx, "go", "tool", "-modfile", filepath.Join("dev-tools", "go.mod"), "github.com/jstemmer/go-junit-report/v2")
->>>>>>> 73e7a81 (ci: lint all build tag sets (#8248))
+		cmd := exec.CommandContext(ctx, "go", "tool", "-modfile", filepath.Join("dev-tools", "go.mod"), "github.com/jstemmer/go-junit-report")
 		cmd.Stdin = srcFile
 		cmd.Stdout = &output
 		cmd.Stderr = &stderr
