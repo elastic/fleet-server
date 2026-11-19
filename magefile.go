@@ -56,7 +56,7 @@ var Aliases = map[string]interface{}{
 	"build":   Build.Binary, //nolint:goconst // mage requires string-literal alias keys
 	"release": Build.Release,
 	"check":   Check.All,
-	"test":    Test.All, //nolint:goconst // mage requires string-literal alias keys
+	"test":    Test.All,
 }
 
 // env vars that a user can use to control targets.
