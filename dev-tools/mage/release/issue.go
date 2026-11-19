@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	devtools "github.com/elastic/fleet-server/v7/dev-tools/mage"
 	"github.com/google/go-github/v68/github"
 )
 
@@ -41,12 +42,13 @@ func EnsureReleaseIssueTracker(cfg *ReleaseConfig, workflowPRs []*github.PullReq
 	if cfg == nil {
 		return fmt.Errorf("release config is required")
 	}
-	if cfg.NextRelease == "" {
-		return fmt.Errorf("NEXT_RELEASE is required")
+	if err := cfg.EnsureParsedVersions(); err != nil {
+		return fmt.Errorf("NEXT_RELEASE is required: %w", err)
 	}
 
 	title := releaseIssueTitle(cfg.NextRelease)
 	seedURLs := prURLsFromPullRequests(workflowPRs)
+	isMajorMinor := isMajorMinorRelease(cfg.NextReleaseVersion)
 
 	if cfg.DryRun {
 		printf("\nDRY RUN: Would ensure issue tracker %q\n", title)
@@ -75,7 +77,7 @@ func EnsureReleaseIssueTracker(cfg *ReleaseConfig, workflowPRs []*github.PullReq
 	}
 
 	if !found {
-		body := buildReleaseIssueBody(isMajorMinorRelease(cfg.NextRelease), prURLs, nil)
+		body := buildReleaseIssueBody(isMajorMinor, prURLs, nil)
 		issue, err := gh.createIssue(owner, repo, title, body, []string{labelRelease})
 		if err != nil {
 			return err
@@ -84,7 +86,7 @@ func EnsureReleaseIssueTracker(cfg *ReleaseConfig, workflowPRs []*github.PullReq
 		return nil
 	}
 
-	updatedBody, changed := mergeReleaseIssueBody(existing.GetBody(), cfg.NextRelease, prURLs)
+	updatedBody, changed := mergeReleaseIssueBody(existing.GetBody(), cfg.NextRelease, isMajorMinor, prURLs)
 	if changed {
 		if err := gh.updateIssueBody(owner, repo, existing.GetNumber(), updatedBody); err != nil {
 			return err
@@ -104,9 +106,8 @@ func releaseIssueTitle(version string) string {
 	return fmt.Sprintf("[RELEASE %s] Instructions & Checklist", version)
 }
 
-func isMajorMinorRelease(version string) bool {
-	parts := strings.Split(version, ".")
-	return len(parts) >= 3 && parts[2] == "0"
+func isMajorMinorRelease(v *devtools.ReleaseVersion) bool {
+	return v != nil && v.Patch == 0
 }
 
 func prURLsFromPullRequests(prs []*github.PullRequest) []string {
@@ -216,12 +217,12 @@ func formatPRChecklist(prURLs []string, checked map[string]bool) string {
 
 // mergeReleaseIssueBody updates an existing issue body with missing tracker link and PR URLs.
 // Checklist item checkboxes outside the PRs section are left untouched.
-func mergeReleaseIssueBody(existingBody, version string, prURLs []string) (string, bool) {
+func mergeReleaseIssueBody(existingBody, version string, isMajorMinor bool, prURLs []string) (string, bool) {
 	existingChecked := extractPRCheckboxes(existingBody)
 	allURLs := mergePRURLs(prURLs, keys(existingChecked))
 
 	if strings.TrimSpace(existingBody) == "" {
-		return buildReleaseIssueBody(isMajorMinorRelease(version), allURLs, existingChecked), true
+		return buildReleaseIssueBody(isMajorMinor, allURLs, existingChecked), true
 	}
 
 	body := existingBody

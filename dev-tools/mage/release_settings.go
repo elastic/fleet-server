@@ -15,11 +15,19 @@ import (
 // ReleaseSettings holds configuration for release automation (feature freeze / patch).
 // NEXT_RELEASE is optional during general loads; release targets call RequireRelease()
 // before running workflows.
+//
+// Versions are parsed once into ReleaseVersion fields. String fields are derived at
+// that time for call sites that need serialized values (PR titles, file writes).
+// Workflow logic should use the parsed fields, not re-parse strings.
 type ReleaseSettings struct {
-	NextRelease             string
+	LatestReleaseVersion *ReleaseVersion
+	NextProjectMinor     *ReleaseVersion
+	NextReleaseVersion   *ReleaseVersion
+
 	LatestRelease           string
-	NextProjectMinorVersion string
 	NextProjectMinorBranch  string
+	NextProjectMinorVersion string
+	NextRelease             string
 
 	BaseBranch    string
 	ReleaseBranch string
@@ -46,10 +54,10 @@ func LoadReleaseSettings() (*ReleaseSettings, error) {
 
 // RequireRelease ensures NEXT_RELEASE was provided so inferred release fields are set.
 func (s *ReleaseSettings) RequireRelease() error {
-	if s.NextRelease == "" {
+	if s.NextRelease == "" && s.NextReleaseVersion == nil {
 		return fmt.Errorf("NEXT_RELEASE environment variable is required")
 	}
-	return nil
+	return s.EnsureParsedVersions()
 }
 
 func defaultReleaseSettings() *ReleaseSettings {
@@ -101,16 +109,47 @@ func (s *ReleaseSettings) loadFromEnv() error {
 	return s.populateFromNext(nextRelease)
 }
 
+// EnsureParsedVersions fills parsed version fields from NextRelease when missing.
+// Production loads set these in populateFromNext; tests may set only the string.
+// An explicitly set LatestRelease string is preserved when inference leaves it empty
+// (minor releases with patch 0).
+func (s *ReleaseSettings) EnsureParsedVersions() error {
+	if s.NextReleaseVersion != nil {
+		if s.LatestReleaseVersion == nil && s.LatestRelease != "" {
+			return s.SetLatestReleaseFromString(s.LatestRelease)
+		}
+		return nil
+	}
+	if s.NextRelease == "" {
+		return fmt.Errorf("NextRelease is required")
+	}
+	latestOverride := s.LatestRelease
+	if err := s.populateFromNext(s.NextRelease); err != nil {
+		return err
+	}
+	if latestOverride != "" && s.LatestReleaseVersion == nil {
+		return s.SetLatestReleaseFromString(latestOverride)
+	}
+	return nil
+}
+
 func (s *ReleaseSettings) populateFromNext(nextRelease string) error {
 	parsed, err := ParseReleaseVersion(nextRelease)
 	if err != nil {
 		return err
 	}
 
+	s.NextReleaseVersion = &parsed
 	s.NextRelease = parsed.String()
-	s.LatestRelease = InferLatestRelease(parsed)
+
+	s.LatestReleaseVersion = InferLatestRelease(parsed)
+	s.LatestRelease = VersionString(s.LatestReleaseVersion)
+
 	s.ReleaseBranch = InferReleaseBranch(parsed)
-	s.NextProjectMinorVersion = InferNextProjectMinorVersion(parsed)
+
+	nextMinor := InferNextProjectMinorVersion(parsed)
+	s.NextProjectMinor = &nextMinor
+	s.NextProjectMinorVersion = nextMinor.String()
 	s.NextProjectMinorBranch = InferNextProjectMinorBranch(parsed)
 	return nil
 }
@@ -122,6 +161,14 @@ type ReleaseVersion struct {
 
 func (v ReleaseVersion) String() string {
 	return fmt.Sprintf("%d.%d.%d", v.Major, v.Minor, v.Patch)
+}
+
+// VersionString returns v.String(), or "" when v is nil.
+func VersionString(v *ReleaseVersion) string {
+	if v == nil {
+		return ""
+	}
+	return v.String()
 }
 
 // ParseReleaseVersion parses a release version string as major.minor.patch with no
@@ -173,13 +220,14 @@ func parseStrictReleaseVersion(nextRelease string) (*libversion.V, error) {
 	return v, nil
 }
 
-// InferLatestRelease calculates the previous release version (patch - 1).
-// For minor releases (patch == 0), returns empty string; callers may resolve via GitHub.
-func InferLatestRelease(v ReleaseVersion) string {
+// InferLatestRelease returns the previous patch version (patch - 1).
+// For minor releases (patch == 0), returns nil; callers may resolve via GitHub.
+func InferLatestRelease(v ReleaseVersion) *ReleaseVersion {
 	if v.Patch == 0 {
-		return ""
+		return nil
 	}
-	return ReleaseVersion{Major: v.Major, Minor: v.Minor, Patch: v.Patch - 1}.String()
+	prev := ReleaseVersion{Major: v.Major, Minor: v.Minor, Patch: v.Patch - 1}
+	return &prev
 }
 
 // InferReleaseBranch returns the major.minor release branch name.
@@ -188,11 +236,22 @@ func InferReleaseBranch(v ReleaseVersion) string {
 }
 
 // InferNextProjectMinorVersion returns the next minor version as major.(minor+1).0.
-func InferNextProjectMinorVersion(v ReleaseVersion) string {
-	return ReleaseVersion{Major: v.Major, Minor: v.Minor + 1, Patch: 0}.String()
+func InferNextProjectMinorVersion(v ReleaseVersion) ReleaseVersion {
+	return ReleaseVersion{Major: v.Major, Minor: v.Minor + 1, Patch: 0}
 }
 
 // InferNextProjectMinorBranch returns the next minor branch as major.(minor+1).
 func InferNextProjectMinorBranch(v ReleaseVersion) string {
 	return fmt.Sprintf("%d.%d", v.Major, v.Minor+1)
+}
+
+// SetLatestReleaseFromString parses and stores a previously published release version.
+func (s *ReleaseSettings) SetLatestReleaseFromString(raw string) error {
+	parsed, err := ParseReleaseVersion(raw)
+	if err != nil {
+		return err
+	}
+	s.LatestReleaseVersion = &parsed
+	s.LatestRelease = parsed.String()
+	return nil
 }

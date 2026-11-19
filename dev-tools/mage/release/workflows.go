@@ -53,11 +53,10 @@ func patchVersionBumpLabels() []string {
 // requireFeatureFreezeNextRelease ensures NEXT_RELEASE is an X.Y.0 version.
 // Patch bumps belong in RunPatchRelease.
 func requireFeatureFreezeNextRelease(cfg *ReleaseConfig) error {
-	parsed, err := parseSemver(cfg.NextRelease)
-	if err != nil {
+	if err := cfg.EnsureParsedVersions(); err != nil {
 		return err
 	}
-	if parsed.patch != 0 {
+	if cfg.NextReleaseVersion.Patch != 0 {
 		return fmt.Errorf(
 			"runMajorMinor requires NEXT_RELEASE with patch 0 (got %s); use mage release:runPatch for patch bumps",
 			cfg.NextRelease,
@@ -67,13 +66,13 @@ func requireFeatureFreezeNextRelease(cfg *ReleaseConfig) error {
 }
 
 func checkRequirements(cfg *ReleaseConfig) error {
-	parsed, err := parseSemver(cfg.NextRelease)
-	if err != nil {
+	if err := cfg.EnsureParsedVersions(); err != nil {
 		return err
 	}
 
-	if (parsed.major == 6 || parsed.major == 7 || parsed.major == 8) && parsed.patch == 0 {
-		return fmt.Errorf("minor releases for version %d.x are deprecated and blocked", parsed.major)
+	v := cfg.NextReleaseVersion
+	if (v.Major == 6 || v.Major == 7 || v.Major == 8) && v.Patch == 0 {
+		return fmt.Errorf("minor releases for version %d.x are deprecated and blocked", v.Major)
 	}
 
 	repo, err := openRepo(".")
@@ -362,11 +361,7 @@ func RunPatchRelease(cfg *ReleaseConfig) error {
 	}
 
 	if cfg.ReleaseBranch == "" {
-		parsed, err := devtools.ParseReleaseVersion(cfg.NextRelease)
-		if err != nil {
-			return err
-		}
-		cfg.ReleaseBranch = devtools.InferReleaseBranch(parsed)
+		cfg.ReleaseBranch = devtools.InferReleaseBranch(*cfg.NextReleaseVersion)
 	}
 
 	if err := ensurePatchBranchReadyForBump(repo, cfg); err != nil {
@@ -403,18 +398,18 @@ func RunPatchRelease(cfg *ReleaseConfig) error {
 }
 
 func ensurePatchBranchReadyForBump(repo *gitRepo, cfg *ReleaseConfig) error {
-	parsed, err := devtools.ParseReleaseVersion(cfg.NextRelease)
-	if err != nil {
+	if err := cfg.EnsureParsedVersions(); err != nil {
 		return err
 	}
-	prev := devtools.InferLatestRelease(parsed)
-	if prev == "" {
+	prev := devtools.InferLatestRelease(*cfg.NextReleaseVersion)
+	if prev == nil {
 		return fmt.Errorf(
 			"prepare-next-patch requires NEXT_RELEASE with patch > 0 (got %s)",
 			cfg.NextRelease,
 		)
 	}
-	cfg.LatestRelease = prev
+	cfg.LatestReleaseVersion = prev
+	cfg.LatestRelease = prev.String()
 
 	if err := repo.ensureExistingBranch(cfg.ReleaseBranch); err != nil {
 		return fmt.Errorf(
@@ -432,11 +427,11 @@ func ensurePatchBranchReadyForBump(repo *gitRepo, cfg *ReleaseConfig) error {
 			cfg.NextRelease, cfg.ReleaseBranch,
 		)
 	}
-	if branchVersion != prev {
+	if branchVersion != cfg.LatestRelease {
 		return fmt.Errorf(
 			"NEXT_RELEASE=%s expects version %s on branch %s (got %s in version/version.go); "+
 				"set NEXT_RELEASE to the version to land (NEW_VERSION from version-bump)",
-			cfg.NextRelease, prev, cfg.ReleaseBranch, branchVersion,
+			cfg.NextRelease, cfg.LatestRelease, cfg.ReleaseBranch, branchVersion,
 		)
 	}
 	printf("Verified branch %s is at %s; will bump to NEXT_RELEASE=%s\n", cfg.ReleaseBranch, branchVersion, cfg.NextRelease)

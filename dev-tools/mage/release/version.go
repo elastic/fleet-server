@@ -8,58 +8,48 @@ import (
 	"fmt"
 	"strings"
 
-	libversion "github.com/elastic/beats/v7/pkg/version"
+	devtools "github.com/elastic/fleet-server/v7/dev-tools/mage"
 )
 
-type releaseSemver struct {
-	major, minor, patch int
-}
-
-func parseSemver(version string) (releaseSemver, error) {
-	v, err := parseStrictReleaseVersion(version)
+// selectLatestReleaseBefore picks the highest same-major version strictly less than current.
+// GitHub release tags are external input, so they are parsed here at the boundary.
+func selectLatestReleaseBefore(versions []string, currentVersion string) (string, error) {
+	current, err := devtools.ParseReleaseVersion(currentVersion)
 	if err != nil {
-		return releaseSemver{}, err
+		return "", err
 	}
-	return releaseSemver{major: v.Major, minor: v.Minor, patch: v.Bugfix}, nil
-}
 
-// parseStrictReleaseVersion uses beats/v7/pkg/version (same API as the old
-// elastic-agent-libs/version package) and rejects signed components and
-// prerelease/build metadata so release versions stay plain X.Y.Z.
-func parseStrictReleaseVersion(raw string) (*libversion.V, error) {
-	version := strings.TrimPrefix(strings.TrimSpace(raw), "v")
-	if version == "" {
-		return nil, fmt.Errorf("invalid version format: %s (expected major.minor.patch)", raw)
-	}
-	if strings.ContainsAny(version, "-+") {
-		return nil, fmt.Errorf("invalid version format: %s (expected major.minor.patch without prerelease/build metadata)", raw)
-	}
-	parts := strings.Split(version, ".")
-	if len(parts) != 3 {
-		return nil, fmt.Errorf("invalid version format: %s (expected major.minor.patch)", raw)
-	}
-	for _, part := range parts {
-		if part == "" || strings.HasPrefix(part, "-") || strings.HasPrefix(part, "+") {
-			return nil, fmt.Errorf("invalid version format: %s (expected major.minor.patch)", raw)
+	var best *devtools.ReleaseVersion
+	for _, raw := range versions {
+		candidate, err := devtools.ParseReleaseVersion(raw)
+		if err != nil {
+			continue
 		}
-		for _, r := range part {
-			if r < '0' || r > '9' {
-				return nil, fmt.Errorf("invalid version format: %s (expected major.minor.patch)", raw)
-			}
+		if candidate.Major != current.Major {
+			continue
+		}
+		if !releaseVersionLess(candidate, current) {
+			continue
+		}
+		if best == nil || releaseVersionLess(*best, candidate) {
+			c := candidate
+			best = &c
 		}
 	}
+	if best == nil {
+		return "", fmt.Errorf("no published release found before %s (same major)", currentVersion)
+	}
+	return best.String(), nil
+}
 
-	v, err := libversion.New(version)
-	if err != nil {
-		return nil, fmt.Errorf("invalid version format: %s (expected major.minor.patch): %w", raw, err)
+func releaseVersionLess(a, b devtools.ReleaseVersion) bool {
+	if a.Major != b.Major {
+		return a.Major < b.Major
 	}
-	if v.Meta != "" {
-		return nil, fmt.Errorf("invalid version format: %s (expected major.minor.patch without prerelease/build metadata)", raw)
+	if a.Minor != b.Minor {
+		return a.Minor < b.Minor
 	}
-	if v.Major < 0 || v.Minor < 0 || v.Bugfix < 0 {
-		return nil, fmt.Errorf("invalid version format: %s (expected major.minor.patch)", raw)
-	}
-	return v, nil
+	return a.Patch < b.Patch
 }
 
 // branchVersionFromRelease returns the X.Y branch name from an X.Y or X.Y.Z
@@ -81,48 +71,4 @@ func branchVersionFromRelease(version string) (string, error) {
 		}
 	}
 	return fmt.Sprintf("%s.%s", parts[0], parts[1]), nil
-}
-
-func (v releaseSemver) String() string {
-	return fmt.Sprintf("%d.%d.%d", v.major, v.minor, v.patch)
-}
-
-func (v releaseSemver) less(other releaseSemver) bool {
-	if v.major != other.major {
-		return v.major < other.major
-	}
-	if v.minor != other.minor {
-		return v.minor < other.minor
-	}
-	return v.patch < other.patch
-}
-
-// selectLatestReleaseBefore picks the highest same-major version strictly less than current.
-func selectLatestReleaseBefore(versions []string, currentVersion string) (string, error) {
-	current, err := parseSemver(currentVersion)
-	if err != nil {
-		return "", err
-	}
-
-	var best *releaseSemver
-	for _, raw := range versions {
-		candidate, err := parseSemver(raw)
-		if err != nil {
-			continue
-		}
-		if candidate.major != current.major {
-			continue
-		}
-		if !candidate.less(current) {
-			continue
-		}
-		if best == nil || best.less(candidate) {
-			c := candidate
-			best = &c
-		}
-	}
-	if best == nil {
-		return "", fmt.Errorf("no published release found before %s (same major)", currentVersion)
-	}
-	return best.String(), nil
 }

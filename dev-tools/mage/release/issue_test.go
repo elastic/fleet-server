@@ -10,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	devtools "github.com/elastic/fleet-server/v7/dev-tools/mage"
 	"github.com/google/go-github/v68/github"
 )
 
@@ -22,10 +23,14 @@ func TestReleaseIssueTitle(t *testing.T) {
 }
 
 func TestIsMajorMinorRelease(t *testing.T) {
-	if !isMajorMinorRelease(testVersion950) {
+	minor, err := devtools.ParseReleaseVersion(testVersion950)
+	require.NoError(t, err)
+	if !isMajorMinorRelease(&minor) {
 		t.Fatal("expected 9.5.0 to be treated as major/minor")
 	}
-	if isMajorMinorRelease("9.5.1") {
+	patch, err := devtools.ParseReleaseVersion("9.5.1")
+	require.NoError(t, err)
+	if isMajorMinorRelease(&patch) {
 		t.Fatal("expected 9.5.1 not to be treated as major/minor")
 	}
 }
@@ -108,7 +113,7 @@ func TestMergeReleaseIssueBodyAddsMissingPRsAndPreservesChecks(t *testing.T) {
 - [x] ` + testPRURL10 + `
 - [ ] ` + testPRURL11 + `
 `
-	updated, changed := mergeReleaseIssueBody(existing, "9.4.1", []string{
+	updated, changed := mergeReleaseIssueBody(existing, "9.4.1", false, []string{
 		testPRURL11,
 		testPRURL12,
 	})
@@ -128,7 +133,7 @@ func TestMergeReleaseIssueBodyAddsMissingPRsAndPreservesChecks(t *testing.T) {
 		t.Fatal("non-PR checklist state must be preserved")
 	}
 
-	_, changedAgain := mergeReleaseIssueBody(updated, "9.4.1", []string{
+	_, changedAgain := mergeReleaseIssueBody(updated, "9.4.1", false, []string{
 		testPRURL10,
 		testPRURL11,
 		testPRURL12,
@@ -145,7 +150,7 @@ func TestMergeReleaseIssueBodyAddsTrackerWhenMissing(t *testing.T) {
 
 - [ ] https://github.com/elastic/fleet-server/pull/10
 `
-	updated, changed := mergeReleaseIssueBody(existing, "9.4.1", []string{testPRURL10})
+	updated, changed := mergeReleaseIssueBody(existing, "9.4.1", false, []string{testPRURL10})
 	if !changed {
 		t.Fatal("missing global tracker should trigger an update")
 	}

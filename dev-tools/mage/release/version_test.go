@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	devtools "github.com/elastic/fleet-server/v7/dev-tools/mage"
 )
 
 func TestSelectLatestReleaseBefore(t *testing.T) {
@@ -17,12 +19,12 @@ func TestSelectLatestReleaseBefore(t *testing.T) {
 	require.Equal(t, testVersion943, got)
 }
 
-func TestParseSemverRejectsSignedComponents(t *testing.T) {
+func TestParseReleaseVersionRejectsSignedComponents(t *testing.T) {
 	for _, version := range []string{"-1.0.0", "+9.6.0", "9.-1.0", "9.6.+1", testInvalidFooPatch} {
-		_, err := parseSemver(version)
-		require.Error(t, err, "parseSemver(%q) expected error", version)
+		_, err := devtools.ParseReleaseVersion(version)
+		require.Error(t, err, "ParseReleaseVersion(%q) expected error", version)
 	}
-	got, err := parseSemver("9.6.0")
+	got, err := devtools.ParseReleaseVersion("9.6.0")
 	require.NoError(t, err)
 	require.Equal(t, "9.6.0", got.String())
 }

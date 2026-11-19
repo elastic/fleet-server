@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	devtools "github.com/elastic/fleet-server/v7/dev-tools/mage"
 )
 
 const (
@@ -72,7 +74,7 @@ func writeRepoFile(relPath string, content []byte) error {
 
 // UpdateVersion updates the version in version/version.go.
 func UpdateVersion(newVersion string) error {
-	parsed, err := parseSemver(newVersion)
+	parsed, err := devtools.ParseReleaseVersion(newVersion)
 	if err != nil {
 		return err
 	}
