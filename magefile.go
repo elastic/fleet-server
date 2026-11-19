@@ -51,11 +51,12 @@ import (
 
 var Default = Build.Binary
 
+// Mage only discovers aliases whose keys are string literals, so the build and test keys must not use the cmdBuild and cmdTest constants.
 var Aliases = map[string]interface{}{
-	cmdBuild:  Build.Binary,
+	"build":   Build.Binary, //nolint:goconst // mage requires string-literal alias keys
 	"release": Build.Release,
 	"check":   Check.All,
-	cmdTest:   Test.All,
+	"test":    Test.All, //nolint:goconst // mage requires string-literal alias keys
 }
 
 // env vars that a user can use to control targets.
@@ -620,7 +621,7 @@ func genNotice(ctx context.Context, fips bool) error {
 // getModules returns a list of direct and indirect modules that are used by the main package and its dependencies.
 // Test and tooling packages are excluded.
 func getModules(extraTags ...string) ([]string, error) {
-	tags := append([]string{"linux", "darwin", osWindows}, extraTags...)
+	tags := append([]string{"linux", "darwin", osWindows}, extraTags...) //nolint:goconst // platform name list
 	args := []string{
 		cmdList,
 		"-deps",
@@ -2257,12 +2258,12 @@ func (Test) FipsProviderUnit() error {
 	mg.Deps(mg.F(mkDir, "build"))
 	os.Setenv(envFIPS, "true")
 	if !isFIPS() {
-		return fmt.Errorf("FIPS must be set to true.")
+		return fmt.Errorf("FIPS must be set to true")
 	}
 	env := environMap()
 	addFIPSEnvVars(env)
 	output, err := teeCommand(env, "go", "test", "-tags="+getTagsString(), "-v", "-race", "-coverprofile="+filepath.Join("build", "coverage-fips-provider-"+runtime.GOOS+".out"), "./...")
-	err = errors.Join(err, os.WriteFile(filepath.Join("build", "test-unit-fips-provider-"+runtime.GOOS+".out"), output, 0o644))
+	err = errors.Join(err, os.WriteFile(filepath.Join("build", "test-unit-fips-provider-"+runtime.GOOS+".out"), output, 0o644)) //nolint:gosec // G306: test output, not a secret
 	return err
 }
 
