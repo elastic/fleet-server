@@ -169,7 +169,6 @@ steps:
         command: ".buildkite/scripts/unit_test.sh"
         env:
           FIPS: "true"
-          GOEXPERIMENT: "systemcrypto"
           GO_DISTRO: "microsoft"
           GODEBUG: "fips140=on,tlsmlkem=0"
         agents:
