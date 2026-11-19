@@ -251,7 +251,9 @@ func TestEnrollAgentWithAgentToServerMessage(t *testing.T) {
 
 	bulker.On("Search", mock.Anything, dl.FleetEnrollmentAPIKeys, mock.Anything, mock.Anything).
 		Return(&es.ResultT{
-			Hits: []es.HitT{{Source: enrollKeyBytes}},
+			HitsT: es.HitsT{
+				Hits: []es.HitT{{Source: enrollKeyBytes}},
+			},
 		}, nil)
 
 	var createdAgent model.Agent
@@ -318,206 +320,11 @@ func TestEnrollAgentWithAgentToServerMessage(t *testing.T) {
 	bulker.AssertExpectations(t)
 }
 
-<<<<<<< HEAD
-=======
-func TestEnrollAgentRateLimiter(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		bulker := ftesting.NewMockBulk()
-		enrollKey := model.EnrollmentAPIKey{ //nolint:gosec // fake api key used in test
-			APIKeyID: "enroll-key-id",
-			PolicyID: "policy-123",
-			Active:   true,
-		}
-		enrollKeyBytes, err := json.Marshal(enrollKey) //nolint:gosec // fake api key used in test
-		require.NoError(t, err)
-
-		bulker.On("Search", mock.Anything, dl.FleetEnrollmentAPIKeys, mock.Anything, mock.Anything).
-			Return(&es.ResultT{
-				Hits: []es.HitT{{Source: enrollKeyBytes}},
-			}, nil)
-
-		agentUID := uuid.Must(uuid.NewV7())
-		oa := &OpAMPT{bulk: bulker, enrollLimit: limit.NewLimiter(&config.Limit{Max: 1})}
-
-		ch := make(chan struct{})
-		bulker.On("Create", mock.Anything, dl.FleetAgents, agentUID.String(), mock.Anything, mock.Anything).
-			Run(func(args mock.Arguments) {
-				ch <- struct{}{}
-			}).
-			Return("doc-id", nil)
-
-		apiKey := &apikey.APIKey{ID: "enroll-key-id"}
-		zlog := zerolog.New(io.Discard)
-
-		go func() {
-			_, err := oa.enrollAgent(t.Context(), zlog, agentUID, &protobufs.AgentToServer{}, apiKey)
-			require.NoError(t, err, "expected one enrollment to succeed")
-		}()
-
-		synctest.Wait()
-
-		_, err = oa.enrollAgent(t.Context(), zlog, agentUID, &protobufs.AgentToServer{}, apiKey)
-		require.Error(t, err, "expected max limit to be reached")
-
-		<-ch
-		synctest.Wait()
-	})
-}
-
-// TestEnrollAgentGeneratesNewUIDWhenFlagSet verifies enrollAgent generates a
-// fresh UUID when the AgentToServer message sets the RequestInstanceUid flag,
-// ignoring the incoming uid argument.
-func TestEnrollAgentGeneratesNewUIDWhenFlagSet(t *testing.T) {
-	bulker := ftesting.NewMockBulk()
-
-	enrollKey := model.EnrollmentAPIKey{ //nolint:gosec // fake api key used in test
-		APIKeyID: "enroll-key-id",
-		PolicyID: "policy-123",
-		Active:   true,
-	}
-	enrollKeyBytes, err := json.Marshal(enrollKey) //nolint:gosec // fake api key used in test
-	require.NoError(t, err)
-
-	bulker.On("Search", mock.Anything, dl.FleetEnrollmentAPIKeys, mock.Anything, mock.Anything).
-		Return(&es.ResultT{Hits: []es.HitT{{Source: enrollKeyBytes}}}, nil)
-
-	var createdID string
-	bulker.On("Create", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything, mock.Anything).
-		Run(func(args mock.Arguments) {
-			id, ok := args.Get(2).(string)
-			require.True(t, ok)
-			createdID = id
-		}).
-		Return("doc-id", nil)
-
-	oa := &OpAMPT{bulk: bulker, enrollLimit: limit.NewLimiter(nil)}
-	incomingUID := uuid.Must(uuid.NewV7())
-	msg := &protobufs.AgentToServer{
-		Flags: uint64(protobufs.AgentToServerFlags_AgentToServerFlags_RequestInstanceUid),
-	}
-
-	apiKey := &apikey.APIKey{ID: "enroll-key-id"}
-	zlog := zerolog.New(io.Discard)
-
-	agent, err := oa.enrollAgent(t.Context(), zlog, incomingUID, msg, apiKey)
-	require.NoError(t, err)
-	require.NotEmpty(t, agent.Id)
-	require.NotEqual(t, incomingUID.String(), agent.Id, "agent should be enrolled under a new UID, not the incoming one")
-	require.Equal(t, agent.Id, createdID)
-}
-
-func TestEnrollAgentTags(t *testing.T) {
-	cases := []struct {
-		name         string
-		tagsValue    string
-		wantTags     []string
-		otherNIAKeys []string
-	}{
-		{
-			name:         "no tags attribute",
-			tagsValue:    "",
-			wantTags:     []string{"otel-collector"},
-			otherNIAKeys: []string{string(semconv.HostNameKey)},
-		},
-		{
-			name:         "single tag",
-			tagsValue:    "dev",
-			wantTags:     []string{"otel-collector", "dev"},
-			otherNIAKeys: []string{string(semconv.HostNameKey)},
-		},
-		{
-			name:         "multiple tags",
-			tagsValue:    "dev,west,us-west-1a",
-			wantTags:     []string{"otel-collector", "dev", "west", "us-west-1a"},
-			otherNIAKeys: []string{string(semconv.HostNameKey)},
-		},
-		{
-			name:         "tags with spaces",
-			tagsValue:    " dev , west , us-west-1a ",
-			wantTags:     []string{"otel-collector", "dev", "west", "us-west-1a"},
-			otherNIAKeys: []string{string(semconv.HostNameKey)},
-		},
-		{
-			name:         "duplicate of agent type is removed",
-			tagsValue:    "otel-collector,dev",
-			wantTags:     []string{"otel-collector", "dev"},
-			otherNIAKeys: []string{string(semconv.HostNameKey)},
-		},
-		{
-			name:         "duplicate tags within list are removed",
-			tagsValue:    "dev,west,dev",
-			wantTags:     []string{"otel-collector", "dev", "west"},
-			otherNIAKeys: []string{string(semconv.HostNameKey)},
-		},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			bulker := ftesting.NewMockBulk()
-			enrollKey := model.EnrollmentAPIKey{ //nolint:gosec // test data, not real credentials
-				APIKeyID: "enroll-key-id",
-				PolicyID: "policy-123",
-				Active:   true,
-			}
-			enrollKeyBytes, err := json.Marshal(enrollKey) //nolint:gosec // test data, not real credentials
-			require.NoError(t, err)
-			bulker.On("Search", mock.Anything, dl.FleetEnrollmentAPIKeys, mock.Anything, mock.Anything).
-				Return(&es.ResultT{Hits: []es.HitT{{Source: enrollKeyBytes}}}, nil)
-			agentUID := uuid.Must(uuid.NewV7())
-			bulker.On("Create", mock.Anything, dl.FleetAgents, agentUID.String(), mock.Anything, mock.Anything).
-				Return("doc-id", nil)
-
-			nia := []*protobufs.KeyValue{
-				{
-					Key:   string(semconv.HostNameKey),
-					Value: &protobufs.AnyValue{Value: &protobufs.AnyValue_StringValue{StringValue: "host-1"}},
-				},
-			}
-			if tc.tagsValue != "" {
-				nia = append(nia, &protobufs.KeyValue{
-					Key:   "tags",
-					Value: &protobufs.AnyValue{Value: &protobufs.AnyValue_StringValue{StringValue: tc.tagsValue}},
-				})
-			}
-
-			msg := &protobufs.AgentToServer{
-				AgentDescription: &protobufs.AgentDescription{
-					IdentifyingAttributes: []*protobufs.KeyValue{
-						{
-							Key:   string(semconv.ServiceNameKey),
-							Value: &protobufs.AnyValue{Value: &protobufs.AnyValue_StringValue{StringValue: "otel-collector"}},
-						},
-					},
-					NonIdentifyingAttributes: nia,
-				},
-			}
-
-			oa := &OpAMPT{bulk: bulker, enrollLimit: limit.NewLimiter(nil)}
-			zlog := zerolog.New(io.Discard)
-			agent, err := oa.enrollAgent(t.Context(), zlog, agentUID, msg, &apikey.APIKey{ID: "enroll-key-id"})
-			require.NoError(t, err)
-			require.Equal(t, tc.wantTags, agent.Tags)
-
-			// tags must not appear in stored NonIdentifyingAttributes
-			var niMap map[string]any
-			require.NoError(t, json.Unmarshal(agent.NonIdentifyingAttributes, &niMap))
-			require.NotContains(t, niMap, "tags")
-			for _, k := range tc.otherNIAKeys {
-				require.Contains(t, niMap, k, "expected NIA key %q to be present", k)
-			}
-		})
-	}
-}
-
->>>>>>> a937df3 (chore(deps): update Go to 1.27.4 (#8247))
 func TestUpdateAgentWithAgentToServerMessage(t *testing.T) {
 	checker := &mockCheckin{}
 	oa := &OpAMPT{bc: checker}
 
-<<<<<<< HEAD
 	agent := &model.Agent{ESDocument: model.ESDocument{Id: "agent-123"}}
-=======
-		agent := &model.Agent{Id: "agent-123"}
->>>>>>> a937df3 (chore(deps): update Go to 1.27.4 (#8247))
 
 	msg := &protobufs.AgentToServer{
 		SequenceNum: 7,
@@ -564,60 +371,11 @@ func TestUpdateAgentWithAgentToServerMessage(t *testing.T) {
 	require.Equal(t, "boom", health.LastError)
 	require.Equal(t, "StatusRecoverableError", health.Status)
 
-<<<<<<< HEAD
 	configBytes := getUnexportedField(extraVal, "effectiveConfig").Bytes()
 	var config map[string]any
 	require.NoError(t, json.Unmarshal(configBytes, &config))
 	require.Equal(t, redact.REDACTED, config["password"])
 	require.Equal(t, float64(2), config["num"])
-=======
-		configBytes := getUnexportedField(extraVal, "effectiveConfig").Bytes()
-		var config map[string]any
-		require.NoError(t, json.Unmarshal(configBytes, &config))
-		require.Equal(t, redact.REDACTED, config["password"])
-		require.Equal(t, float64(2), config["num"])
-	})
-
-	t.Run("checkin clears audit_unenroll attributes", func(t *testing.T) {
-		checker := &mockCheckin{}
-		oa := &OpAMPT{bc: checker}
-
-		agent := &model.Agent{
-			Id:                    "agent-123",
-			AuditUnenrolledReason: reenrolled,
-			AuditUnenrolledTime:   time.Now().UTC().Format(time.RFC3339),
-		}
-
-		msg := &protobufs.AgentToServer{
-			SequenceNum:  3,
-			Capabilities: uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsHealth),
-			Health: &protobufs.ComponentHealth{
-				Healthy: true,
-			},
-		}
-
-		zlog := zerolog.New(io.Discard)
-		require.NoError(t, oa.updateAgent(zlog, agent, msg))
-		require.Equal(t, "agent-123", checker.id)
-
-		pending := pendingFromOptions(t, checker.opts)
-		require.Equal(t, string(CheckinRequestStatusOnline), getUnexportedField(pending, "status").String())
-
-		extra := getUnexportedField(pending, "extra")
-		require.False(t, extra.IsNil())
-		extraVal := extra.Elem()
-
-		capabilitiesVal := getUnexportedField(extraVal, "capabilities")
-		capabilities, ok := capabilitiesVal.Interface().([]string)
-		require.True(t, ok)
-		require.ElementsMatch(t, []string{"ReportsHealth"}, capabilities)
-
-		deleteAuditVal := getUnexportedField(extraVal, "deleteAudit")
-		deleteAudit, ok := deleteAuditVal.Interface().(bool)
-		require.True(t, ok)
-		require.True(t, deleteAudit)
-	})
->>>>>>> a937df3 (chore(deps): update Go to 1.27.4 (#8247))
 }
 
 func TestHandleMessageAgentDisconnect(t *testing.T) {
@@ -636,7 +394,7 @@ func TestHandleMessageAgentDisconnect(t *testing.T) {
 				agentBytes, err := json.Marshal(agent)
 				require.NoError(t, err)
 				bulker.On("Search", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything).
-					Return(&es.ResultT{Hits: []es.HitT{{ID: "agent-123", Source: agentBytes}}}, nil)
+					Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{{ID: "agent-123", Source: agentBytes}}}}, nil)
 				return bulker
 			},
 			wantError: false,
@@ -646,7 +404,7 @@ func TestHandleMessageAgentDisconnect(t *testing.T) {
 			getBulker: func(_ *testing.T) *ftesting.MockBulk {
 				bulker := ftesting.NewMockBulk()
 				bulker.On("Search", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything).
-					Return(&es.ResultT{Hits: []es.HitT{}}, nil)
+					Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{}}}, nil)
 				return bulker
 			},
 			wantError: true,
@@ -687,39 +445,6 @@ func TestHandleMessageAgentDisconnect(t *testing.T) {
 	}
 }
 
-<<<<<<< HEAD
-=======
-func mockBulkerOpAMPNewEnrollment(t *testing.T, apiKeyID string) *ftesting.MockBulk {
-	t.Helper()
-	bulker := ftesting.NewMockBulk()
-	bulker.On("Search", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything).
-		Return(&es.ResultT{Hits: []es.HitT{}}, nil)
-	enrollKey := model.EnrollmentAPIKey{
-		APIKeyID: apiKeyID,
-		PolicyID: "policy-123",
-		Active:   true,
-	}
-	enrollKeyBytes, err := json.Marshal(enrollKey) //nolint:gosec // fake api key used in test
-	require.NoError(t, err)
-	bulker.On("Search", mock.Anything, dl.FleetEnrollmentAPIKeys, mock.Anything, mock.Anything).
-		Return(&es.ResultT{Hits: []es.HitT{{Source: enrollKeyBytes}}}, nil)
-	bulker.On("Create", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything, mock.Anything).
-		Return("doc-id", nil)
-	return bulker
-}
-
-func mockBulkerOpAMPExistingAgent(t *testing.T, lastCheckinStatus string) *ftesting.MockBulk {
-	t.Helper()
-	bulker := ftesting.NewMockBulk()
-	agent := model.Agent{LastCheckinStatus: lastCheckinStatus}
-	agentBytes, err := json.Marshal(agent)
-	require.NoError(t, err)
-	bulker.On("Search", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything).
-		Return(&es.ResultT{Hits: []es.HitT{{ID: "agent-123", Source: agentBytes}}}, nil)
-	return bulker
-}
-
->>>>>>> a937df3 (chore(deps): update Go to 1.27.4 (#8247))
 func TestHandleMessageCapabilities(t *testing.T) {
 	const testAPIKeyID = "test-key"
 
@@ -735,7 +460,7 @@ func TestHandleMessageCapabilities(t *testing.T) {
 				t.Helper()
 				bulker := ftesting.NewMockBulk()
 				bulker.On("Search", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything).
-					Return(&es.ResultT{Hits: []es.HitT{}}, nil)
+					Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{}}}, nil)
 				enrollKey := model.EnrollmentAPIKey{
 					APIKeyID: testAPIKeyID,
 					PolicyID: "policy-123",
@@ -744,7 +469,7 @@ func TestHandleMessageCapabilities(t *testing.T) {
 				enrollKeyBytes, err := json.Marshal(enrollKey) //nolint:gosec // fake api key used in test
 				require.NoError(t, err)
 				bulker.On("Search", mock.Anything, dl.FleetEnrollmentAPIKeys, mock.Anything, mock.Anything).
-					Return(&es.ResultT{Hits: []es.HitT{{Source: enrollKeyBytes}}}, nil)
+					Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{{Source: enrollKeyBytes}}}}, nil)
 				bulker.On("Create", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything, mock.Anything).
 					Return("doc-id", nil)
 				return bulker
@@ -796,38 +521,7 @@ func TestHandleMessageCapabilities(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-<<<<<<< HEAD
 			bulker := tc.getBulker(t)
-=======
-			bulker := ftesting.NewMockBulk()
-			agent := model.Agent{
-				LastCheckinStatus:     string(CheckinRequestStatusOnline),
-				AuditUnenrolledReason: tc.auditReason,
-			}
-			agentBytes, err := json.Marshal(agent)
-			require.NoError(t, err)
-			bulker.On("Search", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything).
-				Return(&es.ResultT{Hits: []es.HitT{{ID: "agent-123", Source: agentBytes}}}, nil)
-
-			if tc.flags&uint64(protobufs.AgentToServerFlags_AgentToServerFlags_RequestInstanceUid) != 0 {
-				bulker.On("Search", mock.Anything, dl.FleetEnrollmentAPIKeys, mock.Anything, mock.Anything).
-					Return(&es.ResultT{Hits: []es.HitT{{Source: enrollKeyBytes}}}, nil)
-				bulker.On("Create", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything, mock.Anything).
-					Return("doc-id", nil)
-			}
-
-			var updatedID string
-			if tc.wantUpdateCalled {
-				bulker.On("Update", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything, mock.Anything).
-					Run(func(args mock.Arguments) {
-						id, ok := args.Get(2).(string)
-						require.True(t, ok)
-						updatedID = id
-					}).
-					Return(nil)
-			}
-
->>>>>>> a937df3 (chore(deps): update Go to 1.27.4 (#8247))
 			checker := &mockCheckin{}
 			oa := &OpAMPT{bulk: bulker, bc: checker}
 

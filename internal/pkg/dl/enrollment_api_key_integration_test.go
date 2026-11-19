@@ -24,8 +24,10 @@ import (
 
 func createRandomEnrollmentAPIKey(policyID string, active bool) model.EnrollmentAPIKey {
 	now := time.Now().UTC()
-	return model.EnrollmentAPIKey{ //nolint:gosec // G101: fake API key for test data, not a real credential
-		Id:        xid.New().String(),
+	return model.EnrollmentAPIKey{
+		ESDocument: model.ESDocument{
+			Id: xid.New().String(),
+		},
 		Active:    active,
 		APIKey:    "d2JndlFIWUJJUVVxWDVia2NJTV86X0d6ZmljZGNTc1d4R1otbklrZFFRZw==",
 		APIKeyID:  xid.New().String(),
@@ -39,7 +41,7 @@ func createRandomEnrollmentAPIKey(policyID string, active bool) model.Enrollment
 func storeRandomEnrollmentAPIKey(ctx context.Context, bulker bulk.Bulk, index string, policyID string, active bool) (model.EnrollmentAPIKey, error) {
 	rec := createRandomEnrollmentAPIKey(policyID, active)
 
-	body, err := json.Marshal(rec) //nolint:gosec // G117: marshals fake test data, no real secret is exposed
+	body, err := json.Marshal(rec)
 	if err != nil {
 		return rec, err
 	}

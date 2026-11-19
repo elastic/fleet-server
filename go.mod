@@ -1,10 +1,6 @@
 module github.com/elastic/fleet-server/v7
 
-<<<<<<< HEAD
-go 1.26.10
-=======
 go 1.27.4
->>>>>>> a937df3 (chore(deps): update Go to 1.27.4 (#8247))
 
 require (
 	github.com/Pallinder/go-randomdata v1.2.0

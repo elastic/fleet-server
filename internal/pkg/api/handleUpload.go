@@ -74,7 +74,8 @@ func (ut *UploadT) validateUploadBeginRequest(ctx context.Context, reader io.Rea
 			return nil, "", fmt.Errorf("%w: %w", ErrFileInfoBodyRequired, err)
 		}
 
-		if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
 			return nil, "", uploader.ErrPayloadSizeTooLarge
 		}
 		return nil, "", &BadRequestErr{msg: "unable to decode upload begin request", nextErr: err}
@@ -195,7 +196,8 @@ func (ut *UploadT) validateUploadCompleteRequest(r *http.Request, id string) (st
 
 	var req UploadCompleteRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
 			return "", uploader.ErrPayloadSizeTooLarge
 		}
 

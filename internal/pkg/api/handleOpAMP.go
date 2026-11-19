@@ -327,11 +327,7 @@ func (oa *OpAMPT) enrollAgent(zlog zerolog.Logger, agentID string, aToS *protobu
 	}
 
 	agent := model.Agent{
-<<<<<<< HEAD
 		ESDocument: model.ESDocument{Id: agentID},
-=======
-		Id:         instanceUID,
->>>>>>> a937df3 (chore(deps): update Go to 1.27.4 (#8247))
 		Active:     true,
 		EnrolledAt: now.UTC().Format(time.RFC3339),
 		PolicyID:   rec.PolicyID,

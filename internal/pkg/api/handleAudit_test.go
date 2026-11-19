@@ -23,8 +23,6 @@ import (
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 )
 
-const testAgentID = "test-id"
-
 func Test_Audit_validateUnenrollRequst(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -50,7 +48,7 @@ func Test_Audit_validateUnenrollRequst(t *testing.T) {
 		},
 		cfg:   &config.Server{},
 		valid: nil,
-		err:   &BadRequestErr{msg: errMsgDecodeAuditUnenroll, nextErr: errors.New("invalid character '}' looking for beginning of value")},
+		err:   &BadRequestErr{msg: "unable to decode audit/unenroll request", nextErr: errors.New("invalid character '}' looking for beginning of value")},
 	}, {
 		name: "bad reason",
 		req: &http.Request{
@@ -72,7 +70,7 @@ func Test_Audit_validateUnenrollRequst(t *testing.T) {
 			},
 		},
 		valid: nil,
-		err:   &BadRequestErr{msg: errMsgDecodeAuditUnenroll, nextErr: errors.New("http: request body too large")},
+		err:   &BadRequestErr{msg: "unable to decode audit/unenroll request", nextErr: errors.New("http: request body too large")},
 	}}
 
 	for _, tc := range tests {
@@ -93,7 +91,9 @@ func Test_Audit_validateUnenrollRequst(t *testing.T) {
 
 func Test_Audit_markUnenroll(t *testing.T) {
 	agent := &model.Agent{
-		Id: testAgentID,
+		ESDocument: model.ESDocument{
+			Id: "test-id",
+		},
 	}
 	bulker := ftesting.NewMockBulk()
 	bulker.On("Update", mock.Anything, dl.FleetAgents, agent.Id, mock.Anything, mock.Anything, mock.Anything).Return(nil)
@@ -137,7 +137,9 @@ func Test_Audit_unenroll(t *testing.T) {
 
 	t.Run("ok", func(t *testing.T) {
 		agent := &model.Agent{
-			Id: testAgentID,
+			ESDocument: model.ESDocument{
+				Id: "test-id",
+			},
 		}
 		bulker := ftesting.NewMockBulk()
 		bulker.On("Update", mock.Anything, dl.FleetAgents, agent.Id, mock.Anything, mock.Anything, mock.Anything).Return(nil)
