@@ -390,7 +390,8 @@ func environMap() map[string]string {
 
 // addFIPSEnvVars mutates the passed env map by adding settings needed to produce a FIPS-capable binary.
 func addFIPSEnvVars(env map[string]string) {
-	env["GOEXPERIMENT"] = "systemcrypto"
+	// microsoft/go 1.27+ enables system crypto automatically on supported platforms and
+	// rejects GOEXPERIMENT=systemcrypto, so it is no longer set here.
 	env["CGO_ENABLED"] = "1"
 	env["MS_GOTOOLCHAIN_TELEMETRY_ENABLED"] = "0"
 }
@@ -1631,7 +1632,7 @@ func checkFIPSBinary(path string) error {
 	if err != nil {
 		return fmt.Errorf("unable to read buildinfo: %w", err)
 	}
-	var checkLinks, foundTags, foundExperiment, foundFIPSDefault bool
+	var checkLinks, foundTags, foundSystemCrypto, foundFIPSDefault bool
 
 	for _, setting := range info.Settings {
 		switch setting.Key {
@@ -1641,10 +1642,12 @@ func checkFIPSBinary(path string) error {
 				return fmt.Errorf("requirefips tag not found in %s", setting.Value)
 			}
 			continue
-		case "GOEXPERIMENT":
-			foundExperiment = true
-			if !strings.Contains(setting.Value, "systemcrypto") {
-				return fmt.Errorf("did not find GOEXPIRIMENT=systemcrypto")
+		case "microsoft_systemcrypto":
+			// microsoft/go 1.27+ records system crypto as this setting instead of
+			// GOEXPERIMENT=systemcrypto.
+			foundSystemCrypto = true
+			if setting.Value != "1" {
+				return fmt.Errorf("system crypto is not enabled (microsoft_systemcrypto=%s)", setting.Value)
 			}
 			continue
 		case "-ldflags":
@@ -1665,8 +1668,8 @@ func checkFIPSBinary(path string) error {
 	if !foundTags {
 		return fmt.Errorf("did not find build tags")
 	}
-	if !foundExperiment {
-		return fmt.Errorf("did not find GOEXPERIMENT")
+	if !foundSystemCrypto {
+		return fmt.Errorf("did not find microsoft_systemcrypto, binary must be built with microsoft/go")
 	}
 	if checkLinks {
 		log.Println("Binary is not stripped, checking symbols table.")
