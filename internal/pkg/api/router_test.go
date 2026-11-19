@@ -21,7 +21,7 @@ func TestPathToOperation(t *testing.T) {
 		path string
 		op   string
 	}{
-		{"/api/status/", "status"},
+		{"/api/status/", "status"}, //nolint:goconst // repeated on purpose
 		{"/api/status", "status"},
 		{"/api/status/toolong", ""},
 		{"/api/fleet/uploads", "uploadBegin"},
@@ -35,7 +35,7 @@ func TestPathToOperation(t *testing.T) {
 		{"/api/fleet/file/abc", "deliverFile"},
 		{"/api/fleet/artifacts/some-id/hash", "artifact"},
 		{"/api/fleet/agents/some-id/audit/unenroll", "audit-unenroll"},
-		{"/v1/opamp", "opamp"},
+		{"/v1/opamp", "opamp"}, //nolint:goconst // repeated on purpose
 		{"/v1/opamp/", "opamp"},
 		{"/api/fleet/agents/some-id/other/unenroll", ""},
 		{"/api/fleet/unimplemented/some-id", ""},
@@ -96,7 +96,7 @@ func TestLimiter(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			h := testStatusServer(t, tt.cfg)
 			w := httptest.NewRecorder()
-			r := httptest.NewRequest("GET", "/api/status", nil)
+			r := httptest.NewRequestWithContext(t.Context(), "GET", "/api/status", nil)
 
 			h.ServeHTTP(w, r)
 			resp := w.Result()

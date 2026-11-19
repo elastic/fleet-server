@@ -15,12 +15,14 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -30,6 +32,8 @@ import (
 	"github.com/elastic/go-ucfg/yaml"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
+	"github.com/elastic/fleet-server/v7/internal/pkg/logger/ecs"
 	"github.com/elastic/fleet-server/v7/internal/pkg/monitor/mock"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 	"github.com/elastic/fleet-server/v7/internal/pkg/testing/certs"
@@ -548,5 +552,117 @@ func Test_server_TLSCertReload(t *testing.T) {
 	case err := <-errCh:
 		require.NoError(t, err)
 	default:
+	}
+}
+
+// Test_server_RouteMonitoring makes sure that the route metrics and the request
+// log match the requests that the server receives.
+func Test_server_RouteMonitoring(t *testing.T) {
+	routes := map[string]struct {
+		path  string
+		stats *routeStats
+	}{
+		"status": {
+			path:  "/api/status",
+			stats: &cntStatus,
+		},
+		"OpAMP": {
+			path:  "/v1/opamp",
+			stats: &cntOpAMP,
+		},
+	}
+
+	tests := []struct {
+		name           string
+		route          string
+		opAMPEnabled   bool
+		rateLimited    bool
+		wantCode       int
+		wantRejections uint64
+	}{{
+		name:         "a status request is counted and logged",
+		route:        "status",
+		opAMPEnabled: true,
+		wantCode:     http.StatusOK,
+	}, {
+		name:         "a status request is counted and logged when OpAMP is disabled",
+		route:        "status",
+		opAMPEnabled: false,
+		wantCode:     http.StatusOK,
+	}, {
+		name:         "an OpAMP request is counted and logged",
+		route:        "OpAMP",
+		opAMPEnabled: true,
+		wantCode:     http.StatusOK,
+	}, {
+		name:         "an OpAMP request is counted and logged when OpAMP is disabled",
+		route:        "OpAMP",
+		opAMPEnabled: false,
+		wantCode:     http.StatusNotFound,
+	}, {
+		name:           "a status request that the rate limit rejects is counted as a rejection and logged",
+		route:          "status",
+		opAMPEnabled:   true,
+		rateLimited:    true,
+		wantCode:       http.StatusTooManyRequests,
+		wantRejections: 1,
+	}, {
+		name:           "an OpAMP request that the rate limit rejects is counted as a rejection and logged",
+		route:          "OpAMP",
+		opAMPEnabled:   true,
+		rateLimited:    true,
+		wantCode:       http.StatusTooManyRequests,
+		wantRejections: 1,
+	}}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			sm := mock.NewMockMonitor()
+			sm.On("State").Return(client.UnitStateHealthy)
+
+			cfg := &config.Server{}
+			cfg.InitDefaults()
+			cfg.Features.EnableOpAMP = tc.opAMPEnabled
+			cfg.Limits.MaxConnections = 10
+			if tc.rateLimited {
+				rejectAll := config.Limit{Interval: time.Hour}
+				cfg.Limits.StatusLimit = rejectAll
+				cfg.Limits.OpAMPLimit = rejectAll
+			}
+
+			st := NewStatusT(cfg, nil, nil, WithSelfMonitor(sm))
+			oa := &OpAMPT{
+				cfg: cfg,
+				handler: func(w http.ResponseWriter, _ *http.Request) {
+					w.WriteHeader(http.StatusOK)
+				},
+			}
+			srv := NewServer("", cfg, WithStatus(st), WithOpAMP(oa))
+
+			route := routes[tc.route]
+			var logs bytes.Buffer
+			ctx := zerolog.New(&logs).Level(zerolog.DebugLevel).WithContext(t.Context())
+			req := httptest.NewRequestWithContext(ctx, http.MethodGet, route.path, nil)
+			rec := httptest.NewRecorder()
+
+			total := route.stats.total.metric.Get()
+			rejections := route.stats.rateLimit.metric.Get()
+
+			srv.handler.ServeHTTP(rec, req)
+
+			require.Equal(t, tc.wantCode, rec.Code)
+
+			requestID := rec.Header().Get(logger.HeaderRequestID)
+			assert.NotEmpty(t, requestID)
+
+			requestLog := logs.String()
+			loggedCode := fmt.Sprintf(`"%s":%d`, ecs.HTTPResponseCode, tc.wantCode)
+			assert.Contains(t, requestLog, loggedCode)
+
+			count := route.stats.total.metric.Get() - total
+			assert.Equal(t, uint64(1), count, "route total")
+
+			rejectionCount := route.stats.rateLimit.metric.Get() - rejections
+			assert.Equal(t, tc.wantRejections, rejectionCount, "rate limit rejections")
+		})
 	}
 }
