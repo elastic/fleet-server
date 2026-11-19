@@ -16,7 +16,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
-	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 
@@ -30,6 +29,7 @@ import (
 //
 // Reproduces https://github.com/elastic/fleet-server/issues/6877
 func TestEffectiveConfigReplacesRemovedFields(t *testing.T) {
+	const onlineStatus = "online"
 	ctx := testlog.SetLogger(t).WithContext(t.Context())
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, dl.FleetAgents)
@@ -42,7 +42,7 @@ func TestEffectiveConfigReplacesRemovedFields(t *testing.T) {
 		Active:            true,
 		EnrolledAt:        now,
 		LastCheckin:       now,
-		LastCheckinStatus: "online",
+		LastCheckinStatus: onlineStatus,
 		UpdatedAt:         now,
 		EffectiveConfig:   initialConfig,
 	})
@@ -57,9 +57,8 @@ func TestEffectiveConfigReplacesRemovedFields(t *testing.T) {
 
 	bc := NewBulk(bulker)
 	err = bc.CheckIn(agentID,
-		WithStatus("online"),
+		WithStatus(onlineStatus),
 		WithEffectiveConfig(updatedConfig),
-		WithSeqNo(sqn.SeqNo{1}), // triggers refresh on flush
 	)
 	require.NoError(t, err)
 

@@ -9,13 +9,16 @@ package dl
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/gofrs/uuid/v5"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
@@ -62,73 +65,53 @@ func storeRandomPolicies(ctx context.Context, bulker bulk.Bulk, index string, co
 			})
 		}
 	}
-	_, err := bulker.MIndex(ctx, ops, bulk.WithRefresh())
+	items, err := bulker.MIndex(ctx, ops, bulk.WithRefresh())
 	if err != nil {
 		return err
+	}
+	for i, item := range items {
+		if err := es.TranslateError(item.Status, item.Error); err != nil {
+			writeErr := fmt.Errorf("write policy fixture %d: %w", i, err)
+			return writeErr
+		}
 	}
 	return nil
 }
 
 func TestQueryLatestPolicies(t *testing.T) {
-	ctx := testlog.SetLogger(t).WithContext(t.Context())
-
-	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetPolicies, bulk.WithFlushThresholdCount(1))
-
-	err := storeRandomPolicies(ctx, bulker, index, 4, 4)
-	if err != nil {
-		t.Fatal(err)
+	const policyCount = 4
+	tests := []struct {
+		name      string
+		revisions int
+	}{
+		{
+			name:      "the latest revisions are visible after one bulk request",
+			revisions: 4,
+		},
+		{
+			name:      "the latest revisions are visible after multiple bulk requests",
+			revisions: 100_000,
+		},
 	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := testlog.SetLogger(t).WithContext(t.Context())
+			index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetPolicies)
 
-	var policies []model.Policy
-	require.Eventually(t, func() bool {
-		policies, err = QueryLatestPolicies(ctx, bulker, WithIndexName(index))
-		if err != nil {
-			t.Fatal(err)
-		}
-		return len(policies) == 4
-	}, time.Second*2, time.Millisecond*100, "Expected to eventually have 4 policies, found: %d", len(policies))
+			err := storeRandomPolicies(ctx, bulker, index, policyCount, tt.revisions)
+			require.NoError(t, err)
 
-	for _, policy := range policies {
-		if policy.RevisionIdx != 4 {
-			t.Errorf("Expected to find revision_idx 4 for policy %s, found %d", policy.PolicyID, policy.RevisionIdx)
-		}
-	}
-}
-
-// TestQueryLatestPolicies400k tests to see if  to see if the latest revision is correctly selected when a lot the revision count is very large
-//
-//nolint:dupl // test duplication
-func TestQueryLatestPolicies400k(t *testing.T) {
-	t.Skip("Test flaky, see: https://github.com/elastic/fleet-server/issues/5181")
-	ctx := testlog.SetLogger(t).WithContext(t.Context())
-
-	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetPolicies, bulk.WithFlushThresholdCount(1))
-
-	err := storeRandomPolicies(ctx, bulker, index, 4, 100000)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	var policies []model.Policy
-	require.Eventually(t, func() bool {
-		var err error
-		policies, err = QueryLatestPolicies(ctx, bulker, WithIndexName(index))
-		if err != nil {
-			t.Fatal(err)
-		}
-		return len(policies) == 4
-	}, time.Second*2, time.Millisecond*100, "Expected to eventually have 4 policies found: %d", len(policies))
-
-	for _, policy := range policies {
-		if policy.RevisionIdx != 100000 {
-			t.Errorf("Expected to find revision_idx 100000 for policy %s, found %d", policy.PolicyID, policy.RevisionIdx)
-		}
+			policies, err := QueryLatestPolicies(ctx, bulker, WithIndexName(index))
+			require.NoError(t, err)
+			require.Len(t, policies, policyCount)
+			for _, policy := range policies {
+				assert.Equal(t, int64(tt.revisions), policy.RevisionIdx, "policy %s", policy.PolicyID)
+			}
+		})
 	}
 }
 
-// TesyQueryLatestPolices11kUnique tests behaviour when 11k unique policies are used, there is a 10k size specification in the aggregation.
-//
-//nolint:dupl // test duplication
+// TestQueryLatestPolicies11kUnique covers more policies than the aggregation limit.
 func TestQueryLatestPolicies11kUnique(t *testing.T) {
 	t.Skip("Re-enable after policy load issues have been sorted: https://github.com/elastic/fleet-server/issues/3254")
 	ctx := testlog.SetLogger(t).WithContext(t.Context())
