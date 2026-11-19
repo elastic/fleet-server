@@ -15,6 +15,13 @@ import (
 
 	"github.com/elastic/beats/v7/pkg/logp"
 	"github.com/elastic/beats/v7/pkg/transport/tlscommon"
+<<<<<<< HEAD
+=======
+
+	"github.com/rs/zerolog"
+	zlog "github.com/rs/zerolog/log"
+
+>>>>>>> af0dc1e (Fix doubled route metrics and missing request logs when OpAMP is enabled (#8276))
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
 	"github.com/elastic/fleet-server/v7/internal/pkg/limit"
 	"github.com/elastic/fleet-server/v7/internal/pkg/logger"
@@ -45,6 +52,22 @@ func NewServer(addr string, cfg *config.Server, opts ...APIOpt) *server {
 		handler: newRouter(&cfg.Limits, a, a.tracer),
 		logger:  logp.NewLogger("api-server"),
 	}
+<<<<<<< HEAD
+=======
+
+	// If OpAMP feature is enabled, add OpAMP route handler to router and
+	// let OpAMP server modify connection context (setup later when HTTP server
+	// object is constructed).
+	var opAMPHandler http.Handler
+	if a.oa != nil && a.oa.Enabled() {
+		zlog.Info().Msg("enabling OpAMP endpoint")
+		opAMPHandler = http.HandlerFunc(a.oa.handler)
+		s.connContext = a.oa.connCtx
+	}
+
+	s.handler = newRouter(&cfg.Limits, a, a.tracer, opAMPHandler)
+	return &s
+>>>>>>> af0dc1e (Fix doubled route metrics and missing request logs when OpAMP is enabled (#8276))
 }
 
 func (s *server) Run(ctx context.Context) error {

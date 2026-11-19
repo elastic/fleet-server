@@ -21,7 +21,7 @@ func TestPathToOperation(t *testing.T) {
 		path string
 		op   string
 	}{
-		{"/api/status/", "status"},
+		{"/api/status/", "status"}, //nolint:goconst // repeated on purpose
 		{"/api/status", "status"},
 		{"/api/status/toolong", ""},
 		{"/api/fleet/uploads", "uploadBegin"},
@@ -35,6 +35,11 @@ func TestPathToOperation(t *testing.T) {
 		{"/api/fleet/file/abc", "deliverFile"},
 		{"/api/fleet/artifacts/some-id/hash", "artifact"},
 		{"/api/fleet/agents/some-id/audit/unenroll", "audit-unenroll"},
+<<<<<<< HEAD
+=======
+		{"/v1/opamp", "opamp"}, //nolint:goconst // repeated on purpose
+		{"/v1/opamp/", "opamp"},
+>>>>>>> af0dc1e (Fix doubled route metrics and missing request logs when OpAMP is enabled (#8276))
 		{"/api/fleet/agents/some-id/other/unenroll", ""},
 		{"/api/fleet/unimplemented/some-id", ""},
 		{"/api/flet/agents/some-id/acks", ""},
@@ -102,3 +107,62 @@ func TestLimiter(t *testing.T) {
 		})
 	}
 }
+<<<<<<< HEAD
+=======
+
+func TestThrottleWithCount(t *testing.T) {
+	tests := []struct {
+		name         string
+		responseCode int
+	}{{
+		name:         "a successful request is not counted as a connection rejection",
+		responseCode: http.StatusOK,
+	}, {
+		name:         "a 429 from an admitted request is not counted as a connection rejection",
+		responseCode: http.StatusTooManyRequests,
+	}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			before := cntHTTPRejected.Load()
+			h := throttleWithCount(5)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(tt.responseCode)
+			}))
+			w := httptest.NewRecorder()
+
+			h.ServeHTTP(w, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil))
+
+			require.Equal(t, tt.responseCode, w.Code)
+
+			rejectionCount := cntHTTPRejected.Load() - before
+			require.Zero(t, rejectionCount)
+		})
+	}
+
+	t.Run("increments counter when connection cap is hit", func(t *testing.T) {
+		before := cntHTTPRejected.Load()
+
+		started := make(chan struct{})
+		release := make(chan struct{})
+		requestDone := make(chan struct{})
+		h := throttleWithCount(1)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			close(started)
+			<-release
+		}))
+
+		go func() {
+			defer close(requestDone)
+			h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil))
+		}()
+		t.Cleanup(func() {
+			close(release)
+			<-requestDone
+		})
+		<-started // first request has acquired the connection slot
+
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil))
+		require.Equal(t, http.StatusTooManyRequests, w.Code)
+		require.Equal(t, before+1, cntHTTPRejected.Load())
+	})
+}
+>>>>>>> af0dc1e (Fix doubled route metrics and missing request logs when OpAMP is enabled (#8276))
