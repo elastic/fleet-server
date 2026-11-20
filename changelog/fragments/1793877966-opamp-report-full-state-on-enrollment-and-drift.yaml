@@ -1,0 +1,11 @@
+kind: bug-fix
+
+summary: Stop setting ReportFullState on every OpAMP response
+
+description: |
+  Fleet Server now sets the OpAMP ReportFullState flag only for a new or replaced
+  enrollment and when the agent's sequence number shows drift. Setting it on every
+  response made opamp-go HTTP clients skip their polling interval and check in back
+  to back with their full state.
+
+component: fleet-server
