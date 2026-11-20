@@ -35,6 +35,11 @@ func TestPathToOperation(t *testing.T) {
 		{"/api/fleet/file/abc", "deliverFile"},
 		{"/api/fleet/artifacts/some-id/hash", "artifact"},
 		{"/api/fleet/agents/some-id/audit/unenroll", "audit-unenroll"},
+<<<<<<< HEAD
+=======
+		{"/v1/opamp", "opamp"},
+		{"/v1/opamp/", "opamp"},
+>>>>>>> 8107f04 (chore: exclude goconst from test files (#8308))
 		{"/api/fleet/agents/some-id/other/unenroll", ""},
 		{"/api/fleet/unimplemented/some-id", ""},
 		{"/api/flet/agents/some-id/acks", ""},
