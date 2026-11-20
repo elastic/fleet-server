@@ -42,7 +42,7 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 
 	cfg := config.Fleet{
 		Agent: config.Agent{
-			ID: "agent-id", //nolint:goconst // test fixture value
+			ID: "agent-id",
 		},
 	}
 	reporter := &FakeReporter{}
@@ -87,7 +87,7 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 		if state != client.UnitStateStarting {
 			return fmt.Errorf("should be reported as starting; instead its %s", state)
 		}
-		if msg != "Waiting on default policy with Fleet Server integration" { //nolint:goconst // test fixture value
+		if msg != "Waiting on default policy with Fleet Server integration" {
 			return fmt.Errorf("should be matching with default policy")
 		}
 		return nil
@@ -134,7 +134,7 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 	rId = xid.New().String()
 	pData = model.PolicyData{Inputs: []map[string]any{
 		{
-			"type": "fleet-server", //nolint:goconst // test fixture value
+			"type": "fleet-server",
 		},
 	}}
 	policy = model.Policy{
@@ -296,9 +296,9 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 	activeToken := model.EnrollmentAPIKey{ //nolint:gosec // fake api key used in test
 		Id:       xid.New().String(),
 		Active:   true,
-		APIKey:   "d2JndlFIWUJJUVVxWDVia2NJTV86X0d6ZmljZGNTc1d4R1otbklrZFFRZw==", //nolint:goconst // test fixture value
+		APIKey:   "d2JndlFIWUJJUVVxWDVia2NJTV86X0d6ZmljZGNTc1d4R1otbklrZFFRZw==",
 		APIKeyID: xid.New().String(),
-		Name:     "Active", //nolint:goconst // test fixture value
+		Name:     "Active",
 		PolicyID: policyID,
 	}
 	tokenLock.Lock()

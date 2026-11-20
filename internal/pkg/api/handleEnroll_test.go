@@ -49,12 +49,12 @@ func TestRemoveDuplicateStr(t *testing.T) {
 		},
 		{
 			name:      "one duplicated tag",
-			inputTags: []string{"foo", "foo", "foo", "foo"}, //nolint:goconst // test fixture value
+			inputTags: []string{"foo", "foo", "foo", "foo"},
 			agentTags: []string{"foo"},
 		},
 		{
 			name:      "multiple duplicated tags",
-			inputTags: []string{"foo", "bar", "bar", "baz", "foo"}, //nolint:goconst // test fixture value
+			inputTags: []string{"foo", "bar", "bar", "baz", "foo"},
 			agentTags: []string{"bar", "baz", "foo"},
 		},
 	}
@@ -74,7 +74,7 @@ func TestEnroll(t *testing.T) {
 	zlog := zerolog.Logger{}
 	enrollmentID := "1234"
 	req := &EnrollRequest{
-		Type:         "PERMANENT", //nolint:goconst // test fixture value
+		Type:         "PERMANENT",
 		EnrollmentId: &enrollmentID,
 		Metadata: EnrollMetadata{
 			UserProvided: []byte("{}"),
@@ -99,7 +99,7 @@ func TestEnroll(t *testing.T) {
 		"", nil)
 	resp, _ := et._enroll(ctx, rb, zlog, req, "1234", []string{}, "8.9.0")
 
-	if resp.Action != "created" { //nolint:goconst // test fixture value
+	if resp.Action != "created" {
 		t.Fatal("enroll failed")
 	}
 }
@@ -306,7 +306,7 @@ func TestEnrollWithAgentIDExistingActive_WrongPolicy(t *testing.T) {
 	rb := &rollback.Rollback{}
 	zlog := zerolog.Logger{}
 	agentID := "1234"
-	replaceToken := "replace_token" //nolint:goconst // test fixture value
+	replaceToken := "replace_token"
 	var pbkdf2Cfg config.PBKDF2
 	pbkdf2Cfg.InitDefaults()
 	replaceHash, err := hashReplaceToken(replaceToken, pbkdf2Cfg)
@@ -391,7 +391,7 @@ func TestEnrollWithAgentIDExistingActive(t *testing.T) {
 	bulker := ftesting.NewMockBulk()
 	et, _ := NewEnrollerT(verCon, cfg, bulker, c)
 
-	policyID := "my-policy#9.2" //nolint:goconst // test fixture value
+	policyID := "my-policy#9.2"
 	source := fmt.Sprintf(`{"active":true,"agent":{"id":"1234","version":"8.9.0"},"type":"PERMANENT","policy_id":"%s","replace_token":"%s"}`, policyID, replaceHash)
 	bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{
 		Hits: []es.HitT{{
@@ -457,7 +457,7 @@ func TestEnrollWithAgentIDExistingPendingUninstallClearsPending(t *testing.T) {
 	bulker := ftesting.NewMockBulk()
 	et, _ := NewEnrollerT(verCon, cfg, bulker, c)
 
-	policyID := "my-policy" //nolint:goconst // test fixture value
+	policyID := "my-policy"
 	// Existing pending-uninstall agent whose output key was already cleared on the
 	// unenroll ack (api_key empty, permissions_hash kept).
 	source := fmt.Sprintf(`{"active":true,"uninstall_pending":true,"agent":{"id":"1234","version":"8.9.0"},"type":"PERMANENT","policy_id":"%s","replace_token":"%s",`+
@@ -567,8 +567,8 @@ func TestEnrollWithAgentIDExistingActive_UpgradedAt(t *testing.T) {
 	}{
 		{
 			name:            "version change stamps upgraded_at",
-			storedVersion:   "8.9.0", //nolint:goconst // test fixture value
-			enrollVersion:   "9.0.0", //nolint:goconst // test fixture value
+			storedVersion:   "8.9.0",
+			enrollVersion:   "9.0.0",
 			useReplaceToken: true,
 			wantUpgradedAt:  true,
 		},
@@ -716,8 +716,8 @@ func TestEnrollerT_retrieveStaticTokenEnrollmentToken(t *testing.T) {
 					Enabled: true,
 					PolicyTokens: []config.PolicyToken{
 						{
-							TokenKey: "abcdefg",      //nolint:goconst // test fixture value
-							PolicyID: "dummy-policy", //nolint:goconst // test fixture value
+							TokenKey: "abcdefg",
+							PolicyID: "dummy-policy",
 						},
 					},
 				},
@@ -947,7 +947,7 @@ func syncEnrollResponse(status int) *http.Response {
 	return &http.Response{
 		StatusCode: status,
 		Body:       io.NopCloser(strings.NewReader(`{}`)),
-		Header:     http.Header{"X-Elastic-Product": []string{"Elasticsearch"}}, //nolint:goconst // test fixture value
+		Header:     http.Header{"X-Elastic-Product": []string{"Elasticsearch"}},
 	}
 }
 
