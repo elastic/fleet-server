@@ -1,0 +1,14 @@
+kind: enhancement
+component: fleet-server
+
+summary: Record UPGRADE action results from check-in upgrade_details
+
+description: |
+  Fleet Server now records the result of an UPGRADE action from the agent's
+  check-in `upgrade_details` once the outcome is known, instead of on every
+  UPGRADE ack. An ack whose action matches the stored `upgrade_details` returns
+  200 without writing, so retried acks no longer repeat refreshed writes against
+  Elasticsearch. Upgrades that end in `UPG_FAILED` or `UPG_ROLLBACK` are now
+  recorded with an error, so they count as failures in Kibana's Agent activity.
+
+issue: https://github.com/elastic/fleet-server/issues/8274

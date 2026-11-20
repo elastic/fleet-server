@@ -22,6 +22,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
+	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
@@ -30,6 +31,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func BenchmarkMakeUpdatePolicyBody(b *testing.B) {
@@ -1207,6 +1209,81 @@ func TestAckHandleUpgrade(t *testing.T) {
 
 			err := ack.handleUpgrade(ctx, logger, tc.agent, tc.event)
 			assert.NoError(t, err)
+			bulker.AssertExpectations(t)
+		})
+	}
+}
+
+func TestAckHandleActionResultUpgrade(t *testing.T) {
+	const actionID = "2b12dcd8-bde0-4045-92dc-c4b27668d733"
+	action := model.Action{Id: "doc", ActionID: actionID, Type: TypeUpgrade}
+	agentWith := func(ud *model.UpgradeDetails) *model.Agent {
+		return &model.Agent{
+			Id:             "ab12dcd8-bde0-4045-92dc-c4b27668d735",
+			Agent:          &model.AgentMetadata{ID: "agent", Version: "8.0.0"},
+			UpgradeDetails: ud,
+		}
+	}
+	noRefresh := mock.MatchedBy(func(opts []bulk.Opt) bool { return len(opts) == 0 })
+
+	tests := []struct {
+		name   string
+		agent  *model.Agent
+		event  string
+		bulker func() *ftesting.MockBulk
+	}{{
+		name:  "stored upgrade_details match, no writes",
+		agent: agentWith(&model.UpgradeDetails{ActionID: actionID, State: "UPG_WATCHING"}),
+		event: `{"action_id":"` + actionID + `","agent_id":"agent"}`,
+		bulker: func() *ftesting.MockBulk {
+			return ftesting.NewMockBulk() // any call fails the test
+		},
+	}, {
+		name:  "no stored upgrade_details, result created without refresh and agent updated",
+		agent: agentWith(nil),
+		event: `{"action_id":"` + actionID + `","agent_id":"agent"}`,
+		bulker: func() *ftesting.MockBulk {
+			m := ftesting.NewMockBulk()
+			m.On("Create", mock.Anything, dl.FleetActionsResults, actionID+":ab12dcd8-bde0-4045-92dc-c4b27668d735", mock.Anything, noRefresh).Return("", nil).Once()
+			m.On("Update", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+			return m
+		},
+	}, {
+		name:  "stored upgrade_details for another action, ack writes",
+		agent: agentWith(&model.UpgradeDetails{ActionID: "other-action", State: "UPG_WATCHING"}),
+		event: `{"action_id":"` + actionID + `","agent_id":"agent"}`,
+		bulker: func() *ftesting.MockBulk {
+			m := ftesting.NewMockBulk()
+			m.On("Create", mock.Anything, dl.FleetActionsResults, mock.Anything, mock.Anything, noRefresh).Return("", nil).Once()
+			m.On("Update", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+			return m
+		},
+	}, {
+		name:  "stored upgrade_details match but the ack carries an error, ack writes",
+		agent: agentWith(&model.UpgradeDetails{ActionID: actionID, State: "UPG_WATCHING"}),
+		event: `{"action_id":"` + actionID + `","agent_id":"agent","error":"upgrade failed"}`,
+		bulker: func() *ftesting.MockBulk {
+			m := ftesting.NewMockBulk()
+			m.On("Create", mock.Anything, dl.FleetActionsResults, mock.Anything, mock.MatchedBy(func(p []byte) bool {
+				var r model.ActionResult
+				return json.Unmarshal(p, &r) == nil && r.Error == "upgrade failed"
+			}), noRefresh).Return("", nil).Once()
+			m.On("Update", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+			return m
+		},
+	}}
+
+	cfg := &config.Server{Limits: config.ServerLimits{}}
+	c, err := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
+	require.NoError(t, err)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			logger := testlog.SetLogger(t)
+			bulker := tc.bulker()
+			ack := NewAckT(cfg, bulker, c)
+
+			err := ack.handleActionResult(context.Background(), logger, tc.agent, action, AckRequest_Events_Item{json.RawMessage(tc.event)})
+			require.NoError(t, err)
 			bulker.AssertExpectations(t)
 		})
 	}
