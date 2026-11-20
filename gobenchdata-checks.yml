@@ -7,3 +7,12 @@ checks:
       diff: (current.NsPerOp - base.NsPerOp) / base.NsPerOp * 100
       thresholds:
         max: 10
+    - name: memoryPerLongPoll
+      description: |-
+        This check is set to fail when a long-poll check-in keeps more memory than the defined threshold.
+        When it fails, measure checkinLongPollBytes in internal/pkg/config again.
+      package: .
+      benchmarks: [CheckinLongPollMemory]
+      diff: (current.Custom["bytes/longpoll"] - base.Custom["bytes/longpoll"]) / base.Custom["bytes/longpoll"] * 100
+      thresholds:
+        max: 5
