@@ -81,8 +81,6 @@ type Monitor interface {
 	GetPolicy(ctx context.Context, policyID string) (*model.Policy, error)
 }
 
-type policyFetcher func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error)
-
 type policiesFetcher func(ctx context.Context, bulker bulk.Bulk, policyIDs []string, opt ...dl.Option) ([]model.Policy, error)
 
 type policyT struct {

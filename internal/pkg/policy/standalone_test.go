@@ -76,7 +76,7 @@ func TestStandAloneSelfMonitor(t *testing.T) {
 		},
 	}
 
-	searchArguments := []any{mock.Anything, ".fleet-policies", mock.Anything, mock.Anything}
+	searchArguments := []any{mock.Anything, ".fleet-policies", []byte(`{"size":0}`), mock.Anything}
 	for _, c := range cases {
 		t.Run(c.title, func(t *testing.T) {
 			bulker := ftesting.NewMockBulk()
