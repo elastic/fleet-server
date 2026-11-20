@@ -29,7 +29,7 @@ const nowStr = "2022-08-12T16:50:05Z"
 func createSomeAgents(ctx context.Context, t *testing.T, n int, apiKey bulk.APIKey, index string, bulker bulk.Bulk) []string {
 	t.Helper()
 
-	var createdAgents []string
+	createdAgents := make([]string, 0, n)
 
 	for i := 0; i < n; i++ {
 		outputAPIKey := bulk.APIKey{
@@ -94,7 +94,7 @@ func TestMigrateOutputs_withDefaultAPIKeyHistory(t *testing.T) {
 	assert.Equal(t, len(agentIDs), migratedAgents)
 
 	for i, id := range agentIDs {
-		wantOutputType := "elasticsearch" //nolint:goconst // test cases have some duplication
+		wantOutputType := "elasticsearch"
 
 		res, err := SearchWithOneParam(ctx, bulker, QueryAgentByID, index, FieldID, id)
 		require.NoError(t, err)

@@ -131,8 +131,174 @@ func TestQueryLatestPoliciesQuery(t *testing.T) {
 				} `json:"bool"`
 			} `json:"query"`
 		}
+<<<<<<< HEAD
 		require.NoError(t, json.Unmarshal(bulker.query, &got))
 		require.Len(t, got.Query.Bool.Filter, 1)
 		assert.Equal(t, id, got.Query.Bool.Filter[0].Term.PolicyID)
 	})
+=======
+		item, ok := b.items[policyID]
+		if !ok {
+			requestErr = errRequestFailed
+		}
+		items[i] = item
+	}
+	return items, requestErr
+}
+
+// searchedPolicyID returns the policy ID of a query for the latest revision of one policy.
+func searchedPolicyID(query []byte) (string, error) {
+	var got struct {
+		Query struct {
+			Bool struct {
+				Filter []struct {
+					Term struct {
+						PolicyID string `json:"policy_id"`
+					} `json:"term"`
+				} `json:"filter"`
+			} `json:"bool"`
+		} `json:"query"`
+	}
+	if err := json.Unmarshal(query, &got); err != nil {
+		return "", err
+	}
+	if len(got.Query.Bool.Filter) != 1 {
+		return "", fmt.Errorf("got %d filters, want 1", len(got.Query.Bool.Filter))
+	}
+	return got.Query.Bool.Filter[0].Term.PolicyID, nil
+}
+
+func TestQueryLatestPoliciesByID(t *testing.T) {
+	bulker := &policyMSearchBulk{
+		items: map[string]bulk.MsearchResponseItem{
+			"policy-a": {
+				Status: http.StatusOK,
+				Aggregations: map[string]es.Aggregation{
+					FieldPolicyID: {
+						Buckets: []es.Bucket{{
+							Key: "policy-a",
+							Aggregations: map[string]es.HitsT{
+								FieldRevisionIdx: {
+									Hits: []es.HitT{{
+										Source: []byte(`{"policy_id":"policy-a","revision_idx":2}`),
+									}},
+								},
+							},
+						}},
+					},
+				},
+			},
+			"policy-b": {
+				Status: http.StatusOK,
+				Aggregations: map[string]es.Aggregation{
+					FieldPolicyID: {
+						Buckets: []es.Bucket{{
+							Key: "policy-b",
+							Aggregations: map[string]es.HitsT{
+								FieldRevisionIdx: {
+									Hits: []es.HitT{{
+										Source: []byte(`{"policy_id":"policy-b","revision_idx":1}`),
+									}},
+								},
+							},
+						}},
+					},
+				},
+			},
+			"malformed-policy": {
+				Status: http.StatusOK,
+				Aggregations: map[string]es.Aggregation{
+					FieldPolicyID: {
+						Buckets: []es.Bucket{{
+							Key: "malformed-policy",
+							Aggregations: map[string]es.HitsT{
+								FieldRevisionIdx: {
+									Hits: []es.HitT{{
+										Source: []byte(`{"policy_id":"malformed-policy","revision_idx":1,"data":"not an object"}`),
+									}},
+								},
+							},
+						}},
+					},
+				},
+			},
+			"timed-out-policy": {
+				Status: http.StatusGatewayTimeout,
+				Error: json.RawMessage(`{
+					"root_cause": [{"type": "timeout_exception", "reason": "timed out"}],
+					"type": "timeout_exception",
+					"reason": "timed out"
+				}`),
+			},
+			"missing-policy": {
+				Status: http.StatusOK,
+				Aggregations: map[string]es.Aggregation{
+					FieldPolicyID: {Buckets: []es.Bucket{}},
+				},
+			},
+			`policy"}]}} , "x": "y`: {
+				Status: http.StatusOK,
+				Aggregations: map[string]es.Aggregation{
+					FieldPolicyID: {Buckets: []es.Bucket{}},
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name         string
+		policyIDs    []string
+		wantPolicies []model.Policy
+		wantErrs     []error
+	}{
+		{
+			name:      "the latest revision of a policy is returned",
+			policyIDs: []string{"policy-a"},
+			wantPolicies: []model.Policy{
+				{PolicyID: "policy-a", RevisionIdx: 2},
+			},
+		},
+		{
+			name:      "valid policies are returned when other policies fail",
+			policyIDs: []string{"policy-a", "failed-policy", "malformed-policy", "timed-out-policy", "policy-b"},
+			wantPolicies: []model.Policy{
+				{PolicyID: "policy-a", RevisionIdx: 2},
+				{PolicyID: "policy-b", RevisionIdx: 1},
+			},
+			wantErrs: []error{errRequestFailed, ErrInvalidPolicy, es.ErrTimeout},
+		},
+		{
+			name:         "no policy is returned for a policy that does not exist",
+			policyIDs:    []string{"missing-policy"},
+			wantPolicies: []model.Policy{},
+		},
+		{
+			name:         "query injection through the policy ID is prevented",
+			policyIDs:    []string{`policy"}]}} , "x": "y`},
+			wantPolicies: []model.Policy{},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			policies, err := QueryLatestPoliciesByID(t.Context(), bulker, tc.policyIDs)
+			if len(tc.wantErrs) == 0 {
+				require.NoError(t, err)
+			}
+			for _, wantErr := range tc.wantErrs {
+				require.ErrorIs(t, err, wantErr)
+			}
+			assert.ElementsMatch(t, tc.wantPolicies, policies)
+		})
+	}
+}
+
+func TestQueryLatestPoliciesByIDRejectedDispatch(t *testing.T) {
+	bulker := ftesting.NewMockBulk()
+	bulker.On("MSearch", mock.Anything, mock.Anything, mock.Anything).Return(nil, bulk.ErrTooManyBulkDispatches)
+
+	policies, err := QueryLatestPoliciesByID(t.Context(), bulker, []string{"policy-a"})
+	require.ErrorIs(t, err, bulk.ErrTooManyBulkDispatches)
+	assert.Empty(t, policies)
+>>>>>>> 8107f04 (chore: exclude goconst from test files (#8308))
 }

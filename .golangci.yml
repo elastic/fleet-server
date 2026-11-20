@@ -154,12 +154,19 @@ linters:
       # "/" will be replaced by the current OS file path separator to properly work on Windows.
       # Default: []
     rules:
+<<<<<<< HEAD
       # elasticsearch.Config and elasticsearch.NewClient are deprecated in v9 in favour of
       # functional options via elasticsearch.New(). Our architecture in es/client.go is built
       # around the Config struct; migration is tracked as a follow-up.
       - text: "SA1019: elasticsearch\\.(Config|NewClient|NewBaseClient)"
         linters:
           - staticcheck
+=======
+      # Repeated fixture strings are clearer inline than as constants in tests.
+      - path: _test\.go
+        linters:
+          - goconst
+>>>>>>> 8107f04 (chore: exclude goconst from test files (#8308))
     paths:
       - third_party$
       - builtin$
