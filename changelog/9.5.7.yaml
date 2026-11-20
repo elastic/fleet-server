@@ -1,0 +1,27 @@
+version: 9.5.7
+entries:
+    - kind: bug-fix
+      summary: Substitute secrets for pending actions during check-in
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/8152
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1793193137
+      file:
+        name: 1793193137-substitute-pending-action-secrets.yaml
+        checksum: 3551ca17d51eda1e405f61f66a64118d39dc2aeb
+    - kind: bug-fix
+      summary: Fix Elasticsearch circuit breaker errors when loading policies
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/8223
+      issue:
+        - https://github.com/elastic/fleet-server/issues/8147
+      impact: ""
+      action: ""
+      timestamp: 1794322028
+      file:
+        name: 1794322028-do-not-load-every-policy-when-an-agent-policy-is-missing.yaml
+        checksum: dcd3a073602fd921c3aee69cd78d70e49092af1f
