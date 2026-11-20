@@ -54,16 +54,16 @@ func TestUploadCompletePerformsRefreshBeforeChunkSearch(t *testing.T) {
 
 	// populate mock info for a *metadata* search, which may occur during finalization
 	mockMeta, _ := json.Marshal(map[string]any{
-		"action_id": "actionID",
-		"agent_id":  "agentID",
-		"src":       fakeIntegrationSrc,
-		"file": map[string]any{
-			"size":      size,
-			"ChunkSize": file.MaxChunkSize,
-			"Status":    file.StatusProgress,
+		fieldActionID: "actionID",
+		fieldAgentID:  "agentID",
+		fieldSource:   fakeIntegrationSrc,
+		fileKey: map[string]any{
+			fieldSize:      size,
+			fieldChunkSize: file.MaxChunkSize,
+			fieldStatus:    file.StatusProgress,
 		},
-		"upload_id":    "some-id",
-		"upload_start": time.Now().UnixMilli(),
+		file.FieldUploadID: "some-id",
+		fieldUploadStart:   time.Now().UnixMilli(),
 	})
 	fakeBulk.On("Search",
 		mock.MatchedBy(func(_ context.Context) bool { return true }), // match context.Context
@@ -105,7 +105,7 @@ func TestUploadCompletePerformsRefreshBeforeChunkSearch(t *testing.T) {
 			Fields: map[string]any{
 				file.FieldBaseID: []any{"actionID.agentID"},
 				file.FieldSHA2:   []any{nullHash},
-				"size":           []any{size},
+				file.FieldSize:   []any{size},
 				file.FieldLast:   []any{true},
 			},
 		}},
