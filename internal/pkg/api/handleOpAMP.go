@@ -204,6 +204,7 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 		}
 
 		sendCapabilities := false
+<<<<<<< HEAD
 		if agent == nil {
 			sendCapabilities = true
 			if agent, err = oa.enrollAgent(zlog, instanceUID.String(), message, apiKey); err != nil {
@@ -217,6 +218,61 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 			}
 		} else if !isActiveStatus(agent.LastCheckinStatus) {
 			sendCapabilities = true
+=======
+		reportFullState := false
+		if !agentFound || enrollRequest {
+			sendCapabilities = true
+			// A new or replaced agent has no state on this connection yet, so ask for a full report
+			// once. Doing it on every response makes an OpAMP client skip its polling interval and
+			// check in back to back.
+			reportFullState = true
+			// record the audit_unenrolled_reason if the agent exists
+			// the reason is used to determine if we need to update the existing agent
+			auditReason := ""
+			if agentFound {
+				auditReason = agent.AuditUnenrolledReason
+			}
+
+			if agent, err = oa.enrollAgent(ctx, zlog, instanceUID, message, apiKey); err != nil {
+				zlog.Error().Err(err).Msg("failed to enroll agent")
+				response.ErrorResponse = &protobufs.ServerErrorResponse{
+					Type:         protobufs.ServerErrorResponseType_ServerErrorResponseType_Unavailable,
+					ErrorMessage: "failed to enroll agent",
+				}
+				return response
+			}
+
+			if agentFound && enrollRequest && auditReason != string(Orphaned) && auditReason != reenrolled {
+				if err := oa.unenrollAgent(ctx, zlog, instanceUID.String()); err != nil {
+					zlog.Error().Err(err).Msg("failed to mark the previous doc as reenrolled")
+				}
+			}
+		} else {
+			if !isActiveStatus(agent.LastCheckinStatus) {
+				sendCapabilities = true
+			}
+			if message.SequenceNum != uint64(agent.SequenceNum)+1 { //nolint:gosec // agent seq num will not be negative
+				// agent.SequenceNum is read from ES, but updateAgent only stages the new value in the
+				// checkin bulker, which flushes on an interval (10s by default). If the agent sends
+				// another message before that flush, we read a stale value here and this check can
+				// report drift that did not happen. The flag then makes the client skip its polling
+				// interval and send again immediately, which can repeat until the flush lands
+				// (see #8187).
+				//
+				// Checking the bulker's pending queue would not help: the next message may be handled
+				// by a different Fleet Server instance.
+				//
+				// This branch has two possible causes that we cannot tell apart here: a genuine gap
+				// (a message the server never stored, so the agent's full state is worth requesting),
+				// or the stale read described above (nothing was missed, so the flag is redundant).
+				reportFullState = true
+				zlog.Debug().
+					Int64("stored_sequence", agent.SequenceNum).
+					Uint64("sequence_num", message.SequenceNum).
+					Str("last_status", agent.LastCheckinStatus).
+					Msg("sequence number drift detected")
+			}
+>>>>>>> e793ebc (fix(opamp): only request a full state report on enrollment or sequence drift (#8197))
 		}
 
 		if err := oa.updateAgent(zlog, agent, message); err != nil {
@@ -229,8 +285,13 @@ func (oa *OpAMPT) handleMessage(zlog zerolog.Logger, apiKey *apikey.APIKey) func
 			}
 		}
 
+<<<<<<< HEAD
 		sToA := protobufs.ServerToAgent{
 			InstanceUid: instanceUID.Bytes(),
+=======
+		if reportFullState {
+			response.Flags = uint64(protobufs.ServerToAgentFlags_ServerToAgentFlags_ReportFullState)
+>>>>>>> e793ebc (fix(opamp): only request a full state report on enrollment or sequence drift (#8197))
 		}
 		if sendCapabilities {
 			sToA.Capabilities = serverCapabilities
