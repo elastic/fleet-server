@@ -4,7 +4,7 @@ go 1.27.4
 
 require (
 	github.com/Pallinder/go-randomdata v1.2.0
-	github.com/dgraph-io/ristretto v0.2.0
+	github.com/dgraph-io/ristretto/v2 v2.4.2
 	github.com/docker/go-units v0.5.0
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261113003147-28a0da4deef0
 	github.com/elastic/elastic-agent-client/v7 v7.21.0
