@@ -422,11 +422,24 @@ func (ack *AckT) handleActionResult(ctx context.Context, zlog zerolog.Logger, ag
 	span.Context.SetLabel("agent_id", agent.Agent.ID)
 	defer span.End()
 
+	// An UPGRADE ack that carries no error is a no-op when the stored upgrade_details already track
+	// this action: the result is recorded from the check-in upgrade_details once the outcome is known.
+	if action.Type == TypeUpgrade && agent.UpgradeDetails != nil && agent.UpgradeDetails.ActionID == action.ActionID {
+		if event, err := ev.AsUpgradeEvent(); err == nil && event.Error == nil {
+			zlog.Debug().Str(ecs.AgentID, agent.Agent.ID).Str(ecs.ActionID, action.Id).Msg("upgrade ack matches stored upgrade_details, no writes")
+			return nil
+		}
+	}
+
 	// Convert ack event to action result document
 	acr := eventToActionResult(agent.Id, action.Type, action.Namespaces, ev)
 
-	// Save action result document
-	if err := dl.CreateActionResult(ctx, ack.bulk, acr); err != nil {
+	// Save action result document. UPGRADE results are not refreshed.
+	var createOpts []bulk.Opt
+	if action.Type != TypeUpgrade {
+		createOpts = append(createOpts, bulk.WithRefresh())
+	}
+	if err := dl.CreateActionResult(ctx, ack.bulk, acr, createOpts...); err != nil {
 		zlog.Error().Err(err).Str(ecs.AgentID, agent.Agent.ID).Str(ecs.ActionID, action.Id).Msg("create action result")
 		return err
 	}

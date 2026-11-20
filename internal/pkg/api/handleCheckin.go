@@ -742,6 +742,10 @@ func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agen
 
 	// validate metadata with state
 	vSpan, _ = apm.StartSpan(ctx, "validateUpgradeMetadata", "validate")
+	var (
+		terminal  bool   // the upgrade ended in a failure (UPG_FAILED) or was rolled back (UPG_ROLLBACK)
+		resultErr string // error recorded on the action result for a terminal state
+	)
 	switch details.State {
 	case UpgradeDetailsStateUPGDOWNLOADING:
 		if details.Metadata == nil {
@@ -776,6 +780,12 @@ func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agen
 			vSpan.End()
 			return fmt.Errorf("%w %s: unable to repack metadata: %w", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGFAILED, err)
 		}
+		terminal = true
+		resultErr = meta.ErrorMsg
+	case UpgradeDetailsStateUPGROLLBACK:
+		// UPG_ROLLBACK carries no error_msg; the reason is in the metadata (e.g. "watch failed").
+		terminal = true
+		resultErr = rollbackErrorMessage(details.Metadata)
 	case UpgradeDetailsStateUPGSCHEDULED:
 		if details.Metadata == nil {
 			vSpan.End()
@@ -797,6 +807,17 @@ func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agen
 
 	doc := bulk.UpdateFields{
 		dl.FieldUpgradeDetails: details,
+	}
+	if terminal {
+		// The result is created before upgrade_details are stored: if the create fails the stored
+		// state is not terminal yet, so the next check-in retries it.
+		recorded := agent.UpgradeDetails != nil && agent.UpgradeDetails.ActionID == details.ActionId && agent.UpgradeDetails.State == string(details.State)
+		if details.ActionId != "" && !recorded {
+			if err := ct.createUpgradeResult(ctx, agent, details.ActionId, resultErr); err != nil {
+				return err
+			}
+		}
+		doc[dl.FieldUpgradeStartedAt] = nil
 	}
 	if agent.UpgradeAttempts != nil && details.State == UpgradeDetailsStateUPGWATCHING {
 		doc[dl.FieldUpgradeAttempts] = nil
@@ -849,6 +870,15 @@ func (ct *CheckinT) markUpgradeComplete(ctx context.Context, agent *model.Agent,
 	span, ctx := apm.StartSpan(ctx, "Mark update complete", "update")
 	span.Context.SetLabel("agent_id", agent.Agent.ID)
 	defer span.End()
+	// A stored upgrade_details.action_id means the ack was (or will be) a no-op, so the result is
+	// recorded here once the watch period has ended. A failed or rolled back upgrade already has its
+	// result. Without a stored action_id (fast upgrade race) the ack remains responsible for it.
+	if ud := agent.UpgradeDetails; ud != nil && ud.ActionID != "" &&
+		ud.State != string(UpgradeDetailsStateUPGFAILED) && ud.State != string(UpgradeDetailsStateUPGROLLBACK) {
+		if err := ct.createUpgradeResult(ctx, agent, ud.ActionID, ""); err != nil {
+			return err
+		}
+	}
 	// Checkin had no upgrade_details but agent either had stored details (normal upgrade path) or
 	// changed version without intermediate details (fast upgrade race). Treat as successful upgrade.
 	doc := bulk.UpdateFields{
@@ -861,6 +891,60 @@ func (ct *CheckinT) markUpgradeComplete(ctx context.Context, agent *model.Agent,
 		return err
 	}
 	return ct.bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3))
+}
+
+// rollbackErrorMessage builds the action result error for a UPG_ROLLBACK state from metadata.reason.
+func rollbackErrorMessage(m *UpgradeDetails_Metadata) string {
+	const msg = "upgrade rolled back"
+	if m == nil {
+		return msg
+	}
+	raw, err := m.MarshalJSON()
+	if err != nil {
+		return msg
+	}
+	var meta struct {
+		Reason string `json:"reason"`
+	}
+	if err := json.Unmarshal(raw, &meta); err != nil || meta.Reason == "" {
+		return msg
+	}
+	return msg + ": " + meta.Reason
+}
+
+// createUpgradeResult creates the UPGRADE action result for the agent (no refresh, an existing
+// result is not an error). errMsg is empty for a successful upgrade.
+func (ct *CheckinT) createUpgradeResult(ctx context.Context, agent *model.Agent, actionID, errMsg string) error {
+	span, ctx := apm.StartSpan(ctx, "Create upgrade result", "update")
+	span.Context.SetLabel("action_id", actionID)
+	span.Context.SetLabel("agent_id", agent.Agent.ID)
+	defer span.End()
+
+	var namespaces []string
+	action, ok := ct.cache.GetAction(actionID)
+	if !ok {
+		actions, err := dl.FindAction(ctx, ct.bulker, actionID)
+		if err != nil {
+			return fmt.Errorf("unable to find upgrade action %q: %w", actionID, err)
+		}
+		if len(actions) > 0 {
+			action = actions[0]
+			ct.cache.SetAction(action)
+			ok = true
+		}
+	}
+	if ok {
+		namespaces = action.Namespaces
+	} else {
+		zerolog.Ctx(ctx).Warn().Str(ecs.ActionID, actionID).Str(ecs.AgentID, agent.Agent.ID).Msg("upgrade action not found, creating result without namespaces")
+	}
+
+	return dl.CreateActionResult(ctx, ct.bulker, model.ActionResult{
+		ActionID:   actionID,
+		AgentID:    agent.Id,
+		Namespaces: namespaces,
+		Error:      errMsg,
+	})
 }
 
 // stalenessThreshold returns the age beyond which an upgrade_started_at value with no associated

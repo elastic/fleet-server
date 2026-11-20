@@ -16,11 +16,13 @@ import (
 	"github.com/rs/zerolog"
 )
 
-func CreateActionResult(ctx context.Context, bulker bulk.Bulk, acr model.ActionResult) error {
-	return createActionResult(ctx, bulker, FleetActionsResults, acr)
+// CreateActionResult creates an action result document. Options (for example bulk.WithRefresh())
+// are passed to the underlying create; no refresh is requested unless asked for.
+func CreateActionResult(ctx context.Context, bulker bulk.Bulk, acr model.ActionResult, opts ...bulk.Opt) error {
+	return createActionResult(ctx, bulker, FleetActionsResults, acr, opts...)
 }
 
-func createActionResult(ctx context.Context, bulker bulk.Bulk, index string, acr model.ActionResult) error {
+func createActionResult(ctx context.Context, bulker bulk.Bulk, index string, acr model.ActionResult, opts ...bulk.Opt) error {
 	if acr.Timestamp == "" {
 		acr.Timestamp = time.Now().UTC().Format(time.RFC3339)
 	}
@@ -30,7 +32,7 @@ func createActionResult(ctx context.Context, bulker bulk.Bulk, index string, acr
 	}
 
 	id := acr.ActionID + ":" + acr.AgentID
-	_, err = bulker.Create(ctx, index, id, body, bulk.WithRefresh())
+	_, err = bulker.Create(ctx, index, id, body, opts...)
 	// ignoring version conflict in case the same action result is tried to be created multiple times (unique id with actionID and agentID)
 	if errors.Is(err, es.ErrElasticVersionConflict) {
 		zerolog.Ctx(ctx).Debug().Err(err).Str("id", id).Msg("action result already exists, ignoring")
