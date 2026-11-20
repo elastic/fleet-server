@@ -42,7 +42,7 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 
 	cfg := config.Fleet{
 		Agent: config.Agent{
-			ID: "agent-id",
+			ID: "agent-id", //nolint:goconst // test fixture value
 		},
 	}
 	reporter := &FakeReporter{}
@@ -59,7 +59,7 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 	bulker.On("GetBulkerMap").Return(emptyBulkerMap)
 
 	monitor := NewSelfMonitor(cfg, bulker, mm, "", reporter)
-	sm := monitor.(*selfMonitorT)
+	sm := selfMonitorOf(t, monitor)
 	var policyLock sync.Mutex
 	var policyResult []model.Policy
 	sm.policyF = func(ctx context.Context, bulker bulk.Bulk, _ string, opt ...dl.Option) (model.Policy, error) {
@@ -77,7 +77,7 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 		merr = monitor.Run(ctx)
 	})
 
-	if err := monitor.(*selfMonitorT).waitStart(ctx); err != nil {
+	if err := sm.waitStart(ctx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -87,7 +87,7 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 		if state != client.UnitStateStarting {
 			return fmt.Errorf("should be reported as starting; instead its %s", state)
 		}
-		if msg != "Waiting on default policy with Fleet Server integration" {
+		if msg != "Waiting on default policy with Fleet Server integration" { //nolint:goconst // test fixture value
 			return fmt.Errorf("should be matching with default policy")
 		}
 		return nil
@@ -134,7 +134,7 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 	rId = xid.New().String()
 	pData = model.PolicyData{Inputs: []map[string]any{
 		{
-			"type": "fleet-server",
+			"type": "fleet-server", //nolint:goconst // test fixture value
 		},
 	}}
 	policy = model.Policy{
@@ -174,7 +174,7 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 
 	cancel()
 	mwg.Wait()
-	if merr != nil && merr != context.Canceled {
+	if merr != nil && !errors.Is(merr, context.Canceled) {
 		t.Fatal(merr)
 	}
 }
@@ -203,7 +203,7 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 	bulker.On("GetBulkerMap").Return(emptyBulkerMap)
 
 	monitor := NewSelfMonitor(cfg, bulker, mm, "", reporter)
-	sm := monitor.(*selfMonitorT)
+	sm := selfMonitorOf(t, monitor)
 	sm.checkTime = 100 * time.Millisecond
 
 	var policyLock sync.Mutex
@@ -218,7 +218,7 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 	}
 
 	var tokenLock sync.Mutex
-	var tokenResult []model.EnrollmentAPIKey
+	tokenResult := make([]model.EnrollmentAPIKey, 0, 1)
 	sm.enrollmentTokenF = func(ctx context.Context, bulker bulk.Bulk, policyID string) ([]model.EnrollmentAPIKey, error) {
 		tokenLock.Lock()
 		defer tokenLock.Unlock()
@@ -231,7 +231,7 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 		merr = monitor.Run(ctx)
 	})
 
-	if err := monitor.(*selfMonitorT).waitStart(ctx); err != nil {
+	if err := sm.waitStart(ctx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -293,12 +293,12 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 	}, ftesting.RetrySleep(1*time.Second))
 
 	// add an active token
-	activeToken := model.EnrollmentAPIKey{
+	activeToken := model.EnrollmentAPIKey{ //nolint:gosec // fake api key used in test
 		Id:       xid.New().String(),
 		Active:   true,
-		APIKey:   "d2JndlFIWUJJUVVxWDVia2NJTV86X0d6ZmljZGNTc1d4R1otbklrZFFRZw==",
+		APIKey:   "d2JndlFIWUJJUVVxWDVia2NJTV86X0d6ZmljZGNTc1d4R1otbklrZFFRZw==", //nolint:goconst // test fixture value
 		APIKeyID: xid.New().String(),
-		Name:     "Active",
+		Name:     "Active", //nolint:goconst // test fixture value
 		PolicyID: policyID,
 	}
 	tokenLock.Lock()
@@ -329,7 +329,7 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 
 	cancel()
 	mwg.Wait()
-	if merr != nil && merr != context.Canceled {
+	if merr != nil && !errors.Is(merr, context.Canceled) {
 		t.Fatal(merr)
 	}
 }
@@ -358,7 +358,7 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 	bulker.On("GetBulkerMap").Return(emptyBulkerMap)
 
 	monitor := NewSelfMonitor(cfg, bulker, mm, policyID, reporter)
-	sm := monitor.(*selfMonitorT)
+	sm := selfMonitorOf(t, monitor)
 	var policyLock sync.Mutex
 	var policyResult []model.Policy
 	sm.policyF = func(ctx context.Context, bulker bulk.Bulk, _ string, opt ...dl.Option) (model.Policy, error) {
@@ -376,7 +376,7 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 		merr = monitor.Run(ctx)
 	})
 
-	if err := monitor.(*selfMonitorT).waitStart(ctx); err != nil {
+	if err := sm.waitStart(ctx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -472,7 +472,7 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 
 	cancel()
 	mwg.Wait()
-	if merr != nil && merr != context.Canceled {
+	if merr != nil && !errors.Is(merr, context.Canceled) {
 		t.Fatal(merr)
 	}
 }
@@ -501,7 +501,7 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 	bulker.On("GetBulkerMap").Return(emptyBulkerMap)
 
 	monitor := NewSelfMonitor(cfg, bulker, mm, policyID, reporter)
-	sm := monitor.(*selfMonitorT)
+	sm := selfMonitorOf(t, monitor)
 	sm.checkTime = 100 * time.Millisecond
 
 	var policyLock sync.Mutex
@@ -516,7 +516,7 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 	}
 
 	var tokenLock sync.Mutex
-	var tokenResult []model.EnrollmentAPIKey
+	tokenResult := make([]model.EnrollmentAPIKey, 0, 1)
 	sm.enrollmentTokenF = func(ctx context.Context, bulker bulk.Bulk, policyID string) ([]model.EnrollmentAPIKey, error) {
 		tokenLock.Lock()
 		defer tokenLock.Unlock()
@@ -529,7 +529,7 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 		merr = monitor.Run(ctx)
 	})
 
-	if err := monitor.(*selfMonitorT).waitStart(ctx); err != nil {
+	if err := sm.waitStart(ctx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -590,7 +590,7 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 	}, ftesting.RetrySleep(1*time.Second))
 
 	// add an active token
-	activeToken := model.EnrollmentAPIKey{
+	activeToken := model.EnrollmentAPIKey{ //nolint:gosec // fake api key used in test
 		Id:       xid.New().String(),
 		Active:   true,
 		APIKey:   "d2JndlFIWUJJUVVxWDVia2NJTV86X0d6ZmljZGNTc1d4R1otbklrZFFRZw==",
@@ -626,7 +626,7 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 
 	cancel()
 	mwg.Wait()
-	if merr != nil && merr != context.Canceled {
+	if merr != nil && !errors.Is(merr, context.Canceled) {
 		t.Fatal(merr)
 	}
 }
@@ -693,7 +693,7 @@ func TestSelfMonitor_reportOutputDegradedState(t *testing.T) {
 	bulkerMap := make(map[string]bulk.Bulk)
 	outputBulker := ftesting.NewMockBulk()
 	mockEsClient, mockTransport := esutil.MockESClient(t)
-	var err error = errors.New("error connecting")
+	err := errors.New("error connecting")
 	mockTransport.RoundTripFn = func(req *http.Request) (*http.Response, error) { return mockTransport.Response, err }
 	outputBulker.On("Client").Return(mockEsClient)
 	bulkerMap["remote"] = outputBulker
@@ -787,7 +787,7 @@ func TestSelfMonitor_SearchesOnlyItsPolicy(t *testing.T) {
 					queries = append(queries, string(query))
 				}).
 				Return(&es.ResultT{}, nil)
-			sm := NewSelfMonitor(config.Fleet{}, bulker, mmock.NewMockMonitor(), tc.policyID, &FakeReporter{}).(*selfMonitorT)
+			sm := selfMonitorOf(t, NewSelfMonitor(config.Fleet{}, bulker, mmock.NewMockMonitor(), tc.policyID, &FakeReporter{}))
 
 			state, err := sm.process(t.Context())
 			require.NoError(t, err)
@@ -807,7 +807,7 @@ func TestSelfMonitor_PolicyChangesAreReadWhileACheckRuns(t *testing.T) {
 		mm := mmock.NewMockMonitor()
 		mm.On("Subscribe").Return(ms).Once()
 		mm.On("Unsubscribe", mock.Anything).Return().Once()
-		sm := NewSelfMonitor(config.Fleet{}, ftesting.NewMockBulk(), mm, "policy-1", &FakeReporter{}).(*selfMonitorT)
+		sm := selfMonitorOf(t, NewSelfMonitor(config.Fleet{}, ftesting.NewMockBulk(), mm, "policy-1", &FakeReporter{}))
 
 		release := make(chan struct{})
 		var checks atomic.Int32
@@ -841,4 +841,20 @@ func TestSelfMonitor_PolicyChangesAreReadWhileACheckRuns(t *testing.T) {
 		cancel()
 		wg.Wait()
 	})
+}
+
+func selfMonitorOf(t *testing.T, monitor SelfMonitor) *selfMonitorT {
+	t.Helper()
+	sm, ok := monitor.(*selfMonitorT)
+	require.True(t, ok, "the self monitor is a selfMonitorT")
+	return sm
+}
+
+func (m *selfMonitorT) waitStart(ctx context.Context) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-m.startCh:
+	}
+	return nil
 }

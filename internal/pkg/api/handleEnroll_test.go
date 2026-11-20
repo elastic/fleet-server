@@ -49,12 +49,12 @@ func TestRemoveDuplicateStr(t *testing.T) {
 		},
 		{
 			name:      "one duplicated tag",
-			inputTags: []string{"foo", "foo", "foo", "foo"},
+			inputTags: []string{"foo", "foo", "foo", "foo"}, //nolint:goconst // test fixture value
 			agentTags: []string{"foo"},
 		},
 		{
 			name:      "multiple duplicated tags",
-			inputTags: []string{"foo", "bar", "bar", "baz", "foo"},
+			inputTags: []string{"foo", "bar", "bar", "baz", "foo"}, //nolint:goconst // test fixture value
 			agentTags: []string{"bar", "baz", "foo"},
 		},
 	}
@@ -74,7 +74,7 @@ func TestEnroll(t *testing.T) {
 	zlog := zerolog.Logger{}
 	enrollmentID := "1234"
 	req := &EnrollRequest{
-		Type:         "PERMANENT",
+		Type:         "PERMANENT", //nolint:goconst // test fixture value
 		EnrollmentId: &enrollmentID,
 		Metadata: EnrollMetadata{
 			UserProvided: []byte("{}"),
@@ -99,7 +99,7 @@ func TestEnroll(t *testing.T) {
 		"", nil)
 	resp, _ := et._enroll(ctx, rb, zlog, req, "1234", []string{}, "8.9.0")
 
-	if resp.Action != "created" {
+	if resp.Action != "created" { //nolint:goconst // test fixture value
 		t.Fatal("enroll failed")
 	}
 }
@@ -306,7 +306,7 @@ func TestEnrollWithAgentIDExistingActive_WrongPolicy(t *testing.T) {
 	rb := &rollback.Rollback{}
 	zlog := zerolog.Logger{}
 	agentID := "1234"
-	replaceToken := "replace_token"
+	replaceToken := "replace_token" //nolint:goconst // test fixture value
 	var pbkdf2Cfg config.PBKDF2
 	pbkdf2Cfg.InitDefaults()
 	replaceHash, err := hashReplaceToken(replaceToken, pbkdf2Cfg)
@@ -349,7 +349,9 @@ func replaceUpdateDoc(t *testing.T, bulker *ftesting.MockBulk) map[string]any {
 	var updateBody []byte
 	for _, c := range bulker.Calls {
 		if c.Method == "Update" {
-			updateBody = c.Arguments.Get(3).([]byte)
+			body, ok := c.Arguments.Get(3).([]byte)
+			require.True(t, ok, "the Update body is a byte slice")
+			updateBody = body
 			break
 		}
 	}
@@ -389,7 +391,7 @@ func TestEnrollWithAgentIDExistingActive(t *testing.T) {
 	bulker := ftesting.NewMockBulk()
 	et, _ := NewEnrollerT(verCon, cfg, bulker, c)
 
-	policyID := "my-policy#9.2"
+	policyID := "my-policy#9.2" //nolint:goconst // test fixture value
 	source := fmt.Sprintf(`{"active":true,"agent":{"id":"1234","version":"8.9.0"},"type":"PERMANENT","policy_id":"%s","replace_token":"%s"}`, policyID, replaceHash)
 	bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{
 		Hits: []es.HitT{{
@@ -455,7 +457,7 @@ func TestEnrollWithAgentIDExistingPendingUninstallClearsPending(t *testing.T) {
 	bulker := ftesting.NewMockBulk()
 	et, _ := NewEnrollerT(verCon, cfg, bulker, c)
 
-	policyID := "my-policy"
+	policyID := "my-policy" //nolint:goconst // test fixture value
 	// Existing pending-uninstall agent whose output key was already cleared on the
 	// unenroll ack (api_key empty, permissions_hash kept).
 	source := fmt.Sprintf(`{"active":true,"uninstall_pending":true,"agent":{"id":"1234","version":"8.9.0"},"type":"PERMANENT","policy_id":"%s","replace_token":"%s",`+
@@ -565,8 +567,8 @@ func TestEnrollWithAgentIDExistingActive_UpgradedAt(t *testing.T) {
 	}{
 		{
 			name:            "version change stamps upgraded_at",
-			storedVersion:   "8.9.0",
-			enrollVersion:   "9.0.0",
+			storedVersion:   "8.9.0", //nolint:goconst // test fixture value
+			enrollVersion:   "9.0.0", //nolint:goconst // test fixture value
 			useReplaceToken: true,
 			wantUpgradedAt:  true,
 		},
@@ -665,7 +667,7 @@ func TestEnrollerT_retrieveStaticTokenEnrollmentToken(t *testing.T) {
 		return func() bulk.Bulk {
 			bulker := ftesting.NewMockBulk()
 
-			hits := []es.HitT{}
+			hits := make([]es.HitT, 0, len(policies))
 			for _, p := range policies {
 				b, _ := json.Marshal(p)
 				hits = append(hits, es.HitT{
@@ -673,9 +675,7 @@ func TestEnrollerT_retrieveStaticTokenEnrollmentToken(t *testing.T) {
 				})
 			}
 			res := &es.ResultT{
-				HitsT: es.HitsT{
-					Hits: hits,
-				},
+				Hits: hits,
 			}
 			bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(res, nil)
 			return bulker
@@ -716,8 +716,8 @@ func TestEnrollerT_retrieveStaticTokenEnrollmentToken(t *testing.T) {
 					Enabled: true,
 					PolicyTokens: []config.PolicyToken{
 						{
-							TokenKey: "abcdefg",
-							PolicyID: "dummy-policy",
+							TokenKey: "abcdefg",      //nolint:goconst // test fixture value
+							PolicyID: "dummy-policy", //nolint:goconst // test fixture value
 						},
 					},
 				},
@@ -866,7 +866,7 @@ func TestCreateFleetAgentSyncWrite409Succeeds(t *testing.T) {
 		return &http.Response{
 			StatusCode: http.StatusConflict,
 			Body:       io.NopCloser(strings.NewReader(`{}`)),
-			Header:     http.Header{"X-Elastic-Product": []string{"Elasticsearch"}},
+			Header:     http.Header{"X-Elastic-Product": []string{"Elasticsearch"}}, //nolint:goconst // test fixture value
 		}, nil
 	}
 	cli, err := elasticsearch.New(

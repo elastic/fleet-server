@@ -64,7 +64,7 @@ func (b *fakePolicySearchBulk) Search(_ context.Context, _ string, query []byte,
 		for _, bucket := range item.Aggregations[FieldPolicyID].Buckets {
 			hits = append(hits, bucket.Aggregations[FieldRevisionIdx].Hits...)
 		}
-		res := &es.ResultT{HitsT: es.HitsT{Hits: hits}}
+		res := &es.ResultT{Hits: hits}
 		return res, nil
 	}
 	var buckets []es.Bucket

@@ -148,15 +148,6 @@ func (m *selfMonitorT) State() client.UnitState {
 	return m.state
 }
 
-func (m *selfMonitorT) waitStart(ctx context.Context) error { //nolint:unused // not sure if this is used in tests
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-m.startCh:
-	}
-	return nil
-}
-
 func (m *selfMonitorT) process(ctx context.Context) (client.UnitState, error) {
 	if m.bulker.HasTracer() {
 		trans := m.bulker.StartTransaction("Check self monitor", "bulker")
