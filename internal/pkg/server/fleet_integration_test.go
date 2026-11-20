@@ -434,9 +434,8 @@ func TestServerUnauthorized(t *testing.T) {
 		srv.buildURL(agentID, "acks"),
 	}
 
-	allurls := []string{
-		srv.buildURL("", "enroll"),
-	}
+	allurls := make([]string, 0, 1+len(agenturls))
+	allurls = append(allurls, srv.buildURL("", "enroll"))
 	allurls = append(allurls, agenturls...)
 
 	// Expecting no authorization header error
@@ -558,7 +557,7 @@ func TestServerInstrumentation(t *testing.T) {
 				}
 				return
 			}
-			Err = err //nolint:ineffassign,staticcheck // ugly work around for error checking
+			Err = err //nolint:ineffassign // ugly work around for error checking
 			// retry after wait or cancel
 			select {
 			case <-ctx.Done():
