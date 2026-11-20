@@ -113,7 +113,7 @@ func TestLocateChunks(t *testing.T) {
 				Index:  "",
 				Source: []byte(""),
 				Fields: map[string]any{
-					"bid": []any{baseID},
+					file.FieldBaseID: []any{baseID},
 				},
 			},
 			{
@@ -121,8 +121,8 @@ func TestLocateChunks(t *testing.T) {
 				Index:  "",
 				Source: []byte(""),
 				Fields: map[string]any{
-					"bid":  []any{baseID},
-					"last": []any{true},
+					file.FieldBaseID: []any{baseID},
+					"last":           []any{true},
 				},
 			},
 		},
