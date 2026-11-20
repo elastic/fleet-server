@@ -182,8 +182,8 @@ func TestHandleAckEvents(t *testing.T) {
 	}
 
 	agent := &model.Agent{
-		ESDocument: model.ESDocument{Id: "ab12dcd8-bde0-4045-92dc-c4b27668d735"},
-		Agent:      &model.AgentMetadata{Version: "8.0.0"},
+		Id:    "ab12dcd8-bde0-4045-92dc-c4b27668d735",
+		Agent: &model.AgentMetadata{Version: "8.0.0"},
 	}
 
 	ctx := context.Background()
@@ -297,11 +297,10 @@ func TestHandleAckEvents(t *testing.T) {
 			}}),
 			bulker: func(t *testing.T) *ftesting.MockBulk {
 				m := ftesting.NewMockBulk()
-				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "2b12dcd8-bde0-4045-92dc-c4b27668d733")), mock.Anything).Return(&es.ResultT{HitsT: es.HitsT{
+				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "2b12dcd8-bde0-4045-92dc-c4b27668d733")), mock.Anything).Return(&es.ResultT{
 					Hits: []es.HitT{{
 						Source: []byte(`{"action_id":"2b12dcd8-bde0-4045-92dc-c4b27668d733","type":"UPGRADE"}`),
-					}},
-				}}, nil)
+					}}}, nil)
 				m.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
 				m.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 				return m
@@ -317,11 +316,10 @@ func TestHandleAckEvents(t *testing.T) {
 			res: newAckResponse(true, []AckResponseItem{newAckResponseItem(http.StatusInternalServerError)}),
 			bulker: func(t *testing.T) *ftesting.MockBulk {
 				m := ftesting.NewMockBulk()
-				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "2b12dcd8-bde0-4045-92dc-c4b27668d733")), mock.Anything).Return(&es.ResultT{HitsT: es.HitsT{
+				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "2b12dcd8-bde0-4045-92dc-c4b27668d733")), mock.Anything).Return(&es.ResultT{
 					Hits: []es.HitT{{
 						Source: []byte(`{"action_id":"2b12dcd8-bde0-4045-92dc-c4b27668d733","type":"UPGRADE"}`),
-					}},
-				}}, nil)
+					}}}, nil)
 				m.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", errors.New("network error"))
 				return m
 			},
@@ -337,11 +335,10 @@ func TestHandleAckEvents(t *testing.T) {
 			res: newAckResponse(true, []AckResponseItem{newAckResponseItem(http.StatusServiceUnavailable)}),
 			bulker: func(t *testing.T) *ftesting.MockBulk {
 				m := ftesting.NewMockBulk()
-				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "2b12dcd8-bde0-4045-92dc-c4b27668d733")), mock.Anything).Return(&es.ResultT{HitsT: es.HitsT{
+				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "2b12dcd8-bde0-4045-92dc-c4b27668d733")), mock.Anything).Return(&es.ResultT{
 					Hits: []es.HitT{{
 						Source: []byte(`{"action_id":"2b12dcd8-bde0-4045-92dc-c4b27668d733","type":"UPGRADE"}`),
-					}},
-				}}, nil)
+					}}}, nil)
 				m.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", &es.ErrElastic{Status: http.StatusServiceUnavailable, Reason: http.StatusText(http.StatusServiceUnavailable)})
 				return m
 			},
@@ -360,11 +357,10 @@ func TestHandleAckEvents(t *testing.T) {
 			}}),
 			bulker: func(t *testing.T) *ftesting.MockBulk {
 				m := ftesting.NewMockBulk()
-				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "2b12dcd8-bde0-4045-92dc-c4b27668d733")), mock.Anything).Return(&es.ResultT{HitsT: es.HitsT{
+				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "2b12dcd8-bde0-4045-92dc-c4b27668d733")), mock.Anything).Return(&es.ResultT{
 					Hits: []es.HitT{{
 						Source: []byte(`{"action_id":"2b12dcd8-bde0-4045-92dc-c4b27668d733","type":"UPGRADE"}`),
-					}},
-				}}, nil)
+					}}}, nil)
 				m.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", &es.ErrElastic{Status: http.StatusServiceUnavailable, Reason: http.StatusText(http.StatusServiceUnavailable)})
 				return m
 			},
@@ -432,27 +428,23 @@ func TestHandleAckEvents(t *testing.T) {
 			}),
 			bulker: func(t *testing.T) *ftesting.MockBulk {
 				m := ftesting.NewMockBulk()
-				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "2b12dcd8-bde0-4045-92dc-c4b27668d733")), mock.Anything).Return(&es.ResultT{HitsT: es.HitsT{
+				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "2b12dcd8-bde0-4045-92dc-c4b27668d733")), mock.Anything).Return(&es.ResultT{
 					Hits: []es.HitT{{
 						Source: []byte(`{"action_id":"2b12dcd8-bde0-4045-92dc-c4b27668d733","type":"POLICY_CHANGE"}`),
-					}},
-				}}, nil)
-				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "1b12dcd8-bde0-4045-92dc-c4b27668d731")), mock.Anything).Return(&es.ResultT{HitsT: es.HitsT{
+					}}}, nil)
+				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "1b12dcd8-bde0-4045-92dc-c4b27668d731")), mock.Anything).Return(&es.ResultT{
 					Hits: []es.HitT{{
 						Source: []byte(`{"action_id":"1b12dcd8-bde0-4045-92dc-c4b27668d731","type":"UNENROLL"}`),
-					}},
-				}}, nil)
+					}}}, nil)
 				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "1b12dcd8-bde0-4045-92dc-c4b27668d733")), mock.Anything).Return(&es.ResultT{}, nil)
-				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "ab12dcd8-bde0-4045-92dc-c4b27668d73a")), mock.Anything).Return(&es.ResultT{HitsT: es.HitsT{
+				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "ab12dcd8-bde0-4045-92dc-c4b27668d73a")), mock.Anything).Return(&es.ResultT{
 					Hits: []es.HitT{{
 						Source: []byte(`{"action_id":"ab12dcd8-bde0-4045-92dc-c4b27668d73a","type":"UPGRADE"}`),
-					}},
-				}}, nil)
-				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "2b12dcd8-bde0-4045-92dc-c4b27668d733")), mock.Anything).Return(&es.ResultT{HitsT: es.HitsT{
+					}}}, nil)
+				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "2b12dcd8-bde0-4045-92dc-c4b27668d733")), mock.Anything).Return(&es.ResultT{
 					Hits: []es.HitT{{
 						Source: []byte(`{"action_id":"2b12dcd8-bde0-4045-92dc-c4b27668d733"}`),
-					}},
-				}}, nil)
+					}}}, nil)
 				m.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
 				m.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 				return m
@@ -507,11 +499,10 @@ func TestHandleAckEvents(t *testing.T) {
 			}),
 			bulker: func(t *testing.T) *ftesting.MockBulk {
 				m := ftesting.NewMockBulk()
-				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "ab12dcd8-bde0-4045-92dc-c4b27668d73a")), mock.Anything).Return(&es.ResultT{HitsT: es.HitsT{
+				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "ab12dcd8-bde0-4045-92dc-c4b27668d73a")), mock.Anything).Return(&es.ResultT{
 					Hits: []es.HitT{{
 						Source: []byte(`{"action_id":"ab12dcd8-bde0-4045-92dc-c4b27668d73a","type":"UPGRADE"}`),
-					}},
-				}}, nil).Once()
+					}}}, nil).Once()
 				m.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil).Once()
 				m.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 				return m
@@ -534,11 +525,10 @@ func TestHandleAckEvents(t *testing.T) {
 			}),
 			bulker: func(t *testing.T) *ftesting.MockBulk {
 				m := ftesting.NewMockBulk()
-				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "ab12dcd8-bde0-4045-92dc-c4b27668d73a")), mock.Anything).Return(&es.ResultT{HitsT: es.HitsT{
+				m.On("Search", mock.Anything, mock.Anything, mock.MatchedBy(matchAction(t, "ab12dcd8-bde0-4045-92dc-c4b27668d73a")), mock.Anything).Return(&es.ResultT{
 					Hits: []es.HitT{{
 						Source: []byte(`{"action_id":"ab12dcd8-bde0-4045-92dc-c4b27668d73a","type":"UPGRADE"}`),
-					}},
-				}}, nil).Once()
+					}}}, nil).Once()
 				m.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil).Once()
 				m.On("Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 				return m
@@ -679,11 +669,10 @@ func TestInvalidateAPIKeysRemoteOutputReadFromPolicies(t *testing.T) {
 
 	bulkerFn := func(t *testing.T) *ftesting.MockBulk {
 		m := ftesting.NewMockBulk()
-		m.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{HitsT: es.HitsT{
+		m.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{
 			Hits: []es.HitT{{
 				Source: []byte(`{"data":{"outputs":{"remote1":{}}}}`),
-			}},
-		}}, nil).Once()
+			}}}, nil).Once()
 
 		m.On("CreateAndGetBulker", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(remoteBulker, false, nil)
 		m.On("GetBulker", "remote1").Return(nil)
@@ -710,9 +699,8 @@ func TestInvalidateAPIKeysRemoteOutputReadFromPoliciesNotFound(t *testing.T) {
 
 	bulkerFn := func(t *testing.T) *ftesting.MockBulk {
 		m := ftesting.NewMockBulk()
-		m.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{HitsT: es.HitsT{
-			Hits: []es.HitT{},
-		}}, nil).Once()
+		m.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{
+			Hits: []es.HitT{}}, nil).Once()
 		m.On("GetBulker", "remote1").Return(nil)
 		// When the remote bulker cannot be resolved, the primary cluster is used as a fallback.
 		m.On("APIKeyInvalidate", mock.Anything, []string{"toRetire1"}).Return(nil).Once()
@@ -817,8 +805,8 @@ func TestAckHandleUpgrade(t *testing.T) {
 			return m
 		},
 		agent: &model.Agent{
-			ESDocument: model.ESDocument{Id: "ab12dcd8-bde0-4045-92dc-c4b27668d735"},
-			Agent:      &model.AgentMetadata{Version: "8.0.0"},
+			Id:    "ab12dcd8-bde0-4045-92dc-c4b27668d735",
+			Agent: &model.AgentMetadata{Version: "8.0.0"},
 		},
 	}, {
 		name:  "keep upgrade_attempts if upgrade_details is not nil",
@@ -836,7 +824,7 @@ func TestAckHandleUpgrade(t *testing.T) {
 			return m
 		},
 		agent: &model.Agent{
-			ESDocument:     model.ESDocument{Id: "ab12dcd8-bde0-4045-92dc-c4b27668d735"},
+			Id:             "ab12dcd8-bde0-4045-92dc-c4b27668d735",
 			Agent:          &model.AgentMetadata{Version: "8.0.0"},
 			UpgradeDetails: &model.UpgradeDetails{},
 		},
