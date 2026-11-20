@@ -384,7 +384,7 @@ func (oa *OpAMPT) enrollAgent(ctx context.Context, zlog zerolog.Logger, uid uuid
 	}
 
 	agent := model.Agent{
-		ESDocument: model.ESDocument{Id: instanceUID},
+		Id:         instanceUID,
 		Active:     true,
 		EnrolledAt: now.UTC().Format(time.RFC3339),
 		PolicyID:   rec.PolicyID,

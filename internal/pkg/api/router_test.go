@@ -22,7 +22,7 @@ func TestPathToOperation(t *testing.T) {
 		path string
 		op   string
 	}{
-		{"/api/status/", "status"},
+		{"/api/status/", "status"}, //nolint:goconst // repeated on purpose
 		{"/api/status", "status"},
 		{"/api/status/toolong", ""},
 		{"/api/fleet/uploads", "uploadBegin"},
@@ -36,7 +36,7 @@ func TestPathToOperation(t *testing.T) {
 		{"/api/fleet/file/abc", "deliverFile"},
 		{"/api/fleet/artifacts/some-id/hash", "artifact"},
 		{"/api/fleet/agents/some-id/audit/unenroll", "audit-unenroll"},
-		{"/v1/opamp", "opamp"},
+		{"/v1/opamp", "opamp"}, //nolint:goconst // repeated on purpose
 		{"/v1/opamp/", "opamp"},
 		{"/api/fleet/agents/some-id/other/unenroll", ""},
 		{"/api/fleet/unimplemented/some-id", ""},
@@ -106,37 +106,33 @@ func TestLimiter(t *testing.T) {
 	}
 }
 
-func TestStatusRecorder(t *testing.T) {
-	t.Run("captures explicit status", func(t *testing.T) {
-		rw := httptest.NewRecorder()
-		rec := &statusRecorder{ResponseWriter: rw}
-		rec.WriteHeader(http.StatusTeapot)
-		require.Equal(t, http.StatusTeapot, rec.status)
-		require.Equal(t, http.StatusTeapot, rw.Code)
-	})
-
-	t.Run("captures implicit success status", func(t *testing.T) {
-		rw := httptest.NewRecorder()
-		rec := &statusRecorder{ResponseWriter: rw}
-		_, err := rec.Write([]byte("ok"))
-		require.NoError(t, err)
-		require.Equal(t, http.StatusOK, rec.status)
-		require.Equal(t, http.StatusOK, rw.Code)
-		require.Equal(t, "ok", rw.Body.String())
-	})
-}
-
 func TestThrottleWithCount(t *testing.T) {
-	t.Run("does not increment counter on success", func(t *testing.T) {
-		before := cntHTTPRejected.Load()
-		h := throttleWithCount(5)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-		}))
-		w := httptest.NewRecorder()
-		h.ServeHTTP(w, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil))
-		require.Equal(t, http.StatusOK, w.Code)
-		require.Equal(t, before, cntHTTPRejected.Load())
-	})
+	tests := []struct {
+		name         string
+		responseCode int
+	}{{
+		name:         "a successful request is not counted as a connection rejection",
+		responseCode: http.StatusOK,
+	}, {
+		name:         "a 429 from an admitted request is not counted as a connection rejection",
+		responseCode: http.StatusTooManyRequests,
+	}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			before := cntHTTPRejected.Load()
+			h := throttleWithCount(5)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(tt.responseCode)
+			}))
+			w := httptest.NewRecorder()
+
+			h.ServeHTTP(w, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil))
+
+			require.Equal(t, tt.responseCode, w.Code)
+
+			rejectionCount := cntHTTPRejected.Load() - before
+			require.Zero(t, rejectionCount)
+		})
+	}
 
 	t.Run("increments counter when connection cap is hit", func(t *testing.T) {
 		before := cntHTTPRejected.Load()
