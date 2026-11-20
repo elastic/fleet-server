@@ -83,8 +83,8 @@ func prepareQueryLatestPolicyByID() *dsl.Tmpl {
 // QueryDefaultFleetServerPolicy gets the latest revision of the default Fleet Server policy.
 func QueryDefaultFleetServerPolicy(ctx context.Context, bulker bulk.Bulk, opt ...Option) (model.Policy, error) {
 	o := newOption(FleetPolicies, opt...)
-	// TODO: The searches are not atomic because each one can read a different state of the index.
-	// A single search needs Kibana to mark only the latest revision of the default policy.
+	// TODO: Use a single search when Kibana marks only the latest revision of the default policy:
+	// https://github.com/elastic/kibana/issues/306686
 	query, err := tmplQueryDefaultFleetServerPolicyIDs.Render(nil)
 	if err != nil {
 		return model.Policy{}, err
