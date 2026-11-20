@@ -564,6 +564,9 @@ func (m *monitorT) updatePolicy(ctx context.Context, pp *ParsedPolicy) bool {
 
 	// A newer revision can arrive while this policy is parsed.
 	if newPolicy.RevisionIdx <= p.pp.Policy.RevisionIdx {
+		zlog.Debug().
+			Int64("cached_revision_idx", p.pp.Policy.RevisionIdx).
+			Msg("keeping the cached policy because it already has the same or a newer revision")
 		return false
 	}
 
