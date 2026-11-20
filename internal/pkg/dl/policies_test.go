@@ -143,13 +143,13 @@ func searchedPolicyIDs(query []byte) ([]string, error) {
 func TestQueryLatestPolicy(t *testing.T) {
 	bulker := &fakePolicySearchBulk{
 		items: map[string]bulk.MsearchResponseItem{
-			"policy-a": { //nolint:goconst // fixture policy ID
+			"policy-a": {
 				Status: http.StatusOK,
 				Aggregations: latestRevisionAggs(es.HitT{
 					Source: []byte(`{"policy_id":"policy-a","revision_idx":2}`),
 				}),
 			},
-			"default-policy": { //nolint:goconst // fixture policy ID
+			"default-policy": {
 				Status: http.StatusOK,
 				Aggregations: latestRevisionAggs(es.HitT{
 					Source: []byte(`{"policy_id":"default-policy","revision_idx":2,"default_fleet_server":true}`),
@@ -205,13 +205,13 @@ func TestQueryLatestPolicyByID(t *testing.T) {
 					Source: []byte(`{"policy_id":"policy-a","revision_idx":2}`),
 				}),
 			},
-			"missing-policy": { //nolint:goconst // fixture policy ID
+			"missing-policy": {
 				Status: http.StatusOK,
 				Aggregations: map[string]es.Aggregation{
 					FieldPolicyID: {Buckets: []es.Bucket{}},
 				},
 			},
-			"timed-out-policy": { //nolint:goconst // fixture policy ID
+			"timed-out-policy": {
 				Status: http.StatusGatewayTimeout,
 				Error: json.RawMessage(`{
 					"root_cause": [{"type": "timeout_exception", "reason": "timed out"}],
@@ -266,7 +266,7 @@ func TestQueryDefaultFleetServerPolicy(t *testing.T) {
 				Source: []byte(`{"policy_id":"default-policy","revision_idx":2,"default_fleet_server":true,"data":{"outputs":{"o":{"type":"elasticsearch"}}}}`),
 			}),
 		},
-		"old-default-policy": { //nolint:goconst // fixture policy ID
+		"old-default-policy": {
 			Status: http.StatusOK,
 			Aggregations: latestRevisionAggs(es.HitT{
 				Source: []byte(`{"policy_id":"old-default-policy","revision_idx":5,"default_fleet_server":false}`),
@@ -400,13 +400,13 @@ func TestQueryLatestPoliciesByID(t *testing.T) {
 					Source: []byte(`{"policy_id":"policy-a","revision_idx":2}`),
 				}),
 			},
-			"policy-b": { //nolint:goconst // fixture policy ID
+			"policy-b": {
 				Status: http.StatusOK,
 				Aggregations: latestRevisionAggs(es.HitT{
 					Source: []byte(`{"policy_id":"policy-b","revision_idx":1}`),
 				}),
 			},
-			"malformed-policy": { //nolint:goconst // fixture policy ID
+			"malformed-policy": {
 				Status: http.StatusOK,
 				Aggregations: latestRevisionAggs(es.HitT{
 					Source: []byte(`{"policy_id":"malformed-policy","revision_idx":1,"data":"not an object"}`),
@@ -426,7 +426,7 @@ func TestQueryLatestPoliciesByID(t *testing.T) {
 					FieldPolicyID: {Buckets: []es.Bucket{}},
 				},
 			},
-			`policy"}]}} , "x": "y`: { //nolint:goconst // fixture policy ID
+			`policy"}]}} , "x": "y`: {
 				Status: http.StatusOK,
 				Aggregations: map[string]es.Aggregation{
 					FieldPolicyID: {Buckets: []es.Bucket{}},
