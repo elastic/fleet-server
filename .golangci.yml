@@ -153,6 +153,11 @@ linters:
       # Which file paths to exclude: they will be analyzed, but issues from them won't be reported.
       # "/" will be replaced by the current OS file path separator to properly work on Windows.
       # Default: []
+    rules:
+      # Repeated fixture strings are clearer inline than as constants in tests.
+      - path: _test\.go
+        linters:
+          - goconst
     paths:
       - third_party$
       - builtin$
