@@ -44,6 +44,20 @@ const (
 	LogAccessAPIKeyID = ecs.AccessAPIKeyID
 )
 
+// Error names and messages returned in HTTPErrResp that are shared by more than one error.
+const (
+	errNameUnauthorized        = "Unauthorized"
+	errNameForbidden           = "Forbidden"
+	errNameBadRequest          = "BadRequest"
+	errNameAPIKeyNotFound      = "ErrAPIKeyNotFound" //nolint:gosec // G101: error name, not a credential
+	errNameRangeNotSatisfiable = "ErrRangeNotSatisfiable"
+	errNamePolicyNotFound      = "ErrPolicyNotFound"
+	errMsgFileNotFound         = "file not found"
+)
+
+// errTypeElastic is the APM error.type label value for Elasticsearch errors.
+const errTypeElastic = "ErrElastic"
+
 // BadRequestErr is used for request validation errors. These can be json
 // unmarshal errors such as json.SyntaxError, or any other input validation
 // error.
@@ -91,7 +105,7 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 			ErrAPIKeyNotEnabled,
 			HTTPErrResp{
 				http.StatusUnauthorized,
-				"Unauthorized",
+				errNameUnauthorized,
 				"ApiKey not enabled",
 				zerolog.InfoLevel,
 			},
@@ -146,7 +160,7 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 			ErrUnauthorizedArtifact,
 			HTTPErrResp{
 				http.StatusForbidden,
-				"Forbidden",
+				errNameForbidden,
 				"agent not authorized for artifact",
 				zerolog.WarnLevel,
 			},
@@ -155,7 +169,7 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 			ErrAgentPolicyIDMissing,
 			HTTPErrResp{
 				http.StatusForbidden,
-				"Forbidden",
+				errNameForbidden,
 				"agent has no policy ID",
 				zerolog.WarnLevel,
 			},
@@ -227,7 +241,7 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 			ErrUpdatingInactiveAgent,
 			HTTPErrResp{
 				http.StatusUnauthorized,
-				"Unauthorized",
+				errNameUnauthorized,
 				"Agent not active",
 				zerolog.InfoLevel,
 			},
@@ -354,7 +368,7 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 			apikey.ErrAPIKeyNotFound,
 			HTTPErrResp{
 				http.StatusUnauthorized,
-				"ErrAPIKeyNotFound",
+				errNameAPIKeyNotFound,
 				"api key not found",
 				zerolog.InfoLevel,
 			},
@@ -364,7 +378,7 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 			uploader.ErrInvalidUploadID,
 			HTTPErrResp{
 				http.StatusBadRequest,
-				"ErrAPIKeyNotFound",
+				errNameAPIKeyNotFound,
 				"active upload not found with this ID, it may be expired",
 				zerolog.InfoLevel,
 			},
@@ -511,7 +525,7 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 			HTTPErrResp{
 				http.StatusNotFound,
 				"ErrNoFile",
-				"file not found",
+				errMsgFileNotFound,
 				zerolog.InfoLevel,
 			},
 		},
@@ -519,7 +533,7 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 			ErrBadRange,
 			HTTPErrResp{
 				http.StatusRequestedRangeNotSatisfiable,
-				"ErrRangeNotSatisfiable",
+				errNameRangeNotSatisfiable,
 				"range not satisfiable",
 				zerolog.InfoLevel,
 			},
@@ -528,7 +542,7 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 			ErrMultiRangeNotSupported,
 			HTTPErrResp{
 				http.StatusRequestedRangeNotSatisfiable,
-				"ErrRangeNotSatisfiable",
+				errNameRangeNotSatisfiable,
 				"Multipart ranges not satisfiable",
 				zerolog.InfoLevel,
 			},
@@ -556,7 +570,7 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 			HTTPErrResp{
 				http.StatusNotFound,
 				"ErrFileForDeliveryNotFound",
-				"file not found",
+				errMsgFileNotFound,
 				zerolog.InfoLevel,
 			},
 		},
@@ -564,8 +578,8 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 			ErrPolicyNotFound,
 			HTTPErrResp{
 				http.StatusBadRequest,
-				"ErrPolicyNotFound",
-				"ErrPolicyNotFound",
+				errNamePolicyNotFound,
+				errNamePolicyNotFound,
 				zerolog.InfoLevel,
 			},
 		},
@@ -606,19 +620,17 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 		}
 	}
 
-	var drErr *BadRequestErr
-	if errors.As(err, &drErr) {
+	if _, ok := errors.AsType[*BadRequestErr](err); ok {
 		return HTTPErrResp{
 			http.StatusBadRequest,
-			"BadRequest",
+			errNameBadRequest,
 			err.Error(),
 			zerolog.ErrorLevel,
 		}
 	}
 
 	// If it's a JSON marshal error
-	var jErr *json.MarshalerError
-	if errors.As(err, &jErr) {
+	if _, ok := errors.AsType[*json.MarshalerError](err); ok {
 		return HTTPErrResp{
 			http.StatusInternalServerError,
 			err.Error(),
@@ -627,8 +639,7 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 		}
 	}
 
-	var esErr *es.ErrElastic
-	if errors.As(err, &esErr) {
+	if esErr, ok := errors.AsType[*es.ErrElastic](err); ok {
 		return HTTPErrResp{
 			http.StatusServiceUnavailable,
 			esErr.Error(),
@@ -651,7 +662,7 @@ func NewHTTPErrResp(err error) HTTPErrResp {
 	// Default
 	return HTTPErrResp{
 		StatusCode: http.StatusInternalServerError,
-		Error:      "BadRequest",
+		Error:      errNameBadRequest,
 		Message:    err.Error(),
 		Level:      zerolog.InfoLevel,
 	}
@@ -683,7 +694,7 @@ func ErrorResp(w http.ResponseWriter, r *http.Request, err error) {
 		if trans := apm.TransactionFromContext(r.Context()); trans != nil {
 			esErr := &es.ErrElastic{}
 			if errors.As(err, &esErr) {
-				trans.Context.SetLabel("error.type", "ErrElastic")
+				trans.Context.SetLabel("error.type", errTypeElastic)
 				trans.Context.SetLabel("error.details.status", esErr.Status)
 				trans.Context.SetLabel("error.details.type", esErr.Type)
 				trans.Context.SetLabel("error.details.reason", esErr.Reason)

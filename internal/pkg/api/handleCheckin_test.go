@@ -553,10 +553,8 @@ func TestProcessUpgradeDetails(t *testing.T) {
 			mBulk := ftesting.NewMockBulk()
 			mBulk.On("Search", mock.Anything, dl.FleetActions, mock.Anything, mock.Anything).Return(
 				&es.ResultT{
-					HitsT: es.HitsT{
-						Hits: []es.HitT{
-							{Source: []byte(`{"action_id": "test-action"}`)},
-						},
+					Hits: []es.HitT{
+						{Source: []byte(`{"action_id": "test-action"}`)},
 					},
 				}, nil)
 			mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything, mock.Anything).Return(nil)
@@ -1920,7 +1918,7 @@ func TestProcessPolicyRemoteESServiceTokenSecretPaths(t *testing.T) {
 	defaultKey := bulk.APIKey{ID: "default-id", Key: "default-key"}
 	remoteKey := bulk.APIKey{ID: "remote-id", Key: "remote-key"}
 	agent := &model.Agent{
-		ESDocument: model.ESDocument{Id: "agent1"},
+		Id: "agent1",
 		Outputs: map[string]*model.PolicyOutput{
 			"default": {
 				APIKey:          defaultKey.Agent(),
@@ -2007,7 +2005,7 @@ func TestProcessPolicySecretPathsConcurrentDispatch(t *testing.T) {
 	errs := make([]error, agents)
 	for a := range agents {
 		agent := &model.Agent{
-			ESDocument: model.ESDocument{Id: fmt.Sprintf("agent%d", a)},
+			Id: fmt.Sprintf("agent%d", a),
 			Outputs: map[string]*model.PolicyOutput{
 				"remote": {
 					APIKey:          remoteKey.Agent(),
@@ -2047,11 +2045,11 @@ func TestFetchAgentPendingActionsReplacesSecrets(t *testing.T) {
 
 	bulker := ftesting.NewMockBulk()
 	bulker.On("Search", mock.Anything, dl.FleetActions, mock.Anything, mock.Anything).
-		Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{
+		Return(&es.ResultT{Hits: []es.HitT{
 			{ID: "action-with-secret", SeqNo: 1, Source: json.RawMessage(actionWithSecret)},
 			{ID: "action-without-secret", SeqNo: 2, Source: json.RawMessage(actionWithoutSecret)},
 			{ID: "filtered-action", SeqNo: 3, Source: json.RawMessage(filteredActionWithSecret)},
-		}}}, nil).Once()
+		}}, nil).Once()
 
 	gcp := monitormock.NewMockMonitor()
 	gcp.On("GetCheckpoint").Return(sqn.SeqNo{3}).Once()

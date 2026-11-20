@@ -117,11 +117,9 @@ func TestMonitor_NewPolicy(t *testing.T) {
 
 	rId := xid.New().String()
 	policy := model.Policy{
-		ESDocument: model.ESDocument{
-			Id:      rId,
-			Version: 1,
-			SeqNo:   1,
-		},
+		Id:          rId,
+		Version:     1,
+		SeqNo:       1,
 		PolicyID:    policyID,
 		Data:        policyDataDefault,
 		RevisionIdx: 1,
@@ -194,11 +192,9 @@ func TestMonitor_SamePolicy(t *testing.T) {
 
 	rId := xid.New().String()
 	policy := model.Policy{
-		ESDocument: model.ESDocument{
-			Id:      rId,
-			Version: 1,
-			SeqNo:   1,
-		},
+		Id:          rId,
+		Version:     1,
+		SeqNo:       1,
 		PolicyID:    policyId,
 		Data:        policyDataDefault,
 		RevisionIdx: 1,
@@ -272,11 +268,9 @@ func runTestMonitor_NewPolicyExists(t *testing.T, delay time.Duration) {
 	policyId := uuid.Must(uuid.NewV4()).String()
 	rId := xid.New().String()
 	policy := model.Policy{
-		ESDocument: model.ESDocument{
-			Id:      rId,
-			Version: 1,
-			SeqNo:   1,
-		},
+		Id:          rId,
+		Version:     1,
+		SeqNo:       1,
 		PolicyID:    policyId,
 		Data:        policyDataDefault,
 		RevisionIdx: 2,
@@ -380,11 +374,9 @@ func Test_Monitor_Limit_Delay(t *testing.T) {
 
 		rId := xid.New().String()
 		policy := model.Policy{
-			ESDocument: model.ESDocument{
-				Id:      rId,
-				Version: 1,
-				SeqNo:   1,
-			},
+			Id:             rId,
+			Version:        1,
+			SeqNo:          1,
 			PolicyID:       policyID,
 			CoordinatorIdx: 1,
 			Data:           policyDataDefault,
@@ -470,7 +462,7 @@ func Test_Monitor_pending_sub_gets_latest_revision(t *testing.T) {
 		rId := xid.New().String()
 		hit := func(seqNo, revisionIdx int64) []es.HitT {
 			policyData, err := json.Marshal(&model.Policy{
-				ESDocument:     model.ESDocument{Id: rId, Version: 1, SeqNo: seqNo},
+				Id: rId, Version: 1, SeqNo: seqNo,
 				PolicyID:       policyID,
 				CoordinatorIdx: 1,
 				Data:           policyDataDefault,
@@ -547,11 +539,9 @@ func TestMonitor_LatestRev(t *testing.T) {
 		policyId := uuid.Must(uuid.NewV4()).String()
 		rId := xid.New().String()
 		policy := model.Policy{
-			ESDocument: model.ESDocument{
-				Id:      rId,
-				Version: 1,
-				SeqNo:   1,
-			},
+			Id:          rId,
+			Version:     1,
+			SeqNo:       1,
 			PolicyID:    policyId,
 			Data:        policyDataDefault,
 			RevisionIdx: 2,
@@ -754,7 +744,7 @@ func Test_Monitor_repeated_events_do_not_strand_subscriber_in_rate_limiter(t *te
 
 			rId := xid.New().String()
 			policy := model.Policy{
-				ESDocument:     model.ESDocument{Id: rId, Version: 1, SeqNo: 1},
+				Id: rId, Version: 1, SeqNo: 1,
 				PolicyID:       policyID,
 				CoordinatorIdx: 1,
 				Data:           policyDataDefault,
@@ -843,8 +833,8 @@ func searchedPolicyIDs(t *testing.T, ops []bulk.MultiOp) []string {
 
 func newTestPolicy(revisionIdx int64) model.Policy {
 	return model.Policy{
-		ESDocument: model.ESDocument{Id: xid.New().String(), Version: 1, SeqNo: 1},
-		PolicyID:   uuid.Must(uuid.NewV4()).String(),
+		Id: xid.New().String(), Version: 1, SeqNo: 1,
+		PolicyID: uuid.Must(uuid.NewV4()).String(),
 		Data: &model.PolicyData{
 			Outputs: map[string]map[string]any{
 				"default": {"type": "elasticsearch"},
