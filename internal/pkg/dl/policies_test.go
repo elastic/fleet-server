@@ -331,6 +331,66 @@ func TestQueryDefaultFleetServerPolicy(t *testing.T) {
 	}
 }
 
+func TestQueryDefaultFleetServerPolicyLatestRevision(t *testing.T) {
+	defaultPolicyIDs := &es.ResultT{
+		Aggregations: map[string]es.Aggregation{FieldPolicyID: {Buckets: []es.Bucket{{Key: "default-policy"}}}},
+	}
+	defaultFlags := &es.ResultT{
+		Aggregations: latestRevisionAggs(es.HitT{
+			Source: []byte(`{"policy_id":"default-policy","revision_idx":2,"default_fleet_server":true}`),
+		}),
+	}
+
+	tests := []struct {
+		name       string
+		latest     *es.ResultT
+		latestErr  error
+		wantPolicy model.Policy
+		wantErr    error
+	}{
+		{
+			name: "the latest revision is returned when it is the default",
+			latest: &es.ResultT{Hits: []es.HitT{{
+				Source: []byte(`{"policy_id":"default-policy","revision_idx":3,"default_fleet_server":true}`),
+			}}},
+			wantPolicy: model.Policy{
+				PolicyID:           "default-policy",
+				RevisionIdx:        3,
+				DefaultFleetServer: true,
+			},
+		},
+		{
+			name: "no default policy is found when the latest revision is not the default",
+			latest: &es.ResultT{Hits: []es.HitT{{
+				Source: []byte(`{"policy_id":"default-policy","revision_idx":3,"default_fleet_server":false}`),
+			}}},
+			wantErr: ErrNotFound,
+		},
+		{
+			name:      "the error of a failed search for the latest revision is returned",
+			latestErr: es.ErrTimeout,
+			wantErr:   es.ErrTimeout,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			bulker := ftesting.NewMockBulk()
+			bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(defaultPolicyIDs, nil).Once()
+			bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(defaultFlags, nil).Once()
+			bulker.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(tc.latest, tc.latestErr).Once()
+
+			policy, err := QueryDefaultFleetServerPolicy(t.Context(), bulker)
+			if tc.wantErr == nil {
+				require.NoError(t, err)
+			} else {
+				require.ErrorIs(t, err, tc.wantErr)
+			}
+			assert.Equal(t, tc.wantPolicy, policy)
+		})
+	}
+}
+
 func TestQueryLatestPoliciesByID(t *testing.T) {
 	bulker := &fakePolicySearchBulk{
 		items: map[string]bulk.MsearchResponseItem{

@@ -117,9 +117,18 @@ func QueryDefaultFleetServerPolicy(ctx context.Context, bulker bulk.Bulk, opt ..
 	}
 	for _, policy := range policies {
 		// Policies that are not the default anymore are also returned at their latest revision.
-		if policy.DefaultFleetServer {
-			return QueryLatestPolicyByID(ctx, bulker, policy.PolicyID, opt...)
+		if !policy.DefaultFleetServer {
+			continue
 		}
+		latest, err := QueryLatestPolicyByID(ctx, bulker, policy.PolicyID, opt...)
+		if err != nil {
+			return model.Policy{}, err
+		}
+		// A newer revision can have been deployed since the flags were read.
+		if !latest.DefaultFleetServer {
+			return model.Policy{}, ErrNotFound
+		}
+		return latest, nil
 	}
 	return model.Policy{}, ErrNotFound
 }
