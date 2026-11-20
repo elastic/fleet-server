@@ -97,11 +97,9 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 	rId := xid.New().String()
 	pData := model.PolicyData{Inputs: []map[string]any{}}
 	policy := model.Policy{
-		ESDocument: model.ESDocument{
-			Id:      rId,
-			Version: 1,
-			SeqNo:   1,
-		},
+		Id:                 rId,
+		Version:            1,
+		SeqNo:              1,
 		PolicyID:           policyID,
 		Data:               &pData,
 		RevisionIdx:        1,
@@ -140,11 +138,9 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 		},
 	}}
 	policy = model.Policy{
-		ESDocument: model.ESDocument{
-			Id:      rId,
-			Version: 1,
-			SeqNo:   1,
-		},
+		Id:                 rId,
+		Version:            1,
+		SeqNo:              1,
 		PolicyID:           policyID,
 		Data:               &pData,
 		RevisionIdx:        2,
@@ -259,11 +255,9 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 		},
 	}}
 	policy := model.Policy{
-		ESDocument: model.ESDocument{
-			Id:      rId,
-			Version: 1,
-			SeqNo:   1,
-		},
+		Id:                 rId,
+		Version:            1,
+		SeqNo:              1,
 		PolicyID:           policyID,
 		Data:               &pData,
 		RevisionIdx:        1,
@@ -300,9 +294,7 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 
 	// add an active token
 	activeToken := model.EnrollmentAPIKey{
-		ESDocument: model.ESDocument{
-			Id: xid.New().String(),
-		},
+		Id:       xid.New().String(),
 		Active:   true,
 		APIKey:   "d2JndlFIWUJJUVVxWDVia2NJTV86X0d6ZmljZGNTc1d4R1otbklrZFFRZw==",
 		APIKeyID: xid.New().String(),
@@ -403,11 +395,9 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 	rId := xid.New().String()
 	pData := model.PolicyData{Inputs: []map[string]any{}}
 	policy := model.Policy{
-		ESDocument: model.ESDocument{
-			Id:      rId,
-			Version: 1,
-			SeqNo:   1,
-		},
+		Id:                 rId,
+		Version:            1,
+		SeqNo:              1,
 		PolicyID:           policyID,
 		Data:               &pData,
 		RevisionIdx:        2,
@@ -446,11 +436,9 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 		},
 	}}
 	policy = model.Policy{
-		ESDocument: model.ESDocument{
-			Id:      rId,
-			Version: 1,
-			SeqNo:   2,
-		},
+		Id:                 rId,
+		Version:            1,
+		SeqNo:              2,
 		PolicyID:           policyID,
 		Data:               &pData,
 		RevisionIdx:        1,
@@ -564,11 +552,9 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 		},
 	}}
 	policy := model.Policy{
-		ESDocument: model.ESDocument{
-			Id:      rId,
-			Version: 1,
-			SeqNo:   1,
-		},
+		Id:                 rId,
+		Version:            1,
+		SeqNo:              1,
 		PolicyID:           policyID,
 		Data:               &pData,
 		RevisionIdx:        1,
@@ -605,9 +591,7 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 
 	// add an active token
 	activeToken := model.EnrollmentAPIKey{
-		ESDocument: model.ESDocument{
-			Id: xid.New().String(),
-		},
+		Id:       xid.New().String(),
 		Active:   true,
 		APIKey:   "d2JndlFIWUJJUVVxWDVia2NJTV86X0d6ZmljZGNTc1d4R1otbklrZFFRZw==",
 		APIKeyID: xid.New().String(),
@@ -690,10 +674,8 @@ func TestSelfMonitor_reportOutputHealthyState(t *testing.T) {
 	}), mock.Anything).Return("", nil)
 	bulker.On("Search", mock.Anything, dl.FleetPolicies, mock.Anything, mock.Anything).Return(
 		&es.ResultT{
-			HitsT: es.HitsT{
-				Hits: []es.HitT{
-					{Source: []byte(`{"data": {"outputs":{"remote":{"type":"remote_elasticsearch","hosts":["http://localhost:9200"]}}}}`)},
-				},
+			Hits: []es.HitT{
+				{Source: []byte(`{"data": {"outputs":{"remote":{"type":"remote_elasticsearch","hosts":["http://localhost:9200"]}}}}`)},
 			},
 		}, nil)
 
@@ -726,10 +708,8 @@ func TestSelfMonitor_reportOutputDegradedState(t *testing.T) {
 	}), mock.Anything).Return("", nil)
 	bulker.On("Search", mock.Anything, dl.FleetPolicies, mock.Anything, mock.Anything).Return(
 		&es.ResultT{
-			HitsT: es.HitsT{
-				Hits: []es.HitT{
-					{Source: []byte(`{"data": {"outputs":{"remote":{"type":"remote_elasticsearch","hosts":["http://localhost:9200"]}}}}`)},
-				},
+			Hits: []es.HitT{
+				{Source: []byte(`{"data": {"outputs":{"remote":{"type":"remote_elasticsearch","hosts":["http://localhost:9200"]}}}}`)},
 			},
 		}, nil)
 
@@ -750,10 +730,8 @@ func TestSelfMonitor_reportOutputSkipIfOutdated(t *testing.T) {
 	bulker.On("GetBulkerMap").Return(bulkerMap)
 	bulker.On("Search", mock.Anything, dl.FleetPolicies, mock.Anything, mock.Anything).Return(
 		&es.ResultT{
-			HitsT: es.HitsT{
-				Hits: []es.HitT{
-					{Source: []byte(`{"data": {"outputs":{"outdated":{"type":"remote_elasticsearch","hosts":["http://localhost:9200"]}}}}`)},
-				},
+			Hits: []es.HitT{
+				{Source: []byte(`{"data": {"outputs":{"outdated":{"type":"remote_elasticsearch","hosts":["http://localhost:9200"]}}}}`)},
 			},
 		}, nil)
 
