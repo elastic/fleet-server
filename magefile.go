@@ -46,6 +46,8 @@ import (
 
 	"github.com/elastic/beats/v7/pkg/logp"
 	"github.com/elastic/beats/v7/pkg/transport/tlscommon"
+	devtools "github.com/elastic/fleet-server/v7/dev-tools/mage"
+	"github.com/elastic/fleet-server/v7/dev-tools/mage/release"
 	"github.com/elastic/fleet-server/v7/version"
 )
 
@@ -391,6 +393,9 @@ type Test mg.Namespace
 
 // Docker is the namespace for docker related tasks.
 type Docker mg.Namespace
+
+// Release is the namespace for release automation.
+type Release mg.Namespace
 
 // envToBool reads the env var string s and parses it as a bool.
 func envToBool(s string) bool {
@@ -2548,4 +2553,56 @@ func (Test) CloudE2ERun(ctx context.Context) error {
 	err = cmd.Run()
 	err = errors.Join(err, os.WriteFile(filepath.Join("build", "test-cloude2e.out"), b.Bytes(), 0o644)) //nolint:gosec // G306: test output, not a secret
 	return err
+}
+
+// loadReleaseConfig loads release settings and requires NEXT_RELEASE for workflows.
+func loadReleaseConfig() (*release.ReleaseConfig, error) {
+	settings, err := devtools.LoadReleaseSettings()
+	if err != nil {
+		return nil, err
+	}
+	if err := settings.RequireRelease(); err != nil {
+		return nil, err
+	}
+	return settings, nil
+}
+
+// UpdateVersion updates the version in version/version.go.
+func (Release) UpdateVersion(version string) error {
+	return release.UpdateVersion(version)
+}
+
+// UpdateMergify adds a new backport rule to .mergify.yml.
+func (Release) UpdateMergify(version string) error {
+	return release.UpdateMergify(version)
+}
+
+// RunMajorMinor orchestrates the major/minor release workflow after feature freeze.
+// Set DRY_RUN=true to preview changes without pushing.
+func (Release) RunMajorMinor() error {
+	cfg, err := loadReleaseConfig()
+	if err != nil {
+		return err
+	}
+	return release.RunMajorMinorRelease(cfg)
+}
+
+// RunPatch orchestrates the complete patch release workflow.
+// Set DRY_RUN=true to preview changes without pushing.
+func (Release) RunPatch() error {
+	cfg, err := loadReleaseConfig()
+	if err != nil {
+		return err
+	}
+	return release.RunPatchRelease(cfg)
+}
+
+// EnsureIssueTracker creates or updates the Fleet Server release checklist issue for
+// NEXT_RELEASE, linking related PRs labeled "release".
+func (Release) EnsureIssueTracker() error {
+	cfg, err := loadReleaseConfig()
+	if err != nil {
+		return err
+	}
+	return release.EnsureReleaseIssueTracker(cfg, nil)
 }
