@@ -13,12 +13,13 @@ This toolchain must be present for local compilation.
 As we are using micrsoft/go as a base we follow their conventions.
 
 Our FIPS changes require the `requirefips` build tag.
-When compiling `GOEXPERIMENT=systemcrypto` and `CGO_ENABLED=1` must be set.
+When compiling `CGO_ENABLED=1` must be set.
+microsoft/go 1.27+ enables system crypto automatically and rejects `GOEXPERIMENT=systemcrypto`, so it is no longer set; the binary records it as the `microsoft_systemcrypto=1` build setting instead.
 Additionally the `MS_GOTOOLCHAIN_TELEMETRY_ENABLED=0` env var is set to disable telemetry for [microsoft/go](https://github.com/microsoft/go).
 
 The `FIPS=true` env var is used by our magefile as the FIPS toggle.
 This env var applies to all targets, at a minimum the `requirefips` tag will be set.
-For targets that compile binaries, the `GOEXPERIMENT=systemcrypto` and `CGO_ENABLED=1` env vars are set.
+For targets that compile binaries, the `CGO_ENABLED=1` env var is set.
 
 For developer conveniance, running `FIPS=true mage multipass` will provision a multipass VM with the Microsoft/go toolchain.
 See [Multipass VM Usage](#multipass-vm-usage) for additional details.
