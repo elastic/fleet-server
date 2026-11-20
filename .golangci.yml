@@ -160,6 +160,10 @@ linters:
       - text: "SA1019: elasticsearch\\.(Config|NewClient|NewBaseClient)"
         linters:
           - staticcheck
+      # Repeated fixture strings are clearer inline than as constants in tests.
+      - path: _test\.go
+        linters:
+          - goconst
     paths:
       - third_party$
       - builtin$

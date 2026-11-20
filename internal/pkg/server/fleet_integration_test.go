@@ -4,7 +4,7 @@
 
 //go:build integration
 
-//nolint:dupl,goconst // don't care about repeating code
+//nolint:dupl // don't care about repeating code
 package server
 
 import (
