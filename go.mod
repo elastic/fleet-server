@@ -10,16 +10,10 @@ require (
 	github.com/elastic/elastic-agent-client/v7 v7.21.0
 	github.com/elastic/go-elasticsearch/v8 v8.19.7
 	github.com/elastic/go-ucfg v0.9.2
-<<<<<<< HEAD
 	github.com/fxamacker/cbor/v2 v2.9.6
 	github.com/go-chi/chi/v5 v5.4.0
-	github.com/gofrs/uuid v4.4.0+incompatible
-=======
-	github.com/fxamacker/cbor/v2 v2.10.0
-	github.com/go-chi/chi/v5 v5.5.0
 	github.com/go-git/go-git/v5 v5.19.3
-	github.com/gofrs/uuid/v5 v5.5.1
->>>>>>> ef9e2cb (ci(ff): support feature freeze automation (#7339))
+	github.com/gofrs/uuid v4.4.0+incompatible
 	github.com/google/go-cmp v0.7.0
 	github.com/google/go-github/v68 v68.0.0
 	github.com/hashicorp/go-cleanhttp v0.5.2
@@ -43,14 +37,9 @@ require (
 	go.elastic.co/apm/v2 v2.7.12
 	go.elastic.co/ecszerolog v0.2.0
 	go.uber.org/zap v1.28.0
-<<<<<<< HEAD
 	golang.org/x/net v0.62.0
-	golang.org/x/sync v0.24.0
-=======
-	golang.org/x/net v0.63.0
 	golang.org/x/oauth2 v0.37.0
-	golang.org/x/sync v0.25.0
->>>>>>> ef9e2cb (ci(ff): support feature freeze automation (#7339))
+	golang.org/x/sync v0.24.0
 	golang.org/x/time v0.16.0
 	google.golang.org/grpc v1.85.0
 	google.golang.org/protobuf v1.36.12
@@ -81,12 +70,9 @@ require (
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
-<<<<<<< HEAD
 	github.com/gofrs/uuid/v5 v5.5.0 // indirect
-=======
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
 	github.com/google/go-querystring v1.2.0 // indirect
->>>>>>> ef9e2cb (ci(ff): support feature freeze automation (#7339))
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
@@ -102,13 +88,9 @@ require (
 	github.com/prometheus/client_model v0.6.3 // indirect
 	github.com/prometheus/common v0.72.1 // indirect
 	github.com/prometheus/procfs v0.22.0 // indirect
-<<<<<<< HEAD
-	github.com/shirou/gopsutil/v4 v4.26.10 // indirect
-=======
 	github.com/sergi/go-diff v1.4.0 // indirect
-	github.com/shirou/gopsutil/v4 v4.26.9 // indirect
+	github.com/shirou/gopsutil/v4 v4.26.10 // indirect
 	github.com/skeema/knownhosts v1.3.1 // indirect
->>>>>>> ef9e2cb (ci(ff): support feature freeze automation (#7339))
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/stretchr/objx v0.5.3 // indirect
 	github.com/tklauser/go-sysconf v0.4.0 // indirect
