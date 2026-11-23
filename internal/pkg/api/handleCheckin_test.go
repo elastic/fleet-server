@@ -482,6 +482,9 @@ func TestProcessUpgradeDetails(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal error: %v", err)
 	}
+	retryFuture := time.Now().Add(time.Hour).UTC().Format(time.RFC3339)
+	retryJustPassed := time.Now().Add(-10 * time.Second).UTC().Format(time.RFC3339)
+	retryPast := time.Now().Add(-time.Hour).UTC().Format(time.RFC3339)
 	// expectActionLookup serves the upgrade action from Elasticsearch; it is always read so the result
 	// carries the action's namespaces, which the action cache does not retain.
 	expectActionLookup := func(mBulk *ftesting.MockBulk) {
@@ -938,6 +941,123 @@ func TestProcessUpgradeDetails(t *testing.T) {
 				mBulk := ftesting.NewMockBulk()
 				expectResult(mBulk, "failed")
 				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", updateClearsStartedAt, mock.Anything).Return(nil)
+				return mBulk
+			},
+			cache: func() *testcache.MockCache {
+				mCache := testcache.NewMockCache()
+				mCache.On("GetAction", "test-action").Return(model.Action{}, true)
+				return mCache
+			},
+			err: nil,
+		}, {
+			name:  "upgrade failed while download retries remain creates no result",
+			agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
+			details: &UpgradeDetails{
+				ActionId: "test-action",
+				State:    UpgradeDetailsStateUPGFAILED,
+				Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"error_msg":"copy failed","failed_state":"UPG_DOWNLOADING","retry_until":"` + retryFuture + `"}`)},
+			},
+			bulk: func() *ftesting.MockBulk {
+				mBulk := ftesting.NewMockBulk()
+				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything).Return(nil)
+				return mBulk
+			},
+			cache: func() *testcache.MockCache {
+				mCache := testcache.NewMockCache()
+				mCache.On("GetAction", "test-action").Return(model.Action{}, true)
+				return mCache
+			},
+			err: nil,
+		}, {
+			name:  "upgrade failed shortly after retry_until is within the clock skew grace",
+			agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
+			details: &UpgradeDetails{
+				ActionId: "test-action",
+				State:    UpgradeDetailsStateUPGFAILED,
+				Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"error_msg":"copy failed","failed_state":"UPG_DOWNLOADING","retry_until":"` + retryJustPassed + `"}`)},
+			},
+			bulk: func() *ftesting.MockBulk {
+				mBulk := ftesting.NewMockBulk()
+				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything).Return(nil)
+				return mBulk
+			},
+			cache: func() *testcache.MockCache {
+				mCache := testcache.NewMockCache()
+				mCache.On("GetAction", "test-action").Return(model.Action{}, true)
+				return mCache
+			},
+			err: nil,
+		}, {
+			name:  "upgrade failed after retry_until records the final failure",
+			agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
+			details: &UpgradeDetails{
+				ActionId: "test-action",
+				State:    UpgradeDetailsStateUPGFAILED,
+				Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"error_msg":"failed to get upgrade artifact","failed_state":"UPG_DOWNLOADING","retry_until":"` + retryPast + `"}`)},
+			},
+			bulk: func() *ftesting.MockBulk {
+				mBulk := ftesting.NewMockBulk()
+				expectResult(mBulk, "failed to get upgrade artifact")
+				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", updateClearsStartedAt, mock.Anything).Return(nil)
+				return mBulk
+			},
+			cache: func() *testcache.MockCache {
+				mCache := testcache.NewMockCache()
+				mCache.On("GetAction", "test-action").Return(model.Action{}, true)
+				return mCache
+			},
+			err: nil,
+		}, {
+			name:  "upgrade failed in extraction without retry_until records the failure immediately",
+			agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
+			details: &UpgradeDetails{
+				ActionId: "test-action",
+				State:    UpgradeDetailsStateUPGFAILED,
+				Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"error_msg":"extract failed","failed_state":"UPG_EXTRACTING"}`)},
+			},
+			bulk: func() *ftesting.MockBulk {
+				mBulk := ftesting.NewMockBulk()
+				expectResult(mBulk, "extract failed")
+				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", updateClearsStartedAt, mock.Anything).Return(nil)
+				return mBulk
+			},
+			cache: func() *testcache.MockCache {
+				mCache := testcache.NewMockCache()
+				mCache.On("GetAction", "test-action").Return(model.Action{}, true)
+				return mCache
+			},
+			err: nil,
+		}, {
+			name:  "upgrade failed after retry_until settles a failure stored while it was retryable",
+			agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}, UpgradeStartedAt: "2026-01-01T00:00:00Z", UpgradeDetails: &model.UpgradeDetails{ActionID: "test-action", State: "UPG_FAILED"}},
+			details: &UpgradeDetails{
+				ActionId: "test-action",
+				State:    UpgradeDetailsStateUPGFAILED,
+				Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"error_msg":"failed to get upgrade artifact","failed_state":"UPG_DOWNLOADING","retry_until":"` + retryPast + `"}`)},
+			},
+			bulk: func() *ftesting.MockBulk {
+				mBulk := ftesting.NewMockBulk()
+				expectResult(mBulk, "failed to get upgrade artifact")
+				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", updateClearsStartedAt, mock.Anything).Return(nil)
+				return mBulk
+			},
+			cache: func() *testcache.MockCache {
+				mCache := testcache.NewMockCache()
+				mCache.On("GetAction", "test-action").Return(model.Action{}, true)
+				return mCache
+			},
+			err: nil,
+		}, {
+			name:  "download resumes after a retryable failure creates no result",
+			agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}, UpgradeStartedAt: "2026-01-01T00:00:00Z", UpgradeDetails: &model.UpgradeDetails{ActionID: "test-action", State: "UPG_FAILED"}},
+			details: &UpgradeDetails{
+				ActionId: "test-action",
+				State:    UpgradeDetailsStateUPGDOWNLOADING,
+				Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"download_percent":0.5}`)},
+			},
+			bulk: func() *ftesting.MockBulk {
+				mBulk := ftesting.NewMockBulk()
+				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything).Return(nil)
 				return mBulk
 			},
 			cache: func() *testcache.MockCache {

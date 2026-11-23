@@ -775,12 +775,19 @@ func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agen
 			vSpan.End()
 			return fmt.Errorf("%w: %s metadata contains empty error_msg attribute", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGFAILED)
 		}
+		// The agent reports UPG_FAILED for each failed download attempt and keeps retrying until
+		// retry_until, so the failure is final only once that deadline has passed (or when there is
+		// none, as for every non-download failure). A failure that may still be retried creates no
+		// result and leaves upgrade_started_at alone; a later check-in settles it. This is decided
+		// from the check-in alone so that any Fleet Server instance reaches the same outcome.
+		// Read retry_until before repacking, which drops the UPG_DOWNLOADING attributes.
+		final := upgradeFailureIsFinal(details.Metadata, time.Now())
 		// Repack metadata in failed case as the agent may send UPG_DOWNLOADING attributes.
 		if err = details.Metadata.FromUpgradeMetadataFailed(meta); err != nil {
 			vSpan.End()
 			return fmt.Errorf("%w %s: unable to repack metadata: %w", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGFAILED, err)
 		}
-		terminal = true
+		terminal = final
 		resultErr = meta.ErrorMsg
 	case UpgradeDetailsStateUPGROLLBACK:
 		// UPG_ROLLBACK carries no error_msg; the reason is in the metadata (e.g. "watch failed").
@@ -811,7 +818,10 @@ func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agen
 	if terminal {
 		// The result is created before upgrade_details are stored: if the create fails the stored
 		// state is not terminal yet, so the next check-in retries it.
-		recorded := agent.UpgradeDetails != nil && agent.UpgradeDetails.ActionID == details.ActionId && agent.UpgradeDetails.State == string(details.State)
+		// upgrade_started_at is cleared together with the result, so it also tells apart a stored
+		// UPG_FAILED that was still retryable when it was stored.
+		recorded := agent.UpgradeDetails != nil && agent.UpgradeDetails.ActionID == details.ActionId &&
+			agent.UpgradeDetails.State == string(details.State) && agent.UpgradeStartedAt == ""
 		if details.ActionId != "" && !recorded {
 			if err := ct.createUpgradeResult(ctx, agent, details.ActionId, resultErr); err != nil {
 				return err
@@ -891,6 +901,31 @@ func (ct *CheckinT) markUpgradeComplete(ctx context.Context, agent *model.Agent,
 		return err
 	}
 	return ct.bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3))
+}
+
+// upgradeRetryGrace is added to the agent-reported retry_until to tolerate clock skew between the
+// agent and Fleet Server.
+const upgradeRetryGrace = time.Minute
+
+// upgradeFailureIsFinal reports whether a UPG_FAILED check-in is the final outcome of the upgrade.
+// The agent sets metadata.retry_until only while a step (the download) can still be retried, and
+// does not clear it when the retries are exhausted, so the failure is final once it has passed.
+// A missing or unparseable retry_until means there is nothing to wait for.
+func upgradeFailureIsFinal(m *UpgradeDetails_Metadata, now time.Time) bool {
+	if m == nil {
+		return true
+	}
+	raw, err := m.MarshalJSON()
+	if err != nil {
+		return true
+	}
+	var meta struct {
+		RetryUntil *time.Time `json:"retry_until"`
+	}
+	if err := json.Unmarshal(raw, &meta); err != nil || meta.RetryUntil == nil || meta.RetryUntil.IsZero() {
+		return true
+	}
+	return now.After(meta.RetryUntil.Add(upgradeRetryGrace))
 }
 
 // rollbackErrorMessage builds the action result error for a UPG_ROLLBACK state from metadata.reason.
