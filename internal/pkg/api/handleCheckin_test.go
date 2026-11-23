@@ -930,7 +930,7 @@ func TestProcessUpgradeDetails(t *testing.T) {
 			bulk: func() *ftesting.MockBulk {
 				mBulk := ftesting.NewMockBulk()
 				expectResult(mBulk, "failed")
-				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", updateClearsStartedAt, mock.Anything, mock.Anything).Return(nil)
+				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", updateClearsStartedAt, mock.Anything).Return(nil)
 				return mBulk
 			},
 			cache: func() *testcache.MockCache {
@@ -984,7 +984,7 @@ func TestProcessUpgradeDetails(t *testing.T) {
 			},
 			bulk: func() *ftesting.MockBulk {
 				mBulk := ftesting.NewMockBulk()
-				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", updateClearsStartedAt, mock.Anything, mock.Anything).Return(nil)
+				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", updateClearsStartedAt, mock.Anything).Return(nil)
 				return mBulk // no Create expected
 			},
 			cache: func() *testcache.MockCache {
@@ -1002,7 +1002,7 @@ func TestProcessUpgradeDetails(t *testing.T) {
 			},
 			bulk: func() *ftesting.MockBulk {
 				mBulk := ftesting.NewMockBulk()
-				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", updateClearsStartedAt, mock.Anything, mock.Anything).Return(nil)
+				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", updateClearsStartedAt, mock.Anything).Return(nil)
 				return mBulk
 			},
 			cache: func() *testcache.MockCache {
@@ -1041,7 +1041,7 @@ func TestProcessUpgradeDetails(t *testing.T) {
 			bulk: func() *ftesting.MockBulk {
 				mBulk := ftesting.NewMockBulk()
 				expectResult(mBulk, "upgrade rolled back: watch failed")
-				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", updateClearsStartedAt, mock.Anything, mock.Anything).Return(nil)
+				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", updateClearsStartedAt, mock.Anything).Return(nil)
 				return mBulk
 			},
 			cache: func() *testcache.MockCache {
@@ -1060,7 +1060,7 @@ func TestProcessUpgradeDetails(t *testing.T) {
 			bulk: func() *ftesting.MockBulk {
 				mBulk := ftesting.NewMockBulk()
 				expectResult(mBulk, "upgrade rolled back")
-				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", updateClearsStartedAt, mock.Anything, mock.Anything).Return(nil)
+				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", updateClearsStartedAt, mock.Anything).Return(nil)
 				return mBulk
 			},
 			cache: func() *testcache.MockCache {
@@ -1079,7 +1079,7 @@ func TestProcessUpgradeDetails(t *testing.T) {
 			},
 			bulk: func() *ftesting.MockBulk {
 				mBulk := ftesting.NewMockBulk()
-				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", updateClearsStartedAt, mock.Anything, mock.Anything).Return(nil)
+				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", updateClearsStartedAt, mock.Anything).Return(nil)
 				return mBulk // no Create expected
 			},
 			cache: func() *testcache.MockCache {
@@ -1095,7 +1095,7 @@ func TestProcessUpgradeDetails(t *testing.T) {
 			bulk: func() *ftesting.MockBulk {
 				mBulk := ftesting.NewMockBulk()
 				expectResult(mBulk, "")
-				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything).Return(nil)
 				return mBulk
 			},
 			cache: func() *testcache.MockCache {
@@ -1110,7 +1110,7 @@ func TestProcessUpgradeDetails(t *testing.T) {
 			details: nil,
 			bulk: func() *ftesting.MockBulk {
 				mBulk := ftesting.NewMockBulk()
-				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything).Return(nil)
 				return mBulk
 			},
 			cache: func() *testcache.MockCache {
