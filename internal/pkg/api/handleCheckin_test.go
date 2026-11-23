@@ -482,14 +482,21 @@ func TestProcessUpgradeDetails(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal error: %v", err)
 	}
+	// expectActionLookup serves the upgrade action from Elasticsearch; it is always read so the result
+	// carries the action's namespaces, which the action cache does not retain.
+	expectActionLookup := func(mBulk *ftesting.MockBulk) {
+		mBulk.On("Search", mock.Anything, dl.FleetActions, mock.Anything, mock.Anything).Return(
+			&es.ResultT{Hits: []es.HitT{{Source: []byte(`{"action_id": "test-action", "namespaces": ["default"]}`)}}}, nil).Once()
+	}
 	// resultMatches matches the JSON of a created action result; the create must not request a refresh.
 	expectResult := func(mBulk *ftesting.MockBulk, wantErr string) {
+		expectActionLookup(mBulk)
 		mBulk.On("Create", mock.Anything, dl.FleetActionsResults, "test-action:doc-ID", mock.MatchedBy(func(p []byte) bool {
 			var r model.ActionResult
 			if err := json.Unmarshal(p, &r); err != nil {
 				return false
 			}
-			return r.ActionID == "test-action" && r.AgentID == "doc-ID" && r.Error == wantErr
+			return r.ActionID == "test-action" && r.AgentID == "doc-ID" && r.Error == wantErr && slices.Equal(r.Namespaces, []string{"default"})
 		}), mock.MatchedBy(func(opts []bulk.Opt) bool { return len(opts) == 0 })).Return("", nil).Once()
 	}
 	// updateClearsStartedAt matches an agent update that clears upgrade_started_at.
@@ -1021,6 +1028,7 @@ func TestProcessUpgradeDetails(t *testing.T) {
 			},
 			bulk: func() *ftesting.MockBulk {
 				mBulk := ftesting.NewMockBulk()
+				expectActionLookup(mBulk)
 				mBulk.On("Create", mock.Anything, dl.FleetActionsResults, "test-action:doc-ID", mock.Anything, mock.Anything).Return("", errBoom).Once()
 				return mBulk // no Update expected
 			},
@@ -1100,7 +1108,6 @@ func TestProcessUpgradeDetails(t *testing.T) {
 			},
 			cache: func() *testcache.MockCache {
 				mCache := testcache.NewMockCache()
-				mCache.On("GetAction", "test-action").Return(model.Action{}, true)
 				return mCache
 			},
 			err: nil,

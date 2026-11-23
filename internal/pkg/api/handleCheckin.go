@@ -920,21 +920,16 @@ func (ct *CheckinT) createUpgradeResult(ctx context.Context, agent *model.Agent,
 	span.Context.SetLabel("agent_id", agent.Agent.ID)
 	defer span.End()
 
-	var namespaces []string
-	action, ok := ct.cache.GetAction(actionID)
-	if !ok {
-		actions, err := dl.FindAction(ctx, ct.bulker, actionID)
-		if err != nil {
-			return fmt.Errorf("unable to find upgrade action %q: %w", actionID, err)
-		}
-		if len(actions) > 0 {
-			action = actions[0]
-			ct.cache.SetAction(action)
-			ok = true
-		}
+	// Always read the action from Elasticsearch: the action cache only retains the action ID and
+	// type, so a cache hit would not provide the namespaces the result must carry. This runs once,
+	// when the outcome is known, so the extra read is cheap.
+	actions, err := dl.FindAction(ctx, ct.bulker, actionID)
+	if err != nil {
+		return fmt.Errorf("unable to find upgrade action %q: %w", actionID, err)
 	}
-	if ok {
-		namespaces = action.Namespaces
+	var namespaces []string
+	if len(actions) > 0 {
+		namespaces = actions[0].Namespaces
 	} else {
 		zerolog.Ctx(ctx).Warn().Str(ecs.ActionID, actionID).Str(ecs.AgentID, agent.Agent.ID).Msg("upgrade action not found, creating result without namespaces")
 	}
