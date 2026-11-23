@@ -775,7 +775,7 @@ func mockBulkerOpAMPExistingAgentWithSequence(t *testing.T, sequenceNum int64) *
 	agentBytes, err := json.Marshal(agent)
 	require.NoError(t, err)
 	bulker.On("Search", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything).
-		Return(&es.ResultT{Hits: []es.HitT{{ID: "agent-123", Source: agentBytes}}}, nil)
+		Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{{ID: "agent-123", Source: agentBytes}}}}, nil)
 	return bulker
 }
 
