@@ -1777,11 +1777,7 @@ func (Test) JunitReport(ctx context.Context) error {
 		var stderr bytes.Buffer
 
 		//nolint:gosec // G204: fixed tool invocation, only the modfile path is computed
-<<<<<<< HEAD
-		cmd := exec.CommandContext(ctx, "go", "tool", "-modfile", filepath.Join("dev-tools", "go.mod"), "github.com/jstemmer/go-junit-report")
-=======
 		cmd := exec.CommandContext(ctx, "go", "tool", "-modfile", filepath.Join("dev-tools", "tools", "go.mod"), "github.com/jstemmer/go-junit-report/v2")
->>>>>>> ef9e2cb (ci(ff): support feature freeze automation (#7339))
 		cmd.Stdin = srcFile
 		cmd.Stdout = &output
 		cmd.Stderr = &stderr
