@@ -148,21 +148,58 @@ func (m *monitorT) Run(ctx context.Context) error {
 	s := m.monitor.Subscribe()
 	defer m.monitor.Unsubscribe(s)
 
+<<<<<<< HEAD
+=======
+	dCtx, dCancel := context.WithCancel(ctx)
+	var wg sync.WaitGroup
+	defer wg.Wait()
+	defer dCancel()
+	wg.Go(func() { m.runLoader(dCtx) })
+	wg.Go(func() { m.runDispatcher(dCtx) })
+
+>>>>>>> a2aa6ca (Fix missed policy updates during slow initial policy loads (#8277))
 	close(m.startCh)
 
 	var iCtx context.Context
 	var trans *apm.Transaction
 LOOP:
 	for {
+<<<<<<< HEAD
 		m.log.Trace().Msg("policy monitor loop start")
 		iCtx = ctx
+=======
+		m.log.Trace().Msg("policy monitor notification loop start")
+>>>>>>> a2aa6ca (Fix missed policy updates during slow initial policy loads (#8277))
 		select {
+		case <-ctx.Done():
+			return nil
+		case hits := <-s.Output(): // TODO would be nice to attach transaction IDs to hits, but would likely need a bigger refactor.
+			m.log.Trace().Int("hits", len(hits)).Msg("policy monitor hits from sub")
+			trans, tCtx := m.startTrans(ctx, "output policies")
+			err := m.processHits(tCtx, hits)
+			endTrans(trans)
+			if err != nil {
+				return err
+			}
+			m.kickDeploy()
+		}
+	}
+}
+
+// runLoader loads queued policies and signals the dispatcher after each load.
+func (m *monitorT) runLoader(ctx context.Context) {
+	for {
+		m.log.Trace().Msg("policy monitor loader loop start")
+		select {
+		case <-ctx.Done():
+			return
 		case <-m.kickCh:
 			m.log.Trace().Msg("policy monitor kicked")
 			if m.bulker.HasTracer() {
 				trans = m.bulker.StartTransaction("initial policies", "policy_monitor")
 				iCtx = apm.ContextWithTransaction(ctx, trans)
 			}
+<<<<<<< HEAD
 
 			if err := m.loadPolicies(iCtx); err != nil {
 				endTrans(trans)
@@ -170,6 +207,21 @@ LOOP:
 			}
 			m.dispatchPending(iCtx)
 			endTrans(trans)
+=======
+			m.kickDeploy()
+		}
+	}
+}
+
+// runDispatcher drains pendingQ each time deployCh is signalled, until ctx is done.
+// deployCh has a buffer of one: a signal sent while a drain runs causes one more drain,
+// so a subscriber pushed after the last empty pop is not missed.
+func (m *monitorT) runDispatcher(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+>>>>>>> a2aa6ca (Fix missed policy updates during slow initial policy loads (#8277))
 		case <-m.deployCh:
 			m.log.Trace().Msg("policy monitor deploy ch")
 			if m.bulker.HasTracer() {
@@ -493,6 +545,14 @@ func (m *monitorT) updatePolicy(ctx context.Context, pp *ParsedPolicy) bool {
 		}
 		m.policies[newPolicy.PolicyID] = p
 		zlog.Info().Str(logger.PolicyID, newPolicy.PolicyID).Msg("New policy found on update and added")
+		return false
+	}
+
+	// A newer revision can arrive while this policy is parsed.
+	if newPolicy.RevisionIdx <= p.pp.Policy.RevisionIdx {
+		zlog.Debug().
+			Int64("cached_revision_idx", p.pp.Policy.RevisionIdx).
+			Msg("keeping the cached policy because it already has the same or a newer revision")
 		return false
 	}
 
