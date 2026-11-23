@@ -41,12 +41,8 @@ require (
 	go.elastic.co/ecszerolog v0.2.0
 	go.opentelemetry.io/otel v1.47.0
 	go.uber.org/zap v1.28.0
-<<<<<<< HEAD
 	golang.org/x/net v0.62.0
-=======
-	golang.org/x/net v0.63.0
 	golang.org/x/oauth2 v0.37.0
->>>>>>> ef9e2cb (ci(ff): support feature freeze automation (#7339))
 	golang.org/x/sync v0.25.0
 	golang.org/x/time v0.16.0
 	google.golang.org/grpc v1.85.0
@@ -95,13 +91,9 @@ require (
 	github.com/prometheus/client_model v0.6.3 // indirect
 	github.com/prometheus/common v0.72.1 // indirect
 	github.com/prometheus/procfs v0.22.0 // indirect
-<<<<<<< HEAD
-	github.com/shirou/gopsutil/v4 v4.26.10 // indirect
-=======
 	github.com/sergi/go-diff v1.4.0 // indirect
-	github.com/shirou/gopsutil/v4 v4.26.9 // indirect
+	github.com/shirou/gopsutil/v4 v4.26.10 // indirect
 	github.com/skeema/knownhosts v1.3.1 // indirect
->>>>>>> ef9e2cb (ci(ff): support feature freeze automation (#7339))
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/stretchr/objx v0.5.3 // indirect
 	github.com/tklauser/go-sysconf v0.4.0 // indirect
