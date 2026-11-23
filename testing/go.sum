@@ -43,8 +43,8 @@ github.com/docker/go-units v0.5.0 h1:69rxXcBk27SvSaaxTtLh/8llcHD8vYHT7WSdRZ/jvr4
 github.com/docker/go-units v0.5.0/go.mod h1:fgPhTUdO+D/Jk86RDLlptpiXQzgHJF7gydDDbaIK4Dk=
 github.com/ebitengine/purego v0.11.2 h1:WWiTx8rD8zYdOwSj8O/NiNbsOvSAgJMTlyV1XlbUSeU=
 github.com/ebitengine/purego v0.11.2/go.mod h1:DCHPP08djqhNSoTfImcnHYQRZmd0qhakvrozqaEYhGQ=
-github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261113003147-28a0da4deef0 h1:ZjWMfUey9r0DQXpTWa7P6kXoVCSzuuAa1fgOUSan5NE=
-github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261113003147-28a0da4deef0/go.mod h1:Ev5yU7FdWLFW1nPzX0dycAgwUpVq/H4XHTePP3Puhk0=
+github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261123151532-85a0ed9cce81 h1:hi1LJYf1S5dVPCGtoQrDixq3Nzx4PAcH/eONE0mJy1c=
+github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261123151532-85a0ed9cce81/go.mod h1:HyvZqHMRmhhe4KCw8T27I85P4zVHpUk+w10/9FnCar0=
 github.com/elastic/elastic-agent-client/v7 v7.21.0 h1:G2RkxMgsPwYlZMgH1DEswNQUEssnHe321OY4EYiMzSw=
 github.com/elastic/elastic-agent-client/v7 v7.21.0/go.mod h1:7Uen/EzVK7JG7ErIDofZDWdbyPsinbghHEfgIxaO/PY=
 github.com/elastic/go-sysinfo v1.15.5 h1:fCVUDmjHgljLUQCygherMnsRRJ9AkuAQIywTL7dEH28=

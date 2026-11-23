@@ -9,7 +9,7 @@ replace (
 
 require (
 	github.com/Shopify/toxiproxy/v2 v2.12.0
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261113003147-28a0da4deef0
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261123151532-85a0ed9cce81
 	github.com/elastic/elastic-agent-client/v7 v7.21.0
 	github.com/elastic/fleet-server/pkg/api v0.0.0-00010101000000-000000000000
 	github.com/elastic/fleet-server/v7 v7.0.0-00010101000000-000000000000
