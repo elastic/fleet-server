@@ -46,6 +46,8 @@ import (
 
 	"github.com/elastic/beats/v7/pkg/logp"
 	"github.com/elastic/beats/v7/pkg/transport/tlscommon"
+	devtools "github.com/elastic/fleet-server/v7/dev-tools/mage"
+	"github.com/elastic/fleet-server/v7/dev-tools/mage/release"
 	"github.com/elastic/fleet-server/v7/version"
 )
 
@@ -393,6 +395,9 @@ type Test mg.Namespace
 // Docker is the namespace for docker related tasks.
 type Docker mg.Namespace
 
+// Release is the namespace for release automation.
+type Release mg.Namespace
+
 // envToBool reads the env var string s and parses it as a bool.
 func envToBool(s string) bool {
 	v, ok := os.LookupEnv(s)
@@ -501,7 +506,7 @@ func Generate() error {
 
 // Headers ensures files have copyright headers.
 func (Check) Headers() error {
-	return sh.Run("go", "tool", "-modfile", filepath.Join("dev-tools", "go.mod"), "github.com/elastic/go-licenser", "-license", "Elasticv2")
+	return sh.Run("go", "tool", "-modfile", filepath.Join("dev-tools", "tools", "go.mod"), "github.com/elastic/go-licenser", "-license", "Elasticv2")
 }
 
 // Notice generates the NOTICE.txt and NOTICE-fips.txt files.
@@ -566,7 +571,7 @@ func genNotice(ctx context.Context, fips bool) error {
 	listCmd := exec.CommandContext(ctx, "go", listArgs...)
 
 	//nolint:gosec // G204: args are fixed paths and the NOTICE file name chosen above
-	detectorCmd := exec.CommandContext(ctx, "go", "tool", "-modfile", filepath.Join("dev-tools", "go.mod"), "go.elastic.co/go-licence-detector",
+	detectorCmd := exec.CommandContext(ctx, "go", "tool", "-modfile", filepath.Join("dev-tools", "tools", "go.mod"), "go.elastic.co/go-licence-detector",
 		"-includeIndirect",
 		"-rules", filepath.Join("dev-tools", "notice", "rules.json"),
 		"-overrides", filepath.Join("dev-tools", "notice", "overrides.json"),
@@ -656,7 +661,7 @@ func (Check) NoChanges() error {
 
 // Imports runs goimports to reorder imports.
 func (Check) Imports() error {
-	return sh.Run("go", "tool", "-modfile", filepath.Join("dev-tools", "go.mod"), "golang.org/x/tools/cmd/goimports", "-w", ".")
+	return sh.Run("go", "tool", "-modfile", filepath.Join("dev-tools", "tools", "go.mod"), "golang.org/x/tools/cmd/goimports", "-w", ".")
 }
 
 // Ci runs CI related checks - runs generate, imports, fix, checkHeaders, notice, checkNoChanges.
@@ -1776,7 +1781,7 @@ func (Test) JunitReport(ctx context.Context) error {
 		var stderr bytes.Buffer
 
 		//nolint:gosec // G204: fixed tool invocation, only the modfile path is computed
-		cmd := exec.CommandContext(ctx, "go", "tool", "-modfile", filepath.Join("dev-tools", "go.mod"), "github.com/jstemmer/go-junit-report/v2")
+		cmd := exec.CommandContext(ctx, "go", "tool", "-modfile", filepath.Join("dev-tools", "tools", "go.mod"), "github.com/jstemmer/go-junit-report/v2")
 		cmd.Stdin = srcFile
 		cmd.Stdout = &output
 		cmd.Stderr = &stderr
@@ -1840,7 +1845,7 @@ func (Test) Benchstat() error {
 	args := []string{
 		"tool",
 		"-modfile",
-		filepath.Join("dev-tools", "go.mod"),
+		filepath.Join("dev-tools", "tools", "go.mod"),
 		"golang.org/x/perf/cmd/benchstat",
 		base,
 	}
@@ -2549,4 +2554,56 @@ func (Test) CloudE2ERun(ctx context.Context) error {
 	err = cmd.Run()
 	err = errors.Join(err, os.WriteFile(filepath.Join("build", "test-cloude2e.out"), b.Bytes(), 0o644)) //nolint:gosec // G306: test output, not a secret
 	return err
+}
+
+// loadReleaseConfig loads release settings and requires NEXT_RELEASE for workflows.
+func loadReleaseConfig() (*release.ReleaseConfig, error) {
+	settings, err := devtools.LoadReleaseSettings()
+	if err != nil {
+		return nil, err
+	}
+	if err := settings.RequireRelease(); err != nil {
+		return nil, err
+	}
+	return settings, nil
+}
+
+// UpdateVersion updates the version in version/version.go.
+func (Release) UpdateVersion(version string) error {
+	return release.UpdateVersion(version)
+}
+
+// UpdateMergify adds a new backport rule to .mergify.yml.
+func (Release) UpdateMergify(version string) error {
+	return release.UpdateMergify(version)
+}
+
+// RunMajorMinor orchestrates the major/minor release workflow after feature freeze.
+// Set DRY_RUN=true to preview changes without pushing.
+func (Release) RunMajorMinor() error {
+	cfg, err := loadReleaseConfig()
+	if err != nil {
+		return err
+	}
+	return release.RunMajorMinorRelease(cfg)
+}
+
+// RunPatch orchestrates the complete patch release workflow.
+// Set DRY_RUN=true to preview changes without pushing.
+func (Release) RunPatch() error {
+	cfg, err := loadReleaseConfig()
+	if err != nil {
+		return err
+	}
+	return release.RunPatchRelease(cfg)
+}
+
+// EnsureIssueTracker creates or updates the Fleet Server release checklist issue for
+// NEXT_RELEASE, linking related PRs labeled "release".
+func (Release) EnsureIssueTracker() error {
+	cfg, err := loadReleaseConfig()
+	if err != nil {
+		return err
+	}
+	return release.EnsureReleaseIssueTracker(cfg, nil)
 }
