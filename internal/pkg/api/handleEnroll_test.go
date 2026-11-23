@@ -349,7 +349,9 @@ func replaceUpdateDoc(t *testing.T, bulker *ftesting.MockBulk) map[string]any {
 	var updateBody []byte
 	for _, c := range bulker.Calls {
 		if c.Method == "Update" {
-			updateBody = c.Arguments.Get(3).([]byte)
+			body, ok := c.Arguments.Get(3).([]byte)
+			require.True(t, ok, "Update body is not []byte")
+			updateBody = body
 			break
 		}
 	}
@@ -601,7 +603,7 @@ func TestEnrollerT_retrieveStaticTokenEnrollmentToken(t *testing.T) {
 		return func() bulk.Bulk {
 			bulker := ftesting.NewMockBulk()
 
-			hits := []es.HitT{}
+			hits := make([]es.HitT, 0, len(policies))
 			for _, p := range policies {
 				b, _ := json.Marshal(p)
 				hits = append(hits, es.HitT{
@@ -783,6 +785,7 @@ func assertSyncEnrollParams(t *testing.T, req *http.Request) {
 	require.Equal(t, "wait_for", req.URL.Query().Get("refresh"), "refresh must be wait_for so the document is visible before the response is sent")
 }
 
+//nolint:dupl // intentionally parallel to its sibling scenario test
 func TestCreateFleetAgentSyncWrite409Succeeds(t *testing.T) {
 	mt := &MockTransport{}
 	mt.RoundTripFn = func(req *http.Request) (*http.Response, error) {
@@ -805,6 +808,7 @@ func TestCreateFleetAgentSyncWrite409Succeeds(t *testing.T) {
 	require.NoError(t, err)
 }
 
+//nolint:dupl // intentionally parallel to its sibling scenario test
 func TestCreateFleetAgentSyncWriteErrorSurfaces(t *testing.T) {
 	mt := &MockTransport{}
 	mt.RoundTripFn = func(req *http.Request) (*http.Response, error) {
@@ -878,6 +882,7 @@ func syncEnrollResponse(status int) *http.Response {
 	}
 }
 
+//nolint:dupl // intentionally parallel to its sibling scenario test
 func TestCreateFleetAgentSyncWriteTimeoutThenConflictSucceeds(t *testing.T) {
 	const agentID = "test-agent-id"
 	calls := 0
@@ -902,6 +907,7 @@ func TestCreateFleetAgentSyncWriteTimeoutThenConflictSucceeds(t *testing.T) {
 	requireSameBodies(t, bodies)
 }
 
+//nolint:dupl // intentionally parallel to its sibling scenario test
 func TestCreateFleetAgentSyncWriteTimeoutThenSucceeds(t *testing.T) {
 	const agentID = "test-agent-id"
 	calls := 0

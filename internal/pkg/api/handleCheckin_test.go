@@ -58,7 +58,8 @@ func (m *mockPolicyMonitor) Run(ctx context.Context) error {
 
 func (m *mockPolicyMonitor) Subscribe(agentID, policyID string, revIDX int64) (policy.Subscription, error) {
 	args := m.Called(agentID, policyID, revIDX)
-	return args.Get(0).(policy.Subscription), args.Error(1)
+	sub, _ := args.Get(0).(policy.Subscription)
+	return sub, args.Error(1)
 }
 
 func (m *mockPolicyMonitor) Unsubscribe(sub policy.Subscription) error {
@@ -68,7 +69,8 @@ func (m *mockPolicyMonitor) Unsubscribe(sub policy.Subscription) error {
 
 func (m *mockPolicyMonitor) LatestRev(ctx context.Context, id string) int64 {
 	args := m.Called(ctx, id)
-	return args.Get(0).(int64)
+	rev, _ := args.Get(0).(int64)
+	return rev
 }
 
 func (m *mockPolicyMonitor) GetPolicy(ctx context.Context, policyID string) (*model.Policy, error) {
@@ -399,7 +401,7 @@ func TestFilterActions(t *testing.T) {
 		}},
 		resp: []model.Action{},
 	}, {
-		name: "No type is filterd",
+		name: "No type is filtered",
 		actions: []model.Action{{
 			ActionID: "1234",
 		}},
@@ -451,6 +453,7 @@ func TestResolveSeqNo(t *testing.T) {
 
 }
 
+//nolint:dupl // table cases are intentionally parallel
 func TestProcessUpgradeDetails(t *testing.T) {
 	esd := model.ESDocument{Id: "doc-ID"}
 	doc := bulk.UpdateFields{
@@ -1448,18 +1451,18 @@ func TestHandleCheckin_GracefulForceUnenroll(t *testing.T) {
 			var req *http.Request
 			if errors.Is(tc.authErr, apikey.ErrNoAuthHeader) {
 				// no Authorization header — triggers ErrNoAuthHeader before any bulker call
-				req = httptest.NewRequest(http.MethodPost, "/", nil)
+				req = newTestRequest(http.MethodPost, "/", nil)
 			} else if errors.Is(tc.authErr, ErrAPIKeyNotEnabled) {
 				// ErrAPIKeyNotEnabled is produced by authAPIKey after APIKeyAuth returns
 				// a disabled key (Enabled: false, nil error). SetAPIKey is then called
 				// to update the cache before the error is surfaced.
-				req = httptest.NewRequest(http.MethodPost, "/", nil)
+				req = newTestRequest(http.MethodPost, "/", nil)
 				req.Header.Set("Authorization", makeAPIKeyAuthHeader("key-id", "key-secret"))
 				mCache.On("ValidAPIKey", mock.Anything).Return(false)
 				mBulk.On("APIKeyAuth", mock.Anything, mock.Anything).Return(&bulk.SecurityInfo{Enabled: false}, nil)
 				mCache.On("SetAPIKey", mock.Anything, false)
 			} else {
-				req = httptest.NewRequest(http.MethodPost, "/", nil)
+				req = newTestRequest(http.MethodPost, "/", nil)
 				req.Header.Set("Authorization", makeAPIKeyAuthHeader("key-id", "key-secret"))
 				mCache.On("ValidAPIKey", mock.Anything).Return(false)
 				mBulk.On("APIKeyAuth", mock.Anything, mock.Anything).Return((*bulk.SecurityInfo)(nil), tc.authErr)
@@ -1687,7 +1690,7 @@ func TestValidateCheckinRequest(t *testing.T) {
 					assert.JSONEq(t, string(tc.expValid.rawAvailableRollbacks), string(valid.rawAvailableRollbacks))
 				}
 			} else {
-				// Asserting error messages prior to ErrorAs becuase ErrorAs modifies
+				// Asserting error messages prior to ErrorAs because ErrorAs modifies
 				// the target error. If we assert error messages after calling ErrorAs
 				// we will end up with false positives.
 				assert.Equal(t, tc.expErr.Error(), err.Error())
@@ -2318,7 +2321,7 @@ func TestProcessPolicyOTLPOutput(t *testing.T) {
 	const outputName = "my-otlp"
 
 	// secretDocID is returned by MockBulk.WriteSecret; MockBulk.ReadSecrets returns id+"_value".
-	const secretDocID = "otlp-secret-doc-id"
+	const secretDocID = "otlp-secret-doc-id" //nolint:gosec // G101: test fixture, not a real credential
 	wantHeader := "ApiKey " + base64.StdEncoding.EncodeToString([]byte(secretDocID+"_value"))
 
 	tests := []struct {
@@ -2430,7 +2433,7 @@ func TestProcessPolicyOTLPOutput(t *testing.T) {
 func TestPrepareOTelExporters(t *testing.T) {
 	esAPIKey := "keyid:secret"
 	esAPIKeyB64 := base64.StdEncoding.EncodeToString([]byte(esAPIKey))
-	otlpAPIKey := "otlpid:otlpsecret"
+	otlpAPIKey := "otlpid:otlpsecret" //nolint:gosec // G101: test fixture, not a real credential
 	otlpAPIKeyB64 := base64.StdEncoding.EncodeToString([]byte(otlpAPIKey))
 
 	esOutput := map[string]any{"type": policy.OutputTypeElasticsearch, "api_key": esAPIKey}
@@ -2538,9 +2541,9 @@ func TestPrepareOTelExporters(t *testing.T) {
 }
 
 func TestFetchAgentPendingActionsReplacesSecrets(t *testing.T) {
-	const actionWithSecret = `{"action_id":"action-with-secret","type":"INPUT_ACTION","data":{"parameters":{"credential":"$co.elastic.secret{ref1}"}},"secret_references":[{"id":"ref1"}]}`
-	const actionWithoutSecret = `{"action_id":"action-without-secret","type":"INPUT_ACTION","data":{"parameters":{"credential":"plain"}}}`
-	const filteredActionWithSecret = `{"action_id":"filtered-action","type":"POLICY_CHANGE","data":{"parameters":{"credential":"$co.elastic.secret{ref1}"}},"secret_references":[{"id":"ref1"}]}`
+	const actionWithSecret = `{"action_id":"action-with-secret","type":"INPUT_ACTION","data":{"parameters":{"credential":"$co.elastic.secret{ref1}"}},"secret_references":[{"id":"ref1"}]}`       //nolint:gosec // G101: test fixture, not a real credential
+	const actionWithoutSecret = `{"action_id":"action-without-secret","type":"INPUT_ACTION","data":{"parameters":{"credential":"plain"}}}`                                                        //nolint:gosec // G101: test fixture, not a real credential
+	const filteredActionWithSecret = `{"action_id":"filtered-action","type":"POLICY_CHANGE","data":{"parameters":{"credential":"$co.elastic.secret{ref1}"}},"secret_references":[{"id":"ref1"}]}` //nolint:gosec // G101: test fixture, not a real credential
 
 	bulker := ftesting.NewMockBulk()
 	bulker.On("Search", mock.Anything, dl.FleetActions, mock.Anything, mock.Anything).

@@ -45,7 +45,7 @@ var (
 )
 
 func TestFileDeliveryRouteDisallowedMethods(t *testing.T) {
-	hr, _, _, fakebulk := prepareFileDeliveryMock(t)
+	hr, _, fakebulk := prepareFileDeliveryMock(t)
 	rec := httptest.NewRecorder()
 	fakebulk.On("Search",
 		mock.Anything,
@@ -63,14 +63,14 @@ func TestFileDeliveryRouteDisallowedMethods(t *testing.T) {
 
 	for _, method := range disallowed {
 		t.Run("filedelivery"+method, func(t *testing.T) {
-			hr.ServeHTTP(rec, httptest.NewRequest(method, "/api/fleet/file/X", nil))
+			hr.ServeHTTP(rec, newTestRequest(method, "/api/fleet/file/X", nil))
 			assert.Equal(t, http.StatusMethodNotAllowed, rec.Code)
 		})
 	}
 }
 
 func TestFileDeliveryRouteGetMissingFile(t *testing.T) {
-	hr, _, _, fakebulk := prepareFileDeliveryMock(t)
+	hr, _, fakebulk := prepareFileDeliveryMock(t)
 	rec := httptest.NewRecorder()
 	fakebulk.On("Search",
 		mock.Anything,
@@ -79,13 +79,13 @@ func TestFileDeliveryRouteGetMissingFile(t *testing.T) {
 		mock.Anything,
 		mock.Anything,
 	).Return(&es.ResultT{}, nil)
-	hr.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/fleet/file/X", nil))
+	hr.ServeHTTP(rec, newTestRequest(http.MethodGet, "/api/fleet/file/X", nil))
 	assert.Equal(t, http.StatusNotFound, rec.Code)
 }
 
 // if metadata exists, but no chunks, file should be 404
 func TestFileDeliveryNoChunks(t *testing.T) {
-	hr, _, _, fakebulk := prepareFileDeliveryMock(t)
+	hr, _, fakebulk := prepareFileDeliveryMock(t)
 	rec := httptest.NewRecorder()
 
 	fakebulk.On("Search", mock.Anything, isFileMetaSearch, mock.Anything, mock.Anything, mock.Anything).Return(
@@ -120,12 +120,12 @@ func TestFileDeliveryNoChunks(t *testing.T) {
 		}, nil,
 	)
 
-	hr.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/fleet/file/X", nil))
+	hr.ServeHTTP(rec, newTestRequest(http.MethodGet, "/api/fleet/file/X", nil))
 	assert.Equal(t, http.StatusNotFound, rec.Code)
 }
 
 func TestFileDelivery(t *testing.T) {
-	hr, _, tx, bulk := prepareFileDeliveryMock(t)
+	hr, tx, bulk := prepareFileDeliveryMock(t)
 	rec := httptest.NewRecorder()
 
 	bulk.On("Search", mock.Anything, isFileMetaSearch, mock.Anything, mock.Anything, mock.Anything).Return(
@@ -169,9 +169,9 @@ func TestFileDelivery(t *testing.T) {
 		}, nil,
 	)
 
-	tx.Response = sendBodyBytes(sampleDocBody_ABCD)
+	tx.Response = sendBodyBytes(sampleDocBody_ABCD) //nolint:bodyclose // mock transport response, closed by the handler under test
 
-	hr.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/fleet/file/X", nil))
+	hr.ServeHTTP(rec, newTestRequest(http.MethodGet, "/api/fleet/file/X", nil))
 
 	bulk.AssertCalled(t, "Search", mock.Anything, isFileMetaSearch, mock.Anything, mock.Anything, mock.Anything)
 	bulk.AssertCalled(t, "Search", mock.Anything, isFileChunkSearch, mock.Anything, mock.Anything, mock.Anything)
@@ -181,7 +181,7 @@ func TestFileDelivery(t *testing.T) {
 }
 
 func TestFileDeliveryMultipleChunks(t *testing.T) {
-	hr, _, tx, bulk := prepareFileDeliveryMock(t)
+	hr, tx, bulk := prepareFileDeliveryMock(t)
 	rec := httptest.NewRecorder()
 
 	bulk.On("Search", mock.Anything, isFileMetaSearch, mock.Anything, mock.Anything, mock.Anything).Return(
@@ -249,14 +249,14 @@ func TestFileDeliveryMultipleChunks(t *testing.T) {
 		}
 	}
 
-	hr.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/fleet/file/X", nil))
+	hr.ServeHTTP(rec, newTestRequest(http.MethodGet, "/api/fleet/file/X", nil))
 
 	require.Equal(t, http.StatusOK, rec.Code)
 	assert.Equal(t, []byte{0xAB, 0xCD, 0xEF, 0x01}, rec.Body.Bytes())
 }
 
 func TestFileDeliverySetsHeaders(t *testing.T) {
-	hr, _, tx, bulk := prepareFileDeliveryMock(t)
+	hr, tx, bulk := prepareFileDeliveryMock(t)
 	rec := httptest.NewRecorder()
 
 	bulk.On("Search", mock.Anything, isFileMetaSearch, mock.Anything, mock.Anything, mock.Anything).Return(
@@ -299,9 +299,9 @@ func TestFileDeliverySetsHeaders(t *testing.T) {
 			},
 		}, nil,
 	)
-	tx.Response = sendBodyBytes(sampleDocBody_ABCD)
+	tx.Response = sendBodyBytes(sampleDocBody_ABCD) //nolint:bodyclose // mock transport response, closed by the handler under test
 
-	hr.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/fleet/file/X", nil))
+	hr.ServeHTTP(rec, newTestRequest(http.MethodGet, "/api/fleet/file/X", nil))
 
 	require.Equal(t, http.StatusOK, rec.Code)
 	assert.Equal(t, "text/csv", rec.Header().Get("Content-Type"))
@@ -311,7 +311,7 @@ func TestFileDeliverySetsHeaders(t *testing.T) {
 }
 
 func TestFileDeliverySetsHashWhenPresent(t *testing.T) {
-	hr, _, tx, bulk := prepareFileDeliveryMock(t)
+	hr, tx, bulk := prepareFileDeliveryMock(t)
 	rec := httptest.NewRecorder()
 
 	bulk.On("Search", mock.Anything, isFileMetaSearch, mock.Anything, mock.Anything, mock.Anything).Return(
@@ -357,9 +357,9 @@ func TestFileDeliverySetsHashWhenPresent(t *testing.T) {
 			},
 		}, nil,
 	)
-	tx.Response = sendBodyBytes(sampleDocBody_ABCD)
+	tx.Response = sendBodyBytes(sampleDocBody_ABCD) //nolint:bodyclose // mock transport response, closed by the handler under test
 
-	hr.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/fleet/file/X", nil))
+	hr.ServeHTTP(rec, newTestRequest(http.MethodGet, "/api/fleet/file/X", nil))
 
 	require.Equal(t, http.StatusOK, rec.Code)
 	assert.Equal(t, "deadbeef", rec.Header().Get("X-File-SHA2"))
@@ -429,7 +429,7 @@ func TestIgnoredRangeRequests(t *testing.T) {
 }
 
 func TestFileDeliveryRangeSupport(t *testing.T) {
-	hr, _, tx, bulk := prepareFileDeliveryMock(t)
+	hr, tx, bulk := prepareFileDeliveryMock(t)
 
 	mockChunkSize := 100
 	mockFileSize := 600
@@ -471,7 +471,7 @@ func TestFileDeliveryRangeSupport(t *testing.T) {
 }
 
 func TestFileDeliveryRangeSupportWithoutExplicitChunkSize(t *testing.T) {
-	hr, _, tx, bulk := prepareFileDeliveryMock(t)
+	hr, tx, bulk := prepareFileDeliveryMock(t)
 
 	mockChunkSize := file.MaxChunkSize // spec default when not explicitly provided
 	mockFileSize := 340
@@ -493,7 +493,7 @@ func TestFileDeliveryRangeSupportWithoutExplicitChunkSize(t *testing.T) {
 }
 
 func TestFileDeliveryInvalidRangeReq(t *testing.T) {
-	hr, _, tx, bulk := prepareFileDeliveryMock(t)
+	hr, tx, bulk := prepareFileDeliveryMock(t)
 
 	mockChunkSize := 64
 	mockFileSize := 450
@@ -526,10 +526,10 @@ func TestFileDeliveryInvalidRangeReq(t *testing.T) {
 }
 
 func TestFileLibraryDeliveryStopsEmptyClients(t *testing.T) {
-	hr, _, _, _ := prepareFileDeliveryMock(t)
+	hr, _, _ := prepareFileDeliveryMock(t)
 	rec := httptest.NewRecorder()
 
-	req := httptest.NewRequest(http.MethodGet, "/api/fleet/file/X?source=foo", nil)
+	req := newTestRequest(http.MethodGet, "/api/fleet/file/X?source=foo", nil)
 	req.Header.Del(HTTPProductOriginHeader)
 	hr.ServeHTTP(rec, req)
 
@@ -537,10 +537,10 @@ func TestFileLibraryDeliveryStopsEmptyClients(t *testing.T) {
 }
 
 func TestFileLibraryDeliveryStopsInvalidClients(t *testing.T) {
-	hr, _, _, _ := prepareFileDeliveryMock(t)
+	hr, _, _ := prepareFileDeliveryMock(t)
 	rec := httptest.NewRecorder()
 
-	req := httptest.NewRequest(http.MethodGet, "/api/fleet/file/X?source=foo", nil)
+	req := newTestRequest(http.MethodGet, "/api/fleet/file/X?source=foo", nil)
 	req.Header.Add(HTTPProductOriginHeader, "bar")
 	hr.ServeHTTP(rec, req)
 
@@ -548,7 +548,7 @@ func TestFileLibraryDeliveryStopsInvalidClients(t *testing.T) {
 }
 
 func TestFileLibraryDeliveryAllowsValidClients(t *testing.T) {
-	hr, _, tx, bulk := prepareFileDeliveryMock(t)
+	hr, tx, bulk := prepareFileDeliveryMock(t)
 	rec := httptest.NewRecorder()
 
 	libName := "foolib"
@@ -573,9 +573,9 @@ func TestFileLibraryDeliveryAllowsValidClients(t *testing.T) {
 			},
 		}, nil,
 	)
-	tx.Response = sendBodyBytes(sampleDocBody_ABCD)
+	tx.Response = sendBodyBytes(sampleDocBody_ABCD) //nolint:bodyclose // mock transport response, closed by the handler under test
 
-	req := httptest.NewRequest(http.MethodGet, "/api/fleet/file/X?source="+libName, nil)
+	req := newTestRequest(http.MethodGet, "/api/fleet/file/X?source="+libName, nil)
 	req.Header.Set(HTTPProductOriginHeader, "endpoint-security")
 	hr.ServeHTTP(rec, req)
 
@@ -585,7 +585,7 @@ func TestFileLibraryDeliveryAllowsValidClients(t *testing.T) {
 }
 
 func TestFileLibraryDelivery(t *testing.T) {
-	hr, _, tx, bulk := prepareFileDeliveryMock(t)
+	hr, tx, bulk := prepareFileDeliveryMock(t)
 	rec := httptest.NewRecorder()
 
 	libName := "script"
@@ -622,9 +622,9 @@ func TestFileLibraryDelivery(t *testing.T) {
 			},
 		}, nil,
 	)
-	tx.Response = sendBodyBytes(sampleDocBody_ABCD)
+	tx.Response = sendBodyBytes(sampleDocBody_ABCD) //nolint:bodyclose // mock transport response, closed by the handler under test
 
-	req := httptest.NewRequest(http.MethodGet, "/api/fleet/file/X?source="+libName, nil)
+	req := newTestRequest(http.MethodGet, "/api/fleet/file/X?source="+libName, nil)
 	req.Header.Set(HTTPProductOriginHeader, "endpoint-security")
 	hr.ServeHTTP(rec, req)
 
@@ -642,7 +642,7 @@ func TestFileLibraryDelivery(t *testing.T) {
 */
 
 // prepareUploaderMock sets up common dependencies and registers upload routes to a returned router
-func prepareFileDeliveryMock(t *testing.T) (http.Handler, apiServer, *MockTransport, *itesting.MockBulk) {
+func prepareFileDeliveryMock(t *testing.T) (http.Handler, *MockTransport, *itesting.MockBulk) {
 	// chunk index operations skip the bulker in order to send binary docs directly
 	// so a mock *elasticsearch.Client needs to be be prepared
 	mockES, tx := mockESClient(t)
@@ -675,7 +675,7 @@ func prepareFileDeliveryMock(t *testing.T) (http.Handler, apiServer, *MockTransp
 		},
 	}
 
-	return Handler(&si), si, tx, fakebulk
+	return Handler(&si), tx, fakebulk
 }
 
 func mockChunkedFile(tx *MockTransport, bulk *itesting.MockBulk, mockChunkSize int64, mockFileSize int64, fileID string, writeChunkSize bool) []byte {
@@ -773,6 +773,6 @@ func hexDecode(s string) []byte {
 
 func mockChunkCBOR(docid string, data []byte) []byte {
 	dlen := make([]byte, 4)
-	binary.BigEndian.PutUint32(dlen, uint32(len(data)))
+	binary.BigEndian.PutUint32(dlen, uint32(len(data))) //nolint:gosec // G115: test chunks are far smaller than 4 GiB
 	return hexDecode(fmt.Sprintf("A7665F696E64657878212E666C6565742D66696C6564656C69766572792D646174612D656E64706F696E74635F6964%02X%02X685F76657273696F6E01675F7365715F6E6F016D5F7072696D6172795F7465726D0165666F756E64F5666669656C6473A16464617461815A%02X%02X", len(docid)+0x60, docid, dlen, data))
 }

@@ -381,7 +381,7 @@ func TestPolicyOutputESPrepare(t *testing.T) {
 			WithOutputSecretCandidateCollector(collector))
 		require.Error(t, err)
 		bulker.AssertNotCalled(t, "DeleteSecret", mock.Anything, secretID)
-		require.Equal(t, []OutputSecretCandidate{{
+		require.Equal(t, []OutputSecretCandidate{{ //nolint:gosec // G101: test fixture, not a real credential
 			AgentID:    "agent-id",
 			OutputName: "test output",
 			SecretID:   secretID,
@@ -565,7 +565,7 @@ func TestPolicyOTLPOutputPrepare(t *testing.T) {
 
 func TestPolicyOTLPOutputPrepareManagedToExternal(t *testing.T) {
 	const (
-		secretID = "prev-secret-id"
+		secretID = "prev-secret-id" //nolint:gosec // G101: test fixture, not a real credential
 		oldKeyID = "prev-key-id"
 	)
 	secretRef := "$co.elastic.secret{" + secretID + "}"
@@ -786,7 +786,9 @@ func TestPolicyOTLPOutputPrepareRetiresRemovedOutput(t *testing.T) {
 
 			// If there were pending records, verify the first call transferred one of them.
 			if len(tc.pendingRecords) > 0 {
-				transferParams := parseParkParams(t, bulker.Calls[0].Arguments.Get(3).([]byte))
+				transferBody, ok := bulker.Calls[0].Arguments.Get(3).([]byte)
+				require.True(t, ok, "park body is not []byte")
+				transferParams := parseParkParams(t, transferBody)
 				transferRecord, ok := transferParams[dl.FieldPolicyOutputToRetireAPIKeyIDs].(map[string]any)
 				require.True(t, ok, "first Update must be a transfer of the pending record")
 				assert.Equal(t, pendingKeyID, transferRecord["id"])
@@ -794,7 +796,9 @@ func TestPolicyOTLPOutputPrepareRetiresRemovedOutput(t *testing.T) {
 
 			// The second-to-last call parks the removed output's active key onto the incoming output.
 			// Requirement (a): this call precedes the remove — enforced by NotBefore above.
-			parkParams := parseParkParams(t, bulker.Calls[tc.wantCalls-2].Arguments.Get(3).([]byte))
+			parkBody, ok := bulker.Calls[tc.wantCalls-2].Arguments.Get(3).([]byte)
+			require.True(t, ok, "park body is not []byte")
+			parkParams := parseParkParams(t, parkBody)
 			parkRecord, ok := parkParams[dl.FieldPolicyOutputToRetireAPIKeyIDs].(map[string]any)
 			require.True(t, ok, "park body must contain a retirement record map")
 			assert.Equal(t, removedKeyID, parkRecord["id"])
@@ -1034,7 +1038,7 @@ func TestPolicyRemoteESOutputPrepare(t *testing.T) {
 		logger := testlog.SetLogger(t)
 		bulker := ftesting.NewMockBulk()
 		var apiKey *bulk.APIKey = nil
-		var err error = errors.New("error connecting")
+		err := errors.New("error connecting")
 
 		outputBulker := ftesting.NewMockBulk()
 		outputBulker.On("APIKeyCreate",

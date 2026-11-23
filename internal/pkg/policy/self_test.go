@@ -55,7 +55,7 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 	bulker.On("GetBulkerMap").Return(emptyBulkerMap)
 
 	monitor := NewSelfMonitor(cfg, bulker, mm, "", reporter)
-	sm := monitor.(*selfMonitorT)
+	sm := asSelfMonitorT(t, monitor)
 	sm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
 		return []model.Policy{}, nil
 	}
@@ -66,7 +66,7 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 		merr = monitor.Run(ctx)
 	})
 
-	if err := monitor.(*selfMonitorT).waitStart(ctx); err != nil {
+	if err := sm.waitStart(ctx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -157,7 +157,7 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 
 	cancel()
 	mwg.Wait()
-	if merr != nil && merr != context.Canceled {
+	if merr != nil && !errors.Is(merr, context.Canceled) {
 		t.Fatal(merr)
 	}
 }
@@ -186,7 +186,7 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 	bulker.On("GetBulkerMap").Return(emptyBulkerMap)
 
 	monitor := NewSelfMonitor(cfg, bulker, mm, "", reporter)
-	sm := monitor.(*selfMonitorT)
+	sm := asSelfMonitorT(t, monitor)
 	sm.checkTime = 100 * time.Millisecond
 
 	var policyLock sync.Mutex
@@ -198,7 +198,7 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 	}
 
 	var tokenLock sync.Mutex
-	var tokenResult []model.EnrollmentAPIKey
+	tokenResult := make([]model.EnrollmentAPIKey, 0, 1)
 	sm.enrollmentTokenF = func(ctx context.Context, bulker bulk.Bulk, policyID string) ([]model.EnrollmentAPIKey, error) {
 		tokenLock.Lock()
 		defer tokenLock.Unlock()
@@ -211,7 +211,7 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 		merr = monitor.Run(ctx)
 	})
 
-	if err := monitor.(*selfMonitorT).waitStart(ctx); err != nil {
+	if err := sm.waitStart(ctx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -273,7 +273,7 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 	}, ftesting.RetrySleep(1*time.Second))
 
 	// add an active token
-	activeToken := model.EnrollmentAPIKey{
+	activeToken := model.EnrollmentAPIKey{ //nolint:gosec // G101: test fixture, not a real credential
 		Id:       xid.New().String(),
 		Active:   true,
 		APIKey:   "d2JndlFIWUJJUVVxWDVia2NJTV86X0d6ZmljZGNTc1d4R1otbklrZFFRZw==",
@@ -309,7 +309,7 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 
 	cancel()
 	mwg.Wait()
-	if merr != nil && merr != context.Canceled {
+	if merr != nil && !errors.Is(merr, context.Canceled) {
 		t.Fatal(merr)
 	}
 }
@@ -338,7 +338,7 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 	bulker.On("GetBulkerMap").Return(emptyBulkerMap)
 
 	monitor := NewSelfMonitor(cfg, bulker, mm, policyID, reporter)
-	sm := monitor.(*selfMonitorT)
+	sm := asSelfMonitorT(t, monitor)
 	sm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
 		return []model.Policy{}, nil
 	}
@@ -349,7 +349,7 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 		merr = monitor.Run(ctx)
 	})
 
-	if err := monitor.(*selfMonitorT).waitStart(ctx); err != nil {
+	if err := sm.waitStart(ctx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -439,7 +439,7 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 
 	cancel()
 	mwg.Wait()
-	if merr != nil && merr != context.Canceled {
+	if merr != nil && !errors.Is(merr, context.Canceled) {
 		t.Fatal(merr)
 	}
 }
@@ -468,7 +468,7 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 	bulker.On("GetBulkerMap").Return(emptyBulkerMap)
 
 	monitor := NewSelfMonitor(cfg, bulker, mm, policyID, reporter)
-	sm := monitor.(*selfMonitorT)
+	sm := asSelfMonitorT(t, monitor)
 	sm.checkTime = 100 * time.Millisecond
 
 	var policyLock sync.Mutex
@@ -480,7 +480,7 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 	}
 
 	var tokenLock sync.Mutex
-	var tokenResult []model.EnrollmentAPIKey
+	tokenResult := make([]model.EnrollmentAPIKey, 0, 1)
 	sm.enrollmentTokenF = func(ctx context.Context, bulker bulk.Bulk, policyID string) ([]model.EnrollmentAPIKey, error) {
 		tokenLock.Lock()
 		defer tokenLock.Unlock()
@@ -493,7 +493,7 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 		merr = monitor.Run(ctx)
 	})
 
-	if err := monitor.(*selfMonitorT).waitStart(ctx); err != nil {
+	if err := sm.waitStart(ctx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -554,7 +554,7 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 	}, ftesting.RetrySleep(1*time.Second))
 
 	// add an active token
-	activeToken := model.EnrollmentAPIKey{
+	activeToken := model.EnrollmentAPIKey{ //nolint:gosec // G101: test fixture, not a real credential
 		Id:       xid.New().String(),
 		Active:   true,
 		APIKey:   "d2JndlFIWUJJUVVxWDVia2NJTV86X0d6ZmljZGNTc1d4R1otbklrZFFRZw==",
@@ -590,7 +590,7 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 
 	cancel()
 	mwg.Wait()
-	if merr != nil && merr != context.Canceled {
+	if merr != nil && !errors.Is(merr, context.Canceled) {
 		t.Fatal(merr)
 	}
 }
@@ -657,7 +657,7 @@ func TestSelfMonitor_reportOutputDegradedState(t *testing.T) {
 	bulkerMap := make(map[string]bulk.Bulk)
 	outputBulker := ftesting.NewMockBulk()
 	mockEsClient, mockTransport := esutil.MockESClient(t)
-	var err error = errors.New("error connecting")
+	err := errors.New("error connecting")
 	mockTransport.RoundTripFn = func(req *http.Request) (*http.Response, error) { return mockTransport.Response, err }
 	outputBulker.On("Client").Return(mockEsClient)
 	bulkerMap["remote"] = outputBulker
@@ -721,4 +721,14 @@ func TestSelfMonitor_reportOutputSkipIfNotFound(t *testing.T) {
 
 	bulker.AssertExpectations(t)
 	outputBulker.AssertExpectations(t)
+}
+
+// asSelfMonitorT returns m as *selfMonitorT, failing the test if it is another type.
+func asSelfMonitorT(t *testing.T, m any) *selfMonitorT {
+	t.Helper()
+	sm, ok := m.(*selfMonitorT)
+	if !ok {
+		t.Fatalf("monitor is %T, want *selfMonitorT", m)
+	}
+	return sm
 }

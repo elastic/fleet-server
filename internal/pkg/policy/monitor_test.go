@@ -95,7 +95,7 @@ func TestMonitor_NewPolicy(t *testing.T) {
 	bulker := ftesting.NewMockBulk()
 
 	monitor := NewMonitor(bulker, mm, config.ServerLimits{})
-	pm := monitor.(*monitorT)
+	pm := asMonitorT(t, monitor)
 	pm.policiesF = func(ctx context.Context, bulker bulk.Bulk, _ []string, opt ...dl.Option) ([]model.Policy, error) {
 		return []model.Policy{}, nil
 	}
@@ -106,13 +106,13 @@ func TestMonitor_NewPolicy(t *testing.T) {
 		merr = monitor.Run(ctx)
 	})
 
-	err := monitor.(*monitorT).waitStart(ctx)
+	err := pm.waitStart(ctx)
 	require.NoError(t, err)
 
 	agentId := uuid.Must(uuid.NewV4()).String()
 	policyID := uuid.Must(uuid.NewV4()).String()
 	s, err := monitor.Subscribe(agentId, policyID, 0)
-	defer monitor.Unsubscribe(s)
+	defer func() { _ = monitor.Unsubscribe(s) }()
 	require.NoError(t, err)
 
 	rId := xid.New().String()
@@ -147,7 +147,7 @@ func TestMonitor_NewPolicy(t *testing.T) {
 
 	cancel()
 	mwg.Wait()
-	if merr != nil && merr != context.Canceled {
+	if merr != nil && !errors.Is(merr, context.Canceled) {
 		t.Fatal(merr)
 	}
 	require.False(t, timedout, "never got policy update; timed out after 2s")
@@ -170,7 +170,7 @@ func TestMonitor_SamePolicy(t *testing.T) {
 	bulker := ftesting.NewMockBulk()
 
 	monitor := NewMonitor(bulker, mm, config.ServerLimits{})
-	pm := monitor.(*monitorT)
+	pm := asMonitorT(t, monitor)
 	pm.policiesF = func(ctx context.Context, bulker bulk.Bulk, _ []string, opt ...dl.Option) ([]model.Policy, error) {
 		return []model.Policy{}, nil
 	}
@@ -181,13 +181,13 @@ func TestMonitor_SamePolicy(t *testing.T) {
 		merr = monitor.Run(ctx)
 	})
 
-	err := monitor.(*monitorT).waitStart(ctx)
+	err := pm.waitStart(ctx)
 	require.NoError(t, err)
 
 	agentId := uuid.Must(uuid.NewV4()).String()
 	policyId := uuid.Must(uuid.NewV4()).String()
 	s, err := monitor.Subscribe(agentId, policyId, 1)
-	defer monitor.Unsubscribe(s)
+	defer func() { _ = monitor.Unsubscribe(s) }()
 	require.NoError(t, err)
 
 	rId := xid.New().String()
@@ -220,7 +220,7 @@ func TestMonitor_SamePolicy(t *testing.T) {
 
 	cancel()
 	mwg.Wait()
-	if merr != nil && merr != context.Canceled {
+	if merr != nil && !errors.Is(merr, context.Canceled) {
 		t.Fatal(merr)
 	}
 	require.False(t, gotPolicy, "got policy update when it was the same rev idx")
@@ -262,7 +262,7 @@ func runTestMonitor_NewPolicyExists(t *testing.T, delay time.Duration) {
 	bulker := ftesting.NewMockBulk()
 
 	monitor := NewMonitor(bulker, mm, config.ServerLimits{})
-	pm := monitor.(*monitorT)
+	pm := asMonitorT(t, monitor)
 
 	agentId := uuid.Must(uuid.NewV4()).String()
 	policyId := uuid.Must(uuid.NewV4()).String()
@@ -289,11 +289,11 @@ func runTestMonitor_NewPolicyExists(t *testing.T, delay time.Duration) {
 		merr = monitor.Run(ctx)
 	}()
 
-	err := monitor.(*monitorT).waitStart(ctx)
+	err := pm.waitStart(ctx)
 	require.NoError(t, err)
 
 	s, err := monitor.Subscribe(agentId, policyId, 1)
-	defer monitor.Unsubscribe(s)
+	defer func() { _ = monitor.Unsubscribe(s) }()
 	require.NoError(t, err)
 
 	timedout := false
@@ -309,7 +309,7 @@ func runTestMonitor_NewPolicyExists(t *testing.T, delay time.Duration) {
 
 	cancel()
 	mwg.Wait()
-	if merr != nil && merr != context.Canceled {
+	if merr != nil && !errors.Is(merr, context.Canceled) {
 		t.Fatal(merr)
 	}
 	require.False(t, timedout, "never got policy update; timed out after 500ms")
@@ -341,7 +341,7 @@ func Test_Monitor_Limit_Delay(t *testing.T) {
 		bulker := ftesting.NewMockBulk()
 
 		monitor := NewMonitor(bulker, mm, config.ServerLimits{PolicyLimit: config.Limit{Burst: 1, Interval: interval}})
-		pm := monitor.(*monitorT)
+		pm := asMonitorT(t, monitor)
 		pm.policiesF = func(ctx context.Context, bulker bulk.Bulk, _ []string, opt ...dl.Option) ([]model.Policy, error) {
 			return []model.Policy{}, nil
 		}
@@ -368,7 +368,7 @@ func Test_Monitor_Limit_Delay(t *testing.T) {
 		for range cap(subs) {
 			sub, err := monitor.Subscribe(uuid.Must(uuid.NewV4()).String(), policyID, 0)
 			require.NoError(t, err)
-			defer monitor.Unsubscribe(sub)
+			defer func() { _ = monitor.Unsubscribe(sub) }()
 			subs = append(subs, sub)
 		}
 
@@ -437,7 +437,7 @@ func Test_Monitor_pending_sub_gets_latest_revision(t *testing.T) {
 		// Burst of 1 and a long interval: the first subscriber is dispatched immediately,
 		// the second waits in the rate limiter.
 		monitor := NewMonitor(ftesting.NewMockBulk(), mm, config.ServerLimits{PolicyLimit: config.Limit{Burst: 1, Interval: time.Hour}})
-		pm := monitor.(*monitorT)
+		pm := asMonitorT(t, monitor)
 		pm.policiesF = func(ctx context.Context, bulker bulk.Bulk, _ []string, opt ...dl.Option) ([]model.Policy, error) {
 			return []model.Policy{}, nil
 		}
@@ -455,7 +455,7 @@ func Test_Monitor_pending_sub_gets_latest_revision(t *testing.T) {
 		for i := range subs {
 			sub, err := monitor.Subscribe(uuid.Must(uuid.NewV4()).String(), policyID, 0)
 			require.NoError(t, err)
-			defer monitor.Unsubscribe(sub)
+			defer func() { _ = monitor.Unsubscribe(sub) }()
 			subs[i] = sub
 		}
 
@@ -510,7 +510,7 @@ func TestMonitor_LatestRev(t *testing.T) {
 		bulker := ftesting.NewMockBulk()
 		mm := mmock.NewMockMonitor()
 		monitor := NewMonitor(bulker, mm, config.ServerLimits{})
-		pm := monitor.(*monitorT)
+		pm := asMonitorT(t, monitor)
 		pm.policiesF = func(ctx context.Context, bulker bulk.Bulk, _ []string, opt ...dl.Option) ([]model.Policy, error) {
 			return nil, fmt.Errorf("policy fetch error")
 		}
@@ -523,7 +523,7 @@ func TestMonitor_LatestRev(t *testing.T) {
 		bulker := ftesting.NewMockBulk()
 		mm := mmock.NewMockMonitor()
 		monitor := NewMonitor(bulker, mm, config.ServerLimits{})
-		pm := monitor.(*monitorT)
+		pm := asMonitorT(t, monitor)
 		pm.policiesF = func(ctx context.Context, bulker bulk.Bulk, _ []string, opt ...dl.Option) ([]model.Policy, error) {
 			return []model.Policy{}, nil
 		}
@@ -535,7 +535,7 @@ func TestMonitor_LatestRev(t *testing.T) {
 		bulker := ftesting.NewMockBulk()
 		mm := mmock.NewMockMonitor()
 		monitor := NewMonitor(bulker, mm, config.ServerLimits{})
-		pm := monitor.(*monitorT)
+		pm := asMonitorT(t, monitor)
 		policyId := uuid.Must(uuid.NewV4()).String()
 		rId := xid.New().String()
 		policy := model.Policy{
@@ -720,7 +720,7 @@ func Test_Monitor_repeated_events_do_not_strand_subscriber_in_rate_limiter(t *te
 			// Burst of 1 and a long interval: the first subscriber is dispatched immediately,
 			// the second waits in the rate limiter holding the popped subscriber.
 			monitor := NewMonitor(ftesting.NewMockBulk(), mm, config.ServerLimits{PolicyLimit: config.Limit{Burst: 1, Interval: time.Hour}})
-			pm := monitor.(*monitorT)
+			pm := asMonitorT(t, monitor)
 			pm.policiesF = func(ctx context.Context, bulker bulk.Bulk, _ []string, opt ...dl.Option) ([]model.Policy, error) {
 				return []model.Policy{}, nil
 			}
@@ -738,7 +738,7 @@ func Test_Monitor_repeated_events_do_not_strand_subscriber_in_rate_limiter(t *te
 			for i := range subs {
 				sub, err := monitor.Subscribe(uuid.Must(uuid.NewV4()).String(), policyID, 0)
 				require.NoError(t, err)
-				defer monitor.Unsubscribe(sub)
+				defer func() { _ = monitor.Unsubscribe(sub) }()
 				subs[i] = sub
 			}
 
@@ -884,10 +884,12 @@ func TestMonitor_CacheMissLoadsOnlyTheRequestedPolicy(t *testing.T) {
 				Run(func(args mock.Arguments) {
 					mut.Lock()
 					defer mut.Unlock()
-					searched = append(searched, searchedPolicyIDs(t, args.Get(1).([]bulk.MultiOp))...)
+					ops, ok := args.Get(1).([]bulk.MultiOp)
+					assert.True(t, ok, "MSearch ops are not []bulk.MultiOp")
+					searched = append(searched, searchedPolicyIDs(t, ops)...)
 				}).
 				Return([]bulk.MsearchResponseItem{policySearchResult(t, p)}, nil)
-			pm := NewMonitor(bulker, mmock.NewMockMonitor(), config.ServerLimits{}).(*monitorT)
+			pm := asMonitorT(t, NewMonitor(bulker, mmock.NewMockMonitor(), config.ServerLimits{}))
 
 			assert.Equal(t, int64(2), tc.get(t, pm, p.PolicyID))
 
@@ -934,7 +936,7 @@ func TestMonitor_PolicyThatDidNotLoadIsLoadedOnTheNextSubscribe(t *testing.T) {
 				mm.On("Unsubscribe", mock.Anything).Return().Once()
 				p := newTestPolicy(3)
 				var calls atomic.Int32
-				pm := NewMonitor(ftesting.NewMockBulk(), mm, config.ServerLimits{}).(*monitorT)
+				pm := asMonitorT(t, NewMonitor(ftesting.NewMockBulk(), mm, config.ServerLimits{}))
 				pm.policiesF = func(context.Context, bulk.Bulk, []string, ...dl.Option) ([]model.Policy, error) {
 					if calls.Add(1) == 1 {
 						return tc.firstLoad()
@@ -1170,7 +1172,7 @@ func TestMonitor_PoliciesInFlightAreLimited(t *testing.T) {
 		release := make(chan struct{})
 		var mut sync.Mutex
 		var searching, maxSearching int
-		pm := NewMonitor(ftesting.NewMockBulk(), mmock.NewMockMonitor(), config.ServerLimits{}).(*monitorT)
+		pm := asMonitorT(t, NewMonitor(ftesting.NewMockBulk(), mmock.NewMockMonitor(), config.ServerLimits{}))
 		pm.policiesF = func(_ context.Context, _ bulk.Bulk, policyIDs []string, _ ...dl.Option) ([]model.Policy, error) {
 			mut.Lock()
 			searching += len(policyIDs)
@@ -1210,7 +1212,7 @@ func TestMonitor_ConcurrentCacheMissesShareLoads(t *testing.T) {
 		release := make(chan struct{})
 		var mut sync.Mutex
 		var searched []string
-		pm := NewMonitor(ftesting.NewMockBulk(), mmock.NewMockMonitor(), config.ServerLimits{}).(*monitorT)
+		pm := asMonitorT(t, NewMonitor(ftesting.NewMockBulk(), mmock.NewMockMonitor(), config.ServerLimits{}))
 		pm.policiesF = func(_ context.Context, _ bulk.Bulk, policyIDs []string, _ ...dl.Option) ([]model.Policy, error) {
 			mut.Lock()
 			searched = append(searched, policyIDs...)
@@ -1258,7 +1260,7 @@ func TestMonitor_CallersDoNotFailWithTheCancellationOfTheCallerThatStartedTheLoa
 		p := newTestPolicy(3)
 		release := make(chan struct{})
 		var calls atomic.Int32
-		pm := NewMonitor(ftesting.NewMockBulk(), mmock.NewMockMonitor(), config.ServerLimits{}).(*monitorT)
+		pm := asMonitorT(t, NewMonitor(ftesting.NewMockBulk(), mmock.NewMockMonitor(), config.ServerLimits{}))
 		pm.policiesF = func(ctx context.Context, _ bulk.Bulk, _ []string, _ ...dl.Option) ([]model.Policy, error) {
 			calls.Add(1)
 			// Like MSearch, return when the context of the load ends.
@@ -1296,7 +1298,7 @@ func TestMonitor_LoadEndsWhenTheMonitorStops(t *testing.T) {
 		mm := mmock.NewMockMonitor()
 		mm.On("Subscribe").Return(ms).Once()
 		mm.On("Unsubscribe", mock.Anything).Return().Once()
-		pm := NewMonitor(ftesting.NewMockBulk(), mm, config.ServerLimits{}).(*monitorT)
+		pm := asMonitorT(t, NewMonitor(ftesting.NewMockBulk(), mm, config.ServerLimits{}))
 		pm.policiesF = func(ctx context.Context, _ bulk.Bulk, _ []string, _ ...dl.Option) ([]model.Policy, error) {
 			// Like a search that a stopped bulker never answers.
 			<-ctx.Done()
@@ -1321,7 +1323,7 @@ func TestMonitor_CallerStopsWaitingForASharedLoadWhenItsContextEnds(t *testing.T
 	synctest.Test(t, func(t *testing.T) {
 		p := newTestPolicy(3)
 		release := make(chan struct{})
-		pm := NewMonitor(ftesting.NewMockBulk(), mmock.NewMockMonitor(), config.ServerLimits{}).(*monitorT)
+		pm := asMonitorT(t, NewMonitor(ftesting.NewMockBulk(), mmock.NewMockMonitor(), config.ServerLimits{}))
 		pm.policiesF = func(context.Context, bulk.Bulk, []string, ...dl.Option) ([]model.Policy, error) {
 			// A slow load that does not observe the context of the callers.
 			<-release
@@ -1351,4 +1353,12 @@ func TestMonitor_CallerStopsWaitingForASharedLoadWhenItsContextEnds(t *testing.T
 		wg.Wait()
 		assert.Equal(t, int64(3), leaderRev, "the load goes on for the caller that still waits for it")
 	})
+}
+
+// asMonitorT returns m as *monitorT, failing the test if it is another type.
+func asMonitorT(t *testing.T, m any) *monitorT {
+	t.Helper()
+	pm, ok := m.(*monitorT)
+	require.Truef(t, ok, "monitor is %T, want *monitorT", m)
+	return pm
 }
