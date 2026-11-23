@@ -881,12 +881,13 @@ func (ct *CheckinT) markUpgradeComplete(ctx context.Context, agent *model.Agent,
 	span.Context.SetLabel("agent_id", agent.Agent.ID)
 	defer span.End()
 	// A stored upgrade_details.action_id means the ack was (or will be) a no-op, so the result is
-	// recorded here once the watch period has ended. A failed or rolled back upgrade already has its
-	// result. Without a stored action_id (fast upgrade race) the ack remains responsible for it.
-	if ud := agent.UpgradeDetails; ud != nil && ud.ActionID != "" &&
-		ud.State != string(UpgradeDetailsStateUPGFAILED) && ud.State != string(UpgradeDetailsStateUPGROLLBACK) {
-		if err := ct.createUpgradeResult(ctx, agent, ud.ActionID, ""); err != nil {
-			return err
+	// recorded here once the upgrade has ended. The create is idempotent, so it is safe to attempt
+	// again; what is recorded depends on how the stored upgrade stopped being reported.
+	if ud := agent.UpgradeDetails; ud != nil && ud.ActionID != "" {
+		if errMsg, ok := noDetailsUpgradeResult(agent, ver); ok {
+			if err := ct.createUpgradeResult(ctx, agent, ud.ActionID, errMsg); err != nil {
+				return err
+			}
 		}
 	}
 	// Checkin had no upgrade_details but agent either had stored details (normal upgrade path) or
@@ -926,6 +927,31 @@ func upgradeFailureIsFinal(m *UpgradeDetails_Metadata, now time.Time) bool {
 		return true
 	}
 	return now.After(meta.RetryUntil.Add(upgradeRetryGrace))
+}
+
+// noDetailsUpgradeResult decides which result, if any, to record for the stored upgrade of an agent
+// that checked in without upgrade_details; ver is non-empty when the agent's version changed.
+//   - A changed version, or a stored UPG_WATCHING, is evidence the upgrade completed: success. This
+//     includes a retryable UPG_FAILED stored before the retry succeeded, whose progress check-ins
+//     were missed.
+//   - A stored UPG_FAILED or UPG_ROLLBACK whose upgrade_started_at is still set was not settled
+//     (for instance by a Fleet Server that stored it without creating the result): record it from
+//     the stored state. An empty upgrade_started_at means it was already settled.
+//   - Any other stored state, e.g. UPG_SCHEDULED after the agent canceled the queued upgrade, is no
+//     evidence that the upgrade ran: record nothing.
+func noDetailsUpgradeResult(agent *model.Agent, ver string) (errMsg string, record bool) {
+	switch ud := agent.UpgradeDetails; {
+	case ver != "", ud.State == string(UpgradeDetailsStateUPGWATCHING):
+		return "", true
+	case ud.State == string(UpgradeDetailsStateUPGFAILED) && agent.UpgradeStartedAt != "":
+		if ud.Metadata != nil && ud.Metadata.ErrorMsg != "" {
+			return ud.Metadata.ErrorMsg, true
+		}
+		return "upgrade failed", true
+	case ud.State == string(UpgradeDetailsStateUPGROLLBACK) && agent.UpgradeStartedAt != "":
+		return rollbackErrorMessage(nil), true
+	}
+	return "", false
 }
 
 // rollbackErrorMessage builds the action result error for a UPG_ROLLBACK state from metadata.reason.

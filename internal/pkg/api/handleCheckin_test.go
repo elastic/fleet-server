@@ -1217,6 +1217,75 @@ func TestProcessUpgradeDetails(t *testing.T) {
 			},
 			err: nil,
 		}, {
+			name:    "checkin details nil after a canceled scheduled upgrade records no result",
+			agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}, UpgradeStartedAt: "2026-01-01T00:00:00Z", UpgradeDetails: &model.UpgradeDetails{ActionID: "test-action", State: "UPG_SCHEDULED"}},
+			details: nil,
+			bulk: func() *ftesting.MockBulk {
+				mBulk := ftesting.NewMockBulk()
+				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything).Return(nil)
+				return mBulk
+			},
+			cache: func() *testcache.MockCache {
+				return testcache.NewMockCache()
+			},
+			err: nil,
+		}, {
+			name:    "checkin details nil with a changed version records success for a stored retryable failure",
+			agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}, UpgradeStartedAt: "2026-01-01T00:00:00Z", UpgradeDetails: &model.UpgradeDetails{ActionID: "test-action", State: "UPG_FAILED"}},
+			details: nil,
+			ver:     "9.4.0",
+			bulk: func() *ftesting.MockBulk {
+				mBulk := ftesting.NewMockBulk()
+				expectResult(mBulk, "")
+				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything).Return(nil)
+				return mBulk
+			},
+			cache: func() *testcache.MockCache {
+				return testcache.NewMockCache()
+			},
+			err: nil,
+		}, {
+			name:    "checkin details nil settles an unsettled stored failure from its error",
+			agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}, UpgradeStartedAt: "2026-01-01T00:00:00Z", UpgradeDetails: &model.UpgradeDetails{ActionID: "test-action", State: "UPG_FAILED", Metadata: &model.Metadata{ErrorMsg: "download failed"}}},
+			details: nil,
+			bulk: func() *ftesting.MockBulk {
+				mBulk := ftesting.NewMockBulk()
+				expectResult(mBulk, "download failed")
+				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything).Return(nil)
+				return mBulk
+			},
+			cache: func() *testcache.MockCache {
+				return testcache.NewMockCache()
+			},
+			err: nil,
+		}, {
+			name:    "checkin details nil does not repeat a settled stored failure",
+			agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}, UpgradeDetails: &model.UpgradeDetails{ActionID: "test-action", State: "UPG_FAILED", Metadata: &model.Metadata{ErrorMsg: "download failed"}}},
+			details: nil,
+			bulk: func() *ftesting.MockBulk {
+				mBulk := ftesting.NewMockBulk()
+				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything).Return(nil)
+				return mBulk
+			},
+			cache: func() *testcache.MockCache {
+				return testcache.NewMockCache()
+			},
+			err: nil,
+		}, {
+			name:    "checkin details nil settles an unsettled stored rollback",
+			agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}, UpgradeStartedAt: "2026-01-01T00:00:00Z", UpgradeDetails: &model.UpgradeDetails{ActionID: "test-action", State: "UPG_ROLLBACK"}},
+			details: nil,
+			bulk: func() *ftesting.MockBulk {
+				mBulk := ftesting.NewMockBulk()
+				expectResult(mBulk, "upgrade rolled back")
+				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything).Return(nil)
+				return mBulk
+			},
+			cache: func() *testcache.MockCache {
+				return testcache.NewMockCache()
+			},
+			err: nil,
+		}, {
 			name:    "checkin details nil completes a stored upgrade, success result created",
 			agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}, UpgradeDetails: &model.UpgradeDetails{ActionID: "test-action", State: "UPG_WATCHING"}},
 			details: nil,
