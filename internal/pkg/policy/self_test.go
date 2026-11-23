@@ -20,6 +20,7 @@ import (
 	"github.com/gofrs/uuid/v5"
 	"github.com/rs/xid"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
@@ -727,8 +728,6 @@ func TestSelfMonitor_reportOutputSkipIfNotFound(t *testing.T) {
 func asSelfMonitorT(t *testing.T, m any) *selfMonitorT {
 	t.Helper()
 	sm, ok := m.(*selfMonitorT)
-	if !ok {
-		t.Fatalf("monitor is %T, want *selfMonitorT", m)
-	}
+	require.Truef(t, ok, "monitor is %T, want *selfMonitorT", m)
 	return sm
 }
