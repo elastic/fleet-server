@@ -37,8 +37,8 @@ github.com/dustin/go-humanize v1.0.1 h1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkp
 github.com/dustin/go-humanize v1.0.1/go.mod h1:Mu1zIs6XwVuF/gI1OepvI0qD18qycQx+mFykh5fBlto=
 github.com/ebitengine/purego v0.11.2 h1:WWiTx8rD8zYdOwSj8O/NiNbsOvSAgJMTlyV1XlbUSeU=
 github.com/ebitengine/purego v0.11.2/go.mod h1:DCHPP08djqhNSoTfImcnHYQRZmd0qhakvrozqaEYhGQ=
-github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261112233701-ee45eea5525c h1:uFuHBwPJkzoQb3m/4LOdkcaPUAIwhp0LEGtZoAdmfI8=
-github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261112233701-ee45eea5525c/go.mod h1:wEPq3ghoykAgORN8T77KlQxoZFtK8XO//+gIW4hzk5w=
+github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261123185254-2e7b83127e7e h1:PPeS6nPmYA7hkY/gRwBstVHUneo4FsLp7zPvZ6bYWBg=
+github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261123185254-2e7b83127e7e/go.mod h1:alWVTD6ugGKxKTxCRM0QJPRMg9NNEy1/Ar75udXhuJo=
 github.com/elastic/elastic-agent-client/v7 v7.21.0 h1:G2RkxMgsPwYlZMgH1DEswNQUEssnHe321OY4EYiMzSw=
 github.com/elastic/elastic-agent-client/v7 v7.21.0/go.mod h1:7Uen/EzVK7JG7ErIDofZDWdbyPsinbghHEfgIxaO/PY=
 github.com/elastic/elastic-transport-go/v8 v8.11.0 h1:taYmqC2M6+fZt/+W+ENYh/W5L9+KrlJGOSbEJs8egWc=
