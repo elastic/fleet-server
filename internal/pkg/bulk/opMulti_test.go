@@ -8,6 +8,7 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"testing"
@@ -24,66 +25,89 @@ const payload = `{"_id" : "1", "_index" : "test"}`
 
 func TestMultiWriteOptionsReachElasticsearch(t *testing.T) {
 	tests := []struct {
-		name string
-		give func(*Bulker, context.Context, []MultiOp, ...Opt) ([]BulkIndexerResponseItem, error)
-		body string
-		opts []Opt
-		want string
+		name        string
+		method      func(*Bulker, context.Context, []MultiOp, ...Opt) ([]BulkIndexerResponseItem, error)
+		body        []byte
+		opts        []Opt
+		want        string
+		wantRefresh bool
 	}{
 		{
-			name: "a multi-create forwards refresh",
-			give: (*Bulker).MCreate,
-			body: `{}`,
-			want: `{"create":{"_id":"1","_index":"testidx"}}`,
+			name:   "a multi-create uses defaults",
+			method: (*Bulker).MCreate,
+			want:   `{"create":{"_id":"1","_index":"testidx"}}`,
 		},
 		{
-			name: "a multi-index forwards refresh",
-			give: (*Bulker).MIndex,
-			body: `{}`,
-			want: `{"index":{"_id":"1","_index":"testidx"}}`,
+			name:        "a multi-create forwards refresh",
+			method:      (*Bulker).MCreate,
+			body:        []byte(`{}`),
+			opts:        []Opt{WithRefresh(), WithFlushAfter(1)},
+			want:        `{"create":{"_id":"1","_index":"testidx"}}`,
+			wantRefresh: true,
 		},
 		{
-			name: "a multi-update forwards refresh and conflict retries",
-			give: (*Bulker).MUpdate,
-			body: `{"doc":{}}`,
-			opts: []Opt{WithRetryOnConflict(3)},
-			want: `{"update":{"_id":"1","retry_on_conflict":3,"_index":"testidx"}}`,
+			name:        "a multi-index forwards refresh",
+			method:      (*Bulker).MIndex,
+			body:        []byte(`{}`),
+			opts:        []Opt{WithRefresh(), WithFlushAfter(1)},
+			want:        `{"index":{"_id":"1","_index":"testidx"}}`,
+			wantRefresh: true,
 		},
 		{
-			name: "a multi-delete forwards refresh",
-			give: (*Bulker).MDelete,
-			want: `{"delete":{"_id":"1","_index":"testidx"}}`,
+			name:        "a multi-update forwards refresh and conflict retries",
+			method:      (*Bulker).MUpdate,
+			body:        []byte(`{"doc":{}}`),
+			opts:        []Opt{WithRefresh(), WithFlushAfter(1), WithRetryOnConflict(3)},
+			want:        `{"update":{"_id":"1","retry_on_conflict":3,"_index":"testidx"}}`,
+			wantRefresh: true,
+		},
+		{
+			name:        "a multi-delete forwards refresh",
+			method:      (*Bulker).MDelete,
+			opts:        []Opt{WithRefresh(), WithFlushAfter(1)},
+			want:        `{"delete":{"_id":"1","_index":"testidx"}}`,
+			wantRefresh: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ops := []MultiOp{{Index: testIndex, ID: "1", Body: tt.body}}
+			var bulkerOpts []BulkOpt
+			if len(tt.opts) > 0 {
+				bulkerOpts = []BulkOpt{WithFlushInterval(time.Hour)}
+			}
+			wantQuery := url.Values{}
+			if tt.wantRefresh {
+				wantQuery.Set("refresh", "true")
+			}
+
+			var query url.Values
+			var requestBody []byte
+			recordBulkRequest := performFunc(func(req *http.Request) (*http.Response, error) {
+				query = req.URL.Query()
+				body, err := io.ReadAll(req.Body)
+				if err != nil {
+					return nil, err
+				}
+				requestBody = body
+				response := &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"items":[{"index":{"status":200}}]}`)),
+				}
+				return response, nil
+			})
+
 			synctest.Test(t, func(t *testing.T) {
-				var refresh string
-				var requestBody []byte
-				transport := performFunc(func(req *http.Request) (*http.Response, error) {
-					refresh = req.URL.Query().Get("refresh")
-					body, err := io.ReadAll(req.Body)
-					if err != nil {
-						return nil, err
-					}
-					requestBody = body
-					return &http.Response{
-						StatusCode: http.StatusOK,
-						Body:       io.NopCloser(strings.NewReader(`{"items":[{"index":{"status":200}}]}`)),
-					}, nil
-				})
-				bulker := NewBulker(transport, nil, WithFlushInterval(time.Hour))
-				ctx := runBulker(t, bulker)
-				writeCtx, cancel := context.WithTimeout(ctx, time.Minute)
+				bulker := NewBulker(recordBulkRequest, nil, bulkerOpts...)
+				ctx, cancel := context.WithTimeout(runBulker(t, bulker), time.Minute)
 				defer cancel()
 
-				ops := []MultiOp{{Index: testIndex, ID: "1", Body: []byte(tt.body)}}
-				opts := append([]Opt{WithRefresh(), WithFlushAfter(1)}, tt.opts...)
-				items, err := tt.give(bulker, writeCtx, ops, opts...)
+				items, err := tt.method(bulker, ctx, ops, tt.opts...)
 				require.NoError(t, err)
+
 				require.Len(t, items, len(ops))
 
-				assert.Equal(t, "true", refresh)
+				assert.Equal(t, wantQuery, query)
 
 				metadata, _, _ := strings.Cut(string(requestBody), "\n")
 				assert.JSONEq(t, tt.want, metadata)
