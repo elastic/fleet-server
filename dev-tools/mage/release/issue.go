@@ -86,7 +86,7 @@ func EnsureReleaseIssueTracker(cfg *ReleaseConfig, workflowPRs []*github.PullReq
 		return nil
 	}
 
-	updatedBody, changed := mergeReleaseIssueBody(existing.GetBody(), cfg.NextRelease, isMajorMinor, prURLs)
+	updatedBody, changed := mergeReleaseIssueBody(existing.GetBody(), isMajorMinor, prURLs)
 	if changed {
 		if err := gh.updateIssueBody(owner, repo, existing.GetNumber(), updatedBody); err != nil {
 			return err
@@ -217,7 +217,7 @@ func formatPRChecklist(prURLs []string, checked map[string]bool) string {
 
 // mergeReleaseIssueBody updates an existing issue body with missing tracker link and PR URLs.
 // Checklist item checkboxes outside the PRs section are left untouched.
-func mergeReleaseIssueBody(existingBody, version string, isMajorMinor bool, prURLs []string) (string, bool) {
+func mergeReleaseIssueBody(existingBody string, isMajorMinor bool, prURLs []string) (string, bool) {
 	existingChecked := extractPRCheckboxes(existingBody)
 	allURLs := mergePRURLs(prURLs, keys(existingChecked))
 

@@ -113,7 +113,7 @@ func TestMergeReleaseIssueBodyAddsMissingPRsAndPreservesChecks(t *testing.T) {
 - [x] ` + testPRURL10 + `
 - [ ] ` + testPRURL11 + `
 `
-	updated, changed := mergeReleaseIssueBody(existing, "9.4.1", false, []string{
+	updated, changed := mergeReleaseIssueBody(existing, false, []string{
 		testPRURL11,
 		testPRURL12,
 	})
@@ -133,7 +133,7 @@ func TestMergeReleaseIssueBodyAddsMissingPRsAndPreservesChecks(t *testing.T) {
 		t.Fatal("non-PR checklist state must be preserved")
 	}
 
-	_, changedAgain := mergeReleaseIssueBody(updated, "9.4.1", false, []string{
+	_, changedAgain := mergeReleaseIssueBody(updated, false, []string{
 		testPRURL10,
 		testPRURL11,
 		testPRURL12,
@@ -150,7 +150,7 @@ func TestMergeReleaseIssueBodyAddsTrackerWhenMissing(t *testing.T) {
 
 - [ ] https://github.com/elastic/fleet-server/pull/10
 `
-	updated, changed := mergeReleaseIssueBody(existing, "9.4.1", false, []string{testPRURL10})
+	updated, changed := mergeReleaseIssueBody(existing, false, []string{testPRURL10})
 	if !changed {
 		t.Fatal("missing global tracker should trigger an update")
 	}
