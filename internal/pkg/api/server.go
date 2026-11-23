@@ -15,7 +15,6 @@ import (
 
 	"github.com/elastic/beats/v7/pkg/logp"
 	"github.com/elastic/beats/v7/pkg/transport/tlscommon"
-	"github.com/go-chi/chi/v5"
 
 	"github.com/rs/zerolog"
 	zlog "github.com/rs/zerolog/log"
@@ -52,19 +51,18 @@ func NewServer(addr string, cfg *config.Server, opts ...APIOpt) *server {
 		logger: zap.NewStub("api-server"),
 	}
 
-	handler := newRouter(&cfg.Limits, a, a.tracer)
 	// If OpAMP feature is enabled, add OpAMP route handler to router and
 	// let OpAMP server modify connection context (setup later when HTTP server
 	// object is constructed).
+	var opAMPHandler http.Handler
 	if a.oa != nil && a.oa.Enabled() {
 		zlog.Info().Msg("enabling OpAMP endpoint")
-		handler = addOpAMPRouteHandler(handler, a.oa, &cfg.Limits)
+		opAMPHandler = http.HandlerFunc(a.oa.handler)
 		s.connContext = a.oa.connCtx
 	}
 
-	s.handler = handler
+	s.handler = newRouter(&cfg.Limits, a, a.tracer, opAMPHandler)
 	return &s
-
 }
 
 func (s *server) Run(ctx context.Context) error {
@@ -151,19 +149,6 @@ func (s *server) Run(ctx context.Context) error {
 	}
 
 	return nil
-}
-
-func addOpAMPRouteHandler(existingHandler http.Handler, oa *OpAMPT, cfg *config.ServerLimits) http.Handler {
-	r := chi.NewRouter()
-	r.Use(Limiter(cfg).middleware)
-
-	opAMPHandler := oa.handler
-	r.HandleFunc("/v1/opamp", http.HandlerFunc(opAMPHandler))
-
-	// Handle existing routes
-	r.Mount("/", existingHandler)
-
-	return r
 }
 
 func getDiagConnFunc(ctx context.Context) func(c net.Conn, s http.ConnState) {
