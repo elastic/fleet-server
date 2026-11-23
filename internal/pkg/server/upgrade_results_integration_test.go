@@ -58,6 +58,51 @@ func Test_Upgrade_Results(t *testing.T) {
 		require.Len(t, u.results(), 1)
 	})
 
+	t.Run("failed download that can still be retried is not recorded", func(t *testing.T) {
+		u := newUpgradeTest(t, ctx, srv)
+
+		retryUntil := time.Now().Add(time.Hour).UTC().Format(time.RFC3339)
+		u.checkin(api.UpgradeDetailsStateUPGFAILED, map[string]any{"failed_state": "UPG_DOWNLOADING", "error_msg": "copy failed", "retry_until": retryUntil})
+		require.Empty(t, u.results(), "no result while the download can still be retried")
+		require.NotEmpty(t, u.agent().UpgradeStartedAt, "agent stays updating while the download can be retried")
+
+		// The retry succeeded, the agent proceeds and the upgrade completes: a single success.
+		u.checkin(api.UpgradeDetailsStateUPGDOWNLOADING, nil)
+		u.checkin(api.UpgradeDetailsStateUPGWATCHING, nil)
+		u.ack("")
+		require.Empty(t, u.results())
+		u.checkinNoDetails()
+		res := u.waitResults(1)
+		require.Empty(t, res[0].Error)
+	})
+
+	t.Run("failed download is recorded once retry_until has passed", func(t *testing.T) {
+		u := newUpgradeTest(t, ctx, srv)
+
+		retryUntil := time.Now().Add(-time.Hour).UTC().Format(time.RFC3339)
+		u.checkin(api.UpgradeDetailsStateUPGFAILED, map[string]any{"failed_state": "UPG_DOWNLOADING", "error_msg": "failed to get upgrade artifact", "retry_until": retryUntil})
+		res := u.waitResults(1)
+		require.Equal(t, "failed to get upgrade artifact", res[0].Error)
+		require.Empty(t, u.agent().UpgradeStartedAt)
+	})
+
+	t.Run("failure after the download is recorded immediately", func(t *testing.T) {
+		u := newUpgradeTest(t, ctx, srv)
+
+		u.checkin(api.UpgradeDetailsStateUPGFAILED, map[string]any{"failed_state": "UPG_EXTRACTING", "error_msg": "extract failed"})
+		res := u.waitResults(1)
+		require.Equal(t, "extract failed", res[0].Error)
+	})
+
+	t.Run("canceled scheduled upgrade records no result", func(t *testing.T) {
+		u := newUpgradeTest(t, ctx, srv)
+
+		u.checkin(api.UpgradeDetailsStateUPGSCHEDULED, map[string]any{"scheduled_at": time.Now().Add(time.Hour).UTC().Format(time.RFC3339)})
+		u.checkinNoDetails() // the agent dropped the queued upgrade after a cancel action
+		require.Empty(t, u.results(), "an upgrade that never ran must not be recorded as a success")
+		require.Nil(t, u.agent().UpgradeDetails)
+	})
+
 	t.Run("rolled back upgrade is recorded with the reason", func(t *testing.T) {
 		u := newUpgradeTest(t, ctx, srv)
 
