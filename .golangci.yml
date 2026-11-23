@@ -89,10 +89,15 @@ linters:
       min-occurrences: 2
 
     gomoddirectives:
+<<<<<<< HEAD
       # Allow local `replace` directives. Default is false.
       replace-local: false
       replace-allow-list:
         - github.com/deepmap/oapi-codegen
+=======
+      # Allow local `replace` directives (e.g. dev-tools submodule in go.mod).
+      replace-local: true
+>>>>>>> ef9e2cb (ci(ff): support feature freeze automation (#7339))
     gomodguard:
       blocked:
         # List of blocked modules.
