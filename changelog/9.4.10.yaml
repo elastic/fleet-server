@@ -1,0 +1,33 @@
+version: 9.4.10
+entries:
+    - kind: bug-fix
+      summary: Substitute secrets for pending actions during check-in
+      description: |
+        Fleet Server now replaces `$co.elastic.secret{id}` references in action data
+        for actions returned by the check-in pending-actions path. Previously, only
+        actions delivered through the dispatcher were substituted, so agents that
+        received an action while offline or between check-ins got the literal secret
+        reference instead of the secret value.
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/8152
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1793193137
+      file:
+        name: 1793193137-substitute-pending-action-secrets.yaml
+        checksum: 3551ca17d51eda1e405f61f66a64118d39dc2aeb
+    - kind: bug-fix
+      summary: Fix doubled route metrics and missing request logs when OpAMP is enabled
+      description: When the OpAMP endpoint was enabled, Fleet Server counted each API request two times in the active and total route metrics. Requests that a route limit rejected did not show in the request log or in APM. Fleet Server now counts each request one time and logs and traces rejected requests like other responses.
+      component: fleet-server
+      pr:
+        - https://github.com/elastic/fleet-server/pull/8276
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1795003967
+      file:
+        name: 1795003967-fix-doubled-route-metrics-and-missing-request-logs-when-opamp-is-enabled.yaml
+        checksum: 0bf86659e7be856fbb9e9954aad4c139c6a260a3
