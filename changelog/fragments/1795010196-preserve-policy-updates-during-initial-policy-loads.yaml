@@ -1,0 +1,7 @@
+kind: bug-fix
+summary: Preserve policy updates during initial policy loads
+description: |
+  Fix lost notifications and stale cached policies that can occur during
+  long initial policy loads.
+component: fleet-server
+issue: https://github.com/elastic/fleet-server/issues/8275
