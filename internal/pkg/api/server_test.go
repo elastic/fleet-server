@@ -311,7 +311,10 @@ func Test_server_ClientCert(t *testing.T) {
 		defer rCancel()
 		req, err := http.NewRequestWithContext(rCtx, "GET", "https://"+addr+"/api/status", nil)
 		require.NoError(t, err)
-		_, err = httpClient.Do(req)
+		resp, err := httpClient.Do(req)
+		if err == nil {
+			resp.Body.Close()
+		}
 		require.Error(t, err)
 
 		cancel()
@@ -336,7 +339,7 @@ func Test_server_ClientCert(t *testing.T) {
 		cfg.Port = port
 		addr := cfg.BindEndpoints()[0]
 
-		// prep server config without specifing client_authentication
+		// prep server config without specifying client_authentication
 		tlsYML := fmt.Sprintf(`
 enabled: true
 certificate: "%s"

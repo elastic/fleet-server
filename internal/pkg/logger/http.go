@@ -32,7 +32,7 @@ const (
 
 type ReaderCounter struct {
 	io.ReadCloser
-	count uint64
+	count atomic.Uint64
 }
 
 func NewReaderCounter(r io.ReadCloser) *ReaderCounter {
@@ -43,17 +43,17 @@ func NewReaderCounter(r io.ReadCloser) *ReaderCounter {
 
 func (rd *ReaderCounter) Read(buf []byte) (int, error) {
 	n, err := rd.ReadCloser.Read(buf)
-	atomic.AddUint64(&rd.count, uint64(n)) //nolint:gosec // disable G115
+	rd.count.Add(uint64(n)) //nolint:gosec // disable G115
 	return n, err
 }
 
 func (rd *ReaderCounter) Count() uint64 {
-	return atomic.LoadUint64(&rd.count)
+	return rd.count.Load()
 }
 
 type ResponseCounter struct {
 	http.ResponseWriter
-	count      uint64
+	count      atomic.Uint64
 	statusCode int
 }
 
@@ -69,7 +69,7 @@ func (rc *ResponseCounter) Write(buf []byte) (int, error) {
 	}
 
 	n, err := rc.ResponseWriter.Write(buf)
-	atomic.AddUint64(&rc.count, uint64(n)) //nolint:gosec // disable G115
+	rc.count.Add(uint64(n)) //nolint:gosec // disable G115
 	return n, err
 }
 
@@ -88,7 +88,7 @@ func (rc *ResponseCounter) Unwrap() http.ResponseWriter {
 }
 
 func (rc *ResponseCounter) Count() uint64 {
-	return atomic.LoadUint64(&rc.count)
+	return rc.count.Load()
 }
 
 type ctxTSKey struct{}

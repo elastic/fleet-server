@@ -1,6 +1,6 @@
 module github.com/elastic/fleet-server/testing
 
-go 1.26.11
+go 1.27.4
 
 replace (
 	github.com/elastic/fleet-server/pkg/api => ../pkg/api
@@ -9,7 +9,7 @@ replace (
 
 require (
 	github.com/Shopify/toxiproxy/v2 v2.12.0
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261112233701-ee45eea5525c
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261123185254-2e7b83127e7e
 	github.com/elastic/elastic-agent-client/v7 v7.21.0
 	github.com/elastic/fleet-server/pkg/api v0.0.0-00010101000000-000000000000
 	github.com/elastic/fleet-server/v7 v7.17.29

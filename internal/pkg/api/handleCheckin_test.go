@@ -58,7 +58,8 @@ func (m *mockPolicyMonitor) Run(ctx context.Context) error {
 
 func (m *mockPolicyMonitor) Subscribe(agentID, policyID string, revIDX int64) (policy.Subscription, error) {
 	args := m.Called(agentID, policyID, revIDX)
-	return args.Get(0).(policy.Subscription), args.Error(1)
+	sub, _ := args.Get(0).(policy.Subscription)
+	return sub, args.Error(1)
 }
 
 func (m *mockPolicyMonitor) Unsubscribe(sub policy.Subscription) error {
@@ -68,7 +69,8 @@ func (m *mockPolicyMonitor) Unsubscribe(sub policy.Subscription) error {
 
 func (m *mockPolicyMonitor) LatestRev(ctx context.Context, id string) int64 {
 	args := m.Called(ctx, id)
-	return args.Get(0).(int64)
+	rev, _ := args.Get(0).(int64)
+	return rev
 }
 
 func (m *mockPolicyMonitor) GetPolicy(ctx context.Context, policyID string) (*model.Policy, error) {
@@ -399,7 +401,7 @@ func TestFilterActions(t *testing.T) {
 		}},
 		resp: []model.Action{},
 	}, {
-		name: "No type is filterd",
+		name: "No type is filtered",
 		actions: []model.Action{{
 			ActionID: "1234",
 		}},
@@ -451,6 +453,7 @@ func TestResolveSeqNo(t *testing.T) {
 
 }
 
+//nolint:dupl // table cases are intentionally parallel
 func TestProcessUpgradeDetails(t *testing.T) {
 	esd := model.ESDocument{Id: "doc-ID"}
 	doc := bulk.UpdateFields{
@@ -617,10 +620,8 @@ func TestProcessUpgradeDetails(t *testing.T) {
 			mBulk := ftesting.NewMockBulk()
 			mBulk.On("Search", mock.Anything, dl.FleetActions, mock.Anything, mock.Anything).Return(
 				&es.ResultT{
-					HitsT: es.HitsT{
-						Hits: []es.HitT{
-							{Source: []byte(`{"action_id": "test-action"}`)},
-						},
+					Hits: []es.HitT{
+						{Source: []byte(`{"action_id": "test-action"}`)},
 					},
 				}, nil)
 			mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything, mock.Anything).Return(nil)
@@ -1450,18 +1451,18 @@ func TestHandleCheckin_GracefulForceUnenroll(t *testing.T) {
 			var req *http.Request
 			if errors.Is(tc.authErr, apikey.ErrNoAuthHeader) {
 				// no Authorization header — triggers ErrNoAuthHeader before any bulker call
-				req = httptest.NewRequest(http.MethodPost, "/", nil)
+				req = newTestRequest(http.MethodPost, "/", nil)
 			} else if errors.Is(tc.authErr, ErrAPIKeyNotEnabled) {
 				// ErrAPIKeyNotEnabled is produced by authAPIKey after APIKeyAuth returns
 				// a disabled key (Enabled: false, nil error). SetAPIKey is then called
 				// to update the cache before the error is surfaced.
-				req = httptest.NewRequest(http.MethodPost, "/", nil)
+				req = newTestRequest(http.MethodPost, "/", nil)
 				req.Header.Set("Authorization", makeAPIKeyAuthHeader("key-id", "key-secret"))
 				mCache.On("ValidAPIKey", mock.Anything).Return(false)
 				mBulk.On("APIKeyAuth", mock.Anything, mock.Anything).Return(&bulk.SecurityInfo{Enabled: false}, nil)
 				mCache.On("SetAPIKey", mock.Anything, false)
 			} else {
-				req = httptest.NewRequest(http.MethodPost, "/", nil)
+				req = newTestRequest(http.MethodPost, "/", nil)
 				req.Header.Set("Authorization", makeAPIKeyAuthHeader("key-id", "key-secret"))
 				mCache.On("ValidAPIKey", mock.Anything).Return(false)
 				mBulk.On("APIKeyAuth", mock.Anything, mock.Anything).Return((*bulk.SecurityInfo)(nil), tc.authErr)
@@ -1689,7 +1690,7 @@ func TestValidateCheckinRequest(t *testing.T) {
 					assert.JSONEq(t, string(tc.expValid.rawAvailableRollbacks), string(valid.rawAvailableRollbacks))
 				}
 			} else {
-				// Asserting error messages prior to ErrorAs becuase ErrorAs modifies
+				// Asserting error messages prior to ErrorAs because ErrorAs modifies
 				// the target error. If we assert error messages after calling ErrorAs
 				// we will end up with false positives.
 				assert.Equal(t, tc.expErr.Error(), err.Error())
@@ -1984,7 +1985,7 @@ func TestProcessPolicyRemoteESServiceTokenSecretPaths(t *testing.T) {
 	defaultKey := bulk.APIKey{ID: "default-id", Key: "default-key"}
 	remoteKey := bulk.APIKey{ID: "remote-id", Key: "remote-key"}
 	agent := &model.Agent{
-		ESDocument: model.ESDocument{Id: "agent1"},
+		Id: "agent1",
 		Outputs: map[string]*model.PolicyOutput{
 			"default": {
 				APIKey:          defaultKey.Agent(),
@@ -2066,7 +2067,7 @@ func TestProcessPolicyPrunesAgentPinnedInputsSecretPaths(t *testing.T) {
 	require.NotNil(t, defaultOut.Role)
 	key := bulk.APIKey{ID: "default-id", Key: "default-key"}
 	agent := &model.Agent{
-		ESDocument: model.ESDocument{Id: "agent1"},
+		Id: "agent1",
 		Outputs: map[string]*model.PolicyOutput{
 			"default": {
 				APIKey:          key.Agent(),
@@ -2194,9 +2195,9 @@ func TestProcessPolicyAgentTags(t *testing.T) {
 
 			apiKey := bulk.APIKey{ID: "default-id", Key: "default-key"}
 			agent := &model.Agent{
-				ESDocument: model.ESDocument{Id: "agent1"},
-				Tags:       tc.tags,
-				TagsHash:   tc.tagsHash,
+				Id:       "agent1",
+				Tags:     tc.tags,
+				TagsHash: tc.tagsHash,
 				Outputs: map[string]*model.PolicyOutput{
 					"default": {
 						APIKey:          apiKey.Agent(),
@@ -2281,7 +2282,7 @@ func TestProcessPolicySecretPathsConcurrentDispatch(t *testing.T) {
 	errs := make([]error, agents)
 	for a := range agents {
 		agent := &model.Agent{
-			ESDocument: model.ESDocument{Id: fmt.Sprintf("agent%d", a)},
+			Id: fmt.Sprintf("agent%d", a),
 			Outputs: map[string]*model.PolicyOutput{
 				"remote": {
 					APIKey:          remoteKey.Agent(),
@@ -2320,7 +2321,7 @@ func TestProcessPolicyOTLPOutput(t *testing.T) {
 	const outputName = "my-otlp"
 
 	// secretDocID is returned by MockBulk.WriteSecret; MockBulk.ReadSecrets returns id+"_value".
-	const secretDocID = "otlp-secret-doc-id"
+	const secretDocID = "otlp-secret-doc-id" //nolint:gosec // G101: test fixture, not a real credential
 	wantHeader := "ApiKey " + base64.StdEncoding.EncodeToString([]byte(secretDocID+"_value"))
 
 	tests := []struct {
@@ -2394,7 +2395,7 @@ func TestProcessPolicyOTLPOutput(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			agent := &model.Agent{ESDocument: model.ESDocument{Id: "agent1"}}
+			agent := &model.Agent{Id: "agent1"}
 
 			action, _, err := processPolicy(t.Context(), logger, bulker, agent, pp, true, nil)
 			require.NoError(t, err)
@@ -2432,7 +2433,7 @@ func TestProcessPolicyOTLPOutput(t *testing.T) {
 func TestPrepareOTelExporters(t *testing.T) {
 	esAPIKey := "keyid:secret"
 	esAPIKeyB64 := base64.StdEncoding.EncodeToString([]byte(esAPIKey))
-	otlpAPIKey := "otlpid:otlpsecret"
+	otlpAPIKey := "otlpid:otlpsecret" //nolint:gosec // G101: test fixture, not a real credential
 	otlpAPIKeyB64 := base64.StdEncoding.EncodeToString([]byte(otlpAPIKey))
 
 	esOutput := map[string]any{"type": policy.OutputTypeElasticsearch, "api_key": esAPIKey}
@@ -2540,17 +2541,17 @@ func TestPrepareOTelExporters(t *testing.T) {
 }
 
 func TestFetchAgentPendingActionsReplacesSecrets(t *testing.T) {
-	const actionWithSecret = `{"action_id":"action-with-secret","type":"INPUT_ACTION","data":{"parameters":{"credential":"$co.elastic.secret{ref1}"}},"secret_references":[{"id":"ref1"}]}`
-	const actionWithoutSecret = `{"action_id":"action-without-secret","type":"INPUT_ACTION","data":{"parameters":{"credential":"plain"}}}`
-	const filteredActionWithSecret = `{"action_id":"filtered-action","type":"POLICY_CHANGE","data":{"parameters":{"credential":"$co.elastic.secret{ref1}"}},"secret_references":[{"id":"ref1"}]}`
+	const actionWithSecret = `{"action_id":"action-with-secret","type":"INPUT_ACTION","data":{"parameters":{"credential":"$co.elastic.secret{ref1}"}},"secret_references":[{"id":"ref1"}]}`       //nolint:gosec // G101: test fixture, not a real credential
+	const actionWithoutSecret = `{"action_id":"action-without-secret","type":"INPUT_ACTION","data":{"parameters":{"credential":"plain"}}}`                                                        //nolint:gosec // G101: test fixture, not a real credential
+	const filteredActionWithSecret = `{"action_id":"filtered-action","type":"POLICY_CHANGE","data":{"parameters":{"credential":"$co.elastic.secret{ref1}"}},"secret_references":[{"id":"ref1"}]}` //nolint:gosec // G101: test fixture, not a real credential
 
 	bulker := ftesting.NewMockBulk()
 	bulker.On("Search", mock.Anything, dl.FleetActions, mock.Anything, mock.Anything).
-		Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{
+		Return(&es.ResultT{Hits: []es.HitT{
 			{ID: "action-with-secret", SeqNo: 1, Source: json.RawMessage(actionWithSecret)},
 			{ID: "action-without-secret", SeqNo: 2, Source: json.RawMessage(actionWithoutSecret)},
 			{ID: "filtered-action", SeqNo: 3, Source: json.RawMessage(filteredActionWithSecret)},
-		}}}, nil).Once()
+		}}, nil).Once()
 
 	gcp := monitormock.NewMockMonitor()
 	gcp.On("GetCheckpoint").Return(sqn.SeqNo{3}).Once()
