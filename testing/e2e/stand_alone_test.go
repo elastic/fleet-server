@@ -646,6 +646,33 @@ func (suite *StandAloneSuite) writeOpAMPCollectorConfig(configFilePath, instance
 	suite.Require().NoError(err)
 }
 
+// removeUpstreamCollectorComponent drops a contrib component from the otelcontribcol
+// builder config, so that it is not compiled into the collector built by
+// TestOpAMPWithUpstreamCollector. Only the OpAMP extension matters to that test.
+//
+// It is used for asapauthextension, whose github.com/SermoDigital/jose dependency
+// registers crypto.Hash(0) in an init function. Go 1.27 panics on that, so any
+// otelcontribcol built with Go 1.27 crashes on startup. Remove this workaround once
+// https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/51868 is fixed.
+func (suite *StandAloneSuite) removeUpstreamCollectorComponent(cloneDir, component string) {
+	configPath := filepath.Join(cloneDir, "cmd", "otelcontribcol", "builder-config.yaml")
+	config, err := os.ReadFile(configPath)
+	suite.Require().NoError(err)
+
+	gomod := "gomod: github.com/open-telemetry/opentelemetry-collector-contrib/" + component + " "
+	lines := strings.Split(string(config), "\n")
+	kept := lines[:0]
+	for _, line := range lines {
+		if strings.Contains(line, gomod) {
+			suite.T().Logf("Removing %s from the upstream collector build", component)
+			continue
+		}
+		kept = append(kept, line)
+	}
+	err = os.WriteFile(configPath, []byte(strings.Join(kept, "\n")), 0o600)
+	suite.Require().NoError(err)
+}
+
 // TestOpAMPWithUpstreamCollector ensures that the upstream OTel Collector contrib can connect
 // to Fleet Server over OpAMP and enroll as an agent in the .fleet-agents index.
 func (suite *StandAloneSuite) TestOpAMPWithUpstreamCollector() {
@@ -697,6 +724,8 @@ func (suite *StandAloneSuite) TestOpAMPWithUpstreamCollector() {
 	cloneCmd.Stderr = os.Stderr
 	err = cloneCmd.Run()
 	suite.Require().NoError(err)
+
+	suite.removeUpstreamCollectorComponent(cloneDir, "extension/asapauthextension")
 
 	// Build the OTel Collector binary
 	suite.T().Log("Building otelcol-contrib binary via make otelcontribcol")

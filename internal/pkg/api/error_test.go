@@ -6,6 +6,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -18,25 +19,35 @@ import (
 	"go.elastic.co/apm/v2/apmtest"
 )
 
+// Test literals shared by more than one test case.
+const (
+	testGenericError   = "generic error"
+	testErrTypeElastic = "ErrElastic" // error.type label value for *es.ErrElastic
+	testErrorTypeTag   = "error_type" // APM label key that error.type is reported under
+)
+
 func Test_ErrorResp(t *testing.T) {
 	tests := []struct {
 		name         string
 		err          error
 		expectedTags map[string]interface{}
 	}{{
-		name: "generic error",
-		err:  fmt.Errorf("generic error"),
+		name: testGenericError,
+		err:  errors.New(testGenericError),
 	}, {
 		name: "elastic error",
 		err:  &es.ErrElastic{},
 		expectedTags: map[string]interface{}{
-			"error_type": "ErrElastic",
+			testErrorTypeTag: testErrTypeElastic,
 		},
 	}, {
 		name: "wrapped elastic error",
-		err:  fmt.Errorf("wrapped error: %w", &es.ErrElastic{}),
+		// Converted to error because ErrElastic's Error method has a value receiver,
+		// and go vet (Go 1.27+) rejects wrapping a pointer to such a type with %w.
+		// Production code returns *es.ErrElastic, so the test wraps a pointer too.
+		err: fmt.Errorf("wrapped error: %w", error(&es.ErrElastic{})),
 		expectedTags: map[string]interface{}{
-			"error_type": "ErrElastic",
+			testErrorTypeTag: testErrTypeElastic,
 		},
 	}}
 

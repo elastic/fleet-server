@@ -2,8 +2,6 @@ version: "2"
 run:
   # timeout for analysis, e.g. 30s, 5m, default is 1m
   timeout: 1m
-  build-tags:
-    - integration
 
 issues:
   # Maximum count of issues with the same text.
@@ -162,6 +160,10 @@ linters:
       - text: "SA1019: elasticsearch\\.(Config|NewClient|NewBaseClient)"
         linters:
           - staticcheck
+      # Repeated fixture strings are clearer inline than as constants in tests.
+      - path: _test\.go
+        linters:
+          - goconst
     paths:
       - third_party$
       - builtin$
