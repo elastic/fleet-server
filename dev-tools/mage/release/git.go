@@ -477,7 +477,10 @@ func gitPushEnv(baseEnv []string, token string) []string {
 // push pushes the current branch to the remote.
 // It uses the git CLI (not go-git) so Buildkite reference clones can pack and
 // upload objects from shared mirrors; go-git push hangs in that layout.
-func (g *gitRepo) push(remoteName, token string) error {
+// owner/repo must match the effective origin GitHub destination (PROJECT_OWNER /
+// PROJECT_REPO) so fork dry-runs cannot push to elastic while opening PRs elsewhere.
+// file:// remotes used in tests skip the owner/repo check.
+func (g *gitRepo) push(remoteName, token, owner, repo string) error {
 	if token == "" {
 		return fmt.Errorf("GitHub token is required for pushing")
 	}
@@ -486,6 +489,9 @@ func (g *gitRepo) push(remoteName, token string) error {
 	}
 
 	if err := g.ensureHTTPSRemote(remoteName); err != nil {
+		return err
+	}
+	if err := g.ensureOriginMatchesProject(owner, repo); err != nil {
 		return err
 	}
 
@@ -515,6 +521,69 @@ func (g *gitRepo) push(remoteName, token string) error {
 
 	printf("Pushed branch %s to remote: origin\n", currentBranch)
 	return nil
+}
+
+// ensureOriginMatchesProject checks that origin's push destination is
+// github.com/<owner>/<repo> (after HTTPS rewrite). file:// remotes are allowed
+// for local tests and skip the check.
+func (g *gitRepo) ensureOriginMatchesProject(owner, repo string) error {
+	if owner == "" || repo == "" {
+		return fmt.Errorf("PROJECT_OWNER and PROJECT_REPO are required before push")
+	}
+
+	urls, err := g.gitConfigGetAll("remote.origin.pushurl")
+	if err != nil {
+		return err
+	}
+	if len(urls) == 0 {
+		urls, err = g.gitConfigGetAll("remote.origin.url")
+		if err != nil {
+			return err
+		}
+	}
+	if len(urls) == 0 {
+		return fmt.Errorf("remote origin has no URLs")
+	}
+
+	sawGitHub := false
+	for _, raw := range urls {
+		u := strings.TrimSpace(raw)
+		if strings.HasPrefix(u, "file://") {
+			continue
+		}
+		httpsURL, _ := githubHTTPSPushURL(u)
+		remoteOwner, remoteRepo, ok := parseGitHubOwnerRepo(httpsURL)
+		if !ok {
+			return fmt.Errorf("remote origin URL %q is not a github.com repository path", raw)
+		}
+		sawGitHub = true
+		if !strings.EqualFold(remoteOwner, owner) || !strings.EqualFold(remoteRepo, repo) {
+			return fmt.Errorf(
+				"origin points at %s/%s but PROJECT_OWNER/PROJECT_REPO are %s/%s; retarget origin or set PROJECT_OWNER/PROJECT_REPO to match before push",
+				remoteOwner, remoteRepo, owner, repo,
+			)
+		}
+	}
+	if !sawGitHub {
+		// file://-only remotes (unit tests): nothing to compare.
+		return nil
+	}
+	return nil
+}
+
+// parseGitHubOwnerRepo extracts owner and repository from an https://github.com/ URL.
+func parseGitHubOwnerRepo(remoteURL string) (owner, repo string, ok bool) {
+	const prefix = "https://github.com/"
+	if !strings.HasPrefix(remoteURL, prefix) {
+		return "", "", false
+	}
+	path := strings.TrimSuffix(strings.TrimPrefix(remoteURL, prefix), ".git")
+	path = strings.Trim(path, "/")
+	parts := strings.Split(path, "/")
+	if len(parts) < 2 || parts[0] == "" || parts[1] == "" {
+		return "", "", false
+	}
+	return parts[0], parts[1], true
 }
 
 // getCurrentBranch returns the name of the current branch.

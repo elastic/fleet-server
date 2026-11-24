@@ -159,6 +159,35 @@ func TestMergeReleaseIssueBodyAddsTrackerWhenMissing(t *testing.T) {
 	}
 }
 
+func TestMergeReleaseIssueBodyPreservesTrailingSections(t *testing.T) {
+	existing := `Global tracker: https://github.com/elastic/ingest-dev/issues/8866
+
+## PRs
+
+- [x] ` + testPRURL10 + `
+
+## Sign-off
+
+- [x] Operator note kept
+`
+	updated, changed := mergeReleaseIssueBody(existing, false, []string{
+		testPRURL10,
+		testPRURL11,
+	})
+	if !changed {
+		t.Fatal("adding a missing PR should mark the body changed")
+	}
+	if !strings.Contains(updated, "- [ ] "+testPRURL11) {
+		t.Fatal("new PR should be appended")
+	}
+	if !strings.Contains(updated, "## Sign-off") {
+		t.Fatal("trailing Sign-off heading must be preserved")
+	}
+	if !strings.Contains(updated, "- [x] Operator note kept") {
+		t.Fatal("trailing Sign-off checklist must be preserved")
+	}
+}
+
 func TestEnsureReleaseIssueTrackerDryRun(t *testing.T) {
 	cfg := &ReleaseConfig{
 		NextRelease: "9.4.1",

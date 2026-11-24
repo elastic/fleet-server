@@ -25,6 +25,8 @@ const (
 )
 
 // ensureLatestRelease sets LatestRelease when unset by querying fleet-server releases/tags.
+// Feature-freeze and patch workflows do not call this; patch derives the previous
+// version with InferLatestRelease. Kept for tests and optional operator use.
 func ensureLatestRelease(c *ReleaseConfig) error {
 	if err := c.EnsureParsedVersions(); err != nil {
 		return err

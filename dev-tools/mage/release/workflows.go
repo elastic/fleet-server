@@ -114,10 +114,6 @@ type workflowPRResult struct {
 func RunMajorMinorRelease(cfg *ReleaseConfig) error {
 	println("=== Starting Major/Minor Release Workflow ===")
 
-	if err := ensureLatestRelease(cfg); err != nil {
-		return err
-	}
-
 	if err := validateReleaseConfig(cfg); err != nil {
 		return err
 	}
@@ -171,7 +167,7 @@ func RunMajorMinorRelease(cfg *ReleaseConfig) error {
 	if err := repo.checkoutBranch(releaseBranch); err != nil {
 		return err
 	}
-	if err := repo.push("origin", cfg.GitHubToken); err != nil {
+	if err := repo.push("origin", cfg.GitHubToken, cfg.ProjectOwner, cfg.ProjectRepo); err != nil {
 		return err
 	}
 
@@ -484,21 +480,29 @@ func finalizePR(repo *gitRepo, gh *gitHubClient, token, branchName, baseBranch s
 		return nil, err
 	}
 
+	ahead, err := repo.hasCommitsAheadOf(baseBranch)
+	if err != nil {
+		return nil, err
+	}
+
 	existingPR, found, err := gh.findOpenPR(opts.Owner, opts.Repo, opts.Head, opts.Base)
 	if err != nil {
 		return nil, err
 	}
 	if found {
+		// Push any local prep commits before reusing the open PR so a re-run that
+		// corrected the branch is reflected on GitHub.
+		if ahead {
+			if err := repo.push("origin", token, opts.Owner, opts.Repo); err != nil {
+				return nil, err
+			}
+		}
 		if err := gh.ensurePRLabels(opts.Owner, opts.Repo, existingPR.GetNumber(), opts.Labels); err != nil {
 			return nil, err
 		}
 		return existingPR, nil
 	}
 
-	ahead, err := repo.hasCommitsAheadOf(baseBranch)
-	if err != nil {
-		return nil, err
-	}
 	if !ahead {
 		printf("No new commits on %s compared to %s; skipping push and PR creation\n", branchName, baseBranch)
 		related, found, err := gh.findRelatedPR(opts.Owner, opts.Repo, opts.Head, opts.Base, opts.Title)
@@ -512,7 +516,7 @@ func finalizePR(repo *gitRepo, gh *gitHubClient, token, branchName, baseBranch s
 		return nil, nil
 	}
 
-	if err := repo.push("origin", token); err != nil {
+	if err := repo.push("origin", token, opts.Owner, opts.Repo); err != nil {
 		return nil, err
 	}
 

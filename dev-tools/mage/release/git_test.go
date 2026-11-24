@@ -256,7 +256,7 @@ func TestGitPushEnv(t *testing.T) {
 func TestPushRequiresToken(t *testing.T) {
 	gitRepo, _ := createTestGitRepo(t)
 
-	err := gitRepo.push("origin", "")
+	err := gitRepo.push("origin", "", "elastic", "fleet-server")
 	if err == nil {
 		t.Fatal("push() should fail without a token")
 	}
@@ -268,7 +268,7 @@ func TestPushRequiresToken(t *testing.T) {
 func TestPushRequiresOriginRemote(t *testing.T) {
 	gitRepo, _ := createTestGitRepo(t)
 
-	err := gitRepo.push("upstream", "test-token")
+	err := gitRepo.push("upstream", "test-token", "elastic", "fleet-server")
 	if err == nil {
 		t.Fatal("push() should reject non-origin remotes")
 	}
@@ -291,12 +291,61 @@ func TestPushToLocalRemote(t *testing.T) {
 	require.NoError(t, gitRepo.createBranch(branch))
 	require.NoError(t, gitRepo.checkoutBranch(branch))
 
-	require.NoError(t, gitRepo.push("origin", "test-token"))
+	require.NoError(t, gitRepo.push("origin", "test-token", "elastic", "fleet-server"))
 
 	remoteHeads := runGitOutput(t, workDir, "ls-remote", "--heads", "origin", branch)
 	if !strings.Contains(remoteHeads, "refs/heads/"+branch) {
 		t.Fatalf("push() did not create remote branch %s; ls-remote:\n%s", branch, remoteHeads)
 	}
+}
+
+func TestParseGitHubOwnerRepo(t *testing.T) {
+	tests := []struct {
+		in        string
+		wantOwner string
+		wantRepo  string
+		ok        bool
+	}{
+		{testGitHubHTTPS, "elastic", "fleet-server", true},
+		{"https://github.com/elastic/fleet-server", "elastic", "fleet-server", true},
+		{"https://github.com/Fr4nc1sc0/fleet-server.git", "Fr4nc1sc0", "fleet-server", true},
+		{"https://example.com/elastic/fleet-server.git", "", "", false},
+		{"file:///tmp/repo.git", "", "", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.in, func(t *testing.T) {
+			owner, repo, ok := parseGitHubOwnerRepo(tt.in)
+			if ok != tt.ok || owner != tt.wantOwner || repo != tt.wantRepo {
+				t.Fatalf("parseGitHubOwnerRepo(%q) = (%q, %q, %v), want (%q, %q, %v)",
+					tt.in, owner, repo, ok, tt.wantOwner, tt.wantRepo, tt.ok)
+			}
+		})
+	}
+}
+
+func TestEnsureOriginMatchesProject(t *testing.T) {
+	t.Run("matches configured project", func(t *testing.T) {
+		gitRepo, _ := createTestGitRepo(t)
+		require.NoError(t, gitRepo.setRemoteURL(testGitHubHTTPS))
+		require.NoError(t, gitRepo.ensureOriginMatchesProject("elastic", "fleet-server"))
+	})
+	t.Run("rejects fork mismatch", func(t *testing.T) {
+		gitRepo, _ := createTestGitRepo(t)
+		require.NoError(t, gitRepo.setRemoteURL(testGitHubHTTPS))
+		err := gitRepo.ensureOriginMatchesProject("my-fork", "fleet-server")
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "PROJECT_OWNER/PROJECT_REPO")
+	})
+	t.Run("skips file remotes", func(t *testing.T) {
+		gitRepo, _ := createTestGitRepo(t)
+		require.NoError(t, gitRepo.setRemoteURL("file:///tmp/repo.git"))
+		require.NoError(t, gitRepo.ensureOriginMatchesProject("elastic", "fleet-server"))
+	})
+	t.Run("requires owner and repo", func(t *testing.T) {
+		gitRepo, _ := createTestGitRepo(t)
+		require.Error(t, gitRepo.ensureOriginMatchesProject("", "fleet-server"))
+		require.Error(t, gitRepo.ensureOriginMatchesProject("elastic", ""))
+	})
 }
 
 func TestGithubHTTPSPushURL(t *testing.T) {

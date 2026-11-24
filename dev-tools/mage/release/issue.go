@@ -241,10 +241,11 @@ func mergeReleaseIssueBody(existingBody string, isMajorMinor bool, prURLs []stri
 	}
 
 	oldPRBlock := strings.TrimPrefix(after, "\n")
+	oldChecklist, trailing := splitPRSectionTrailing(oldPRBlock)
 	newPRBlock := formatPRChecklist(allURLs, existingChecked)
 
-	oldURLs := keys(extractPRCheckboxes(oldPRBlock))
-	if !sameStringSet(oldURLs, allURLs) || normalizePRSection(oldPRBlock) != normalizePRSection(newPRBlock) {
+	oldURLs := keys(extractPRCheckboxes(oldChecklist))
+	if !sameStringSet(oldURLs, allURLs) || normalizePRSection(oldChecklist) != normalizePRSection(newPRBlock) {
 		changed = true
 	}
 	if !changed {
@@ -252,7 +253,20 @@ func mergeReleaseIssueBody(existingBody string, isMajorMinor bool, prURLs []stri
 	}
 
 	updated := strings.TrimRight(before, "\n") + "\n\n" + prSection + "\n\n" + newPRBlock
+	if trailing != "" {
+		updated = strings.TrimRight(updated, "\n") + "\n\n" + trailing
+	}
 	return updated, true
+}
+
+// splitPRSectionTrailing separates the PR checklist from any later markdown
+// sections (for example "## Sign-off") so updates do not drop operator notes.
+func splitPRSectionTrailing(prSectionBody string) (checklist, trailing string) {
+	idx := strings.Index(prSectionBody, "\n## ")
+	if idx < 0 {
+		return prSectionBody, ""
+	}
+	return prSectionBody[:idx], strings.TrimLeft(prSectionBody[idx+1:], "\n")
 }
 
 func keys(m map[string]bool) []string {
