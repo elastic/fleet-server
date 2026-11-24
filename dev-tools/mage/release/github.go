@@ -157,10 +157,12 @@ func (gh *gitHubClient) listPRsByHeadBase(owner, repo, head, base, state string)
 	}
 
 	prs, _, err := gh.client.PullRequests.List(gh.ctx, owner, repo, &github.PullRequestListOptions{
-		State:   state,
-		Head:    headQuery,
-		Base:    base,
-		PerPage: 30,
+		State: state,
+		Head:  headQuery,
+		Base:  base,
+		ListOptions: github.ListOptions{
+			PerPage: 30,
+		},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list pull requests: %w", err)
@@ -171,9 +173,11 @@ func (gh *gitHubClient) listPRsByHeadBase(owner, repo, head, base, state string)
 func (gh *gitHubClient) findPRByExactTitle(owner, repo, base, title string) (*github.PullRequest, bool, error) {
 	query := fmt.Sprintf(`repo:%s/%s is:pr base:%s "%s" in:title`, owner, repo, base, title)
 	result, _, err := gh.client.Search.Issues(gh.ctx, query, &github.SearchOptions{
-		Sort:    searchSortUpdated,
-		Order:   searchOrderDesc,
-		PerPage: 10,
+		Sort:  searchSortUpdated,
+		Order: searchOrderDesc,
+		ListOptions: github.ListOptions{
+			PerPage: 10,
+		},
 	})
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to search pull requests by title: %w", err)
@@ -330,9 +334,11 @@ func (gh *gitHubClient) addLabels(owner, repo string, number int, labels []strin
 func (gh *gitHubClient) findIssueByTitle(owner, repo, title string) (*github.Issue, bool, error) {
 	query := fmt.Sprintf(`repo:%s/%s is:issue in:title "%s"`, owner, repo, title)
 	result, _, err := gh.client.Search.Issues(gh.ctx, query, &github.SearchOptions{
-		Sort:    searchSortUpdated,
-		Order:   searchOrderDesc,
-		PerPage: 20,
+		Sort:  searchSortUpdated,
+		Order: searchOrderDesc,
+		ListOptions: github.ListOptions{
+			PerPage: 20,
+		},
 	})
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to search issues for title %q: %w", title, err)
@@ -391,9 +397,11 @@ func (gh *gitHubClient) updateIssueBody(owner, repo string, number int, body str
 func (gh *gitHubClient) listReleaseLabeledPRsForVersion(owner, repo, version string) ([]*github.PullRequest, error) {
 	query := fmt.Sprintf(`repo:%s/%s is:pr label:release "%s"`, owner, repo, version)
 	opts := &github.SearchOptions{
-		Sort:    searchSortUpdated,
-		Order:   searchOrderDesc,
-		PerPage: 100,
+		Sort:  searchSortUpdated,
+		Order: searchOrderDesc,
+		ListOptions: github.ListOptions{
+			PerPage: 100,
+		},
 	}
 
 	var prs []*github.PullRequest
