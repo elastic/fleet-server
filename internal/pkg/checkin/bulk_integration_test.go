@@ -29,7 +29,6 @@ import (
 //
 // Reproduces https://github.com/elastic/fleet-server/issues/6877
 func TestEffectiveConfigReplacesRemovedFields(t *testing.T) {
-	const onlineStatus = "online"
 	ctx := testlog.SetLogger(t).WithContext(t.Context())
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, dl.FleetAgents)
@@ -42,7 +41,7 @@ func TestEffectiveConfigReplacesRemovedFields(t *testing.T) {
 		Active:            true,
 		EnrolledAt:        now,
 		LastCheckin:       now,
-		LastCheckinStatus: onlineStatus,
+		LastCheckinStatus: "online",
 		UpdatedAt:         now,
 		EffectiveConfig:   initialConfig,
 	})
@@ -57,7 +56,7 @@ func TestEffectiveConfigReplacesRemovedFields(t *testing.T) {
 
 	bc := NewBulk(bulker)
 	err = bc.CheckIn(agentID,
-		WithStatus(onlineStatus),
+		WithStatus("online"),
 		WithEffectiveConfig(updatedConfig),
 	)
 	require.NoError(t, err)
