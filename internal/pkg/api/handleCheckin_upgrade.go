@@ -68,18 +68,26 @@ func upgradeFailureIsFinal(m *UpgradeDetails_Metadata, now time.Time) bool {
 	return now.After(meta.RetryUntil.Add(upgradeRetryGrace))
 }
 
-// upgradeCompleted reports whether an agent that checked in without upgrade_details has completed
-// the stored upgrade. ver is non-empty when the agent's version changed. A stored upgrade that
-// never started, e.g. UPG_SCHEDULED after the agent dropped the queued upgrade on a cancel action,
-// is not completed, and UPG_FAILED and UPG_ROLLBACK already have their result.
-func upgradeCompleted(ud *model.UpgradeDetails, ver string) bool {
-	switch ud.State {
-	case string(UpgradeDetailsStateUPGFAILED), string(UpgradeDetailsStateUPGROLLBACK):
-		return false
+// noDetailsOutcome decides what to record for the stored upgrade of an agent that checked in
+// without upgrade_details; ver is non-empty when the agent's version changed.
+//   - A stored UPG_WATCHING, or a changed version, means the upgrade completed: a success.
+//   - A stored UPG_FAILED or UPG_ROLLBACK whose upgrade_started_at is still set has no result yet
+//     (creating it failed when it was reported, see processUpgradeDetails), so it is recorded now.
+//     The error text is not stored, so it is generic. Once the result exists upgrade_started_at is
+//     cleared and nothing more is recorded.
+//   - Any other stored state, e.g. UPG_SCHEDULED after the agent dropped the queued upgrade on a
+//     cancel action, never ran: nothing is recorded.
+func noDetailsOutcome(agent *model.Agent, ver string) (outcome upgradeOutcome, record bool) {
+	unsettled := agent.UpgradeStartedAt != ""
+	switch agent.UpgradeDetails.State {
+	case string(UpgradeDetailsStateUPGFAILED):
+		return upgradeOutcome{errMsg: "upgrade failed"}, unsettled
+	case string(UpgradeDetailsStateUPGROLLBACK):
+		return upgradeOutcome{errMsg: rollbackError(nil), rollback: true}, unsettled
 	case string(UpgradeDetailsStateUPGWATCHING):
-		return true
+		return upgradeOutcome{}, true
 	}
-	return ver != ""
+	return upgradeOutcome{}, ver != ""
 }
 
 // rollbackError builds the action result error for a UPG_ROLLBACK state from metadata.reason, e.g.

@@ -39,24 +39,39 @@ func TestUpgradeFailureIsFinal(t *testing.T) {
 	}
 }
 
-func TestUpgradeCompleted(t *testing.T) {
+func TestNoDetailsOutcome(t *testing.T) {
+	success := upgradeOutcome{}
+	failed := upgradeOutcome{errMsg: "upgrade failed"}
+	rolledBack := upgradeOutcome{errMsg: "upgrade rolled back", rollback: true}
+
 	tests := []struct {
-		name  string
-		state UpgradeDetailsState
-		ver   string
-		want  bool
+		name      string
+		state     UpgradeDetailsState
+		unsettled bool // upgrade_started_at is still set
+		ver       string
+		want      upgradeOutcome
+		record    bool
 	}{
-		{"watch period ended", UpgradeDetailsStateUPGWATCHING, "", true},
-		{"version changed after the restart", UpgradeDetailsStateUPGRESTARTING, "9.4.0", true},
-		{"version unchanged while the upgrade is in progress", UpgradeDetailsStateUPGDOWNLOADING, "", false},
-		{"scheduled upgrade the agent dropped on a cancel action", UpgradeDetailsStateUPGSCHEDULED, "", false},
-		{"failed upgrade already has its result", UpgradeDetailsStateUPGFAILED, "9.4.0", false},
-		{"rolled back upgrade already has its result", UpgradeDetailsStateUPGROLLBACK, "9.3.0", false},
+		{"watch period ended", UpgradeDetailsStateUPGWATCHING, true, "", success, true},
+		{"version changed after the restart", UpgradeDetailsStateUPGRESTARTING, true, "9.4.0", success, true},
+		{"version unchanged while the upgrade is in progress", UpgradeDetailsStateUPGDOWNLOADING, true, "", success, false},
+		{"scheduled upgrade the agent dropped on a cancel action", UpgradeDetailsStateUPGSCHEDULED, true, "", success, false},
+		{"failure whose result could not be created", UpgradeDetailsStateUPGFAILED, true, "", failed, true},
+		{"failure that already has its result", UpgradeDetailsStateUPGFAILED, false, "9.4.0", failed, false},
+		{"rollback whose result could not be created", UpgradeDetailsStateUPGROLLBACK, true, "9.3.0", rolledBack, true},
+		{"rollback that already has its result", UpgradeDetailsStateUPGROLLBACK, false, "9.3.0", rolledBack, false},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			ud := &model.UpgradeDetails{ActionID: "test-action", State: string(tc.state)}
-			assert.Equal(t, tc.want, upgradeCompleted(ud, tc.ver))
+			agent := &model.Agent{UpgradeDetails: &model.UpgradeDetails{ActionID: "test-action", State: string(tc.state)}}
+			if tc.unsettled {
+				agent.UpgradeStartedAt = "2026-01-01T00:00:00Z"
+			}
+			outcome, record := noDetailsOutcome(agent, tc.ver)
+			assert.Equal(t, tc.record, record)
+			if tc.record {
+				assert.Equal(t, tc.want, outcome)
+			}
 		})
 	}
 }

@@ -882,11 +882,13 @@ func (ct *CheckinT) markUpgradeComplete(ctx context.Context, agent *model.Agent,
 	span, ctx := apm.StartSpan(ctx, "Mark update complete", "update")
 	span.Context.SetLabel("agent_id", agent.Agent.ID)
 	defer span.End()
-	// A stored upgrade_details.action_id means the ack was (or will be) a no-op, so the success is
-	// recorded here once the upgrade is known to have completed.
-	if ud := agent.UpgradeDetails; ud != nil && ud.ActionID != "" && upgradeCompleted(ud, ver) {
-		if err := ct.createUpgradeResult(ctx, agent, ud.ActionID, upgradeOutcome{}); err != nil {
-			return err
+	// A stored upgrade_details.action_id means the ack was (or will be) a no-op, so the result is
+	// recorded here once the outcome of the stored upgrade is known.
+	if ud := agent.UpgradeDetails; ud != nil && ud.ActionID != "" {
+		if outcome, ok := noDetailsOutcome(agent, ver); ok {
+			if err := ct.createUpgradeResult(ctx, agent, ud.ActionID, outcome); err != nil {
+				return err
+			}
 		}
 	}
 	// Checkin had no upgrade_details but agent either had stored details (normal upgrade path) or

@@ -129,6 +129,26 @@ func Test_Upgrade_Results(t *testing.T) {
 		require.Empty(t, u.agent().UpgradeStartedAt)
 	})
 
+	t.Run("failure whose result could not be created is recorded when the details are omitted", func(t *testing.T) {
+		u := newUpgradeTest(t, ctx, srv)
+
+		// upgrade_started_at is still set: the result create failed when UPG_FAILED was reported.
+		u.storeUpgradeDetails("UPG_FAILED")
+		u.checkinNoDetails()
+		res := u.waitResults()
+		require.Equal(t, "upgrade failed", res[0].Error)
+		require.Empty(t, u.agent().UpgradeStartedAt)
+	})
+
+	t.Run("requested rollback whose result could not be created is recorded as a success", func(t *testing.T) {
+		u := newUpgradeTestWithData(t, ctx, srv, `{"version":"9.3.0","rollback":true}`)
+
+		u.storeUpgradeDetails("UPG_ROLLBACK")
+		u.checkinNoDetails()
+		res := u.waitResults()
+		require.Empty(t, res[0].Error)
+	})
+
 	t.Run("rolled back upgrade without a reason", func(t *testing.T) {
 		u := newUpgradeTest(t, ctx, srv)
 
@@ -270,6 +290,15 @@ func (u *upgradeTest) checkin(state api.UpgradeDetailsState, metadata map[string
 		details["metadata"] = metadata
 	}
 	u.send(details)
+}
+
+// storeUpgradeDetails stores upgrade_details in the given state on the agent, as left by a check-in
+// whose result could not be created.
+func (u *upgradeTest) storeUpgradeDetails(state string) {
+	u.t.Helper()
+	body, err := bulk.UpdateFields{dl.FieldUpgradeDetails: map[string]any{"action_id": u.actionID, "state": state}}.Marshal()
+	require.NoError(u.t, err)
+	require.NoError(u.t, u.srv.bulker.Update(u.ctx, dl.FleetAgents, u.agentID, body, bulk.WithRefresh()))
 }
 
 // checkinNoDetails sends a check-in without upgrade_details, which ends a watched upgrade.
