@@ -743,8 +743,8 @@ func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agen
 	// validate metadata with state
 	vSpan, _ = apm.StartSpan(ctx, "validateUpgradeMetadata", "validate")
 	var (
-		terminal  bool   // the upgrade ended in a failure (UPG_FAILED) or was rolled back (UPG_ROLLBACK)
-		resultErr string // error recorded on the action result for a terminal state
+		terminal bool           // the upgrade ended in a failure (UPG_FAILED) or was rolled back (UPG_ROLLBACK)
+		outcome  upgradeOutcome // how it ended, recorded on the action result when terminal
 	)
 	switch details.State {
 	case UpgradeDetailsStateUPGDOWNLOADING:
@@ -775,24 +775,23 @@ func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agen
 			vSpan.End()
 			return fmt.Errorf("%w: %s metadata contains empty error_msg attribute", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGFAILED)
 		}
-		// The agent reports UPG_FAILED for each failed download attempt and keeps retrying until
-		// retry_until, so the failure is final only once that deadline has passed (or when there is
-		// none, as for every non-download failure). A failure that may still be retried creates no
-		// result and leaves upgrade_started_at alone; a later check-in settles it. This is decided
-		// from the check-in alone so that any Fleet Server instance reaches the same outcome.
-		// Read retry_until before repacking, which drops the UPG_DOWNLOADING attributes.
-		final := upgradeFailureIsFinal(details.Metadata, time.Now())
+		// A download failure that can still be retried is not an outcome yet: ignore it, so the
+		// stored details keep their last state and a later check-in records the final failure.
+		if !upgradeFailureIsFinal(details.Metadata, time.Now()) {
+			vSpan.End()
+			return nil
+		}
 		// Repack metadata in failed case as the agent may send UPG_DOWNLOADING attributes.
 		if err = details.Metadata.FromUpgradeMetadataFailed(meta); err != nil {
 			vSpan.End()
 			return fmt.Errorf("%w %s: unable to repack metadata: %w", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGFAILED, err)
 		}
-		terminal = final
-		resultErr = meta.ErrorMsg
+		terminal = true
+		outcome = upgradeOutcome{errMsg: meta.ErrorMsg}
 	case UpgradeDetailsStateUPGROLLBACK:
 		// UPG_ROLLBACK carries no error_msg; the reason is in the metadata (e.g. "watch failed").
 		terminal = true
-		resultErr = rollbackErrorMessage(details.Metadata)
+		outcome = upgradeOutcome{errMsg: rollbackError(details.Metadata), rollback: true}
 	case UpgradeDetailsStateUPGSCHEDULED:
 		if details.Metadata == nil {
 			vSpan.End()
@@ -817,13 +816,11 @@ func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agen
 	}
 	if terminal {
 		// The result is created before upgrade_details are stored: if the create fails the stored
-		// state is not terminal yet, so the next check-in retries it.
-		// upgrade_started_at is cleared together with the result, so it also tells apart a stored
-		// UPG_FAILED that was still retryable when it was stored.
-		recorded := agent.UpgradeDetails != nil && agent.UpgradeDetails.ActionID == details.ActionId &&
-			agent.UpgradeDetails.State == string(details.State) && agent.UpgradeStartedAt == ""
+		// state is not terminal yet, so the next check-in retries it. The agent keeps reporting the
+		// terminal state on later check-ins, which must not create the result again.
+		recorded := agent.UpgradeDetails != nil && agent.UpgradeDetails.ActionID == details.ActionId && agent.UpgradeDetails.State == string(details.State)
 		if details.ActionId != "" && !recorded {
-			if err := ct.createUpgradeResult(ctx, agent, details.ActionId, resultErr, details.State == UpgradeDetailsStateUPGROLLBACK); err != nil {
+			if err := ct.createUpgradeResult(ctx, agent, details.ActionId, outcome); err != nil {
 				return err
 			}
 		}
@@ -880,14 +877,11 @@ func (ct *CheckinT) markUpgradeComplete(ctx context.Context, agent *model.Agent,
 	span, ctx := apm.StartSpan(ctx, "Mark update complete", "update")
 	span.Context.SetLabel("agent_id", agent.Agent.ID)
 	defer span.End()
-	// A stored upgrade_details.action_id means the ack was (or will be) a no-op, so the result is
-	// recorded here once the upgrade has ended. The create is idempotent, so it is safe to attempt
-	// again; what is recorded depends on how the stored upgrade stopped being reported.
-	if ud := agent.UpgradeDetails; ud != nil && ud.ActionID != "" {
-		if errMsg, ok := noDetailsUpgradeResult(agent, ver); ok {
-			if err := ct.createUpgradeResult(ctx, agent, ud.ActionID, errMsg, ud.State == string(UpgradeDetailsStateUPGROLLBACK)); err != nil {
-				return err
-			}
+	// A stored upgrade_details.action_id means the ack was (or will be) a no-op, so the success is
+	// recorded here once the upgrade is known to have completed.
+	if ud := agent.UpgradeDetails; ud != nil && ud.ActionID != "" && upgradeCompleted(ud, ver) {
+		if err := ct.createUpgradeResult(ctx, agent, ud.ActionID, upgradeOutcome{}); err != nil {
+			return err
 		}
 	}
 	// Checkin had no upgrade_details but agent either had stored details (normal upgrade path) or
@@ -902,139 +896,6 @@ func (ct *CheckinT) markUpgradeComplete(ctx context.Context, agent *model.Agent,
 		return err
 	}
 	return ct.bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3))
-}
-
-// isRollbackAction reports whether the UPGRADE action asks the agent to roll back (data.rollback).
-func isRollbackAction(action model.Action) bool {
-	var data struct {
-		Rollback bool `json:"rollback"`
-	}
-	if err := json.Unmarshal(action.Data, &data); err != nil {
-		return false
-	}
-	return data.Rollback
-}
-
-// upgradeRetryGrace is added to the agent-reported retry_until to tolerate clock skew between the
-// agent and Fleet Server.
-const upgradeRetryGrace = time.Minute
-
-// upgradeFailureIsFinal reports whether a UPG_FAILED check-in is the final outcome of the upgrade.
-// The agent sets metadata.retry_until only while a step (the download) can still be retried, and
-// does not clear it when the retries are exhausted, so the failure is final once it has passed.
-// A missing or unparseable retry_until means there is nothing to wait for.
-func upgradeFailureIsFinal(m *UpgradeDetails_Metadata, now time.Time) bool {
-	if m == nil {
-		return true
-	}
-	raw, err := m.MarshalJSON()
-	if err != nil {
-		return true
-	}
-	var meta struct {
-		RetryUntil *time.Time `json:"retry_until"`
-	}
-	if err := json.Unmarshal(raw, &meta); err != nil || meta.RetryUntil == nil || meta.RetryUntil.IsZero() {
-		return true
-	}
-	return now.After(meta.RetryUntil.Add(upgradeRetryGrace))
-}
-
-// noDetailsUpgradeResult decides which result, if any, to record for the stored upgrade of an agent
-// that checked in without upgrade_details; ver is non-empty when the agent's version changed.
-//   - A changed version, or a stored UPG_WATCHING, is evidence the upgrade completed: success. This
-//     includes a retryable UPG_FAILED stored before the retry succeeded, whose progress check-ins
-//     were missed.
-//   - A stored UPG_FAILED or UPG_ROLLBACK whose upgrade_started_at is still set was not settled
-//     (for instance by a Fleet Server that stored it without creating the result): record it from
-//     the stored state. An empty upgrade_started_at means it was already settled.
-//   - Any other stored state, e.g. UPG_SCHEDULED after the agent canceled the queued upgrade, is no
-//     evidence that the upgrade ran: record nothing.
-func noDetailsUpgradeResult(agent *model.Agent, ver string) (errMsg string, record bool) {
-	ud := agent.UpgradeDetails
-	switch {
-	// A stored UPG_ROLLBACK is handled before the changed-version success: a rollback returns the
-	// agent to its previous version, so ver is non-empty after it too.
-	case ud.State == string(UpgradeDetailsStateUPGROLLBACK):
-		if agent.UpgradeStartedAt == "" {
-			return "", false
-		}
-		reason := ""
-		if ud.Metadata != nil {
-			reason = ud.Metadata.Reason
-		}
-		return rollbackResultError(reason), true
-	case ver != "", ud.State == string(UpgradeDetailsStateUPGWATCHING):
-		return "", true
-	case ud.State == string(UpgradeDetailsStateUPGFAILED) && agent.UpgradeStartedAt != "":
-		if ud.Metadata != nil && ud.Metadata.ErrorMsg != "" {
-			return ud.Metadata.ErrorMsg, true
-		}
-		return "upgrade failed", true
-	}
-	return "", false
-}
-
-// rollbackErrorMessage builds the action result error for a UPG_ROLLBACK state from metadata.reason.
-func rollbackErrorMessage(m *UpgradeDetails_Metadata) string {
-	if m == nil {
-		return rollbackResultError("")
-	}
-	raw, err := m.MarshalJSON()
-	if err != nil {
-		return rollbackResultError("")
-	}
-	var meta struct {
-		Reason string `json:"reason"`
-	}
-	if err := json.Unmarshal(raw, &meta); err != nil {
-		return rollbackResultError("")
-	}
-	return rollbackResultError(meta.Reason)
-}
-
-// rollbackResultError is the action result error for a rolled back upgrade with the given reason.
-func rollbackResultError(reason string) string {
-	const msg = "upgrade rolled back"
-	if reason == "" {
-		return msg
-	}
-	return msg + ": " + reason
-}
-
-// createUpgradeResult creates the UPGRADE action result for the agent (no refresh, an existing
-// result is not an error). errMsg is empty for a successful upgrade.
-func (ct *CheckinT) createUpgradeResult(ctx context.Context, agent *model.Agent, actionID, errMsg string, rolledBack bool) error {
-	span, ctx := apm.StartSpan(ctx, "Create upgrade result", "update")
-	span.Context.SetLabel("action_id", actionID)
-	span.Context.SetLabel("agent_id", agent.Agent.ID)
-	defer span.End()
-
-	// Always read the action from Elasticsearch: the action cache only retains the action ID and
-	// type, so a cache hit would not provide the namespaces the result must carry. This runs once,
-	// when the outcome is known, so the extra read is cheap.
-	actions, err := dl.FindAction(ctx, ct.bulker, actionID)
-	if err != nil {
-		return fmt.Errorf("unable to find upgrade action %q: %w", actionID, err)
-	}
-	var namespaces []string
-	if len(actions) > 0 {
-		namespaces = actions[0].Namespaces
-	} else {
-		zerolog.Ctx(ctx).Warn().Str(ecs.ActionID, actionID).Str(ecs.AgentID, agent.Agent.ID).Msg("upgrade action not found, creating result without namespaces")
-	}
-	// UPG_ROLLBACK is a failure when the agent rolled back an upgrade by itself (e.g. the watch
-	// failed), but it is the successful outcome of an action that requested a rollback.
-	if rolledBack && len(actions) > 0 && isRollbackAction(actions[0]) {
-		errMsg = ""
-	}
-
-	return dl.CreateActionResult(ctx, ct.bulker, model.ActionResult{
-		ActionID:   actionID,
-		AgentID:    agent.Id,
-		Namespaces: namespaces,
-		Error:      errMsg,
-	})
 }
 
 // stalenessThreshold returns the age beyond which an upgrade_started_at value with no associated

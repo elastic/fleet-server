@@ -436,16 +436,6 @@ type HostMetadata struct {
 	Name string `json:"name"`
 }
 
-// Metadata Upgrade state metadata reported by the agent
-type Metadata struct {
-
-	// Error message when the upgrade state is UPG_FAILED
-	ErrorMsg string `json:"error_msg,omitempty"`
-
-	// Reason for the upgrade state, e.g. why the upgrade was rolled back when the state is UPG_ROLLBACK
-	Reason string `json:"reason,omitempty"`
-}
-
 // OutputHealth Output health represents a health state of an output
 type OutputHealth struct {
 	ESDocument
@@ -656,9 +646,6 @@ type UpgradeDetails struct {
 
 	// Upgrade action id reported by the agent
 	ActionID string `json:"action_id,omitempty"`
-
-	// Upgrade state metadata reported by the agent
-	Metadata *Metadata `json:"metadata,omitempty"`
 
 	// Upgrade state reported by the agent
 	State string `json:"state,omitempty"`
