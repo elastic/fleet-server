@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
@@ -71,23 +72,15 @@ func storeRandomPolicies(ctx context.Context, bulker bulk.Bulk, index string, po
 			})
 		}
 	}
-	_, err := bulker.MIndex(ctx, ops)
+	items, err := bulker.MIndex(ctx, ops, bulk.WithRefresh())
 	if err != nil {
 		return nil, err
 	}
-	// TODO: Use bulk.WithRefresh in MIndex when it applies the option, see
-	// https://github.com/elastic/fleet-server/issues/8222.
-	cli := bulker.Client()
-	res, err := cli.Indices.Refresh(
-		cli.Indices.Refresh.WithContext(ctx),
-		cli.Indices.Refresh.WithIndex(index),
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer res.Body.Close()
-	if res.IsError() {
-		return nil, fmt.Errorf("refresh %s: %s", index, res.Status())
+	for i, item := range items {
+		if err := es.TranslateError(item.Status, item.Error); err != nil {
+			writeErr := fmt.Errorf("write policy fixture %d: %w", i, err)
+			return nil, writeErr
+		}
 	}
 	return ids, nil
 }
@@ -123,29 +116,42 @@ func TestQueryDefaultFleetServerPolicyIntegration(t *testing.T) {
 	assert.Contains(t, policy.Data.Outputs, testDefaultOutput)
 }
 
-// TestQueryLatestPolicy400k tests to see if  to see if the latest revision is correctly selected when a lot the revision count is very large
-func TestQueryLatestPolicy400k(t *testing.T) {
-	t.Skip("Test flaky, see: https://github.com/elastic/fleet-server/issues/5181")
-	ctx := testlog.SetLogger(t).WithContext(t.Context())
-
-	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetPolicies, bulk.WithFlushThresholdCount(1))
-
-	policies := make([][]model.Policy, 4)
-	for i := range policies {
-		policies[i] = make([]model.Policy, 100000)
-		for j := range policies[i] {
-			policies[i][j].RevisionIdx = int64(j + 1)
-		}
+func TestQueryLatestPolicies(t *testing.T) {
+	const policyCount = 4
+	tests := []struct {
+		name      string
+		revisions int
+	}{
+		{
+			name:      "the latest revisions are visible after one bulk request",
+			revisions: 4,
+		},
+		{
+			name:      "the latest revisions are visible after multiple bulk requests",
+			revisions: 100_000,
+		},
 	}
-	ids, err := storeRandomPolicies(ctx, bulker, index, policies)
-	require.NoError(t, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := testlog.SetLogger(t).WithContext(t.Context())
+			index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetPolicies)
 
-	for _, id := range ids {
-		var policy model.Policy
-		require.Eventually(t, func() bool {
-			policy, err = QueryLatestPolicy(ctx, bulker, id, WithIndexName(index))
-			return err == nil && policy.RevisionIdx == 100000
-		}, time.Second*2, time.Millisecond*100, "Expected revision_idx 100000 for policy %s, found %d, error: %v", id, policy.RevisionIdx, err)
+			policies := make([][]model.Policy, policyCount)
+			for i := range policies {
+				policies[i] = make([]model.Policy, tt.revisions)
+				for j := range policies[i] {
+					policies[i][j].RevisionIdx = int64(j + 1)
+				}
+			}
+			ids, err := storeRandomPolicies(ctx, bulker, index, policies)
+			require.NoError(t, err)
+
+			for _, id := range ids {
+				policy, err := QueryLatestPolicy(ctx, bulker, id, WithIndexName(index))
+				require.NoError(t, err)
+				assert.Equal(t, int64(tt.revisions), policy.RevisionIdx, "policy %s", id)
+			}
+		})
 	}
 }
 
