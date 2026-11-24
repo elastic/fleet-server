@@ -129,6 +129,7 @@ func TestMonitor_NewPolicy(t *testing.T) {
 		cancel()
 		wg.Wait()
 		require.NoError(t, runErr)
+		synctest.Wait()
 		select {
 		case <-stopped:
 		default:
@@ -658,6 +659,113 @@ type failingSecretsBulk struct {
 
 func (b *failingSecretsBulk) ReadSecrets(_ context.Context, _ []string) (map[string]string, error) {
 	return nil, fmt.Errorf("ReadSecrets must not be called for stale revisions")
+}
+
+type blockingSecretsBulk struct {
+	ftesting.MockBulk
+	started chan struct{}
+	release chan struct{}
+	err     error
+}
+
+func (b *blockingSecretsBulk) ReadSecrets(ctx context.Context, _ []string) (map[string]string, error) {
+	close(b.started)
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case <-b.release:
+		return nil, b.err
+	}
+}
+
+func TestMonitor_SupersededRevisionParseErrorIsIgnored(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+
+		hits := make(chan []es.HitT, 1)
+		ms := mmock.NewMockSubscription()
+		ms.On("Output").Return((<-chan []es.HitT)(hits))
+		mm := mmock.NewMockMonitor()
+		mm.On("Subscribe").Return(ms).Once()
+		mm.On("Unsubscribe", mock.Anything).Return().Once()
+
+		bulker := &blockingSecretsBulk{
+			started: make(chan struct{}),
+			release: make(chan struct{}),
+			err:     errors.New("secret not found"),
+		}
+		pm, ok := NewMonitor(bulker, mm, config.ServerLimits{}).(*monitorT)
+		require.True(t, ok)
+
+		older := newTestPolicy(1)
+		older.Data = &model.PolicyData{
+			Outputs: map[string]map[string]any{
+				"default": {"type": "elasticsearch"},
+			},
+			SecretReferences: []model.SecretReferencesItems{{ID: "old-secret"}},
+		}
+		newer := older
+		newer.RevisionIdx = 2
+		newer.SeqNo = 2
+		newer.Data = policyDataDefault
+
+		pm.policyF = func(context.Context, bulk.Bulk, ...dl.Option) ([]model.Policy, error) {
+			return []model.Policy{older}, nil
+		}
+
+		runDone := make(chan struct{})
+		var wg sync.WaitGroup
+		var runErr error
+		wg.Go(func() {
+			defer close(runDone)
+			runErr = pm.Run(ctx)
+		})
+		defer func() {
+			cancel()
+			wg.Wait()
+		}()
+
+		err := pm.waitStart(ctx)
+		require.NoError(t, err)
+
+		sub, err := pm.Subscribe("agent", older.PolicyID, 0)
+		require.NoError(t, err)
+		synctest.Wait()
+		select {
+		case <-bulker.started:
+		default:
+			require.FailNow(t, "secret lookup for older revision did not start")
+		}
+
+		data, err := json.Marshal(newer)
+		require.NoError(t, err)
+		hits <- []es.HitT{{ID: newer.Id, SeqNo: newer.SeqNo, Version: newer.Version, Source: data}}
+		synctest.Wait()
+		select {
+		case received := <-sub.Output():
+			assert.Equal(t, newer, received.Policy)
+		default:
+			require.FailNow(t, "newer policy revision did not reach the agent")
+		}
+
+		close(bulker.release)
+		synctest.Wait()
+		select {
+		case <-runDone:
+			require.FailNow(t, "Run stopped after parse error on a superseded revision")
+		default:
+		}
+
+		cancel()
+		wg.Wait()
+		require.NoError(t, runErr)
+
+		cachedRevision := pm.policies[older.PolicyID].pp.Policy.RevisionIdx
+		assert.Equal(t, newer.RevisionIdx, cachedRevision)
+		ms.AssertExpectations(t)
+		mm.AssertExpectations(t)
+	})
 }
 
 // TestMonitor_StaleRevisionSkipsSecretResolution verifies that processPolicies

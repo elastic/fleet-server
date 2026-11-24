@@ -461,6 +461,14 @@ func (m *monitorT) processPolicies(ctx context.Context, policies []model.Policy)
 		}
 		pp, err := NewParsedPolicy(ctx, m.bulker, policy)
 		if err != nil {
+			if m.isStaleRevision(policy.PolicyID, policy.RevisionIdx) {
+				m.log.Warn().
+					Err(err).
+					Str(ecs.PolicyID, policy.PolicyID).
+					Int64(ecs.RevisionIdx, policy.RevisionIdx).
+					Msg("ignoring parse error for stale policy revision")
+				continue
+			}
 			return err
 		}
 
