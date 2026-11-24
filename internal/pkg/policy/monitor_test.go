@@ -146,59 +146,6 @@ func TestMonitor_NewPolicy(t *testing.T) {
 		ms.AssertExpectations(t)
 		mm.AssertExpectations(t)
 	})
-<<<<<<< HEAD
-
-	err := monitor.(*monitorT).waitStart(ctx)
-	require.NoError(t, err)
-
-	agentId := uuid.Must(uuid.NewV4()).String()
-	policyID := uuid.Must(uuid.NewV4()).String()
-	s, err := monitor.Subscribe(agentId, policyID, 0)
-	defer monitor.Unsubscribe(s)
-	require.NoError(t, err)
-
-	rId := xid.New().String()
-	policy := model.Policy{
-		ESDocument: model.ESDocument{
-			Id:      rId,
-			Version: 1,
-			SeqNo:   1,
-		},
-		PolicyID:    policyID,
-		Data:        policyDataDefault,
-		RevisionIdx: 1,
-	}
-	policyData, err := json.Marshal(&policy)
-	require.NoError(t, err)
-
-	chHitT <- []es.HitT{{
-		ID:      rId,
-		SeqNo:   1,
-		Version: 1,
-		Source:  policyData,
-	}}
-
-	timedout := false
-	tm := time.NewTimer(2 * time.Second)
-	select {
-	case subPolicy := <-s.Output():
-		tm.Stop()
-		diff := cmp.Diff(policy, subPolicy.Policy)
-		require.Empty(t, diff)
-	case <-tm.C:
-		timedout = true
-	}
-
-	cancel()
-	mwg.Wait()
-	if merr != nil && merr != context.Canceled {
-		t.Fatal(merr)
-	}
-	require.False(t, timedout, "never got policy update; timed out after 2s")
-	ms.AssertExpectations(t)
-	mm.AssertExpectations(t)
-=======
->>>>>>> a2aa6ca (Fix missed policy updates during slow initial policy loads (#8277))
 }
 
 func TestMonitor_SamePolicy(t *testing.T) {
