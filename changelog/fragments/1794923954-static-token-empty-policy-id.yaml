@@ -1,0 +1,5 @@
+kind: bug-fix
+summary: Fail static token enrollments when the token has no policy ID
+description: >-
+  Fleet Server rejects enrollments that use a static policy token without a policy_id.
+component: fleet-server

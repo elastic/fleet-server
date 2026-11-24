@@ -104,5 +104,5 @@ targets:
     kind: file
     spec:
       content: 'go {{ source "latestGoVersion" }}'
-      file: dev-tools/go.mod
+      file: dev-tools/tools/go.mod
       matchpattern: 'go \d+.\d+.\d+'
