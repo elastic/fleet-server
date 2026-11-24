@@ -34,6 +34,11 @@ const (
 	FieldLastCheckinMessage            = "last_checkin_message"
 	FieldLocalMetadata                 = "local_metadata"
 	FieldComponents                    = "components"
+<<<<<<< HEAD
+=======
+	FieldAgentPolicyID                 = "agent_policy_id"
+	FieldDefaultFleetServer            = "default_fleet_server"
+>>>>>>> 39eeea5 (Load only the needed policies in Fleet Server health checks and enrollments (#8224))
 	FieldPolicyID                      = "policy_id"
 	FieldPolicyOutputAPIKey            = "api_key"
 	FieldPolicyOutputAPIKeyID          = "api_key_id"
