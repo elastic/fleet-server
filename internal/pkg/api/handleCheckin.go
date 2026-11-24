@@ -814,17 +814,19 @@ func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agen
 	doc := bulk.UpdateFields{
 		dl.FieldUpgradeDetails: details,
 	}
+	var resultErr error
 	if terminal {
-		// The result is created before upgrade_details are stored: if the create fails the stored
-		// state is not terminal yet, so the next check-in retries it. The agent keeps reporting the
-		// terminal state on later check-ins, which must not create the result again.
-		recorded := agent.UpgradeDetails != nil && agent.UpgradeDetails.ActionID == details.ActionId && agent.UpgradeDetails.State == string(details.State)
-		if details.ActionId != "" && !recorded {
-			if err := ct.createUpgradeResult(ctx, agent, details.ActionId, outcome); err != nil {
-				return err
-			}
+		// upgrade_started_at is cleared only once the result exists, so a stored terminal state
+		// whose upgrade_started_at is still set has no result yet. The agent keeps reporting the
+		// terminal state on later check-ins, which must not create the result again once settled.
+		settled := agent.UpgradeDetails != nil && agent.UpgradeDetails.ActionID == details.ActionId &&
+			agent.UpgradeDetails.State == string(details.State) && agent.UpgradeStartedAt == ""
+		if details.ActionId != "" && !settled {
+			resultErr = ct.createUpgradeResult(ctx, agent, details.ActionId, outcome)
 		}
-		doc[dl.FieldUpgradeStartedAt] = nil
+		if resultErr == nil {
+			doc[dl.FieldUpgradeStartedAt] = nil
+		}
 	}
 	if agent.UpgradeAttempts != nil && details.State == UpgradeDetailsStateUPGWATCHING {
 		doc[dl.FieldUpgradeAttempts] = nil
@@ -834,7 +836,10 @@ func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agen
 	if err != nil {
 		return err
 	}
-	return ct.bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3))
+	// The terminal details are stored even if the result could not be created, so that a later
+	// check-in without upgrade_details cannot mistake the upgrade for a successful one.
+	updateErr := ct.bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3))
+	return errors.Join(resultErr, updateErr)
 }
 
 func (ct *CheckinT) markUpgradeComplete(ctx context.Context, agent *model.Agent, ver string) error {
