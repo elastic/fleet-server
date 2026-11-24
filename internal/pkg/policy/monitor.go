@@ -151,22 +151,24 @@ func (m *monitorT) Run(ctx context.Context) error {
 	var wg sync.WaitGroup
 	defer wg.Wait()
 	defer dCancel()
+
+	loaderErrCh := make(chan error, 1)
+	wg.Go(func() {
+		if err := m.runLoader(dCtx); err != nil && dCtx.Err() == nil {
+			loaderErrCh <- err
+		}
+	})
 	wg.Go(func() { m.runDispatcher(dCtx) })
 
 	close(m.startCh)
 
 	for {
-		m.log.Trace().Msg("policy monitor loop start")
+		m.log.Trace().Msg("policy monitor notification loop start")
 		select {
-		case <-m.kickCh:
-			m.log.Trace().Msg("policy monitor kicked")
-			trans, tCtx := m.startTrans(ctx, "initial policies")
-			err := m.loadPolicies(tCtx)
-			endTrans(trans)
-			if err != nil {
-				return err
-			}
-			m.kickDeploy()
+		case <-ctx.Done():
+			return nil
+		case err := <-loaderErrCh:
+			return err
 		case hits := <-s.Output(): // TODO would be nice to attach transaction IDs to hits, but would likely need a bigger refactor.
 			m.log.Trace().Int("hits", len(hits)).Msg("policy monitor hits from sub")
 			trans, tCtx := m.startTrans(ctx, "output policies")
@@ -176,8 +178,26 @@ func (m *monitorT) Run(ctx context.Context) error {
 				return err
 			}
 			m.kickDeploy()
+		}
+	}
+}
+
+// runLoader loads queued policies and signals the dispatcher after each load.
+func (m *monitorT) runLoader(ctx context.Context) error {
+	for {
+		m.log.Trace().Msg("policy monitor loader loop start")
+		select {
 		case <-ctx.Done():
 			return nil
+		case <-m.kickCh:
+			m.log.Trace().Msg("policy monitor kicked")
+			trans, tCtx := m.startTrans(ctx, "initial policies")
+			err := m.loadPolicies(tCtx)
+			endTrans(trans)
+			if err != nil {
+				return err
+			}
+			m.kickDeploy()
 		}
 	}
 }
@@ -441,6 +461,14 @@ func (m *monitorT) processPolicies(ctx context.Context, policies []model.Policy)
 		}
 		pp, err := NewParsedPolicy(ctx, m.bulker, policy)
 		if err != nil {
+			if m.isStaleRevision(policy.PolicyID, policy.RevisionIdx) {
+				m.log.Warn().
+					Err(err).
+					Str(ecs.PolicyID, policy.PolicyID).
+					Int64(ecs.RevisionIdx, policy.RevisionIdx).
+					Msg("ignoring parse error for stale policy revision")
+				continue
+			}
 			return err
 		}
 
@@ -502,6 +530,14 @@ func (m *monitorT) updatePolicy(ctx context.Context, pp *ParsedPolicy) bool {
 		}
 		m.policies[newPolicy.PolicyID] = p
 		zlog.Info().Str(ecs.PolicyID, newPolicy.PolicyID).Msg("New policy found on update and added")
+		return false
+	}
+
+	// A newer revision can arrive while this policy is parsed.
+	if newPolicy.RevisionIdx <= p.pp.Policy.RevisionIdx {
+		zlog.Debug().
+			Int64("cached_revision_idx", p.pp.Policy.RevisionIdx).
+			Msg("keeping the cached policy because it already has the same or a newer revision")
 		return false
 	}
 
