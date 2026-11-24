@@ -382,7 +382,7 @@ func TestHandleAckEvents(t *testing.T) {
 				AccessAPIKeyID: "access-key-id",
 				LocalMetadata:  json.RawMessage(`{"elastic":{"agent":{"uninstallable":true}}}`),
 				Outputs: map[string]*model.PolicyOutput{
-					"default": {
+					"default": { //nolint:gosec // test fixture, not a real credential
 						APIKey:          "es-output-key",
 						APIKeyID:        "es-output-key-id",
 						PermissionsHash: "oldhash",
@@ -1029,7 +1029,7 @@ func TestInvalidateAPIKeysRemoteOutputReadFromPolicies(t *testing.T) {
 		context.Background(), []string{"toRetire1"}).
 		Return(nil)
 
-	bulkerFn := func(t *testing.T) *ftesting.MockBulk {
+	bulkerFn := func(_ *testing.T) *ftesting.MockBulk {
 		m := ftesting.NewMockBulk()
 		m.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{
 			Hits: []es.HitT{{
@@ -1059,7 +1059,7 @@ func TestInvalidateAPIKeysRemoteOutputReadFromPoliciesNotFound(t *testing.T) {
 
 	remoteBulker := ftesting.NewMockBulk()
 
-	bulkerFn := func(t *testing.T) *ftesting.MockBulk {
+	bulkerFn := func(_ *testing.T) *ftesting.MockBulk {
 		m := ftesting.NewMockBulk()
 		m.On("Search", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&es.ResultT{
 			Hits: []es.HitT{}}, nil).Once()
@@ -1242,7 +1242,7 @@ func TestValidateAckRequest(t *testing.T) {
 			if tc.expErr == nil {
 				assert.NoError(t, err)
 			} else {
-				// Asserting error messages prior to ErrorAs becuase ErrorAs modifies
+				// Asserting error messages prior to ErrorAs because ErrorAs modifies
 				// the target error. If we assert error messages after calling ErrorAs
 				// we will end up with false positives.
 				assert.Equal(t, tc.expErr.Error(), err.Error())
