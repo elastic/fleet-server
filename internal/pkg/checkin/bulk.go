@@ -299,7 +299,6 @@ func (bc *Bulk) flush(ctx context.Context) error {
 	nowTimestamp := start.UTC().Format(time.RFC3339)
 
 	var err error
-	var needRefresh bool
 	for id, pendingData := range pending {
 		var body []byte
 		if pendingData.extra == nil {
@@ -316,9 +315,6 @@ func (bc *Bulk) flush(ctx context.Context) error {
 				simpleCache[pendingData] = body
 			}
 		} else if pendingData.extra.deleteAudit {
-			if pendingData.extra.seqNo.IsSet() {
-				needRefresh = true
-			}
 			// Use a script instead of a partial doc to update if attributes need to be removed
 			params, err := encodeParams(nowTimestamp, pendingData)
 			if err != nil {
@@ -344,9 +340,6 @@ func (bc *Bulk) flush(ctx context.Context) error {
 			// only {traces}, the merge would keep metrics when it should be
 			// removed. A script avoids this by assigning directly to
 			// ctx._source, fully replacing the field.
-			if pendingData.extra.seqNo.IsSet() {
-				needRefresh = true
-			}
 			params, err := encodeParams(nowTimestamp, pendingData)
 			if err != nil {
 				return fmt.Errorf("unable to parse checkin details as params: %w", err)
@@ -364,9 +357,6 @@ func (bc *Bulk) flush(ctx context.Context) error {
 				return fmt.Errorf("could not marshal script action: %w", err)
 			}
 		} else {
-			if pendingData.extra.seqNo.IsSet() {
-				needRefresh = true
-			}
 			body, err = toUpdateBody(nowTimestamp, pendingData)
 			if err != nil {
 				return err
@@ -380,18 +370,21 @@ func (bc *Bulk) flush(ctx context.Context) error {
 		})
 	}
 
+<<<<<<< HEAD
 	var opts []bulk.Opt
 	if needRefresh {
 		opts = append(opts, bulk.WithRefresh())
 	}
 
 	_, err = bc.bulker.MUpdate(ctx, updates, opts...)
+=======
+	items, err := bc.bulker.MUpdate(ctx, updates)
+>>>>>>> e1e4620 (Fix ignored options on Fleet Server bulk writes (#8297))
 
 	zerolog.Ctx(ctx).Trace().
 		Err(err).
 		Dur("rtt", time.Since(start)).
 		Int("cnt", len(updates)).
-		Bool("refresh", needRefresh).
 		Msg("Flush updates")
 
 	return err
