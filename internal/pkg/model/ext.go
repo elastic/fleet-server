@@ -6,6 +6,7 @@ package model
 
 import (
 	"bytes"
+	"fmt"
 	"maps"
 	"slices"
 	"time"
@@ -162,6 +163,31 @@ func (a *Agent) ComputeTagsHash() (string, error) {
 		return "", nil
 	}
 	return smap.Map{"tags": tags}.Hash()
+}
+
+// ForAgent returns the action for the target agent at position i, with the start time of
+// that agent in the rollout.
+func (a Action) ForAgent(i int) (Action, error) {
+	rollout := time.Duration(a.RolloutDurationSeconds) * time.Second
+	startTime, err := rolloutStartTime(a.StartTime, rollout, i, len(a.Agents))
+	a.StartTime = startTime
+	a.Agents = nil
+	return a, err
+}
+
+// rolloutStartTime returns a start time between start and start+rollout for the agent at
+// position i of total agents. As i < total, the start time is always before start+rollout.
+func rolloutStartTime(start string, rollout time.Duration, i, total int) (string, error) {
+	if start == "" {
+		return "", nil
+	}
+	startTS, err := time.Parse(time.RFC3339, start)
+	if err != nil {
+		return "", fmt.Errorf("parse start time: %w", err)
+	}
+	startTS = startTS.Add((rollout * time.Duration(i)) / time.Duration(total))
+	startTime := startTS.Format(time.RFC3339)
+	return startTime, nil
 }
 
 func cloneOTelService(s *Service) *Service {

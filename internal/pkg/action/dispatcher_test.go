@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
@@ -36,6 +37,15 @@ func (m *mockMonitor) Run(ctx context.Context) error {
 func (m *mockMonitor) GetCheckpoint() sqn.SeqNo {
 	args := m.Called()
 	return args.Get(0).(sqn.SeqNo) //nolint:errcheck // we don't need to check here
+}
+
+func (s Sub) receiveActions() []model.Action {
+	select {
+	case actions := <-s.Ch():
+		return actions
+	default:
+		return nil
+	}
 }
 
 func TestNewDispatcher(t *testing.T) {
@@ -234,6 +244,35 @@ func Test_Dispatcher_Run(t *testing.T) {
 				Type:                   "upgrade",
 			}},
 		},
+	}, {
+		name: "action with scheduling for agents that are not connected",
+		getMock: func() *mockMonitor {
+			m := &mockMonitor{}
+			ch := make(chan []es.HitT)
+			go func() {
+				ch <- []es.HitT{es.HitT{
+					Source: json.RawMessage(`{
+						"action_id": "test-action",
+						"agents": ["other1", "other2", "agent1"],
+						"rollout_duration_seconds": 600,
+						"start_time": "2022-01-02T12:00:00Z",
+						"type": "upgrade"
+					}`),
+				}}
+			}()
+			var rch <-chan []es.HitT = ch
+			m.On("Output").Return(rch)
+			return m
+		},
+		expect: map[string][]model.Action{
+			"agent1": []model.Action{model.Action{
+				ActionID:               "test-action",
+				Agents:                 nil,
+				RolloutDurationSeconds: 600,
+				StartTime:              "2022-01-02T12:06:40Z",
+				Type:                   "upgrade",
+			}},
+		},
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -309,68 +348,24 @@ func Test_Dispatcher_Run(t *testing.T) {
 	}
 }
 
-func Test_offsetStartTime(t *testing.T) {
-	tests := []struct {
-		name   string
-		start  string
-		end    string
-		dur    int64
-		i      int
-		total  int
-		result string
-	}{{
-		name:   "no start",
-		result: "",
-	}, {
-		name:   "first agent",
-		start:  "2022-01-02T12:00:00Z",
-		end:    "2022-01-02T13:00:00Z",
-		i:      0,
-		total:  10,
-		result: "2022-01-02T12:00:00Z",
-	}, {
-		name:   "mid agent no dur",
-		start:  "2022-01-02T12:00:00Z",
-		end:    "2022-01-02T13:00:00Z",
-		i:      4,
-		total:  10,
-		result: "2022-01-02T12:00:00Z",
-	}, {
-		name:   "last agent no dur",
-		start:  "2022-01-02T12:00:00Z",
-		end:    "2022-01-02T13:00:00Z",
-		i:      9,
-		total:  10,
-		result: "2022-01-02T12:00:00Z",
-	}, {
-		name:   "first agent 10m dur",
-		start:  "2022-01-02T12:00:00Z",
-		end:    "2022-01-02T13:00:00Z",
-		dur:    600,
-		i:      0,
-		total:  10,
-		result: "2022-01-02T12:00:00Z",
-	}, {
-		name:   "mid agent 10m dur",
-		start:  "2022-01-02T12:00:00Z",
-		end:    "2022-01-02T13:00:00Z",
-		dur:    600,
-		i:      4,
-		total:  10,
-		result: "2022-01-02T12:04:00Z",
-	}, {
-		name:   "last agent 10m dur",
-		start:  "2022-01-02T12:00:00Z",
-		end:    "2022-01-02T13:00:00Z",
-		dur:    600,
-		i:      9,
-		total:  10,
-		result: "2022-01-02T12:09:00Z",
-	}}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			r := offsetStartTime(t.Context(), tt.start, tt.dur, tt.i, tt.total)
-			assert.Equal(t, tt.result, r)
-		})
-	}
+func TestDispatcherWaitsOnlyForConnectedAgents(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		sub := Sub{agentID: "connected", ch: make(chan []model.Action, 1)}
+		d := &Dispatcher{limit: rate.NewLimiter(rate.Every(50*time.Millisecond), 1), subs: map[string]Sub{"connected": sub}}
+		start := time.Now()
+
+		d.process(t.Context(), []es.HitT{{
+			Source: json.RawMessage(`{
+				"action_id": "test-action",
+				"agents": ["other1", "other2", "other3", "other4", "connected"],
+				"type": "upgrade"
+			}`),
+		}})
+
+		elapsed := time.Since(start)
+		assert.Zero(t, elapsed, "process waited for the agents that are not connected")
+
+		actions := sub.receiveActions()
+		assert.Len(t, actions, 1)
+	})
 }

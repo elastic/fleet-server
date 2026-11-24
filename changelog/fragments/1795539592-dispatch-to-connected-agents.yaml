@@ -1,0 +1,7 @@
+kind: bug-fix
+summary: Dispatch actions only to the Elastic Agents connected to each Fleet Server
+description: >-
+  Each Fleet Server instance dispatches an action only to the Elastic Agents that are connected to
+  it. In large-scale environments Fleet Server uses less memory and Elastic Agents get actions with
+  less delay.
+component: fleet-server

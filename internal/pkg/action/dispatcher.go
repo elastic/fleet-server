@@ -127,14 +127,15 @@ func (d *Dispatcher) process(ctx context.Context, hits []es.HitT) {
 			break
 		}
 
-		numAgents := len(action.Agents)
 		for i, agentID := range action.Agents {
-			arr := agentActions[agentID]
-			actionNoAgents := action
-			actionNoAgents.StartTime = offsetStartTime(ctx, action.StartTime, action.RolloutDurationSeconds, i, numAgents)
-			actionNoAgents.Agents = nil
-			arr = append(arr, actionNoAgents)
-			agentActions[agentID] = arr
+			if _, ok := d.getSub(agentID); !ok {
+				continue
+			}
+			agentAction, err := action.ForAgent(i)
+			if err != nil {
+				zerolog.Ctx(ctx).Error().Err(err).Msg("unable to parse start_time string")
+			}
+			agentActions[agentID] = append(agentActions[agentID], agentAction)
 		}
 	}
 
@@ -145,23 +146,6 @@ func (d *Dispatcher) process(ctx context.Context, hits []es.HitT) {
 		}
 		d.dispatch(ctx, agentID, actions)
 	}
-}
-
-// offsetStartTime will return a new start time between start:start+dur based on index i and the total number of agents
-// As we expect i < total  the latest return time will always be < start+dur
-func offsetStartTime(ctx context.Context, start string, dur int64, i, total int) string {
-
-	if start == "" {
-		return ""
-	}
-	startTS, err := time.Parse(time.RFC3339, start)
-	if err != nil {
-		zerolog.Ctx(ctx).Error().Err(err).Msg("unable to parse start_time string")
-		return ""
-	}
-	d := time.Second * time.Duration(dur)
-	startTS = startTS.Add((d * time.Duration(i)) / time.Duration(total)) // adjust start to a position within the range
-	return startTS.Format(time.RFC3339)
 }
 
 // getSub returns the subscription (if any) for the specified agentID.

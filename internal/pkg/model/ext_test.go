@@ -5,6 +5,7 @@
 package model
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -309,6 +310,84 @@ func TestPolicyDataFeatureEnabled(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			assert.Equal(t, tc.want, tc.policyData.FeatureEnabled(FeatureIncludeTagsInEvents))
+		})
+	}
+}
+
+func TestActionForAgent(t *testing.T) {
+	tests := []struct {
+		name          string
+		startTime     string
+		rollout       int64
+		position      int
+		wantStartTime string
+		wantErr       bool
+	}{{
+		name:     "an action without start time stays without start time",
+		position: 2,
+	}, {
+		name:          "the first agent of an action without rollout starts at the start time",
+		startTime:     "2022-01-02T12:00:00Z",
+		wantStartTime: "2022-01-02T12:00:00Z",
+	}, {
+		name:          "a later agent of an action without rollout starts at the start time",
+		startTime:     "2022-01-02T12:00:00Z",
+		position:      2,
+		wantStartTime: "2022-01-02T12:00:00Z",
+	}, {
+		name:          "the last agent of an action without rollout starts at the start time",
+		startTime:     "2022-01-02T12:00:00Z",
+		position:      3,
+		wantStartTime: "2022-01-02T12:00:00Z",
+	}, {
+		name:          "the first agent of a rollout starts at the start time",
+		startTime:     "2022-01-02T12:00:00Z",
+		rollout:       600,
+		wantStartTime: "2022-01-02T12:00:00Z",
+	}, {
+		name:          "a later agent of a rollout starts at its share of the rollout",
+		startTime:     "2022-01-02T12:00:00Z",
+		rollout:       600,
+		position:      2,
+		wantStartTime: "2022-01-02T12:05:00Z",
+	}, {
+		name:          "the last agent of a rollout starts before the end of the rollout",
+		startTime:     "2022-01-02T12:00:00Z",
+		rollout:       600,
+		position:      3,
+		wantStartTime: "2022-01-02T12:07:30Z",
+	}, {
+		name:      "an action with an invalid start time is an error",
+		startTime: "not a time",
+		rollout:   600,
+		position:  2,
+		wantErr:   true,
+	}}
+	agents := []string{"agent-0", "agent-1", "agent-2", "agent-3"}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			action := Action{
+				ActionID:               "action-1",
+				Type:                   "UPGRADE",
+				Agents:                 slices.Clone(agents),
+				StartTime:              tt.startTime,
+				RolloutDurationSeconds: tt.rollout,
+			}
+
+			got, err := action.ForAgent(tt.position)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+
+			want := action
+			want.Agents = nil
+			want.StartTime = tt.wantStartTime
+			assert.Equal(t, want, got)
+
+			assert.Equal(t, agents, action.Agents)
+			assert.Equal(t, tt.startTime, action.StartTime)
 		})
 	}
 }
