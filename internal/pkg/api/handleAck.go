@@ -424,7 +424,7 @@ func (ack *AckT) handleActionResult(ctx context.Context, zlog zerolog.Logger, ag
 
 	// An UPGRADE ack that carries no error is a no-op when the stored upgrade_details already track
 	// this action: the result is recorded from the check-in upgrade_details once the outcome is known.
-	if action.Type == TypeUpgrade && agent.UpgradeDetails != nil && agent.UpgradeDetails.ActionID == action.ActionID {
+	if action.Type == TypeUpgrade && checkinRecordsUpgradeResult(agent.UpgradeDetails, action.ActionID) {
 		if event, err := ev.AsUpgradeEvent(); err == nil && event.Error == nil {
 			zlog.Debug().Str(ecs.AgentID, agent.Agent.ID).Str(ecs.ActionID, action.Id).Msg("upgrade ack matches stored upgrade_details, no writes")
 			return nil

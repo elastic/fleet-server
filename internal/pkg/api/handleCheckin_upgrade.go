@@ -68,6 +68,23 @@ func upgradeFailureIsFinal(m *UpgradeDetails_Metadata, now time.Time) bool {
 	return now.After(meta.RetryUntil.Add(upgradeRetryGrace))
 }
 
+// checkinRecordsUpgradeResult reports whether the stored upgrade_details track the action, so that
+// its result is recorded from the check-in upgrade_details and an ack without an error needs no
+// write. An upgrade stored as UPG_SCHEDULED or UPG_REQUESTED has not progressed, and the agent only
+// acks it when it ended without doing so (e.g. an upgrade to the current version, which reports no
+// upgrade_details afterwards), so nothing else would record its result. Canceling a scheduled
+// upgrade never acks it.
+func checkinRecordsUpgradeResult(ud *model.UpgradeDetails, actionID string) bool {
+	if ud == nil || ud.ActionID != actionID {
+		return false
+	}
+	switch ud.State {
+	case string(UpgradeDetailsStateUPGSCHEDULED), string(UpgradeDetailsStateUPGREQUESTED):
+		return false
+	}
+	return true
+}
+
 // noDetailsOutcome decides what to record for the stored upgrade of an agent that checked in
 // without upgrade_details; ver is non-empty when the agent's version changed.
 //   - A stored UPG_WATCHING, or a changed version, means the upgrade completed: a success.

@@ -149,6 +149,19 @@ func Test_Upgrade_Results(t *testing.T) {
 		require.Empty(t, res[0].Error)
 	})
 
+	t.Run("ack of a scheduled upgrade that ended without progressing records the result", func(t *testing.T) {
+		u := newUpgradeTest(t, ctx, srv)
+
+		// An upgrade to the current version: the agent acks it and later reports no upgrade_details.
+		u.checkin(api.UpgradeDetailsStateUPGSCHEDULED, map[string]any{"scheduled_at": time.Now().Add(-time.Minute).UTC().Format(time.RFC3339)})
+		u.ack("")
+		res := u.waitResults()
+		require.Empty(t, res[0].Error)
+
+		u.checkinNoDetails()
+		require.Len(t, u.results(), 1, "the no-details check-in must not create another result")
+	})
+
 	t.Run("rolled back upgrade without a reason", func(t *testing.T) {
 		u := newUpgradeTest(t, ctx, srv)
 

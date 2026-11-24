@@ -1239,6 +1239,26 @@ func TestAckHandleActionResultUpgrade(t *testing.T) {
 			return ftesting.NewMockBulk() // any call fails the test
 		},
 	}, {
+		name:  "stored SCHEDULED upgrade_details never progressed, ack writes the result",
+		agent: agentWith(&model.UpgradeDetails{ActionID: actionID, State: "UPG_SCHEDULED"}),
+		event: `{"action_id":"` + actionID + `","agent_id":"agent"}`,
+		bulker: func() *ftesting.MockBulk {
+			m := ftesting.NewMockBulk()
+			m.On("Create", mock.Anything, dl.FleetActionsResults, mock.Anything, mock.Anything, noRefresh).Return("", nil).Once()
+			m.On("Update", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+			return m
+		},
+	}, {
+		name:  "stored REQUESTED upgrade_details never progressed, ack writes the result",
+		agent: agentWith(&model.UpgradeDetails{ActionID: actionID, State: "UPG_REQUESTED"}),
+		event: `{"action_id":"` + actionID + `","agent_id":"agent"}`,
+		bulker: func() *ftesting.MockBulk {
+			m := ftesting.NewMockBulk()
+			m.On("Create", mock.Anything, dl.FleetActionsResults, mock.Anything, mock.Anything, noRefresh).Return("", nil).Once()
+			m.On("Update", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+			return m
+		},
+	}, {
 		name:  "no stored upgrade_details, result created without refresh and agent updated",
 		agent: agentWith(nil),
 		event: `{"action_id":"` + actionID + `","agent_id":"agent"}`,
