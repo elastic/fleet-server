@@ -65,7 +65,7 @@ func LocalESURL() string {
 	if hosts == "" {
 		return "http://elastic:changeme@localhost:9200"
 	}
-	raw := strings.SplitN(hosts, ",", 2)[0]
+	raw, _, _ := strings.Cut(hosts, ",")
 	u, err := url.Parse(raw)
 	if err != nil || u.Host == "" {
 		// bare host:port with no scheme
