@@ -11,10 +11,6 @@ WORKDIR /fleet-server/
 # pre-copy/cache go.mod for pre-downloading dependencies and only redownloading them in subsequent builds if they change
 COPY go.mod go.sum ./
 COPY dev-tools/tools/go.mod dev-tools/tools/go.sum ./dev-tools/tools/
-# GOFIPS140 must be set before go mod download so that the golang.org/fips140 module is cached during image build.
-# Without this, the module would be fetched at build time by the host user who lacks write access to the module cache.
-ENV GOFIPS140=certified
-ENV FIPS=true
 RUN go mod download && go mod verify
 RUN go install github.com/magefile/mage # uses version in go.mod
 
