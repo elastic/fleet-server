@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
@@ -62,11 +63,25 @@ func storeRandomPolicies(ctx context.Context, bulker bulk.Bulk, index string, co
 			})
 		}
 	}
+<<<<<<< HEAD
 	_, err := bulker.MIndex(ctx, ops, bulk.WithRefresh())
+=======
+	items, err := bulker.MIndex(ctx, ops, bulk.WithRefresh())
+>>>>>>> e1e4620 (Fix ignored options on Fleet Server bulk writes (#8297))
 	if err != nil {
 		return err
 	}
+<<<<<<< HEAD
 	return nil
+=======
+	for i, item := range items {
+		if err := es.TranslateError(item.Status, item.Error); err != nil {
+			writeErr := fmt.Errorf("write policy fixture %d: %w", i, err)
+			return nil, writeErr
+		}
+	}
+	return ids, nil
+>>>>>>> e1e4620 (Fix ignored options on Fleet Server bulk writes (#8297))
 }
 
 func TestQueryLatestPolicies(t *testing.T) {
@@ -95,6 +110,7 @@ func TestQueryLatestPolicies(t *testing.T) {
 	}
 }
 
+<<<<<<< HEAD
 // TestQueryLatestPolicies400k tests to see if  to see if the latest revision is correctly selected when a lot the revision count is very large
 //
 //nolint:dupl // test duplication
@@ -154,6 +170,44 @@ func TestQueryLatestPolicies11kUnique(t *testing.T) {
 		if policy.RevisionIdx != 2 {
 			t.Errorf("Expected to find revision_idx 1 for policy %s, found %d", policy.PolicyID, policy.RevisionIdx)
 		}
+=======
+func TestQueryLatestPolicies(t *testing.T) {
+	const policyCount = 4
+	tests := []struct {
+		name      string
+		revisions int
+	}{
+		{
+			name:      "the latest revisions are visible after one bulk request",
+			revisions: 4,
+		},
+		{
+			name:      "the latest revisions are visible after multiple bulk requests",
+			revisions: 100_000,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := testlog.SetLogger(t).WithContext(t.Context())
+			index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetPolicies)
+
+			policies := make([][]model.Policy, policyCount)
+			for i := range policies {
+				policies[i] = make([]model.Policy, tt.revisions)
+				for j := range policies[i] {
+					policies[i][j].RevisionIdx = int64(j + 1)
+				}
+			}
+			ids, err := storeRandomPolicies(ctx, bulker, index, policies)
+			require.NoError(t, err)
+
+			for _, id := range ids {
+				policy, err := QueryLatestPolicy(ctx, bulker, id, WithIndexName(index))
+				require.NoError(t, err)
+				assert.Equal(t, int64(tt.revisions), policy.RevisionIdx, "policy %s", id)
+			}
+		})
+>>>>>>> e1e4620 (Fix ignored options on Fleet Server bulk writes (#8297))
 	}
 }
 
