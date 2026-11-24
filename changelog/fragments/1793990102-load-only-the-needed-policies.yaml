@@ -1,0 +1,6 @@
+kind: bug-fix
+summary: Load only the needed policies from Elasticsearch
+description: >-
+  Fleet Server loads only the policies that it needs in its health checks and in static token
+  enrollments instead of all the policies.
+component: fleet-server

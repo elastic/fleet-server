@@ -75,7 +75,11 @@ type Monitor interface {
 	GetPolicy(ctx context.Context, policyID string) (*model.Policy, error)
 }
 
+<<<<<<< HEAD
 type policyFetcher func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error)
+=======
+type policiesFetcher func(ctx context.Context, bulker bulk.Bulk, policyIDs []string, opt ...dl.Option) ([]model.Policy, error)
+>>>>>>> 39eeea5 (Load only the needed policies in Fleet Server health checks and enrollments (#8224))
 
 type policyT struct {
 	pp   ParsedPolicy
