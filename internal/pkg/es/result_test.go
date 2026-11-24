@@ -19,11 +19,9 @@ import (
 
 func TestHitUnmarshal(t *testing.T) {
 	action := model.Action{
-		ESDocument: model.ESDocument{
-			Id:      xid.New().String(),
-			SeqNo:   2,
-			Version: 1,
-		},
+		Id:       xid.New().String(),
+		SeqNo:    2,
+		Version:  1,
 		ActionID: uuid.Must(uuid.NewV4()).String(),
 	}
 
@@ -32,7 +30,7 @@ func TestHitUnmarshal(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Unmarshall action iwth json and check that ES properties are not set
+	// Unmarshall action with json and check that ES properties are not set
 	var a model.Action
 	err = json.Unmarshal(body, &a)
 	if err != nil {

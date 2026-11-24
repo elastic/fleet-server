@@ -254,9 +254,7 @@ func TestEnrollAgentWithAgentToServerMessage(t *testing.T) {
 
 	bulker.On("Search", mock.Anything, dl.FleetEnrollmentAPIKeys, mock.Anything, mock.Anything).
 		Return(&es.ResultT{
-			HitsT: es.HitsT{
-				Hits: []es.HitT{{Source: enrollKeyBytes}},
-			},
+			Hits: []es.HitT{{Source: enrollKeyBytes}},
 		}, nil)
 
 	agentUID := uuid.Must(uuid.NewV7())
@@ -340,9 +338,7 @@ func TestEnrollAgentRateLimiter(t *testing.T) {
 
 		bulker.On("Search", mock.Anything, dl.FleetEnrollmentAPIKeys, mock.Anything, mock.Anything).
 			Return(&es.ResultT{
-				HitsT: es.HitsT{
-					Hits: []es.HitT{{Source: enrollKeyBytes}},
-				},
+				Hits: []es.HitT{{Source: enrollKeyBytes}},
 			}, nil)
 
 		agentUID := uuid.Must(uuid.NewV7())
@@ -388,7 +384,7 @@ func TestEnrollAgentGeneratesNewUIDWhenFlagSet(t *testing.T) {
 	require.NoError(t, err)
 
 	bulker.On("Search", mock.Anything, dl.FleetEnrollmentAPIKeys, mock.Anything, mock.Anything).
-		Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{{Source: enrollKeyBytes}}}}, nil)
+		Return(&es.ResultT{Hits: []es.HitT{{Source: enrollKeyBytes}}}, nil)
 
 	var createdID string
 	bulker.On("Create", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything, mock.Anything).
@@ -470,7 +466,7 @@ func TestEnrollAgentTags(t *testing.T) {
 			enrollKeyBytes, err := json.Marshal(enrollKey) //nolint:gosec // test data, not real credentials
 			require.NoError(t, err)
 			bulker.On("Search", mock.Anything, dl.FleetEnrollmentAPIKeys, mock.Anything, mock.Anything).
-				Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{{Source: enrollKeyBytes}}}}, nil)
+				Return(&es.ResultT{Hits: []es.HitT{{Source: enrollKeyBytes}}}, nil)
 			agentUID := uuid.Must(uuid.NewV7())
 			bulker.On("Create", mock.Anything, dl.FleetAgents, agentUID.String(), mock.Anything, mock.Anything).
 				Return("doc-id", nil)
@@ -522,7 +518,7 @@ func TestUpdateAgentWithAgentToServerMessage(t *testing.T) {
 		checker := &mockCheckin{}
 		oa := &OpAMPT{bc: checker}
 
-		agent := &model.Agent{ESDocument: model.ESDocument{Id: "agent-123"}}
+		agent := &model.Agent{Id: "agent-123"}
 
 		msg := &protobufs.AgentToServer{
 			SequenceNum: 7,
@@ -581,7 +577,7 @@ func TestUpdateAgentWithAgentToServerMessage(t *testing.T) {
 		oa := &OpAMPT{bc: checker}
 
 		agent := &model.Agent{
-			ESDocument:            model.ESDocument{Id: "agent-123"},
+			Id:                    "agent-123",
 			AuditUnenrolledReason: reenrolled,
 			AuditUnenrolledTime:   time.Now().UTC().Format(time.RFC3339),
 		}
@@ -632,7 +628,7 @@ func TestHandleMessageAgentDisconnect(t *testing.T) {
 				agentBytes, err := json.Marshal(agent)
 				require.NoError(t, err)
 				bulker.On("Search", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything).
-					Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{{ID: "agent-123", Source: agentBytes}}}}, nil)
+					Return(&es.ResultT{Hits: []es.HitT{{ID: "agent-123", Source: agentBytes}}}, nil)
 				return bulker
 			},
 			wantError: false,
@@ -642,7 +638,7 @@ func TestHandleMessageAgentDisconnect(t *testing.T) {
 			getBulker: func(_ *testing.T) *ftesting.MockBulk {
 				bulker := ftesting.NewMockBulk()
 				bulker.On("Search", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything).
-					Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{}}}, nil)
+					Return(&es.ResultT{Hits: []es.HitT{}}, nil)
 				return bulker
 			},
 			wantError: true,
@@ -687,7 +683,7 @@ func mockBulkerOpAMPNewEnrollment(t *testing.T, apiKeyID string) *ftesting.MockB
 	t.Helper()
 	bulker := ftesting.NewMockBulk()
 	bulker.On("Search", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything).
-		Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{}}}, nil)
+		Return(&es.ResultT{Hits: []es.HitT{}}, nil)
 	enrollKey := model.EnrollmentAPIKey{
 		APIKeyID: apiKeyID,
 		PolicyID: "policy-123",
@@ -696,7 +692,7 @@ func mockBulkerOpAMPNewEnrollment(t *testing.T, apiKeyID string) *ftesting.MockB
 	enrollKeyBytes, err := json.Marshal(enrollKey) //nolint:gosec // fake api key used in test
 	require.NoError(t, err)
 	bulker.On("Search", mock.Anything, dl.FleetEnrollmentAPIKeys, mock.Anything, mock.Anything).
-		Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{{Source: enrollKeyBytes}}}}, nil)
+		Return(&es.ResultT{Hits: []es.HitT{{Source: enrollKeyBytes}}}, nil)
 	bulker.On("Create", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything, mock.Anything).
 		Return("doc-id", nil)
 	return bulker
@@ -709,7 +705,7 @@ func mockBulkerOpAMPExistingAgent(t *testing.T, lastCheckinStatus string) *ftest
 	agentBytes, err := json.Marshal(agent)
 	require.NoError(t, err)
 	bulker.On("Search", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything).
-		Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{{ID: "agent-123", Source: agentBytes}}}}, nil)
+		Return(&es.ResultT{Hits: []es.HitT{{ID: "agent-123", Source: agentBytes}}}, nil)
 	return bulker
 }
 
@@ -785,7 +781,7 @@ func TestHandleMessageRequestInstanceUid(t *testing.T) {
 				t.Helper()
 				bulker := ftesting.NewMockBulk()
 				bulker.On("Search", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything).
-					Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{}}}, nil)
+					Return(&es.ResultT{Hits: []es.HitT{}}, nil)
 				enrollKey := model.EnrollmentAPIKey{
 					APIKeyID: testAPIKeyID,
 					PolicyID: "policy-123",
@@ -794,7 +790,7 @@ func TestHandleMessageRequestInstanceUid(t *testing.T) {
 				enrollKeyBytes, err := json.Marshal(enrollKey) //nolint:gosec // fake api key used in test
 				require.NoError(t, err)
 				bulker.On("Search", mock.Anything, dl.FleetEnrollmentAPIKeys, mock.Anything, mock.Anything).
-					Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{{Source: enrollKeyBytes}}}}, nil)
+					Return(&es.ResultT{Hits: []es.HitT{{Source: enrollKeyBytes}}}, nil)
 				bulker.On("Create", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything, mock.Anything).
 					Run(func(args mock.Arguments) {
 						id, ok := args.Get(2).(string)
@@ -944,11 +940,11 @@ func TestHandleMessageReenrollOldDocBehavior(t *testing.T) {
 			agentBytes, err := json.Marshal(agent)
 			require.NoError(t, err)
 			bulker.On("Search", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything).
-				Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{{ID: "agent-123", Source: agentBytes}}}}, nil)
+				Return(&es.ResultT{Hits: []es.HitT{{ID: "agent-123", Source: agentBytes}}}, nil)
 
 			if tc.flags&uint64(protobufs.AgentToServerFlags_AgentToServerFlags_RequestInstanceUid) != 0 {
 				bulker.On("Search", mock.Anything, dl.FleetEnrollmentAPIKeys, mock.Anything, mock.Anything).
-					Return(&es.ResultT{HitsT: es.HitsT{Hits: []es.HitT{{Source: enrollKeyBytes}}}}, nil)
+					Return(&es.ResultT{Hits: []es.HitT{{Source: enrollKeyBytes}}}, nil)
 				bulker.On("Create", mock.Anything, dl.FleetAgents, mock.Anything, mock.Anything, mock.Anything).
 					Return("doc-id", nil)
 			}

@@ -22,19 +22,37 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Fields of the upload metadata document, shared by the uploader tests.
+const (
+	fileKey          = "file"
+	fieldSize        = "size"
+	fieldActionID    = "action_id"
+	fieldAgentID     = "agent_id"
+	fieldSource      = "src"
+	fieldChunkSize   = "ChunkSize"
+	fieldStatus      = "Status"
+	fieldUploadStart = "upload_start"
+)
+
+// Dotted paths into the upload request, as accepted by makeUploadRequestDict.
+const (
+	testKeyFileName = fileKey + ".name"
+	testKeyFileSize = fileKey + "." + fieldSize
+)
+
 // convenience function for making a typical file request structure
 // with defaults when specific values are not checked or required
 func makeUploadRequestDict(input map[string]any) JSDict {
 	// defaults
 	d := JSDict{
-		"file": map[string]any{
+		fileKey: map[string]any{
 			"name":      "foo.png",
 			"mime_type": "image/png",
-			"size":      1024,
+			fieldSize:   1024,
 		},
-		"action_id": "123",
-		"agent_id":  "456",
-		"src":       "agent",
+		fieldActionID: "123",
+		fieldAgentID:  "456",
+		fieldSource:   "agent",
 	}
 
 	if input == nil {
@@ -64,10 +82,10 @@ func TestUploadBeginReturnsCorrectInfo(t *testing.T) {
 	action := "abc"
 	agent := "XYZ"
 	data := makeUploadRequestDict(map[string]any{
-		"action_id": action,
-		"agent_id":  agent,
-		"src":       src,
-		"file.size": size,
+		fieldActionID:   action,
+		fieldAgentID:    agent,
+		fieldSource:     src,
+		testKeyFileSize: size,
 	})
 
 	fakeBulk := itesting.NewMockBulk()
@@ -107,11 +125,11 @@ func TestUploadBeginWritesDocumentFromInputs(t *testing.T) {
 	name := "test.zip"
 
 	data := makeUploadRequestDict(map[string]any{
-		"action_id": action,
-		"agent_id":  agent,
-		"src":       src,
-		"file.name": name,
-		"file.size": size,
+		fieldActionID:   action,
+		fieldAgentID:    agent,
+		fieldSource:     src,
+		testKeyFileName: name,
+		testKeyFileSize: size,
 	})
 
 	fakeBulk := itesting.NewMockBulk()
@@ -169,7 +187,7 @@ func TestUploadBeginCalculatesCorrectChunkCount(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.Name, func(t *testing.T) {
 			data := makeUploadRequestDict(map[string]any{
-				"file.size": tc.FileSize,
+				testKeyFileSize: tc.FileSize,
 			})
 			info, err := u.Begin(t.Context(), []string{}, data)
 			assert.NoError(t, err)
@@ -212,7 +230,7 @@ func TestUploadBeginMaxFileSize(t *testing.T) {
 		t.Run(tc.Name, func(t *testing.T) {
 			u := New(nil, fakeBulk, c, tc.UploadSizeLimit, time.Hour)
 			data := makeUploadRequestDict(map[string]any{
-				"file.size": tc.FileSize,
+				testKeyFileSize: tc.FileSize,
 			})
 			_, err := u.Begin(t.Context(), []string{}, data)
 			if tc.ShouldError {
@@ -231,12 +249,12 @@ func TestUploadBeginMaxFileSize(t *testing.T) {
 func TestUploadRejectsMissingRequiredFields(t *testing.T) {
 
 	tests := []string{
-		"file.name",
+		testKeyFileName,
 		"file.mime_type",
-		"file.size",
-		"action_id",
-		"agent_id",
-		"src",
+		testKeyFileSize,
+		fieldActionID,
+		fieldAgentID,
+		fieldSource,
 	}
 
 	fakeBulk := itesting.NewMockBulk()
@@ -284,16 +302,16 @@ func mockUploadInfoResult(bulker *itesting.MockBulk, info file.Info) {
 
 	// convert info into how it's stored/returned in ES
 	out, _ := json.Marshal(map[string]any{
-		"action_id": info.ActionID,
-		"agent_id":  info.AgentID,
-		"src":       info.Source,
-		"file": map[string]any{
-			"size":      info.Total,
-			"ChunkSize": info.ChunkSize,
-			"Status":    info.Status,
+		fieldActionID: info.ActionID,
+		fieldAgentID:  info.AgentID,
+		fieldSource:   info.Source,
+		fileKey: map[string]any{
+			fieldSize:      info.Total,
+			fieldChunkSize: info.ChunkSize,
+			fieldStatus:    info.Status,
 		},
-		"upload_id":    info.ID,
-		"upload_start": info.Start.UnixMilli(),
+		file.FieldUploadID: info.ID,
+		fieldUploadStart:   info.Start.UnixMilli(),
 	})
 
 	bulker.On("Search",
@@ -302,12 +320,10 @@ func mockUploadInfoResult(bulker *itesting.MockBulk, info file.Info) {
 		mock.Anything,
 		mock.Anything,
 	).Return(&es.ResultT{
-		HitsT: es.HitsT{
-			Hits: []es.HitT{
-				{
-					ID:     info.DocID,
-					Source: out,
-				},
+		Hits: []es.HitT{
+			{
+				ID:     info.DocID,
+				Source: out,
 			},
 		},
 	}, nil).Once()
@@ -321,9 +337,9 @@ func TestChunkMarksFinal(t *testing.T) {
 	}{
 		{10, 0, "Small file only chunk is final"},
 		{file.MaxChunkSize, 0, "1 chunksize only chunk is final"},
-		{file.MaxChunkSize + 1, 1, "ChunkSize+1 bytes takes 2 chunks"},
+		{file.MaxChunkSize + 1, 1, "ChunkSize+1 bytes second chunk is final"},
 		{file.MaxChunkSize * 2.5, 2, "2.5x chunk size"},
-		{7534559605, 1796, "7.5Gb file"},
+		{7534559605, 1796, "7.5Gb file last chunk is final"},
 	}
 
 	for _, tc := range tests {
@@ -347,7 +363,7 @@ func TestChunkMarksFinal(t *testing.T) {
 			u := New(nil, fakeBulk, c, size_ptr(8388608000), time.Hour)
 
 			data := makeUploadRequestDict(map[string]any{
-				"file.size": tc.FileSize,
+				testKeyFileSize: tc.FileSize,
 			})
 
 			info, err := u.Begin(t.Context(), []string{}, data)

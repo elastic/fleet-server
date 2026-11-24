@@ -8,6 +8,7 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -50,7 +51,7 @@ func TestUploadBeginValidation(t *testing.T) {
 
 	// test empty body
 	rec := httptest.NewRecorder()
-	hr.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, RouteUploadBegin, nil))
+	hr.ServeHTTP(rec, newTestRequest(http.MethodPost, RouteUploadBegin, nil))
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 	assert.Contains(t, rec.Body.String(), "body is required")
 
@@ -209,7 +210,7 @@ func TestUploadBeginValidation(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.Name, func(t *testing.T) {
 			rec = httptest.NewRecorder()
-			req := httptest.NewRequest(http.MethodPost, RouteUploadBegin, strings.NewReader(tc.Input))
+			req := newTestRequest(http.MethodPost, RouteUploadBegin, strings.NewReader(tc.Input))
 			hr.ServeHTTP(rec, req)
 			assert.Equal(t, tc.ExpectStatus, rec.Code)
 			if tc.ExpectContains != "" {
@@ -221,6 +222,7 @@ func TestUploadBeginValidation(t *testing.T) {
 
 }
 
+//nolint:dupl // intentionally parallel to its sibling scenario test
 func TestUploadBeginAuth(t *testing.T) {
 
 	tests := []struct {
@@ -252,9 +254,7 @@ func TestUploadBeginAuth(t *testing.T) {
 						return nil, ErrAgentIdentity
 					}
 					return &model.Agent{
-						ESDocument: model.ESDocument{
-							Id: tc.AgentFromAPIKey,
-						},
+						Id: tc.AgentFromAPIKey,
 						Agent: &model.AgentMetadata{
 							ID: tc.AgentFromAPIKey,
 						},
@@ -263,7 +263,7 @@ func TestUploadBeginAuth(t *testing.T) {
 			}
 
 			rec := httptest.NewRecorder()
-			req := httptest.NewRequest(http.MethodPost, RouteUploadBegin, strings.NewReader(mockStartBodyWithAgent(tc.AgentInRequestBody)))
+			req := newTestRequest(http.MethodPost, RouteUploadBegin, strings.NewReader(mockStartBodyWithAgent(tc.AgentInRequestBody)))
 			hr.ServeHTTP(rec, req)
 
 			assert.Equal(t, tc.ExpectStatus, rec.Code)
@@ -275,7 +275,7 @@ func TestUploadBeginAuth(t *testing.T) {
 func TestUploadBeginResponse(t *testing.T) {
 	hr, _, _, _ := prepareUploaderMock(t)
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, RouteUploadBegin, strings.NewReader(mockStartBodyWithAgent("foo")))
+	req := newTestRequest(http.MethodPost, RouteUploadBegin, strings.NewReader(mockStartBodyWithAgent("foo")))
 	hr.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusOK, rec.Code)
 
@@ -291,7 +291,7 @@ func TestUploadBeginWritesTimestampToMeta(t *testing.T) {
 	hr, _, fakebulk, _ := prepareUploaderMock(t)
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, RouteUploadBegin, strings.NewReader(mockStartBodyWithAgent("foo")))
+	req := newTestRequest(http.MethodPost, RouteUploadBegin, strings.NewReader(mockStartBodyWithAgent("foo")))
 	hr.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusOK, rec.Code)
 
@@ -316,7 +316,7 @@ func TestUploadBeginWritesTimestampToMeta(t *testing.T) {
 				ts, err = strconv.ParseInt(n, 10, 64)
 				require.NoError(t, err)
 			case uint64:
-				ts = int64(n)
+				ts = int64(n) //nolint:gosec // G115: a millisecond timestamp fits in int64
 			case int64:
 				ts = n
 			case int:
@@ -336,7 +336,7 @@ func TestUploadBeginWritesTimestampToMeta(t *testing.T) {
 func TestUploadBeginBadRequest(t *testing.T) {
 	hr, _, _, _ := prepareUploaderMock(t)
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, RouteUploadBegin, strings.NewReader("not a json"))
+	req := newTestRequest(http.MethodPost, RouteUploadBegin, strings.NewReader("not a json"))
 	hr.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 }
@@ -377,7 +377,7 @@ func TestUploadBeginFileSize(t *testing.T) {
 
 			hr, _, _, _ := configureUploaderMock(t, tc.MaxSize)
 			rec := httptest.NewRecorder()
-			req := httptest.NewRequest(http.MethodPost, RouteUploadBegin, strings.NewReader(mockFile(tc.InputSize)))
+			req := newTestRequest(http.MethodPost, RouteUploadBegin, strings.NewReader(mockFile(tc.InputSize)))
 			hr.ServeHTTP(rec, req)
 			assert.Equal(t, tc.ExpectStatus, rec.Code)
 		})
@@ -389,6 +389,7 @@ func TestUploadBeginFileSize(t *testing.T) {
   Chunk data upload route
 */
 
+//nolint:dupl // intentionally parallel to its sibling scenario test
 func TestChunkUploadRequiresMatchingAuth(t *testing.T) {
 	data := []byte("filedata")
 	hasher := sha256.New()
@@ -438,9 +439,7 @@ func TestChunkUploadRequiresMatchingAuth(t *testing.T) {
 						return nil, ErrAgentIdentity
 					}
 					return &model.Agent{
-						ESDocument: model.ESDocument{
-							Id: tc.AgentFromAPIKey,
-						},
+						Id: tc.AgentFromAPIKey,
 						Agent: &model.AgentMetadata{
 							ID: tc.AgentFromAPIKey,
 						},
@@ -449,7 +448,7 @@ func TestChunkUploadRequiresMatchingAuth(t *testing.T) {
 			}
 
 			rec := httptest.NewRecorder()
-			req := httptest.NewRequest(http.MethodPut, "/api/fleet/uploads/"+mockUploadID+"/0", bytes.NewReader(data))
+			req := newTestRequest(http.MethodPut, "/api/fleet/uploads/"+mockUploadID+"/0", bytes.NewReader(data))
 			req.Header.Set("X-Chunk-SHA2", hash)
 			hr.ServeHTTP(rec, req)
 
@@ -496,7 +495,7 @@ func TestChunkUploadRouteParams(t *testing.T) {
 			})
 
 			rec := httptest.NewRecorder()
-			req := httptest.NewRequest(http.MethodPut, tc.Path, bytes.NewReader(data))
+			req := newTestRequest(http.MethodPut, tc.Path, bytes.NewReader(data))
 			req.Header.Set("X-Chunk-SHA2", hash)
 
 			hr.ServeHTTP(rec, req)
@@ -529,7 +528,7 @@ func TestChunkUploadRequiresChunkHashHeader(t *testing.T) {
 	})
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPut, "/api/fleet/uploads/"+mockUploadID+"/0", bytes.NewReader(data))
+	req := newTestRequest(http.MethodPut, "/api/fleet/uploads/"+mockUploadID+"/0", bytes.NewReader(data))
 	hr.ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
@@ -577,7 +576,7 @@ func TestChunkUploadStatus(t *testing.T) {
 			})
 
 			rec := httptest.NewRecorder()
-			req := httptest.NewRequest(http.MethodPut, "/api/fleet/uploads/"+mockUploadID+"/0", bytes.NewReader(data))
+			req := newTestRequest(http.MethodPut, "/api/fleet/uploads/"+mockUploadID+"/0", bytes.NewReader(data))
 			req.Header.Set("X-Chunk-SHA2", hash)
 
 			hr.ServeHTTP(rec, req)
@@ -628,7 +627,7 @@ func TestChunkUploadExpiry(t *testing.T) {
 			})
 
 			rec := httptest.NewRecorder()
-			req := httptest.NewRequest(http.MethodPut, "/api/fleet/uploads/"+mockUploadID+"/0", bytes.NewReader(data))
+			req := newTestRequest(http.MethodPut, "/api/fleet/uploads/"+mockUploadID+"/0", bytes.NewReader(data))
 			req.Header.Set("X-Chunk-SHA2", hash)
 
 			hr.ServeHTTP(rec, req)
@@ -674,7 +673,7 @@ func TestChunkUploadWritesTimestamp(t *testing.T) {
 	}
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPut, "/api/fleet/uploads/"+mockUploadID+"/0", bytes.NewReader(data))
+	req := newTestRequest(http.MethodPut, "/api/fleet/uploads/"+mockUploadID+"/0", bytes.NewReader(data))
 	req.Header.Set("X-Chunk-SHA2", hash)
 
 	hr.ServeHTTP(rec, req)
@@ -744,7 +743,7 @@ func TestUploadCompleteRequiresMatchingAuth(t *testing.T) {
 			}
 
 			rec := httptest.NewRecorder()
-			req := httptest.NewRequest(http.MethodPost, "/api/fleet/uploads/"+mockUploadID, strings.NewReader(`{"transithash":{"sha256":"`+transit+`"}}`))
+			req := newTestRequest(http.MethodPost, "/api/fleet/uploads/"+mockUploadID, strings.NewReader(`{"transithash":{"sha256":"`+transit+`"}}`))
 			hr.ServeHTTP(rec, req)
 
 			assert.Equal(t, tc.ExpectStatus, rec.Code)
@@ -794,7 +793,7 @@ func TestUploadCompleteRequiresValidStatus(t *testing.T) {
 			}})
 
 			rec := httptest.NewRecorder()
-			req := httptest.NewRequest(http.MethodPost, "/api/fleet/uploads/"+mockUploadID, strings.NewReader(`{"transithash": {"sha256": "`+transit+`"}}`))
+			req := newTestRequest(http.MethodPost, "/api/fleet/uploads/"+mockUploadID, strings.NewReader(`{"transithash": {"sha256": "`+transit+`"}}`))
 
 			hr.ServeHTTP(rec, req)
 
@@ -842,7 +841,7 @@ func TestUploadCompleteRejectsMissingChunks(t *testing.T) {
 	})
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/fleet/uploads/"+mockUploadID, strings.NewReader(`{"transithash": {"sha256": "`+transit+`"}}`))
+	req := newTestRequest(http.MethodPost, "/api/fleet/uploads/"+mockUploadID, strings.NewReader(`{"transithash": {"sha256": "`+transit+`"}}`))
 
 	hr.ServeHTTP(rec, req)
 
@@ -850,6 +849,7 @@ func TestUploadCompleteRejectsMissingChunks(t *testing.T) {
 	assert.Contains(t, rec.Body.String(), "incomplete")
 }
 
+//nolint:dupl // intentionally parallel to its sibling scenario test
 func TestUploadCompleteRejectsFinalChunkNotMarkedFinal(t *testing.T) {
 	mockUploadID := "abc123"
 
@@ -892,7 +892,7 @@ func TestUploadCompleteRejectsFinalChunkNotMarkedFinal(t *testing.T) {
 	})
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/fleet/uploads/"+mockUploadID, strings.NewReader(`{"transithash": {"sha256": "`+transit+`"}}`))
+	req := newTestRequest(http.MethodPost, "/api/fleet/uploads/"+mockUploadID, strings.NewReader(`{"transithash": {"sha256": "`+transit+`"}}`))
 
 	hr.ServeHTTP(rec, req)
 
@@ -900,6 +900,7 @@ func TestUploadCompleteRejectsFinalChunkNotMarkedFinal(t *testing.T) {
 	assert.Contains(t, rec.Body.String(), "failed validation")
 }
 
+//nolint:dupl // intentionally parallel to its sibling scenario test
 func TestUploadCompleteNonFinalChunkMarkedFinal(t *testing.T) {
 	mockUploadID := "abc123"
 
@@ -942,7 +943,7 @@ func TestUploadCompleteNonFinalChunkMarkedFinal(t *testing.T) {
 	})
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/fleet/uploads/"+mockUploadID, strings.NewReader(`{"transithash": {"sha256": "`+transit+`"}}`))
+	req := newTestRequest(http.MethodPost, "/api/fleet/uploads/"+mockUploadID, strings.NewReader(`{"transithash": {"sha256": "`+transit+`"}}`))
 
 	hr.ServeHTTP(rec, req)
 
@@ -992,7 +993,7 @@ func TestUploadCompleteUndersizedChunk(t *testing.T) {
 	})
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/fleet/uploads/"+mockUploadID, strings.NewReader(`{"transithash": {"sha256": "`+transit+`"}}`))
+	req := newTestRequest(http.MethodPost, "/api/fleet/uploads/"+mockUploadID, strings.NewReader(`{"transithash": {"sha256": "`+transit+`"}}`))
 
 	hr.ServeHTTP(rec, req)
 
@@ -1042,7 +1043,7 @@ func TestUploadCompleteIncorrectTransitHash(t *testing.T) {
 	})
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/fleet/uploads/"+mockUploadID, strings.NewReader(`{"transithash": {"sha256": "wrongHash"}}`))
+	req := newTestRequest(http.MethodPost, "/api/fleet/uploads/"+mockUploadID, strings.NewReader(`{"transithash": {"sha256": "wrongHash"}}`))
 
 	hr.ServeHTTP(rec, req)
 
@@ -1092,7 +1093,7 @@ func TestUploadCompleteBadRequests(t *testing.T) {
 	})
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/fleet/uploads/"+mockUploadID, strings.NewReader(`{"transithash": {"sha256": `))
+	req := newTestRequest(http.MethodPost, "/api/fleet/uploads/"+mockUploadID, strings.NewReader(`{"transithash": {"sha256": `))
 
 	hr.ServeHTTP(rec, req)
 
@@ -1143,7 +1144,7 @@ func TestUploadCompletePayloadSize(t *testing.T) {
 
 	longHash := strings.Repeat("a", 2*units.KB)
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(
+	req := httptest.NewRequestWithContext(context.Background(),
 		http.MethodPost,
 		"/api/fleet/uploads/"+mockUploadID,
 		strings.NewReader(`{"transithash": {"sha256": "`+longHash+`"}}`),
@@ -1210,9 +1211,7 @@ func configureUploaderMock(t *testing.T, fileSize *uint64) (http.Handler, apiSer
 			uploader:    uploader.New(es, fakebulk, c, fileSize, maxUploadTimer),
 			authAgent: func(r *http.Request, id *string, bulker bulk.Bulk, c cache.Cache) (*model.Agent, error) {
 				return &model.Agent{
-					ESDocument: model.ESDocument{
-						Id: "foo",
-					},
+					Id: "foo",
 					Agent: &model.AgentMetadata{
 						ID: "foo",
 					},
@@ -1264,12 +1263,10 @@ func mockUploadInfoResult(bulker *itesting.MockBulk, info file.Info) {
 		mock.Anything,
 		mock.Anything,
 	).Return(&es.ResultT{
-		HitsT: es.HitsT{
-			Hits: []es.HitT{
-				{
-					ID:     info.DocID,
-					Source: out,
-				},
+		Hits: []es.HitT{
+			{
+				ID:     info.DocID,
+				Source: out,
 			},
 		},
 	}, nil).Once()
@@ -1298,9 +1295,7 @@ func mockChunkResult(bulker *itesting.MockBulk, chunks []file.ChunkInfo) string 
 		mock.Anything,
 		mock.Anything,
 	).Return(&es.ResultT{
-		HitsT: es.HitsT{
-			Hits: results,
-		},
+		Hits: results,
 	}, nil)
 	return calcTransitHash(chunks)
 }
@@ -1385,4 +1380,9 @@ func generateLargePayload(paddingSize int) string {
 }`
 	padding := strings.Repeat("a", paddingSize)
 	return fmt.Sprintf(payload, padding)
+}
+
+// newTestRequest is httptest.NewRequest with a context, as the noctx linter requires.
+func newTestRequest(method, target string, body io.Reader) *http.Request {
+	return httptest.NewRequestWithContext(context.Background(), method, target, body)
 }
