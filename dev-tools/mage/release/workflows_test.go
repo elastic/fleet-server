@@ -31,9 +31,9 @@ func TestEnsureMajorMinorNextReleaseRequiresExistingBase(t *testing.T) {
 func TestLabelHelpers(t *testing.T) {
 	require.Equal(t, "backport-"+testReleaseBranch, backportLabel(testReleaseBranch))
 
-	labels := prAMainLabels(testReleaseBranch)
+	labels := prAMainLabels()
 	require.True(t, contains(labels, mergeLabelFFDay))
-	require.True(t, contains(labels, "backport-"+testReleaseBranch))
+	require.False(t, contains(labels, "backport-"+testReleaseBranch), "PR-A must not carry backport label (would backport next-minor bump)")
 	require.False(t, contains(labels, mergeLabelAfterImages), "PR-A must not include merge:3-after-images (PR-C omitted)")
 
 	require.True(t, contains(prBReleaseLabels(), mergeLabelAfterBranch))

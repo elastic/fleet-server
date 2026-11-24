@@ -216,7 +216,8 @@ func formatPRChecklist(prURLs []string, checked map[string]bool) string {
 }
 
 // mergeReleaseIssueBody updates an existing issue body with missing tracker link and PR URLs.
-// Checklist item checkboxes outside the PRs section are left untouched.
+// Checklist item checkboxes outside the PRs section are left untouched. Text and headings
+// after the managed PR list are preserved across updates.
 func mergeReleaseIssueBody(existingBody string, isMajorMinor bool, prURLs []string) (string, bool) {
 	existingChecked := extractPRCheckboxes(existingBody)
 	allURLs := mergePRURLs(prURLs, keys(existingChecked))
@@ -240,7 +241,7 @@ func mergeReleaseIssueBody(existingBody string, isMajorMinor bool, prURLs []stri
 		return updated, true
 	}
 
-	oldPRBlock := strings.TrimPrefix(after, "\n")
+	oldPRBlock, trailing := splitPRSectionAndTrailing(after)
 	newPRBlock := formatPRChecklist(allURLs, existingChecked)
 
 	oldURLs := keys(extractPRCheckboxes(oldPRBlock))
@@ -252,7 +253,26 @@ func mergeReleaseIssueBody(existingBody string, isMajorMinor bool, prURLs []stri
 	}
 
 	updated := strings.TrimRight(before, "\n") + "\n\n" + prSection + "\n\n" + newPRBlock
+	if trailing != "" {
+		updated = strings.TrimRight(updated, "\n") + "\n\n" + trailing
+	}
 	return updated, true
+}
+
+// splitPRSectionAndTrailing splits content after the "## PRs" heading into the managed
+// checklist block and any later markdown sections (next line starting with "## ").
+func splitPRSectionAndTrailing(after string) (prBlock, trailing string) {
+	content := strings.TrimPrefix(after, "\n")
+	lines := strings.Split(content, "\n")
+	for i, line := range lines {
+		if i == 0 {
+			continue
+		}
+		if strings.HasPrefix(line, "## ") {
+			return strings.Join(lines[:i], "\n"), strings.Join(lines[i:], "\n")
+		}
+	}
+	return content, ""
 }
 
 func keys(m map[string]bool) []string {
