@@ -535,6 +535,35 @@ func TestProcessUpgradeDetails(t *testing.T) {
 		_, cleared := d.Doc[dl.FieldUpgradeStartedAt]
 		return !cleared && d.Doc[dl.FieldUpgradeDetails] != nil
 	})
+	// Shared setup for the table cases below.
+	bulkOf := func(setup ...func(*ftesting.MockBulk)) func() *ftesting.MockBulk {
+		return func() *ftesting.MockBulk {
+			mBulk := ftesting.NewMockBulk()
+			for _, f := range setup {
+				f(mBulk)
+			}
+			return mBulk
+		}
+	}
+	withResult := func(wantErr string) func(*ftesting.MockBulk) {
+		return func(mBulk *ftesting.MockBulk) { expectResult(mBulk, wantErr) }
+	}
+	withUpdate := func(body any) func(*ftesting.MockBulk) {
+		return func(mBulk *ftesting.MockBulk) {
+			mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", body, mock.Anything).Return(nil)
+		}
+	}
+	withResultError := func(mBulk *ftesting.MockBulk) {
+		expectActionLookup(mBulk)
+		mBulk.On("Create", mock.Anything, dl.FleetActionsResults, "test-action:doc-ID", mock.Anything, mock.Anything).Return("", errBoom).Once()
+	}
+	withRollbackSuccess := expectRollbackActionSuccess
+	actionInCache := func() *testcache.MockCache {
+		mCache := testcache.NewMockCache()
+		mCache.On("GetAction", "test-action").Return(model.Action{}, true)
+		return mCache
+	}
+	emptyCache := func() *testcache.MockCache { return testcache.NewMockCache() }
 	tests := []struct {
 		name    string
 		agent   *model.Agent
@@ -979,17 +1008,9 @@ func TestProcessUpgradeDetails(t *testing.T) {
 				State:    UpgradeDetailsStateUPGFAILED,
 				Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"error_msg":"copy failed","failed_state":"UPG_DOWNLOADING","retry_until":"` + retryFuture + `"}`)},
 			},
-			bulk: func() *ftesting.MockBulk {
-				mBulk := ftesting.NewMockBulk()
-				// nothing is written while the download can still be retried
-				return mBulk
-			},
-			cache: func() *testcache.MockCache {
-				mCache := testcache.NewMockCache()
-				mCache.On("GetAction", "test-action").Return(model.Action{}, true)
-				return mCache
-			},
-			err: nil,
+			bulk:  bulkOf(),
+			cache: actionInCache,
+			err:   nil,
 		}, {
 			name:  "upgrade failed shortly after retry_until is within the clock skew grace",
 			agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
@@ -998,17 +1019,9 @@ func TestProcessUpgradeDetails(t *testing.T) {
 				State:    UpgradeDetailsStateUPGFAILED,
 				Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"error_msg":"copy failed","failed_state":"UPG_DOWNLOADING","retry_until":"` + retryJustPassed + `"}`)},
 			},
-			bulk: func() *ftesting.MockBulk {
-				mBulk := ftesting.NewMockBulk()
-				// nothing is written while the download can still be retried
-				return mBulk
-			},
-			cache: func() *testcache.MockCache {
-				mCache := testcache.NewMockCache()
-				mCache.On("GetAction", "test-action").Return(model.Action{}, true)
-				return mCache
-			},
-			err: nil,
+			bulk:  bulkOf(),
+			cache: actionInCache,
+			err:   nil,
 		}, {
 			name:  "upgrade failed after retry_until records the final failure",
 			agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
@@ -1017,18 +1030,9 @@ func TestProcessUpgradeDetails(t *testing.T) {
 				State:    UpgradeDetailsStateUPGFAILED,
 				Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"error_msg":"failed to get upgrade artifact","failed_state":"UPG_DOWNLOADING","retry_until":"` + retryPast + `"}`)},
 			},
-			bulk: func() *ftesting.MockBulk {
-				mBulk := ftesting.NewMockBulk()
-				expectResult(mBulk, "failed to get upgrade artifact")
-				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", updateClearsStartedAt, mock.Anything).Return(nil)
-				return mBulk
-			},
-			cache: func() *testcache.MockCache {
-				mCache := testcache.NewMockCache()
-				mCache.On("GetAction", "test-action").Return(model.Action{}, true)
-				return mCache
-			},
-			err: nil,
+			bulk:  bulkOf(withResult("failed to get upgrade artifact"), withUpdate(updateClearsStartedAt)),
+			cache: actionInCache,
+			err:   nil,
 		}, {
 			name:  "upgrade failed in extraction without retry_until records the failure immediately",
 			agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
@@ -1037,18 +1041,9 @@ func TestProcessUpgradeDetails(t *testing.T) {
 				State:    UpgradeDetailsStateUPGFAILED,
 				Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"error_msg":"extract failed","failed_state":"UPG_EXTRACTING"}`)},
 			},
-			bulk: func() *ftesting.MockBulk {
-				mBulk := ftesting.NewMockBulk()
-				expectResult(mBulk, "extract failed")
-				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", updateClearsStartedAt, mock.Anything).Return(nil)
-				return mBulk
-			},
-			cache: func() *testcache.MockCache {
-				mCache := testcache.NewMockCache()
-				mCache.On("GetAction", "test-action").Return(model.Action{}, true)
-				return mCache
-			},
-			err: nil,
+			bulk:  bulkOf(withResult("extract failed"), withUpdate(updateClearsStartedAt)),
+			cache: actionInCache,
+			err:   nil,
 		}, {
 			name:  "upgrade failed after retry_until records the failure over stored download progress",
 			agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}, UpgradeDetails: &model.UpgradeDetails{ActionID: "test-action", State: "UPG_DOWNLOADING"}},
@@ -1057,18 +1052,9 @@ func TestProcessUpgradeDetails(t *testing.T) {
 				State:    UpgradeDetailsStateUPGFAILED,
 				Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"error_msg":"failed to get upgrade artifact","failed_state":"UPG_DOWNLOADING","retry_until":"` + retryPast + `"}`)},
 			},
-			bulk: func() *ftesting.MockBulk {
-				mBulk := ftesting.NewMockBulk()
-				expectResult(mBulk, "failed to get upgrade artifact")
-				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", updateClearsStartedAt, mock.Anything).Return(nil)
-				return mBulk
-			},
-			cache: func() *testcache.MockCache {
-				mCache := testcache.NewMockCache()
-				mCache.On("GetAction", "test-action").Return(model.Action{}, true)
-				return mCache
-			},
-			err: nil,
+			bulk:  bulkOf(withResult("failed to get upgrade artifact"), withUpdate(updateClearsStartedAt)),
+			cache: actionInCache,
+			err:   nil,
 		}, {
 			name:  "upgrade failed action in cache empty error_msg",
 			agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
@@ -1112,17 +1098,9 @@ func TestProcessUpgradeDetails(t *testing.T) {
 				State:    UpgradeDetailsStateUPGFAILED,
 				Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"error_msg":"failed"}`)},
 			},
-			bulk: func() *ftesting.MockBulk {
-				mBulk := ftesting.NewMockBulk()
-				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", updateClearsStartedAt, mock.Anything).Return(nil)
-				return mBulk // no Create expected
-			},
-			cache: func() *testcache.MockCache {
-				mCache := testcache.NewMockCache()
-				mCache.On("GetAction", "test-action").Return(model.Action{}, true)
-				return mCache
-			},
-			err: nil,
+			bulk:  bulkOf(withUpdate(updateClearsStartedAt)),
+			cache: actionInCache,
+			err:   nil,
 		}, {
 			name:  "upgrade failed without action_id does not create a result",
 			agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
@@ -1130,11 +1108,7 @@ func TestProcessUpgradeDetails(t *testing.T) {
 				State:    UpgradeDetailsStateUPGFAILED,
 				Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"error_msg":"failed"}`)},
 			},
-			bulk: func() *ftesting.MockBulk {
-				mBulk := ftesting.NewMockBulk()
-				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", updateClearsStartedAt, mock.Anything).Return(nil)
-				return mBulk
-			},
+			bulk: bulkOf(withUpdate(updateClearsStartedAt)),
 			cache: func() *testcache.MockCache {
 				mCache := testcache.NewMockCache()
 				mCache.On("GetAction", "").Return(model.Action{}, true)
@@ -1149,19 +1123,9 @@ func TestProcessUpgradeDetails(t *testing.T) {
 				State:    UpgradeDetailsStateUPGFAILED,
 				Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"error_msg":"failed"}`)},
 			},
-			bulk: func() *ftesting.MockBulk {
-				mBulk := ftesting.NewMockBulk()
-				expectActionLookup(mBulk)
-				mBulk.On("Create", mock.Anything, dl.FleetActionsResults, "test-action:doc-ID", mock.Anything, mock.Anything).Return("", errBoom).Once()
-				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", updateKeepsStartedAt, mock.Anything).Return(nil)
-				return mBulk
-			},
-			cache: func() *testcache.MockCache {
-				mCache := testcache.NewMockCache()
-				mCache.On("GetAction", "test-action").Return(model.Action{}, true)
-				return mCache
-			},
-			err: errBoom,
+			bulk:  bulkOf(withResultError, withUpdate(updateKeepsStartedAt)),
+			cache: actionInCache,
+			err:   errBoom,
 		}, {
 			name:  "upgrade rollback result create error stores the rollback over a watched upgrade",
 			agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}, UpgradeStartedAt: "2026-01-01T00:00:00Z", UpgradeDetails: &model.UpgradeDetails{ActionID: "test-action", State: "UPG_WATCHING"}},
@@ -1170,19 +1134,9 @@ func TestProcessUpgradeDetails(t *testing.T) {
 				State:    UpgradeDetailsStateUPGROLLBACK,
 				Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"reason":"watch failed"}`)},
 			},
-			bulk: func() *ftesting.MockBulk {
-				mBulk := ftesting.NewMockBulk()
-				expectActionLookup(mBulk)
-				mBulk.On("Create", mock.Anything, dl.FleetActionsResults, "test-action:doc-ID", mock.Anything, mock.Anything).Return("", errBoom).Once()
-				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", updateKeepsStartedAt, mock.Anything).Return(nil)
-				return mBulk
-			},
-			cache: func() *testcache.MockCache {
-				mCache := testcache.NewMockCache()
-				mCache.On("GetAction", "test-action").Return(model.Action{}, true)
-				return mCache
-			},
-			err: errBoom,
+			bulk:  bulkOf(withResultError, withUpdate(updateKeepsStartedAt)),
+			cache: actionInCache,
+			err:   errBoom,
 		}, {
 			name:  "upgrade failed re-reported with upgrade_started_at still set creates the missing result",
 			agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}, UpgradeStartedAt: "2026-01-01T00:00:00Z", UpgradeDetails: &model.UpgradeDetails{ActionID: "test-action", State: "UPG_FAILED"}},
@@ -1191,18 +1145,9 @@ func TestProcessUpgradeDetails(t *testing.T) {
 				State:    UpgradeDetailsStateUPGFAILED,
 				Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"error_msg":"failed"}`)},
 			},
-			bulk: func() *ftesting.MockBulk {
-				mBulk := ftesting.NewMockBulk()
-				expectResult(mBulk, "failed")
-				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", updateClearsStartedAt, mock.Anything).Return(nil)
-				return mBulk
-			},
-			cache: func() *testcache.MockCache {
-				mCache := testcache.NewMockCache()
-				mCache.On("GetAction", "test-action").Return(model.Action{}, true)
-				return mCache
-			},
-			err: nil,
+			bulk:  bulkOf(withResult("failed"), withUpdate(updateClearsStartedAt)),
+			cache: actionInCache,
+			err:   nil,
 		}, {
 			name:  "upgrade rollback with reason",
 			agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
@@ -1211,18 +1156,9 @@ func TestProcessUpgradeDetails(t *testing.T) {
 				State:    UpgradeDetailsStateUPGROLLBACK,
 				Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"reason":"watch failed"}`)},
 			},
-			bulk: func() *ftesting.MockBulk {
-				mBulk := ftesting.NewMockBulk()
-				expectResult(mBulk, "upgrade rolled back: watch failed")
-				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", updateClearsStartedAt, mock.Anything).Return(nil)
-				return mBulk
-			},
-			cache: func() *testcache.MockCache {
-				mCache := testcache.NewMockCache()
-				mCache.On("GetAction", "test-action").Return(model.Action{}, true)
-				return mCache
-			},
-			err: nil,
+			bulk:  bulkOf(withResult("upgrade rolled back: watch failed"), withUpdate(updateClearsStartedAt)),
+			cache: actionInCache,
+			err:   nil,
 		}, {
 			name:  "requested rollback is recorded as a success",
 			agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
@@ -1231,18 +1167,9 @@ func TestProcessUpgradeDetails(t *testing.T) {
 				State:    UpgradeDetailsStateUPGROLLBACK,
 				Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"reason":"manual rollback requested to version 9.3.0"}`)},
 			},
-			bulk: func() *ftesting.MockBulk {
-				mBulk := ftesting.NewMockBulk()
-				expectRollbackActionSuccess(mBulk)
-				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", updateClearsStartedAt, mock.Anything).Return(nil)
-				return mBulk
-			},
-			cache: func() *testcache.MockCache {
-				mCache := testcache.NewMockCache()
-				mCache.On("GetAction", "test-action").Return(model.Action{}, true)
-				return mCache
-			},
-			err: nil,
+			bulk:  bulkOf(withRollbackSuccess, withUpdate(updateClearsStartedAt)),
+			cache: actionInCache,
+			err:   nil,
 		}, {
 			name:  "upgrade rollback without reason",
 			agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
@@ -1250,18 +1177,9 @@ func TestProcessUpgradeDetails(t *testing.T) {
 				ActionId: "test-action",
 				State:    UpgradeDetailsStateUPGROLLBACK,
 			},
-			bulk: func() *ftesting.MockBulk {
-				mBulk := ftesting.NewMockBulk()
-				expectResult(mBulk, "upgrade rolled back")
-				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", updateClearsStartedAt, mock.Anything).Return(nil)
-				return mBulk
-			},
-			cache: func() *testcache.MockCache {
-				mCache := testcache.NewMockCache()
-				mCache.On("GetAction", "test-action").Return(model.Action{}, true)
-				return mCache
-			},
-			err: nil,
+			bulk:  bulkOf(withResult("upgrade rolled back"), withUpdate(updateClearsStartedAt)),
+			cache: actionInCache,
+			err:   nil,
 		}, {
 			name:  "upgrade rollback already recorded",
 			agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}, UpgradeDetails: &model.UpgradeDetails{ActionID: "test-action", State: "UPG_ROLLBACK"}},
@@ -1270,71 +1188,37 @@ func TestProcessUpgradeDetails(t *testing.T) {
 				State:    UpgradeDetailsStateUPGROLLBACK,
 				Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"reason":"watch failed"}`)},
 			},
-			bulk: func() *ftesting.MockBulk {
-				mBulk := ftesting.NewMockBulk()
-				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", updateClearsStartedAt, mock.Anything).Return(nil)
-				return mBulk // no Create expected
-			},
-			cache: func() *testcache.MockCache {
-				mCache := testcache.NewMockCache()
-				mCache.On("GetAction", "test-action").Return(model.Action{}, true)
-				return mCache
-			},
-			err: nil,
+			bulk:  bulkOf(withUpdate(updateClearsStartedAt)),
+			cache: actionInCache,
+			err:   nil,
 		}, {
 			name:    "checkin details nil after a canceled scheduled upgrade records no result",
 			agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}, UpgradeStartedAt: "2026-01-01T00:00:00Z", UpgradeDetails: &model.UpgradeDetails{ActionID: "test-action", State: "UPG_SCHEDULED"}},
 			details: nil,
-			bulk: func() *ftesting.MockBulk {
-				mBulk := ftesting.NewMockBulk()
-				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything).Return(nil)
-				return mBulk
-			},
-			cache: func() *testcache.MockCache {
-				return testcache.NewMockCache()
-			},
-			err: nil,
+			bulk:    bulkOf(withUpdate(mock.Anything)),
+			cache:   emptyCache,
+			err:     nil,
 		}, {
 			name:    "checkin details nil does not repeat a settled stored failure",
 			agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}, UpgradeDetails: &model.UpgradeDetails{ActionID: "test-action", State: "UPG_FAILED"}},
 			details: nil,
-			bulk: func() *ftesting.MockBulk {
-				mBulk := ftesting.NewMockBulk()
-				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything).Return(nil)
-				return mBulk
-			},
-			cache: func() *testcache.MockCache {
-				return testcache.NewMockCache()
-			},
-			err: nil,
+			bulk:    bulkOf(withUpdate(mock.Anything)),
+			cache:   emptyCache,
+			err:     nil,
 		}, {
 			name:    "checkin details nil completes a stored upgrade, success result created",
 			agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}, UpgradeDetails: &model.UpgradeDetails{ActionID: "test-action", State: "UPG_WATCHING"}},
 			details: nil,
-			bulk: func() *ftesting.MockBulk {
-				mBulk := ftesting.NewMockBulk()
-				expectResult(mBulk, "")
-				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything).Return(nil)
-				return mBulk
-			},
-			cache: func() *testcache.MockCache {
-				mCache := testcache.NewMockCache()
-				return mCache
-			},
-			err: nil,
+			bulk:    bulkOf(withResult(""), withUpdate(mock.Anything)),
+			cache:   emptyCache,
+			err:     nil,
 		}, {
 			name:    "checkin details nil after rollback does not create a success result",
 			agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}, UpgradeDetails: &model.UpgradeDetails{ActionID: "test-action", State: "UPG_ROLLBACK"}},
 			details: nil,
-			bulk: func() *ftesting.MockBulk {
-				mBulk := ftesting.NewMockBulk()
-				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything).Return(nil)
-				return mBulk
-			},
-			cache: func() *testcache.MockCache {
-				return testcache.NewMockCache()
-			},
-			err: nil,
+			bulk:    bulkOf(withUpdate(mock.Anything)),
+			cache:   emptyCache,
+			err:     nil,
 		}}
 
 	for _, tc := range tests {

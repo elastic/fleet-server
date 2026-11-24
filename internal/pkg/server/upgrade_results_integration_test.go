@@ -45,7 +45,7 @@ func Test_Upgrade_Results(t *testing.T) {
 		require.Empty(t, u.results(), "no result while the upgrade is in progress")
 
 		u.checkin(api.UpgradeDetailsStateUPGFAILED, map[string]any{"failed_state": "UPG_DOWNLOADING", "error_msg": "download failed"})
-		res := u.waitResults(1)
+		res := u.waitResults()
 		require.Equal(t, "download failed", res[0].Error)
 
 		agent := u.agent()
@@ -72,7 +72,7 @@ func Test_Upgrade_Results(t *testing.T) {
 		u.ack("")
 		require.Empty(t, u.results())
 		u.checkinNoDetails()
-		res := u.waitResults(1)
+		res := u.waitResults()
 		require.Empty(t, res[0].Error)
 	})
 
@@ -81,7 +81,7 @@ func Test_Upgrade_Results(t *testing.T) {
 
 		retryUntil := time.Now().Add(-time.Hour).UTC().Format(time.RFC3339)
 		u.checkin(api.UpgradeDetailsStateUPGFAILED, map[string]any{"failed_state": "UPG_DOWNLOADING", "error_msg": "failed to get upgrade artifact", "retry_until": retryUntil})
-		res := u.waitResults(1)
+		res := u.waitResults()
 		require.Equal(t, "failed to get upgrade artifact", res[0].Error)
 		require.Empty(t, u.agent().UpgradeStartedAt)
 	})
@@ -90,7 +90,7 @@ func Test_Upgrade_Results(t *testing.T) {
 		u := newUpgradeTest(t, ctx, srv)
 
 		u.checkin(api.UpgradeDetailsStateUPGFAILED, map[string]any{"failed_state": "UPG_EXTRACTING", "error_msg": "extract failed"})
-		res := u.waitResults(1)
+		res := u.waitResults()
 		require.Equal(t, "extract failed", res[0].Error)
 	})
 
@@ -111,7 +111,7 @@ func Test_Upgrade_Results(t *testing.T) {
 		require.Empty(t, u.results(), "the ack must not record a success while the upgrade is being watched")
 
 		u.checkin(api.UpgradeDetailsStateUPGROLLBACK, map[string]any{"reason": "watch failed"})
-		res := u.waitResults(1)
+		res := u.waitResults()
 		require.Equal(t, "upgrade rolled back: watch failed", res[0].Error)
 		require.Empty(t, u.agent().UpgradeStartedAt)
 
@@ -124,7 +124,7 @@ func Test_Upgrade_Results(t *testing.T) {
 		u := newUpgradeTestWithData(t, ctx, srv, `{"version":"9.3.0","rollback":true}`)
 
 		u.checkin(api.UpgradeDetailsStateUPGROLLBACK, map[string]any{"reason": "manual rollback requested to version 9.3.0"})
-		res := u.waitResults(1)
+		res := u.waitResults()
 		require.Empty(t, res[0].Error, "UPG_ROLLBACK is the successful outcome of a rollback action")
 		require.Empty(t, u.agent().UpgradeStartedAt)
 	})
@@ -133,7 +133,7 @@ func Test_Upgrade_Results(t *testing.T) {
 		u := newUpgradeTest(t, ctx, srv)
 
 		u.checkin(api.UpgradeDetailsStateUPGROLLBACK, nil)
-		res := u.waitResults(1)
+		res := u.waitResults()
 		require.Equal(t, "upgrade rolled back", res[0].Error)
 	})
 
@@ -148,7 +148,7 @@ func Test_Upgrade_Results(t *testing.T) {
 		require.Empty(t, agent.UpgradedAt)
 
 		u.checkinNoDetails() // the watch period ended
-		res := u.waitResults(1)
+		res := u.waitResults()
 		require.Empty(t, res[0].Error)
 		require.Equal(t, []string{"default"}, res[0].Namespaces)
 
@@ -162,7 +162,7 @@ func Test_Upgrade_Results(t *testing.T) {
 		u := newUpgradeTest(t, ctx, srv)
 
 		u.checkin(api.UpgradeDetailsStateUPGROLLBACK, map[string]any{"reason": "watch failed"})
-		u.waitResults(1)
+		u.waitResults()
 
 		u.checkinNoDetails()
 		res := u.results()
@@ -363,14 +363,14 @@ func (u *upgradeTest) results() []model.ActionResult {
 	return results
 }
 
-// waitResults waits until the agent has n results for the UPGRADE action and returns them.
-func (u *upgradeTest) waitResults(n int) []model.ActionResult {
+// waitResults waits until the agent has its single result for the UPGRADE action and returns it.
+func (u *upgradeTest) waitResults() []model.ActionResult {
 	u.t.Helper()
 	var res []model.ActionResult
 	require.Eventually(u.t, func() bool {
 		res = u.results()
-		return len(res) == n
-	}, 10*time.Second, 500*time.Millisecond, "expected %d result(s) for the UPGRADE action", n)
+		return len(res) == 1
+	}, 10*time.Second, 500*time.Millisecond, "expected a result for the UPGRADE action")
 	return res
 }
 
