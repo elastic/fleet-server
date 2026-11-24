@@ -502,6 +502,16 @@ func TestProcessUpgradeDetails(t *testing.T) {
 			return r.ActionID == "test-action" && r.AgentID == "doc-ID" && r.Error == wantErr && slices.Equal(r.Namespaces, []string{"default"})
 		}), mock.MatchedBy(func(opts []bulk.Opt) bool { return len(opts) == 0 })).Return("", nil).Once()
 	}
+	// expectRollbackActionSuccess serves an UPGRADE action that requests a rollback and expects a
+	// result without an error: UPG_ROLLBACK is the successful outcome of such an action.
+	expectRollbackActionSuccess := func(mBulk *ftesting.MockBulk) {
+		mBulk.On("Search", mock.Anything, dl.FleetActions, mock.Anything, mock.Anything).Return(
+			&es.ResultT{Hits: []es.HitT{{Source: []byte(`{"action_id": "test-action", "namespaces": ["default"], "data": {"version": "9.3.0", "rollback": true}}`)}}}, nil).Once()
+		mBulk.On("Create", mock.Anything, dl.FleetActionsResults, "test-action:doc-ID", mock.MatchedBy(func(p []byte) bool {
+			var r model.ActionResult
+			return json.Unmarshal(p, &r) == nil && r.ActionID == "test-action" && r.Error == "" && slices.Equal(r.Namespaces, []string{"default"})
+		}), mock.Anything).Return("", nil).Once()
+	}
 	// updateClearsStartedAt matches an agent update that clears upgrade_started_at.
 	updateClearsStartedAt := mock.MatchedBy(func(p []byte) bool {
 		d := struct {
@@ -1176,6 +1186,41 @@ func TestProcessUpgradeDetails(t *testing.T) {
 				mCache := testcache.NewMockCache()
 				mCache.On("GetAction", "test-action").Return(model.Action{}, true)
 				return mCache
+			},
+			err: nil,
+		}, {
+			name:  "requested rollback is recorded as a success",
+			agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
+			details: &UpgradeDetails{
+				ActionId: "test-action",
+				State:    UpgradeDetailsStateUPGROLLBACK,
+				Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"reason":"manual rollback requested to version 9.3.0"}`)},
+			},
+			bulk: func() *ftesting.MockBulk {
+				mBulk := ftesting.NewMockBulk()
+				expectRollbackActionSuccess(mBulk)
+				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", updateClearsStartedAt, mock.Anything).Return(nil)
+				return mBulk
+			},
+			cache: func() *testcache.MockCache {
+				mCache := testcache.NewMockCache()
+				mCache.On("GetAction", "test-action").Return(model.Action{}, true)
+				return mCache
+			},
+			err: nil,
+		}, {
+			name:    "checkin details nil settles an unsettled stored requested rollback as a success",
+			agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}, UpgradeStartedAt: "2026-01-01T00:00:00Z", UpgradeDetails: &model.UpgradeDetails{ActionID: "test-action", State: "UPG_ROLLBACK"}},
+			details: nil,
+			ver:     "9.3.0",
+			bulk: func() *ftesting.MockBulk {
+				mBulk := ftesting.NewMockBulk()
+				expectRollbackActionSuccess(mBulk)
+				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything).Return(nil)
+				return mBulk
+			},
+			cache: func() *testcache.MockCache {
+				return testcache.NewMockCache()
 			},
 			err: nil,
 		}, {

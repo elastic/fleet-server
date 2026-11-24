@@ -823,7 +823,7 @@ func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agen
 		recorded := agent.UpgradeDetails != nil && agent.UpgradeDetails.ActionID == details.ActionId &&
 			agent.UpgradeDetails.State == string(details.State) && agent.UpgradeStartedAt == ""
 		if details.ActionId != "" && !recorded {
-			if err := ct.createUpgradeResult(ctx, agent, details.ActionId, resultErr); err != nil {
+			if err := ct.createUpgradeResult(ctx, agent, details.ActionId, resultErr, details.State == UpgradeDetailsStateUPGROLLBACK); err != nil {
 				return err
 			}
 		}
@@ -885,7 +885,7 @@ func (ct *CheckinT) markUpgradeComplete(ctx context.Context, agent *model.Agent,
 	// again; what is recorded depends on how the stored upgrade stopped being reported.
 	if ud := agent.UpgradeDetails; ud != nil && ud.ActionID != "" {
 		if errMsg, ok := noDetailsUpgradeResult(agent, ver); ok {
-			if err := ct.createUpgradeResult(ctx, agent, ud.ActionID, errMsg); err != nil {
+			if err := ct.createUpgradeResult(ctx, agent, ud.ActionID, errMsg, ud.State == string(UpgradeDetailsStateUPGROLLBACK)); err != nil {
 				return err
 			}
 		}
@@ -902,6 +902,17 @@ func (ct *CheckinT) markUpgradeComplete(ctx context.Context, agent *model.Agent,
 		return err
 	}
 	return ct.bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3))
+}
+
+// isRollbackAction reports whether the UPGRADE action asks the agent to roll back (data.rollback).
+func isRollbackAction(action model.Action) bool {
+	var data struct {
+		Rollback bool `json:"rollback"`
+	}
+	if err := json.Unmarshal(action.Data, &data); err != nil {
+		return false
+	}
+	return data.Rollback
 }
 
 // upgradeRetryGrace is added to the agent-reported retry_until to tolerate clock skew between the
@@ -993,7 +1004,7 @@ func rollbackResultError(reason string) string {
 
 // createUpgradeResult creates the UPGRADE action result for the agent (no refresh, an existing
 // result is not an error). errMsg is empty for a successful upgrade.
-func (ct *CheckinT) createUpgradeResult(ctx context.Context, agent *model.Agent, actionID, errMsg string) error {
+func (ct *CheckinT) createUpgradeResult(ctx context.Context, agent *model.Agent, actionID, errMsg string, rolledBack bool) error {
 	span, ctx := apm.StartSpan(ctx, "Create upgrade result", "update")
 	span.Context.SetLabel("action_id", actionID)
 	span.Context.SetLabel("agent_id", agent.Agent.ID)
@@ -1011,6 +1022,11 @@ func (ct *CheckinT) createUpgradeResult(ctx context.Context, agent *model.Agent,
 		namespaces = actions[0].Namespaces
 	} else {
 		zerolog.Ctx(ctx).Warn().Str(ecs.ActionID, actionID).Str(ecs.AgentID, agent.Agent.ID).Msg("upgrade action not found, creating result without namespaces")
+	}
+	// UPG_ROLLBACK is a failure when the agent rolled back an upgrade by itself (e.g. the watch
+	// failed), but it is the successful outcome of an action that requested a rollback.
+	if rolledBack && len(actions) > 0 && isRollbackAction(actions[0]) {
+		errMsg = ""
 	}
 
 	return dl.CreateActionResult(ctx, ct.bulker, model.ActionResult{

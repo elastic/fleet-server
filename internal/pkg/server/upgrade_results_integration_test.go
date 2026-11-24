@@ -120,6 +120,15 @@ func Test_Upgrade_Results(t *testing.T) {
 		require.Len(t, u.results(), 1)
 	})
 
+	t.Run("requested rollback is recorded as a success", func(t *testing.T) {
+		u := newUpgradeTestWithData(t, ctx, srv, `{"version":"9.3.0","rollback":true}`)
+
+		u.checkin(api.UpgradeDetailsStateUPGROLLBACK, map[string]any{"reason": "manual rollback requested to version 9.3.0"})
+		res := u.waitResults(1)
+		require.Empty(t, res[0].Error, "UPG_ROLLBACK is the successful outcome of a rollback action")
+		require.Empty(t, u.agent().UpgradeStartedAt)
+	})
+
 	t.Run("rolled back upgrade without a reason", func(t *testing.T) {
 		u := newUpgradeTest(t, ctx, srv)
 
@@ -205,6 +214,12 @@ type upgradeTest struct {
 
 func newUpgradeTest(t *testing.T, ctx context.Context, srv *tserver) *upgradeTest {
 	t.Helper()
+	return newUpgradeTestWithData(t, ctx, srv, `{"version":"9.4.0"}`)
+}
+
+// newUpgradeTestWithData is newUpgradeTest for an UPGRADE action with the given data.
+func newUpgradeTestWithData(t *testing.T, ctx context.Context, srv *tserver, data string) *upgradeTest {
+	t.Helper()
 	resp := EnrollAgent(t, ctx, srv, enrollBody)
 	t.Cleanup(func() {
 		if err := srv.bulker.Delete(context.Background(), dl.FleetAgents, resp.Item.Id); err != nil {
@@ -230,7 +245,7 @@ func newUpgradeTest(t *testing.T, ctx context.Context, srv *tserver) *upgradeTes
 		Expiration: time.Now().Add(2000 * time.Hour).Format(time.RFC3339),
 		ActionID:   u.actionID,
 		Type:       string(api.UPGRADE),
-		Data:       json.RawMessage(`{"version":"9.4.0"}`),
+		Data:       json.RawMessage(data),
 		Namespaces: []string{"default"},
 	})
 	u.refresh(".fleet-actions")
