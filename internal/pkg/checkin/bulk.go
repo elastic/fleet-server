@@ -179,7 +179,6 @@ func (bc *Bulk) flush(ctx context.Context) error {
 	nowTimestamp := start.UTC().Format(time.RFC3339)
 
 	var err error
-	var needRefresh bool
 	for id, pendingData := range pending {
 
 		// In the simple case, there are no fields and no seqNo.
@@ -220,6 +219,7 @@ func (bc *Bulk) flush(ctx context.Context) error {
 			if err != nil {
 				return fmt.Errorf("could not marshall script action: %w", err)
 			}
+<<<<<<< HEAD
 			if pendingData.extra.seqNo.IsSet() {
 				needRefresh = true
 			}
@@ -262,6 +262,35 @@ func (bc *Bulk) flush(ctx context.Context) error {
 			}
 
 			if body, err = fields.Marshal(); err != nil {
+=======
+		} else if pendingData.extra.effectiveConfig != nil {
+			// effective_config is a nested JSON object. ES's {"doc": ...} partial
+			// update recursively merges objects, so keys removed from the config
+			// (e.g. deleted pipelines) would persist. For example, if the stored
+			// config has pipelines {traces, metrics} and the collector reports
+			// only {traces}, the merge would keep metrics when it should be
+			// removed. A script avoids this by assigning directly to
+			// ctx._source, fully replacing the field.
+			params, err := encodeParams(nowTimestamp, pendingData)
+			if err != nil {
+				return fmt.Errorf("unable to parse checkin details as params: %w", err)
+			}
+			action := &estypes.UpdateAction{
+				Script: &estypes.Script{
+					Lang:    &scriptlanguage.Painless,
+					Source:  &checkinWithEffectiveConfigScript,
+					Options: map[string]string{},
+					Params:  params,
+				},
+			}
+			body, err = json.Marshal(&action)
+			if err != nil {
+				return fmt.Errorf("could not marshal script action: %w", err)
+			}
+		} else {
+			body, err = toUpdateBody(nowTimestamp, pendingData)
+			if err != nil {
+>>>>>>> e1e4620 (Fix ignored options on Fleet Server bulk writes (#8297))
 				return err
 			}
 		}
@@ -273,18 +302,21 @@ func (bc *Bulk) flush(ctx context.Context) error {
 		})
 	}
 
+<<<<<<< HEAD
 	var opts []bulk.Opt
 	if needRefresh {
 		opts = append(opts, bulk.WithRefresh())
 	}
 
 	_, err = bc.bulker.MUpdate(ctx, updates, opts...)
+=======
+	items, err := bc.bulker.MUpdate(ctx, updates)
+>>>>>>> e1e4620 (Fix ignored options on Fleet Server bulk writes (#8297))
 
 	zerolog.Ctx(ctx).Trace().
 		Err(err).
 		Dur("rtt", time.Since(start)).
 		Int("cnt", len(updates)).
-		Bool("refresh", needRefresh).
 		Msg("Flush updates")
 
 	return err
