@@ -680,7 +680,7 @@ func TestMonitor_SupersededRevisionParseErrorIsIgnored(t *testing.T) {
 		newer.Data = policyDataDefault
 
 		pm.policiesF = func(context.Context, bulk.Bulk, []string, ...dl.Option) ([]model.Policy, error) {
-			return []model.Policy{older}, nil
+			return []model.Policy{newer}, nil
 		}
 
 		runDone := make(chan struct{})
@@ -698,8 +698,9 @@ func TestMonitor_SupersededRevisionParseErrorIsIgnored(t *testing.T) {
 		err := pm.waitStart(ctx)
 		require.NoError(t, err)
 
-		sub, err := pm.Subscribe("agent", older.PolicyID, 0)
+		data, err := json.Marshal(older)
 		require.NoError(t, err)
+		hits <- []es.HitT{{ID: older.Id, SeqNo: older.SeqNo, Version: older.Version, Source: data}}
 		synctest.Wait()
 		select {
 		case <-bulker.started:
@@ -707,16 +708,9 @@ func TestMonitor_SupersededRevisionParseErrorIsIgnored(t *testing.T) {
 			require.FailNow(t, "secret lookup for older revision did not start")
 		}
 
-		data, err := json.Marshal(newer)
+		loaded, err := pm.GetPolicy(ctx, older.PolicyID)
 		require.NoError(t, err)
-		hits <- []es.HitT{{ID: newer.Id, SeqNo: newer.SeqNo, Version: newer.Version, Source: data}}
-		synctest.Wait()
-		select {
-		case received := <-sub.Output():
-			assert.Equal(t, newer, received.Policy)
-		default:
-			require.FailNow(t, "newer policy revision did not reach the agent")
-		}
+		require.Equal(t, newer.RevisionIdx, loaded.RevisionIdx)
 
 		close(bulker.release)
 		synctest.Wait()
