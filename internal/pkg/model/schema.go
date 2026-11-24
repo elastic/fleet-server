@@ -441,6 +441,9 @@ type Metadata struct {
 
 	// Error message when the upgrade state is UPG_FAILED
 	ErrorMsg string `json:"error_msg,omitempty"`
+
+	// Reason for the upgrade state, e.g. why the upgrade was rolled back when the state is UPG_ROLLBACK
+	Reason string `json:"reason,omitempty"`
 }
 
 // OutputHealth Output health represents a health state of an output

@@ -1286,6 +1286,21 @@ func TestProcessUpgradeDetails(t *testing.T) {
 			},
 			err: nil,
 		}, {
+			name:    "checkin details nil with a changed version after a stored rollback records the rollback",
+			agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}, UpgradeStartedAt: "2026-01-01T00:00:00Z", UpgradeDetails: &model.UpgradeDetails{ActionID: "test-action", State: "UPG_ROLLBACK", Metadata: &model.Metadata{Reason: "watch failed"}}},
+			details: nil,
+			ver:     "9.3.0",
+			bulk: func() *ftesting.MockBulk {
+				mBulk := ftesting.NewMockBulk()
+				expectResult(mBulk, "upgrade rolled back: watch failed")
+				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything).Return(nil)
+				return mBulk
+			},
+			cache: func() *testcache.MockCache {
+				return testcache.NewMockCache()
+			},
+			err: nil,
+		}, {
 			name:    "checkin details nil completes a stored upgrade, success result created",
 			agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}, UpgradeDetails: &model.UpgradeDetails{ActionID: "test-action", State: "UPG_WATCHING"}},
 			details: nil,

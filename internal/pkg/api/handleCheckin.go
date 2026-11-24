@@ -940,7 +940,19 @@ func upgradeFailureIsFinal(m *UpgradeDetails_Metadata, now time.Time) bool {
 //   - Any other stored state, e.g. UPG_SCHEDULED after the agent canceled the queued upgrade, is no
 //     evidence that the upgrade ran: record nothing.
 func noDetailsUpgradeResult(agent *model.Agent, ver string) (errMsg string, record bool) {
-	switch ud := agent.UpgradeDetails; {
+	ud := agent.UpgradeDetails
+	switch {
+	// A stored UPG_ROLLBACK is handled before the changed-version success: a rollback returns the
+	// agent to its previous version, so ver is non-empty after it too.
+	case ud.State == string(UpgradeDetailsStateUPGROLLBACK):
+		if agent.UpgradeStartedAt == "" {
+			return "", false
+		}
+		reason := ""
+		if ud.Metadata != nil {
+			reason = ud.Metadata.Reason
+		}
+		return rollbackResultError(reason), true
 	case ver != "", ud.State == string(UpgradeDetailsStateUPGWATCHING):
 		return "", true
 	case ud.State == string(UpgradeDetailsStateUPGFAILED) && agent.UpgradeStartedAt != "":
@@ -948,29 +960,35 @@ func noDetailsUpgradeResult(agent *model.Agent, ver string) (errMsg string, reco
 			return ud.Metadata.ErrorMsg, true
 		}
 		return "upgrade failed", true
-	case ud.State == string(UpgradeDetailsStateUPGROLLBACK) && agent.UpgradeStartedAt != "":
-		return rollbackErrorMessage(nil), true
 	}
 	return "", false
 }
 
 // rollbackErrorMessage builds the action result error for a UPG_ROLLBACK state from metadata.reason.
 func rollbackErrorMessage(m *UpgradeDetails_Metadata) string {
-	const msg = "upgrade rolled back"
 	if m == nil {
-		return msg
+		return rollbackResultError("")
 	}
 	raw, err := m.MarshalJSON()
 	if err != nil {
-		return msg
+		return rollbackResultError("")
 	}
 	var meta struct {
 		Reason string `json:"reason"`
 	}
-	if err := json.Unmarshal(raw, &meta); err != nil || meta.Reason == "" {
+	if err := json.Unmarshal(raw, &meta); err != nil {
+		return rollbackResultError("")
+	}
+	return rollbackResultError(meta.Reason)
+}
+
+// rollbackResultError is the action result error for a rolled back upgrade with the given reason.
+func rollbackResultError(reason string) string {
+	const msg = "upgrade rolled back"
+	if reason == "" {
 		return msg
 	}
-	return msg + ": " + meta.Reason
+	return msg + ": " + reason
 }
 
 // createUpgradeResult creates the UPGRADE action result for the agent (no refresh, an existing

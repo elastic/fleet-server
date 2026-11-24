@@ -803,6 +803,10 @@
                 "error_msg": {
                   "description": "Error message when the upgrade state is UPG_FAILED",
                   "type": "string"
+                },
+                "reason": {
+                  "description": "Reason for the upgrade state, e.g. why the upgrade was rolled back when the state is UPG_ROLLBACK",
+                  "type": "string"
                 }
               }
             }
