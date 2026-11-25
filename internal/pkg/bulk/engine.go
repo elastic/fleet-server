@@ -66,6 +66,7 @@ type Bulk interface {
 	MIndex(ctx context.Context, ops []MultiOp, opts ...Opt) ([]BulkIndexerResponseItem, error)
 	MUpdate(ctx context.Context, ops []MultiOp, opts ...Opt) ([]BulkIndexerResponseItem, error)
 	MDelete(ctx context.Context, ops []MultiOp, opts ...Opt) ([]BulkIndexerResponseItem, error)
+	MSearch(ctx context.Context, ops []MultiOp, opts ...Opt) ([]MsearchResponseItem, error)
 
 	// APIKey operations
 	APIKeyCreate(ctx context.Context, name, ttl string, roles []byte, meta interface{}) (*APIKey, error)
@@ -390,6 +391,7 @@ func (b *Bulker) Run(ctx context.Context) error {
 
 	var itemCnt int
 	var byteCnt int
+	var flushAfterCnt int
 	var enrollItemCnt int
 
 	doFlush := func() error {
@@ -412,6 +414,7 @@ func (b *Bulker) Run(ctx context.Context) error {
 		// Reset threshold counters
 		itemCnt = 0
 		byteCnt = 0
+		flushAfterCnt = 0
 		return nil
 	}
 
@@ -463,6 +466,9 @@ func (b *Bulker) Run(ctx context.Context) error {
 				// Update threshold counters
 				itemCnt += 1
 				byteCnt += blk.buf.Len()
+				if blk.flushAfter > 0 {
+					flushAfterCnt += 1
+				}
 
 				// Start timer on first queued item
 				if itemCnt == 1 {
@@ -470,7 +476,8 @@ func (b *Bulker) Run(ctx context.Context) error {
 				}
 
 				// Threshold test, short circuit timer on pending count
-				if itemCnt >= b.opts.flushThresholdCnt || byteCnt >= b.opts.flushThresholdSz {
+				if itemCnt >= b.opts.flushThresholdCnt || byteCnt >= b.opts.flushThresholdSz ||
+					(blk.flushAfter > 0 && flushAfterCnt >= blk.flushAfter) {
 					zerolog.Ctx(ctx).Trace().
 						Str("mod", kModBulk).
 						Int("itemCnt", itemCnt).
@@ -623,6 +630,7 @@ func (b *Bulker) newBlk(action actionT, opts optionsT) *bulkT {
 	blk.spanLink = opts.spanLink
 	blk.dedupeKey = opts.DedupeKey
 	blk.refreshIndex = opts.RefreshIndex
+	blk.flushAfter = opts.FlushAfter
 
 	return blk
 }
