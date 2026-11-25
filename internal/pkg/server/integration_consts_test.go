@@ -7,8 +7,6 @@
 package server
 
 // Literals shared by the integration tests.
-//
-//nolint:gosec // G101: test fixture names, not credentials
 const (
 	tDefault           = "default"
 	tDefaultTitle      = "Default"
