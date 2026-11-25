@@ -12,8 +12,12 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
+	"testing/synctest"
+	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/rs/zerolog"
@@ -24,6 +28,14 @@ import (
 // TODO:
 // WithREfresh() options
 // Delete not found?
+
+const (
+	testIndex   = "testidx"
+	testStatus  = "200 OK"
+	testProto   = "HTTP/1.1"
+	testKWField = "kwval"
+	testKWValue = "funkycoldmedina"
+)
 
 type mockBulkTransport struct {
 }
@@ -98,8 +110,8 @@ func (m *mockBulkTransport) Perform(req *http.Request) (*http.Response, error) {
 	resp := &http.Response{
 		Request:    req,
 		StatusCode: 200,
-		Status:     "200 OK",
-		Proto:      "HTTP/1.1",
+		Status:     testStatus,
+		Proto:      testProto,
 		ProtoMajor: 1,
 		ProtoMinor: 1,
 		Body:       io.NopCloser(&body),
@@ -122,7 +134,7 @@ func TestCancelCtx(t *testing.T) {
 		{
 			"create",
 			func(t *testing.T, ctx context.Context) {
-				id, err := bulker.Create(ctx, "testidx", "", []byte(`{"hey":"now"}`))
+				id, err := bulker.Create(ctx, testIndex, "", []byte(`{"hey":"now"}`))
 
 				if id != "" {
 					t.Error("Expected empty id on context cancel:", id)
@@ -136,7 +148,7 @@ func TestCancelCtx(t *testing.T) {
 		{
 			"read",
 			func(t *testing.T, ctx context.Context) {
-				data, err := bulker.Read(ctx, "testidx", "11")
+				data, err := bulker.Read(ctx, testIndex, "11")
 
 				if data != nil {
 					t.Error("Expected empty data on context cancel:", data)
@@ -150,7 +162,7 @@ func TestCancelCtx(t *testing.T) {
 		{
 			"update",
 			func(t *testing.T, ctx context.Context) {
-				err := bulker.Update(ctx, "testidx", "11", []byte(`{"now":"hey"}`))
+				err := bulker.Update(ctx, testIndex, "11", []byte(`{"now":"hey"}`))
 
 				if !errors.Is(err, context.Canceled) {
 					t.Error("Expected context cancel err: ", err)
@@ -160,7 +172,7 @@ func TestCancelCtx(t *testing.T) {
 		{
 			"delete",
 			func(t *testing.T, ctx context.Context) {
-				err := bulker.Delete(ctx, "testidx", "11")
+				err := bulker.Delete(ctx, testIndex, "11")
 
 				if !errors.Is(err, context.Canceled) {
 					t.Error("Expected context cancel err: ", err)
@@ -170,7 +182,7 @@ func TestCancelCtx(t *testing.T) {
 		{
 			"index",
 			func(t *testing.T, ctx context.Context) {
-				id, err := bulker.Index(ctx, "testidx", "", []byte(`{"hey":"now"}`))
+				id, err := bulker.Index(ctx, testIndex, "", []byte(`{"hey":"now"}`))
 
 				if id != "" {
 					t.Error("Expected empty id on context cancel:", id)
@@ -184,7 +196,21 @@ func TestCancelCtx(t *testing.T) {
 		{
 			"search",
 			func(t *testing.T, ctx context.Context) {
-				res, err := bulker.Search(ctx, "testidx", []byte(`{"hey":"now"}`))
+				res, err := bulker.Search(ctx, testIndex, []byte(`{"hey":"now"}`))
+
+				if res != nil {
+					t.Error("Expected empty result on context cancel:", res)
+				}
+
+				if !errors.Is(err, context.Canceled) {
+					t.Error("Expected context cancel err: ", err)
+				}
+			},
+		},
+		{
+			"msearch",
+			func(t *testing.T, ctx context.Context) {
+				res, err := bulker.MSearch(ctx, []MultiOp{{Index: testIndex, Body: []byte(`{"hey":"now"}`)}})
 
 				if res != nil {
 					t.Error("Expected empty result on context cancel:", res)
@@ -198,7 +224,7 @@ func TestCancelCtx(t *testing.T) {
 		{
 			"mcreate",
 			func(t *testing.T, ctx context.Context) {
-				res, err := bulker.MCreate(ctx, []MultiOp{{Index: "testidx", Body: []byte(`{"hey":"now"}`)}})
+				res, err := bulker.MCreate(ctx, []MultiOp{{Index: testIndex, Body: []byte(`{"hey":"now"}`)}})
 
 				if res != nil {
 					t.Error("Expected empty result on context cancel:", res)
@@ -212,7 +238,7 @@ func TestCancelCtx(t *testing.T) {
 		{
 			"mindex",
 			func(t *testing.T, ctx context.Context) {
-				res, err := bulker.MIndex(ctx, []MultiOp{{Index: "testidx", Body: []byte(`{"hey":"now"}`)}})
+				res, err := bulker.MIndex(ctx, []MultiOp{{Index: testIndex, Body: []byte(`{"hey":"now"}`)}})
 
 				if res != nil {
 					t.Error("Expected empty result on context cancel:", res)
@@ -226,7 +252,7 @@ func TestCancelCtx(t *testing.T) {
 		{
 			"mupdate",
 			func(t *testing.T, ctx context.Context) {
-				res, err := bulker.MUpdate(ctx, []MultiOp{{Index: "testidx", ID: "umm", Body: []byte(`{"hey":"now"}`)}})
+				res, err := bulker.MUpdate(ctx, []MultiOp{{Index: testIndex, ID: "umm", Body: []byte(`{"hey":"now"}`)}})
 
 				if res != nil {
 					t.Error("Expected empty result on context cancel:", res)
@@ -240,7 +266,7 @@ func TestCancelCtx(t *testing.T) {
 		{
 			"mdelete",
 			func(t *testing.T, ctx context.Context) {
-				res, err := bulker.MDelete(ctx, []MultiOp{{Index: "testidx", ID: "myid"}})
+				res, err := bulker.MDelete(ctx, []MultiOp{{Index: testIndex, ID: "myid"}})
 
 				if res != nil {
 					t.Error("Expected empty result on context cancel:", res)
@@ -323,7 +349,7 @@ func benchmarkMockBulk(b *testing.B, samples [][]byte) {
 		}
 	}()
 
-	fieldUpdate := UpdateFields{"kwval": "funkycoldmedina"}
+	fieldUpdate := UpdateFields{testKWField: testKWValue}
 	fieldData, err := fieldUpdate.Marshal()
 	if err != nil {
 		b.Fatal(err)
@@ -398,8 +424,6 @@ func BenchmarkMockBulk(b *testing.B) {
 		b.Run(strconv.Itoa(n), bindFunc(n))
 	}
 }
-<<<<<<< HEAD
-=======
 
 type performFunc func(*http.Request) (*http.Response, error)
 
@@ -549,4 +573,32 @@ func runBulker(t *testing.T, bulker *Bulker) context.Context {
 	})
 	return ctx
 }
->>>>>>> 02598fa (Fix error handling in batched policy searches (#8362))
+
+// fixedTransport returns a pre-built response body on every Perform call.
+type fixedTransport struct {
+	body []byte
+}
+
+func (t *fixedTransport) Perform(*http.Request) (*http.Response, error) {
+	return &http.Response{
+		StatusCode: 200,
+		Status:     testStatus,
+		Proto:      testProto,
+		ProtoMajor: 1,
+		ProtoMinor: 1,
+		Body:       io.NopCloser(bytes.NewReader(t.body)),
+	}, nil
+}
+
+func msearchResponse(n int) []byte {
+	var buf bytes.Buffer
+	buf.WriteString(`{"responses":[`)
+	for i := range n {
+		if i > 0 {
+			buf.WriteByte(',')
+		}
+		buf.WriteString(`{"status":200,"took":1,"timed_out":false,"_shards":{"total":1,"successful":1,"skipped":0,"failed":0},"hits":{"total":{"value":0,"relation":"eq"},"hits":[]}}`)
+	}
+	buf.WriteString(`],"took":1}`)
+	return buf.Bytes()
+}

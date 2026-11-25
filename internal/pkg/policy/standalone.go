@@ -29,7 +29,6 @@ type standAloneSelfMonitorT struct {
 	bulker   bulk.Bulk
 	reporter state.Reporter
 
-	policyF       policyFetcher
 	policiesIndex string
 	checkTime     time.Duration
 	checkTimeout  time.Duration
@@ -43,7 +42,6 @@ func NewStandAloneSelfMonitor(bulker bulk.Bulk, reporter state.Reporter) *standA
 		bulker:        bulker,
 		state:         client.UnitStateStarting,
 		reporter:      reporter,
-		policyF:       dl.QueryLatestPolicies,
 		policiesIndex: dl.FleetPolicies,
 		checkTime:     DefaultCheckTime,
 		checkTimeout:  DefaultCheckTimeout,
@@ -95,7 +93,7 @@ func (m *standAloneSelfMonitorT) check(ctx context.Context) {
 	state := client.UnitStateHealthy
 	message := "Running"
 
-	_, err := m.policyF(ctx, m.bulker, dl.WithIndexName(m.policiesIndex))
+	err := dl.CheckPoliciesIndexAccess(ctx, m.bulker, dl.WithIndexName(m.policiesIndex))
 	if errors.Is(err, es.ErrIndexNotFound) {
 		m.log.Debug().Str("index", m.policiesIndex).Msg(es.ErrIndexNotFound.Error())
 		message = "Running: Policies not available yet"
