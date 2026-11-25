@@ -42,11 +42,6 @@ import (
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 )
 
-<<<<<<< HEAD
-=======
-const monitorTestOutput = "default"
-
->>>>>>> 02598fa (Fix error handling in batched policy searches (#8362))
 var policyDataDefault = &model.PolicyData{
 	Outputs: map[string]map[string]any{
 		"default": map[string]any{
@@ -1020,18 +1015,10 @@ func (s *policyStore) clear() {
 func TestMonitor_LoadPolicies(t *testing.T) {
 	store := &policyStore{
 		policies: map[string]error{
-<<<<<<< HEAD
-			"policy-a":             nil,
-			"policy-b":             nil,
-			"failed-policy":        errSearchFailed,
-			"invalid-policy":       errInvalidPolicy,
-			"missing-index-policy": es.ErrIndexNotFound,
-=======
 			"policy-a":       nil,
 			"policy-b":       nil,
 			"failed-policy":  errSearchFailed,
 			"invalid-policy": errInvalidPolicy,
->>>>>>> 02598fa (Fix error handling in batched policy searches (#8362))
 		},
 	}
 
@@ -1064,13 +1051,6 @@ func TestMonitor_LoadPolicies(t *testing.T) {
 		{
 			name:        "no policy is loaded when none is in the store",
 			newPolicies: []string{"policy-not-in-store"},
-<<<<<<< HEAD
-		},
-		{
-			name:        "a missing index does not return an error",
-			newPolicies: []string{"missing-index-policy"},
-=======
->>>>>>> 02598fa (Fix error handling in batched policy searches (#8362))
 		},
 		{
 			name:         "valid policies are loaded when other policies fail",
