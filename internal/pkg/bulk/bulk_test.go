@@ -11,7 +11,6 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -22,6 +21,8 @@ import (
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/apikey"
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TODO:
@@ -418,6 +419,117 @@ func BenchmarkMockBulk(b *testing.B) {
 	}
 }
 
+type performFunc func(*http.Request) (*http.Response, error)
+
+func (f performFunc) Perform(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
+
+func TestMSearch(t *testing.T) {
+	var (
+		errFirstFlushFailed  = errors.New("first flush failed")
+		errSecondFlushFailed = errors.New("second flush failed")
+	)
+
+	indices := map[string]struct {
+		body string
+		err  error
+	}{
+		"ok": {
+			body: `{"responses":[{"status":200,"hits":{"hits":[]}}],"took":1}`,
+		},
+		"rejected": {
+			body: `{"responses":[{"status":429,"error":{"type":"es_rejected_execution_exception","reason":"rejected"}}],"took":1}`,
+		},
+		"first-failed": {
+			err: errFirstFlushFailed,
+		},
+		"second-failed": {
+			err: errSecondFlushFailed,
+		},
+	}
+
+	tests := []struct {
+		name         string
+		indices      []string
+		wantStatuses []int
+		wantErrs     []error
+	}{
+		{
+			name:         "successful and rejected searches return no request error",
+			indices:      []string{"ok", "rejected"},
+			wantStatuses: []int{http.StatusOK, http.StatusTooManyRequests},
+		},
+		{
+			name:         "a failed request error is returned alongside per-search responses",
+			indices:      []string{"first-failed", "rejected"},
+			wantStatuses: []int{0, http.StatusTooManyRequests},
+			wantErrs:     []error{errFirstFlushFailed},
+		},
+		{
+			name:         "distinct errors from multiple failed requests are returned once each",
+			indices:      []string{"first-failed", "second-failed", "first-failed", "rejected"},
+			wantStatuses: []int{0, 0, 0, http.StatusTooManyRequests},
+			wantErrs:     []error{errFirstFlushFailed, errSecondFlushFailed},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				var calls atomic.Int32
+				transport := performFunc(func(req *http.Request) (*http.Response, error) {
+					var meta struct {
+						Index string `json:"index"`
+					}
+					if err := json.NewDecoder(req.Body).Decode(&meta); err != nil {
+						return nil, err
+					}
+					if call := calls.Add(1); call > 1 {
+						// Stagger later flushes so earlier errors reach MSearch first.
+						time.Sleep(time.Duration(call-1) * time.Second)
+					}
+					res := indices[meta.Index]
+					if res.err != nil {
+						return nil, res.err
+					}
+					resp := &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(res.body))}
+					return resp, nil
+				})
+				bulker := NewBulker(transport, nil, WithFlushInterval(time.Hour))
+				ctx := runBulker(t, bulker)
+
+				ops := make([]MultiOp, len(tt.indices))
+				for i, index := range tt.indices {
+					ops[i] = MultiOp{Index: index, Body: []byte(`{}`)}
+				}
+				// WithFlushAfter(1) sends each search in its own request.
+				items, err := bulker.MSearch(ctx, ops, WithFlushAfter(1))
+				if len(tt.wantErrs) == 0 {
+					require.NoError(t, err, "MSearch returned unexpected error")
+				}
+				for _, wantErr := range tt.wantErrs {
+					require.ErrorIs(t, err, wantErr, "MSearch must return error %v", wantErr)
+					errCount := strings.Count(err.Error(), wantErr.Error())
+					assert.Equal(t, 1, errCount, "error %q must not be repeated in %q", wantErr, err)
+				}
+				require.Len(t, items, len(ops), "MSearch must return one item per search")
+				statuses := make([]int, len(items))
+				for i, item := range items {
+					statuses[i] = item.Status
+					wantReqErr := indices[tt.indices[i]].err
+					if wantReqErr == nil {
+						assert.NoError(t, item.RequestError, "items[%d] must not have a request error", i)
+					} else {
+						assert.ErrorIs(t, item.RequestError, wantReqErr, "items[%d] request error", i)
+					}
+				}
+				assert.ElementsMatch(t, tt.wantStatuses, statuses, "unexpected search response statuses")
+			})
+		})
+	}
+}
+
 // TestMSearchFlushAfter verifies that the searches are sent as soon as the number of searches
 // given to WithFlushAfter are queued, without waiting for the flush interval.
 func TestMSearchFlushAfter(t *testing.T) {
@@ -454,46 +566,4 @@ func runBulker(t *testing.T, bulker *Bulker) context.Context {
 		wg.Wait()
 	})
 	return ctx
-}
-
-type performFunc func(*http.Request) (*http.Response, error)
-
-func (f performFunc) Perform(req *http.Request) (*http.Response, error) {
-	return f(req)
-}
-
-func TestMSearchReturnsTheErrorOfAFailedRequest(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		requestErr := errors.New("request failed")
-		rejected := `{"responses":[{"status":429,"error":{"type":"es_rejected_execution_exception","reason":"rejected"}}],"took":1}`
-		var calls atomic.Int32
-		transport := performFunc(func(*http.Request) (*http.Response, error) {
-			if calls.Add(1) == 1 {
-				return nil, requestErr
-			}
-			// Answer after the error of the first request reached MSearch.
-			time.Sleep(time.Second)
-			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(rejected))}, nil
-		})
-		bulker := NewBulker(transport, nil, WithFlushInterval(time.Hour))
-		ctx := runBulker(t, bulker)
-
-		ops := []MultiOp{
-			{Index: testIndex, Body: []byte(`{}`)},
-			{Index: testIndex, Body: []byte(`{}`)},
-		}
-		// WithFlushAfter(1) sends each search in its own request.
-		items, err := bulker.MSearch(ctx, ops, WithFlushAfter(1))
-		if !errors.Is(err, requestErr) {
-			t.Fatalf("got error %v, want %v", err, requestErr)
-		}
-		if len(items) != len(ops) {
-			t.Fatalf("got %d items, want %d", len(items), len(ops))
-		}
-		statuses := []int{items[0].Status, items[1].Status}
-		slices.Sort(statuses)
-		if !slices.Equal(statuses, []int{0, http.StatusTooManyRequests}) {
-			t.Fatalf("got item statuses %v, want 0 for the failed request and 429 for the rejected search", statuses)
-		}
-	})
 }
