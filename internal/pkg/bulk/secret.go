@@ -7,11 +7,16 @@ package bulk
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"go.elastic.co/apm/v2"
 )
+
+// ErrSecretNotFound is returned when a secret document does not exist in the Fleet secrets store.
+var ErrSecretNotFound = errors.New("secret not found")
 
 type ExtendedClient struct {
 	*elasticsearch.Client
@@ -37,6 +42,9 @@ func (c *ExtendedAPI) Read(ctx context.Context, secretID string) (*SecretRespons
 		return nil, err
 	}
 	defer res.Body.Close()
+	if res.StatusCode == http.StatusNotFound {
+		return nil, fmt.Errorf("%q: %w", secretID, ErrSecretNotFound)
+	}
 	var secretResp SecretResponse
 
 	err = json.NewDecoder(res.Body).Decode(&secretResp)
