@@ -23,12 +23,17 @@ import (
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 )
 
+const (
+	testDefaultOutput = "default"
+	testRemoteES      = "remote_elasticsearch"
+)
+
 func createRandomPolicy(id string, revisionIdx int) model.Policy {
 	now := time.Now().UTC()
 	var policyData = model.PolicyData{
-		Outputs: map[string]map[string]interface{}{
-			"default": {
-				"type": "elasticsearch",
+		Outputs: map[string]map[string]any{
+			testDefaultOutput: {
+				FiledType: testES,
 			},
 		},
 		OutputPermissions: json.RawMessage(`{"default": {}}`),
@@ -125,72 +130,45 @@ func TestQueryLatestPolicy400k(t *testing.T) {
 
 	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetPolicies, bulk.WithFlushThresholdCount(1))
 
-<<<<<<< HEAD
-	err := storeRandomPolicies(ctx, bulker, index, 4, 100000)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	var policies []model.Policy
-	require.Eventually(t, func() bool {
-		policies, err := QueryLatestPolicies(ctx, bulker, WithIndexName(index))
-		if err != nil {
-			t.Fatal(err)
-		}
-		return len(policies) == 4
-	}, time.Second*2, time.Millisecond*100, "Expected to eventually have 4 policies found: %d", len(policies))
-
-	for _, policy := range policies {
-		if policy.RevisionIdx != 100000 {
-			t.Errorf("Expected to find revision_idx 100000 for policy %s, found %d", policy.PolicyID, policy.RevisionIdx)
-=======
 	policies := make([][]model.Policy, 4)
 	for i := range policies {
 		policies[i] = make([]model.Policy, 100000)
 		for j := range policies[i] {
 			policies[i][j].RevisionIdx = int64(j + 1)
->>>>>>> 39eeea5 (Load only the needed policies in Fleet Server health checks and enrollments (#8224))
 		}
 	}
 	ids, err := storeRandomPolicies(ctx, bulker, index, policies)
 	require.NoError(t, err)
 
-<<<<<<< HEAD
-// TesyQueryLatestPolices11kUnique tests behaviour when 11k unique policies are used, there is a 10k size specification in the aggregation.
-//
-//nolint:dupl // test duplication
-func TestQueryLatestPolicies11kUnique(t *testing.T) {
-	t.Skip("Re-enable after policy load issues have been sorted: https://github.com/elastic/fleet-server/issues/3254")
-	ctx := testlog.SetLogger(t).WithContext(t.Context())
-
-	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetPolicies, bulk.WithFlushThresholdCount(1))
-
-	err := storeRandomPolicies(ctx, bulker, index, 11000, 2)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	var policies []model.Policy
-	require.Eventually(t, func() bool {
-		policies, err := QueryLatestPolicies(ctx, bulker, WithIndexName(index))
-		if err != nil {
-			t.Fatal(err)
-		}
-		return len(policies) != 11000
-	}, time.Second*2, time.Millisecond*100, "Expected to eventually have 11000 policies found: %d", len(policies))
-
-	for _, policy := range policies {
-		if policy.RevisionIdx != 2 {
-			t.Errorf("Expected to find revision_idx 1 for policy %s, found %d", policy.PolicyID, policy.RevisionIdx)
-		}
-=======
 	for _, id := range ids {
 		var policy model.Policy
 		require.Eventually(t, func() bool {
 			policy, err = QueryLatestPolicy(ctx, bulker, id, WithIndexName(index))
 			return err == nil && policy.RevisionIdx == 100000
 		}, time.Second*2, time.Millisecond*100, "Expected revision_idx 100000 for policy %s, found %d, error: %v", id, policy.RevisionIdx, err)
->>>>>>> 39eeea5 (Load only the needed policies in Fleet Server health checks and enrollments (#8224))
+	}
+}
+
+func TestQueryLatestPoliciesByIDIntegration(t *testing.T) {
+	ctx := testlog.SetLogger(t).WithContext(t.Context())
+	index, bulker := ftesting.SetupCleanIndex(ctx, t, FleetPolicies)
+
+	// Create 2 policies with 3 revisions each.
+	ids := []string{uuid.Must(uuid.NewV4()).String(), uuid.Must(uuid.NewV4()).String()}
+	for _, id := range ids {
+		for rev := 1; rev <= 3; rev++ {
+			_, err := CreatePolicy(ctx, bulker, createRandomPolicy(id, rev), WithIndexName(index))
+			require.NoError(t, err)
+		}
+	}
+
+	policies, err := QueryLatestPoliciesByID(ctx, bulker, []string{ids[0], "missing", ids[1]}, WithIndexName(index))
+	require.NoError(t, err)
+
+	require.Len(t, policies, 2, "the policy that does not exist is not in the result")
+	for i, policy := range policies {
+		require.Equal(t, ids[i], policy.PolicyID)
+		require.Equal(t, int64(3), policy.RevisionIdx, "the latest revision of policy %s", ids[i])
 	}
 }
 
@@ -221,7 +199,7 @@ func TestQueryOutputFromPolicy(t *testing.T) {
 	var policyData = model.PolicyData{
 		Outputs: map[string]map[string]interface{}{
 			"remote": {
-				"type": "remote_elasticsearch",
+				FiledType: testRemoteES,
 			},
 		},
 		OutputPermissions: json.RawMessage(`{"default": {}}`),
@@ -244,5 +222,5 @@ func TestQueryOutputFromPolicy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	require.Equal(t, map[string]interface{}{"type": "remote_elasticsearch"}, policy.Data.Outputs["remote"])
+	require.Equal(t, map[string]any{FiledType: testRemoteES}, policy.Data.Outputs["remote"])
 }

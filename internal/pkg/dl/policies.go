@@ -8,6 +8,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"net/http"
+	"slices"
 
 	"github.com/rs/zerolog"
 
@@ -19,23 +22,6 @@ import (
 )
 
 var (
-<<<<<<< HEAD
-	tmplQueryLatestPolicies = prepareQueryLatestPolicies()
-	tmplQueryLatestPolicy   = prepareQueryLatestPolicy()
-	ErrMissingAggregations  = errors.New("missing expected aggregation result")
-	tmplQueryPolicies       = prepareQueryPolicies()
-)
-
-// addLatestRevisionAggs adds the aggregation that returns the latest revision of each policy
-// matched by the query.
-func addLatestRevisionAggs(root *dsl.Node) {
-	policyID := root.Aggs().Agg(FieldPolicyID)
-	policyID.Terms("field", FieldPolicyID, nil).Size(10000)
-	revisionIdx := policyID.Aggs().Agg(FieldRevisionIdx).TopHits()
-	revisionIdx.Size(1)
-	rSort := revisionIdx.Sort()
-	rSort.SortOrder(FieldRevisionIdx, dsl.SortDescend)
-=======
 	tmplQueryLatestPolicyByID            = prepareQueryLatestPolicyByID()
 	tmplQueryDefaultFleetServerPolicyIDs = prepareQueryDefaultFleetServerPolicyIDs()
 	tmplQueryLatestDefaultFlags          = prepareQueryLatestDefaultFlags()
@@ -60,7 +46,6 @@ func QueryLatestPolicy(ctx context.Context, bulker bulk.Bulk, policyID string, o
 		return QueryDefaultFleetServerPolicy(ctx, bulker, opt...)
 	}
 	return model.Policy{}, ErrNotFound
->>>>>>> 39eeea5 (Load only the needed policies in Fleet Server health checks and enrollments (#8224))
 }
 
 // QueryLatestPolicyByID gets the latest revision of the policy with the given ID.
@@ -95,28 +80,12 @@ func prepareQueryLatestPolicyByID() *dsl.Tmpl {
 	return tmpl
 }
 
-<<<<<<< HEAD
-// QueryLatestPolicies gets the latest revision of every policy, or only of the policy given with
-// WithPolicyID.
-func QueryLatestPolicies(ctx context.Context, bulker bulk.Bulk, opt ...Option) ([]model.Policy, error) {
-	o := newOption(FleetPolicies, opt...)
-	query := tmplQueryLatestPolicies
-	if o.policyID != "" {
-		var err error
-		query, err = tmplQueryLatestPolicy.RenderOne(FieldPolicyID, o.policyID)
-		if err != nil {
-			return nil, err
-		}
-	}
-	res, err := bulker.Search(ctx, o.indexName, query, bulk.WithIgnoreUnavailble())
-=======
 // QueryDefaultFleetServerPolicy gets the latest revision of the default Fleet Server policy.
 func QueryDefaultFleetServerPolicy(ctx context.Context, bulker bulk.Bulk, opt ...Option) (model.Policy, error) {
 	o := newOption(FleetPolicies, opt...)
 	// TODO: Use a single search when Kibana marks only the latest revision of the default policy:
 	// https://github.com/elastic/kibana/issues/306686
 	query, err := tmplQueryDefaultFleetServerPolicyIDs.Render(nil)
->>>>>>> 39eeea5 (Load only the needed policies in Fleet Server health checks and enrollments (#8224))
 	if err != nil {
 		return model.Policy{}, err
 	}
@@ -133,9 +102,6 @@ func QueryDefaultFleetServerPolicy(ctx context.Context, bulker bulk.Bulk, opt ..
 		policyIDs[i] = bucket.Key
 	}
 
-<<<<<<< HEAD
-	policyID, ok := res.Aggregations[FieldPolicyID]
-=======
 	// Many policies can have been the default, so only the default policy is loaded in full.
 	query, err = tmplQueryLatestDefaultFlags.RenderOne(FieldPolicyID, policyIDs)
 	if err != nil {
@@ -265,30 +231,21 @@ func addLatestRevisionAggs(root *dsl.Node, fields ...string) {
 
 func appendLatestPolicies(policies []model.Policy, aggregations map[string]es.Aggregation, sharer *StringSharer) ([]model.Policy, error) {
 	policyID, ok := aggregations[FieldPolicyID]
->>>>>>> 39eeea5 (Load only the needed policies in Fleet Server health checks and enrollments (#8224))
 	if !ok {
 		// Aggregation will not be here if there index is not available
-		return []model.Policy{}, nil
+		return policies, nil
 	}
-	if len(policyID.Buckets) == 0 {
-		return []model.Policy{}, nil
-	}
-	policies := make([]model.Policy, len(policyID.Buckets))
-	// Share equal strings across the policies as each one is decoded, so that text repeated
-	// across the policies is held in memory only once and at most one policy's duplicates exist
-	// at a time. See StringSharer.
-	sharer := NewStringSharer()
-	for i, bucket := range policyID.Buckets {
+	for _, bucket := range policyID.Buckets {
 		revisionIdx, ok := bucket.Aggregations[FieldRevisionIdx]
 		if !ok || len(revisionIdx.Hits) != 1 {
 			return nil, ErrMissingAggregations
 		}
-		hit := revisionIdx.Hits[0]
-		err = hit.Unmarshal(&policies[i])
-		if err != nil {
+		var policy model.Policy
+		if err := revisionIdx.Hits[0].Unmarshal(&policy); err != nil {
 			return nil, err
 		}
-		sharer.Share(&policies[i])
+		sharer.Share(&policy)
+		policies = append(policies, policy)
 	}
 	return policies, nil
 }

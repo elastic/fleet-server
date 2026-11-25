@@ -303,15 +303,10 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 	}, ftesting.RetrySleep(1*time.Second))
 
 	// add an active token
-<<<<<<< HEAD
-	activeToken := model.EnrollmentAPIKey{
+	activeToken := model.EnrollmentAPIKey{ //nolint:gosec // fake api key used in test
 		ESDocument: model.ESDocument{
 			Id: xid.New().String(),
 		},
-=======
-	activeToken := model.EnrollmentAPIKey{ //nolint:gosec // fake api key used in test
-		Id:       xid.New().String(),
->>>>>>> 39eeea5 (Load only the needed policies in Fleet Server health checks and enrollments (#8224))
 		Active:   true,
 		APIKey:   "d2JndlFIWUJJUVVxWDVia2NJTV86X0d6ZmljZGNTc1d4R1otbklrZFFRZw==",
 		APIKeyID: xid.New().String(),
@@ -617,15 +612,10 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 	}, ftesting.RetrySleep(1*time.Second))
 
 	// add an active token
-<<<<<<< HEAD
-	activeToken := model.EnrollmentAPIKey{
+	activeToken := model.EnrollmentAPIKey{ //nolint:gosec // fake api key used in test
 		ESDocument: model.ESDocument{
 			Id: xid.New().String(),
 		},
-=======
-	activeToken := model.EnrollmentAPIKey{ //nolint:gosec // fake api key used in test
-		Id:       xid.New().String(),
->>>>>>> 39eeea5 (Load only the needed policies in Fleet Server health checks and enrollments (#8224))
 		Active:   true,
 		APIKey:   "d2JndlFIWUJJUVVxWDVia2NJTV86X0d6ZmljZGNTc1d4R1otbklrZFFRZw==",
 		APIKeyID: xid.New().String(),
