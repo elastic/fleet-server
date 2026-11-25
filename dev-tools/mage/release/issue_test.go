@@ -159,6 +159,85 @@ func TestMergeReleaseIssueBodyAddsTrackerWhenMissing(t *testing.T) {
 	}
 }
 
+func TestMergeReleaseIssueBodyPreservesTrailingSections(t *testing.T) {
+	existing := `Global tracker: https://github.com/elastic/ingest-dev/issues/8866
+
+# Release Checklist
+
+- [ ] Find the Fleet Server release PRs
+
+## PRs
+
+- [x] ` + testPRURL10 + `
+
+## Notes
+
+Operator note: keep this section.
+`
+	updated, changed := mergeReleaseIssueBody(existing, false, []string{
+		testPRURL10,
+		testPRURL11,
+	})
+	if !changed {
+		t.Fatal("adding a missing PR should mark the body changed")
+	}
+	if !strings.Contains(updated, "- [ ] "+testPRURL11) {
+		t.Fatal("new PR should be appended")
+	}
+	if !strings.Contains(updated, "## Notes") {
+		t.Fatal("trailing ## Notes section must be preserved")
+	}
+	if !strings.Contains(updated, "Operator note: keep this section.") {
+		t.Fatal("trailing notes text must be preserved")
+	}
+
+	again, changedAgain := mergeReleaseIssueBody(updated, false, []string{
+		testPRURL10,
+		testPRURL11,
+	})
+	if changedAgain {
+		t.Fatal("second merge with same PRs should be a no-op")
+	}
+	if !strings.Contains(again, "## Notes") {
+		t.Fatal("trailing section must remain after no-op merge")
+	}
+}
+
+func TestMergeReleaseIssueBodyPreservesPlainAndNestedNotes(t *testing.T) {
+	existing := `## PRs
+
+- [x] ` + testPRURL10 + `
+
+Operator free-form note.
+
+### Notes
+
+Keep nested notes too.
+`
+	updated, changed := mergeReleaseIssueBody(existing, false, []string{
+		testPRURL10,
+		testPRURL11,
+	})
+	require.True(t, changed)
+	require.Contains(t, updated, "Operator free-form note.")
+	require.Contains(t, updated, "### Notes")
+	require.Contains(t, updated, "Keep nested notes too.")
+}
+
+func TestMergeReleaseIssueBodyPreservesNotesAfterEmptyPRSection(t *testing.T) {
+	existing := `## PRs
+
+## Notes
+
+Keep me when the PR list was empty.
+`
+	updated, changed := mergeReleaseIssueBody(existing, false, []string{testPRURL10})
+	require.True(t, changed)
+	require.Contains(t, updated, "- [ ] "+testPRURL10)
+	require.Contains(t, updated, "## Notes")
+	require.Contains(t, updated, "Keep me when the PR list was empty.")
+}
+
 func TestEnsureReleaseIssueTrackerDryRun(t *testing.T) {
 	cfg := &ReleaseConfig{
 		NextRelease: "9.4.1",

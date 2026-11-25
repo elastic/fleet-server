@@ -216,7 +216,8 @@ func formatPRChecklist(prURLs []string, checked map[string]bool) string {
 }
 
 // mergeReleaseIssueBody updates an existing issue body with missing tracker link and PR URLs.
-// Checklist item checkboxes outside the PRs section are left untouched.
+// Checklist item checkboxes outside the PRs section are left untouched. Text and headings
+// after the managed PR list are preserved across updates.
 func mergeReleaseIssueBody(existingBody string, isMajorMinor bool, prURLs []string) (string, bool) {
 	existingChecked := extractPRCheckboxes(existingBody)
 	allURLs := mergePRURLs(prURLs, keys(existingChecked))
@@ -240,7 +241,7 @@ func mergeReleaseIssueBody(existingBody string, isMajorMinor bool, prURLs []stri
 		return updated, true
 	}
 
-	oldPRBlock := strings.TrimPrefix(after, "\n")
+	oldPRBlock, trailing := splitPRSectionAndTrailing(after)
 	newPRBlock := formatPRChecklist(allURLs, existingChecked)
 
 	oldURLs := keys(extractPRCheckboxes(oldPRBlock))
@@ -252,7 +253,52 @@ func mergeReleaseIssueBody(existingBody string, isMajorMinor bool, prURLs []stri
 	}
 
 	updated := strings.TrimRight(before, "\n") + "\n\n" + prSection + "\n\n" + newPRBlock
+	if trailing != "" {
+		updated = strings.TrimRight(updated, "\n") + "\n\n" + trailing
+	}
 	return updated, true
+}
+
+// splitPRSectionAndTrailing splits content after the "## PRs" heading into the managed
+// PR checklist (checkbox lines and the empty-list placeholder) and any trailing text.
+func splitPRSectionAndTrailing(after string) (prBlock, trailing string) {
+	content := strings.TrimPrefix(after, "\n")
+	lines := strings.Split(content, "\n")
+
+	i := 0
+	for i < len(lines) && strings.TrimSpace(lines[i]) == "" {
+		i++
+	}
+
+	managedEnd := i
+	for managedEnd < len(lines) {
+		trimmed := strings.TrimSpace(lines[managedEnd])
+		if trimmed == "" {
+			j := managedEnd + 1
+			for j < len(lines) && strings.TrimSpace(lines[j]) == "" {
+				j++
+			}
+			if j < len(lines) && isManagedPRChecklistLine(strings.TrimSpace(lines[j])) {
+				managedEnd = j
+				continue
+			}
+			break
+		}
+		if isManagedPRChecklistLine(trimmed) {
+			managedEnd++
+			continue
+		}
+		break
+	}
+
+	return strings.Join(lines[i:managedEnd], "\n"), strings.Join(lines[managedEnd:], "\n")
+}
+
+func isManagedPRChecklistLine(trimmed string) bool {
+	if strings.HasPrefix(trimmed, "- [") {
+		return true
+	}
+	return trimmed == "_No related Fleet Server release PRs discovered yet._"
 }
 
 func keys(m map[string]bool) []string {

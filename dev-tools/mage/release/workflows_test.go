@@ -31,14 +31,26 @@ func TestEnsureMajorMinorNextReleaseRequiresExistingBase(t *testing.T) {
 func TestLabelHelpers(t *testing.T) {
 	require.Equal(t, "backport-"+testReleaseBranch, backportLabel(testReleaseBranch))
 
-	labels := prAMainLabels(testReleaseBranch)
+	labels := prAMainLabels()
 	require.True(t, contains(labels, mergeLabelFFDay))
-	require.True(t, contains(labels, "backport-"+testReleaseBranch))
+	require.False(t, contains(labels, "backport-"+testReleaseBranch), "PR-A must not carry backport label (would backport next-minor bump)")
 	require.False(t, contains(labels, mergeLabelAfterImages), "PR-A must not include merge:3-after-images (PR-C omitted)")
 
 	require.True(t, contains(prBReleaseLabels(), mergeLabelAfterBranch))
 	require.True(t, contains(patchVersionBumpLabels(), mergeLabelAfterRelease))
 	require.False(t, contains(patchVersionBumpLabels(), labelDocs), "patch bump must not include docs label")
+}
+
+func TestPRAMainRemoveLabelsPolicy(t *testing.T) {
+	// Mirrors prepMainBackportAndVersion: create labels omit backport-*, RemoveLabels clears leftovers.
+	wantRemove := backportLabel(testReleaseBranch)
+	require.Equal(t, "backport-"+testReleaseBranch, wantRemove)
+	require.False(t, contains(prAMainLabels(), wantRemove))
+	opts := prOptions{
+		Labels:       prAMainLabels(),
+		RemoveLabels: []string{wantRemove},
+	}
+	require.Equal(t, []string{wantRemove}, opts.RemoveLabels)
 }
 
 func TestPRBodiesMentionFleetScope(t *testing.T) {

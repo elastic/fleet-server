@@ -104,6 +104,62 @@ func TestCreatePRIdempotent(t *testing.T) {
 	}
 }
 
+func TestCreatePRRemovesRequestedLabelsOnReuse(t *testing.T) {
+	existingPR := &github.PullRequest{
+		Number:  new(42),
+		HTMLURL: new("https://github.com/elastic/fleet-server/pull/42"),
+		Head:    &github.PullRequestBranch{Ref: new("ff-prep-main-9.6.0")},
+		Base:    &github.PullRequestBranch{Ref: new("main")},
+		State:   new("open"),
+	}
+	removed := []string{}
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == testAPIPullsPath:
+			w.Header().Set("Content-Type", "application/json")
+			require.NoError(t, json.NewEncoder(w).Encode([]*github.PullRequest{existingPR}))
+		case r.Method == http.MethodPost && strings.HasPrefix(r.URL.Path, "/repos/elastic/fleet-server/issues/42/labels"):
+			w.Header().Set("Content-Type", "application/json")
+			require.NoError(t, json.NewEncoder(w).Encode([]*github.Label{{Name: new(labelRelease)}}))
+		case r.Method == http.MethodDelete && strings.Contains(r.URL.Path, "/issues/42/labels/"):
+			parts := strings.Split(r.URL.Path, "/")
+			removed = append(removed, parts[len(parts)-1])
+			w.WriteHeader(http.StatusOK)
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			http.NotFound(w, r)
+		}
+	})
+
+	ghClient := newTestGitHubClient(t, handler)
+	pr, err := ghClient.createPR(prOptions{
+		Owner:        releasesLookupOwner,
+		Repo:         releasesLookupRepo,
+		Title:        "PR-A",
+		Head:         "ff-prep-main-9.6.0",
+		Base:         testBaseBranch,
+		Labels:       []string{labelRelease},
+		RemoveLabels: []string{"backport-" + testReleaseBranch},
+	})
+	require.NoError(t, err)
+	require.Equal(t, 42, pr.GetNumber())
+	require.Equal(t, []string{"backport-" + testReleaseBranch}, removed)
+}
+
+func TestRemovePRLabelsIgnoresMissing(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete && strings.Contains(r.URL.Path, "/labels/") {
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = fmt.Fprint(w, `{"message":"Label does not exist"}`)
+			return
+		}
+		t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+		http.NotFound(w, r)
+	})
+	ghClient := newTestGitHubClient(t, handler)
+	require.NoError(t, ghClient.removePRLabels(releasesLookupOwner, releasesLookupRepo, 7, []string{"backport-9.6"}))
+}
+
 func TestLatestReleaseBeforeUsesReleasesWhenPresent(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {

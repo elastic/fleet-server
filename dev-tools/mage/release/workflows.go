@@ -38,8 +38,11 @@ func backportLabel(releaseBranch string) string {
 	return fmt.Sprintf("backport-%s", releaseBranch)
 }
 
-func prAMainLabels(releaseBranch string) []string {
-	return []string{labelRelease, "impact:critical", backportLabel(releaseBranch), labelSkipChangelog, labelTeamAutomation, mergeLabelFFDay}
+func prAMainLabels() []string {
+	// Do not put backport-{branch} on PR-A: that PR bumps main to the next minor and
+	// also adds the Mergify rule for the same label, so the label would backport the
+	// next-minor bump onto the frozen release branch.
+	return []string{labelRelease, "impact:critical", labelSkipChangelog, labelTeamAutomation, mergeLabelFFDay}
 }
 
 func prBReleaseLabels() []string {
@@ -114,9 +117,8 @@ type workflowPRResult struct {
 func RunMajorMinorRelease(cfg *ReleaseConfig) error {
 	println("=== Starting Major/Minor Release Workflow ===")
 
-	if err := ensureLatestRelease(cfg); err != nil {
-		return err
-	}
+	// Feature freeze does not use LatestRelease. Skipping ensureLatestRelease avoids a
+	// GitHub lookup that fails for the first release of a new major (no prior same-major tag).
 
 	if err := validateReleaseConfig(cfg); err != nil {
 		return err
@@ -212,14 +214,15 @@ func prepMainBackportAndVersion(repo *gitRepo, cfg *ReleaseConfig) (workflowPR, 
 		branch: branch,
 		base:   cfg.BaseBranch,
 		opts: prOptions{
-			Owner:     cfg.ProjectOwner,
-			Repo:      cfg.ProjectRepo,
-			Title:     fmt.Sprintf("[Release][%s] Prepare main for %s and mergify backport-%s", cfg.NextRelease, cfg.NextProjectMinorVersion, cfg.ReleaseBranch),
-			Head:      branch,
-			Base:      cfg.BaseBranch,
-			Body:      prAMainBody(cfg),
-			Reviewers: cfg.ProjectReviewers,
-			Labels:    prAMainLabels(cfg.ReleaseBranch),
+			Owner:        cfg.ProjectOwner,
+			Repo:         cfg.ProjectRepo,
+			Title:        fmt.Sprintf("[Release][%s] Prepare main for %s and mergify backport-%s", cfg.NextRelease, cfg.NextProjectMinorVersion, cfg.ReleaseBranch),
+			Head:         branch,
+			Base:         cfg.BaseBranch,
+			Body:         prAMainBody(cfg),
+			Reviewers:    cfg.ProjectReviewers,
+			Labels:       prAMainLabels(),
+			RemoveLabels: []string{backportLabel(cfg.ReleaseBranch)},
 		},
 	}, nil
 }
@@ -477,8 +480,9 @@ func formatWorkflowPRLine(index int, result workflowPRResult) string {
 }
 
 // finalizePR pushes a branch when it has new commits and creates or reuses an open PR.
-// When the branch has nothing new to push, it still resolves a related open or merged PR
-// so workflow summaries always list every expected slot.
+// When an open PR already exists, local commits are still pushed first so a rerun does
+// not leave the remote tip behind. When the branch has nothing new to push, it still
+// resolves a related open or merged PR so workflow summaries always list every expected slot.
 func finalizePR(repo *gitRepo, gh *gitHubClient, token, branchName, baseBranch string, opts prOptions) (*github.PullRequest, error) {
 	if err := repo.checkoutBranch(branchName); err != nil {
 		return nil, err
@@ -488,32 +492,35 @@ func finalizePR(repo *gitRepo, gh *gitHubClient, token, branchName, baseBranch s
 	if err != nil {
 		return nil, err
 	}
-	if found {
-		if err := gh.ensurePRLabels(opts.Owner, opts.Repo, existingPR.GetNumber(), opts.Labels); err != nil {
-			return nil, err
-		}
-		return existingPR, nil
-	}
 
 	ahead, err := repo.hasCommitsAheadOf(baseBranch)
 	if err != nil {
 		return nil, err
 	}
+	if ahead {
+		if err := repo.push("origin", token); err != nil {
+			return nil, err
+		}
+	}
+
+	if found {
+		if err := gh.applyPRLabels(opts.Owner, opts.Repo, existingPR.GetNumber(), opts.Labels, opts.RemoveLabels); err != nil {
+			return nil, err
+		}
+		return existingPR, nil
+	}
+
 	if !ahead {
 		printf("No new commits on %s compared to %s; skipping push and PR creation\n", branchName, baseBranch)
-		related, found, err := gh.findRelatedPR(opts.Owner, opts.Repo, opts.Head, opts.Base, opts.Title)
+		related, relatedFound, err := gh.findRelatedPR(opts.Owner, opts.Repo, opts.Head, opts.Base, opts.Title)
 		if err != nil {
 			return nil, err
 		}
-		if found {
+		if relatedFound {
 			printf("Related PR #%d (%s): %s\n", related.GetNumber(), prDisplayState(related), related.GetHTMLURL())
 			return related, nil
 		}
 		return nil, nil
-	}
-
-	if err := repo.push("origin", token); err != nil {
-		return nil, err
 	}
 
 	return gh.createPR(opts)
