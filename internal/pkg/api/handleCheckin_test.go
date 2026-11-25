@@ -471,6 +471,7 @@ func TestResolveSeqNo(t *testing.T) {
 }
 
 func TestProcessUpgradeDetails(t *testing.T) {
+	errBoom := errors.New("boom")
 	esd := model.ESDocument{Id: "doc-ID"}
 	doc := bulk.UpdateFields{
 		dl.FieldUpgradeDetails: &UpgradeDetails{
@@ -483,6 +484,108 @@ func TestProcessUpgradeDetails(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal error: %v", err)
 	}
+	retryFuture := time.Now().Add(time.Hour).UTC().Format(time.RFC3339)
+	retryJustPassed := time.Now().Add(-10 * time.Second).UTC().Format(time.RFC3339)
+	retryPast := time.Now().Add(-time.Hour).UTC().Format(time.RFC3339)
+	// expectActionLookup serves the upgrade action from Elasticsearch; it is always read so the result
+	// carries the action's namespaces, which the action cache does not retain.
+	expectActionLookup := func(mBulk *ftesting.MockBulk) {
+		mBulk.On("Search", mock.Anything, dl.FleetActions, mock.Anything, mock.Anything).Return(
+			&es.ResultT{Hits: []es.HitT{{Source: []byte(`{"action_id": "test-action", "namespaces": ["default"]}`)}}}, nil).Once()
+	}
+	// resultMatches matches the JSON of a created action result; the create must not request a refresh.
+	expectResult := func(mBulk *ftesting.MockBulk, wantErr string) {
+		expectActionLookup(mBulk)
+		mBulk.On("Create", mock.Anything, dl.FleetActionsResults, "test-action:doc-ID", mock.MatchedBy(func(p []byte) bool {
+			var r model.ActionResult
+			if err := json.Unmarshal(p, &r); err != nil {
+				return false
+			}
+			return r.ActionID == "test-action" && r.AgentID == "doc-ID" && r.Error == wantErr && slices.Equal(r.Namespaces, []string{"default"})
+		}), mock.MatchedBy(func(opts []bulk.Opt) bool { return len(opts) == 0 })).Return("", nil).Once()
+	}
+	// expectRollbackActionSuccess serves an UPGRADE action that requests a rollback and expects a
+	// result without an error: UPG_ROLLBACK is the successful outcome of such an action.
+	expectRollbackActionSuccess := func(mBulk *ftesting.MockBulk) {
+		mBulk.On("Search", mock.Anything, dl.FleetActions, mock.Anything, mock.Anything).Return(
+			&es.ResultT{Hits: []es.HitT{{Source: []byte(`{"action_id": "test-action", "namespaces": ["default"], "data": {"version": "9.3.0", "rollback": true}}`)}}}, nil).Once()
+		mBulk.On("Create", mock.Anything, dl.FleetActionsResults, "test-action:doc-ID", mock.MatchedBy(func(p []byte) bool {
+			var r model.ActionResult
+			return json.Unmarshal(p, &r) == nil && r.ActionID == "test-action" && r.Error == "" && slices.Equal(r.Namespaces, []string{"default"})
+		}), mock.Anything).Return("", nil).Once()
+	}
+	// updateClearsStartedAt matches an agent update that clears upgrade_started_at.
+	updateClearsStartedAt := mock.MatchedBy(func(p []byte) bool {
+		d := struct {
+			Doc map[string]any `json:"doc"`
+		}{}
+		if err := json.Unmarshal(p, &d); err != nil {
+			return false
+		}
+		v, ok := d.Doc[dl.FieldUpgradeStartedAt]
+		return ok && v == nil
+	})
+	// updateKeepsStartedAt matches an agent update that stores the details without clearing
+	// upgrade_started_at.
+	updateKeepsStartedAt := mock.MatchedBy(func(p []byte) bool {
+		d := struct {
+			Doc map[string]any `json:"doc"`
+		}{}
+		if err := json.Unmarshal(p, &d); err != nil {
+			return false
+		}
+		_, cleared := d.Doc[dl.FieldUpgradeStartedAt]
+		return !cleared && d.Doc[dl.FieldUpgradeDetails] != nil
+	})
+	// Shared setup for the table cases below.
+	bulkOf := func(setup ...func(*ftesting.MockBulk)) func() *ftesting.MockBulk {
+		return func() *ftesting.MockBulk {
+			mBulk := ftesting.NewMockBulk()
+			for _, f := range setup {
+				f(mBulk)
+			}
+			return mBulk
+		}
+	}
+	withResult := func(wantErr string) func(*ftesting.MockBulk) {
+		return func(mBulk *ftesting.MockBulk) { expectResult(mBulk, wantErr) }
+	}
+	withUpdate := func(body any) func(*ftesting.MockBulk) {
+		return func(mBulk *ftesting.MockBulk) {
+			mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", body, mock.Anything).Return(nil)
+		}
+	}
+	withResultError := func(mBulk *ftesting.MockBulk) {
+		expectActionLookup(mBulk)
+		mBulk.On("Create", mock.Anything, dl.FleetActionsResults, "test-action:doc-ID", mock.Anything, mock.Anything).Return("", errBoom).Once()
+	}
+	withRollbackSuccess := expectRollbackActionSuccess
+	actionInCache := func() *testcache.MockCache {
+		mCache := testcache.NewMockCache()
+		mCache.On("GetAction", "test-action").Return(model.Action{}, true)
+		return mCache
+	}
+	emptyCache := func() *testcache.MockCache { return testcache.NewMockCache() }
+	// updateStoresRetrying matches an agent update that stores a retryable download failure as
+	// UPG_DOWNLOADING, with the failure as retry_error_msg, and keeps upgrade_started_at.
+	updateStoresRetrying := mock.MatchedBy(func(p []byte) bool {
+		d := struct {
+			Doc map[string]json.RawMessage `json:"doc"`
+		}{}
+		if err := json.Unmarshal(p, &d); err != nil {
+			return false
+		}
+		if _, cleared := d.Doc[dl.FieldUpgradeStartedAt]; cleared {
+			return false
+		}
+		var ud struct {
+			State    string `json:"state"`
+			Metadata struct {
+				RetryErrorMsg string `json:"retry_error_msg"`
+			} `json:"metadata"`
+		}
+		return json.Unmarshal(d.Doc[dl.FieldUpgradeDetails], &ud) == nil && ud.State == "UPG_DOWNLOADING" && ud.Metadata.RetryErrorMsg == "copy failed"
+	})
 	tests := []struct {
 		name    string
 		agent   *model.Agent
@@ -909,7 +1012,8 @@ func TestProcessUpgradeDetails(t *testing.T) {
 			},
 			bulk: func() *ftesting.MockBulk {
 				mBulk := ftesting.NewMockBulk()
-				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+				expectResult(mBulk, "failed")
+				mBulk.On("Update", mock.Anything, dl.FleetAgents, "doc-ID", updateClearsStartedAt, mock.Anything).Return(nil)
 				return mBulk
 			},
 			cache: func() *testcache.MockCache {
@@ -918,6 +1022,61 @@ func TestProcessUpgradeDetails(t *testing.T) {
 				return mCache
 			},
 			err: nil,
+		}, {
+			name:  "upgrade failed while download retries remain is stored as downloading, without a result",
+			agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
+			details: &UpgradeDetails{
+				ActionId: "test-action",
+				State:    UpgradeDetailsStateUPGFAILED,
+				Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"error_msg":"copy failed","failed_state":"UPG_DOWNLOADING","retry_until":"` + retryFuture + `"}`)},
+			},
+			bulk:  bulkOf(withUpdate(updateStoresRetrying)),
+			cache: actionInCache,
+			err:   nil,
+		}, {
+			name:  "upgrade failed shortly after retry_until is still stored as downloading",
+			agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
+			details: &UpgradeDetails{
+				ActionId: "test-action",
+				State:    UpgradeDetailsStateUPGFAILED,
+				Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"error_msg":"copy failed","failed_state":"UPG_DOWNLOADING","retry_until":"` + retryJustPassed + `"}`)},
+			},
+			bulk:  bulkOf(withUpdate(updateStoresRetrying)),
+			cache: actionInCache,
+			err:   nil,
+		}, {
+			name:  "upgrade failed after retry_until records the final failure",
+			agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
+			details: &UpgradeDetails{
+				ActionId: "test-action",
+				State:    UpgradeDetailsStateUPGFAILED,
+				Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"error_msg":"failed to get upgrade artifact","failed_state":"UPG_DOWNLOADING","retry_until":"` + retryPast + `"}`)},
+			},
+			bulk:  bulkOf(withResult("failed to get upgrade artifact"), withUpdate(updateClearsStartedAt)),
+			cache: actionInCache,
+			err:   nil,
+		}, {
+			name:  "upgrade failed in extraction without retry_until records the failure immediately",
+			agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
+			details: &UpgradeDetails{
+				ActionId: "test-action",
+				State:    UpgradeDetailsStateUPGFAILED,
+				Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"error_msg":"extract failed","failed_state":"UPG_EXTRACTING"}`)},
+			},
+			bulk:  bulkOf(withResult("extract failed"), withUpdate(updateClearsStartedAt)),
+			cache: actionInCache,
+			err:   nil,
+		}, {
+			name:  "upgrade failed after retry_until records the failure over stored download progress",
+			agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}, UpgradeDetails: &model.UpgradeDetails{ActionID: "test-action", State: "UPG_DOWNLOADING"}},
+			details: &UpgradeDetails{
+				ActionId: "test-action",
+				State:    UpgradeDetailsStateUPGFAILED,
+				Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"error_msg":"failed to get upgrade artifact","failed_state":"UPG_DOWNLOADING","retry_until":"` + retryPast + `"}`)},
+			},
+			bulk:  bulkOf(withResult("failed to get upgrade artifact"), withUpdate(updateClearsStartedAt)),
+			cache: actionInCache,
+			err:   nil,
 		}, {
 			name:  "upgrade failed action in cache empty error_msg",
 			agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
@@ -953,6 +1112,165 @@ func TestProcessUpgradeDetails(t *testing.T) {
 				return mCache
 			},
 			err: nil,
+		}, {
+			name:  "upgrade failed already recorded",
+			agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}, UpgradeDetails: &model.UpgradeDetails{ActionID: "test-action", State: "UPG_FAILED"}},
+			details: &UpgradeDetails{
+				ActionId: "test-action",
+				State:    UpgradeDetailsStateUPGFAILED,
+				Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"error_msg":"failed"}`)},
+			},
+			bulk:  bulkOf(withUpdate(updateClearsStartedAt)),
+			cache: actionInCache,
+			err:   nil,
+		}, {
+			name:  "upgrade failed without action_id does not create a result",
+			agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
+			details: &UpgradeDetails{
+				State:    UpgradeDetailsStateUPGFAILED,
+				Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"error_msg":"failed"}`)},
+			},
+			bulk: bulkOf(withUpdate(updateClearsStartedAt)),
+			cache: func() *testcache.MockCache {
+				mCache := testcache.NewMockCache()
+				mCache.On("GetAction", "").Return(model.Action{}, true)
+				return mCache
+			},
+			err: nil,
+		}, {
+			name:  "upgrade failed result create error stores the details, keeps upgrade_started_at and does not fail the check-in",
+			agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
+			details: &UpgradeDetails{
+				ActionId: "test-action",
+				State:    UpgradeDetailsStateUPGFAILED,
+				Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"error_msg":"failed"}`)},
+			},
+			bulk:  bulkOf(withResultError, withUpdate(updateKeepsStartedAt)),
+			cache: actionInCache,
+			err:   nil, // the check-in does not fail, the result is retried later
+		}, {
+			name:  "upgrade rollback result create error stores the rollback over a watched upgrade",
+			agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}, UpgradeStartedAt: "2026-01-01T00:00:00Z", UpgradeDetails: &model.UpgradeDetails{ActionID: "test-action", State: "UPG_WATCHING"}},
+			details: &UpgradeDetails{
+				ActionId: "test-action",
+				State:    UpgradeDetailsStateUPGROLLBACK,
+				Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"reason":"watch failed"}`)},
+			},
+			bulk:  bulkOf(withResultError, withUpdate(updateKeepsStartedAt)),
+			cache: actionInCache,
+			err:   nil, // the check-in does not fail, the result is retried later
+		}, {
+			name:  "upgrade failed re-reported with upgrade_started_at still set creates the missing result",
+			agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}, UpgradeStartedAt: "2026-01-01T00:00:00Z", UpgradeDetails: &model.UpgradeDetails{ActionID: "test-action", State: "UPG_FAILED"}},
+			details: &UpgradeDetails{
+				ActionId: "test-action",
+				State:    UpgradeDetailsStateUPGFAILED,
+				Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"error_msg":"failed"}`)},
+			},
+			bulk:  bulkOf(withResult("failed"), withUpdate(updateClearsStartedAt)),
+			cache: actionInCache,
+			err:   nil,
+		}, {
+			name:  "upgrade rollback with reason",
+			agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
+			details: &UpgradeDetails{
+				ActionId: "test-action",
+				State:    UpgradeDetailsStateUPGROLLBACK,
+				Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"reason":"watch failed"}`)},
+			},
+			bulk:  bulkOf(withResult("upgrade rolled back: watch failed"), withUpdate(updateClearsStartedAt)),
+			cache: actionInCache,
+			err:   nil,
+		}, {
+			name:  "requested rollback is recorded as a success",
+			agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
+			details: &UpgradeDetails{
+				ActionId: "test-action",
+				State:    UpgradeDetailsStateUPGROLLBACK,
+				Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"reason":"manual rollback requested to version 9.3.0"}`)},
+			},
+			bulk:  bulkOf(withRollbackSuccess, withUpdate(updateClearsStartedAt)),
+			cache: actionInCache,
+			err:   nil,
+		}, {
+			name:  "upgrade rollback without reason",
+			agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
+			details: &UpgradeDetails{
+				ActionId: "test-action",
+				State:    UpgradeDetailsStateUPGROLLBACK,
+			},
+			bulk:  bulkOf(withResult("upgrade rolled back"), withUpdate(updateClearsStartedAt)),
+			cache: actionInCache,
+			err:   nil,
+		}, {
+			name:  "upgrade rollback already recorded",
+			agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}, UpgradeDetails: &model.UpgradeDetails{ActionID: "test-action", State: "UPG_ROLLBACK"}},
+			details: &UpgradeDetails{
+				ActionId: "test-action",
+				State:    UpgradeDetailsStateUPGROLLBACK,
+				Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"reason":"watch failed"}`)},
+			},
+			bulk:  bulkOf(withUpdate(updateClearsStartedAt)),
+			cache: actionInCache,
+			err:   nil,
+		}, {
+			name:    "checkin details nil after a canceled scheduled upgrade records no result",
+			agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}, UpgradeStartedAt: "2026-01-01T00:00:00Z", UpgradeDetails: &model.UpgradeDetails{ActionID: "test-action", State: "UPG_SCHEDULED"}},
+			details: nil,
+			bulk:    bulkOf(withUpdate(mock.Anything)),
+			cache:   emptyCache,
+			err:     nil,
+		}, {
+			name:    "checkin details nil does not repeat a settled stored failure",
+			agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}, UpgradeDetails: &model.UpgradeDetails{ActionID: "test-action", State: "UPG_FAILED"}},
+			details: nil,
+			bulk:    bulkOf(withUpdate(mock.Anything)),
+			cache:   emptyCache,
+			err:     nil,
+		}, {
+			name:    "checkin details nil records a failure whose result could not be created",
+			agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}, UpgradeStartedAt: "2026-01-01T00:00:00Z", UpgradeDetails: &model.UpgradeDetails{ActionID: "test-action", State: "UPG_FAILED"}},
+			details: nil,
+			bulk:    bulkOf(withResult("upgrade failed"), withUpdate(mock.Anything)),
+			cache:   emptyCache,
+			err:     nil,
+		}, {
+			name:    "checkin details nil records a rollback whose result could not be created",
+			agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}, UpgradeStartedAt: "2026-01-01T00:00:00Z", UpgradeDetails: &model.UpgradeDetails{ActionID: "test-action", State: "UPG_ROLLBACK"}},
+			details: nil,
+			ver:     "9.3.0",
+			bulk:    bulkOf(withResult("upgrade rolled back"), withUpdate(mock.Anything)),
+			cache:   emptyCache,
+			err:     nil,
+		}, {
+			name:    "checkin details nil records a requested rollback whose result could not be created as a success",
+			agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}, UpgradeStartedAt: "2026-01-01T00:00:00Z", UpgradeDetails: &model.UpgradeDetails{ActionID: "test-action", State: "UPG_ROLLBACK"}},
+			details: nil,
+			ver:     "9.3.0",
+			bulk:    bulkOf(withRollbackSuccess, withUpdate(mock.Anything)),
+			cache:   emptyCache,
+			err:     nil,
+		}, {
+			name:    "checkin details nil result create error keeps the stored details and does not fail the check-in",
+			agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}, UpgradeStartedAt: "2026-01-01T00:00:00Z", UpgradeDetails: &model.UpgradeDetails{ActionID: "test-action", State: "UPG_WATCHING"}},
+			details: nil,
+			bulk:    bulkOf(withResultError), // no update: the details are cleared once the result exists
+			cache:   emptyCache,
+			err:     nil,
+		}, {
+			name:    "checkin details nil completes a stored upgrade, success result created",
+			agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}, UpgradeDetails: &model.UpgradeDetails{ActionID: "test-action", State: "UPG_WATCHING"}},
+			details: nil,
+			bulk:    bulkOf(withResult(""), withUpdate(mock.Anything)),
+			cache:   emptyCache,
+			err:     nil,
+		}, {
+			name:    "checkin details nil after rollback does not create a success result",
+			agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}, UpgradeDetails: &model.UpgradeDetails{ActionID: "test-action", State: "UPG_ROLLBACK"}},
+			details: nil,
+			bulk:    bulkOf(withUpdate(mock.Anything)),
+			cache:   emptyCache,
+			err:     nil,
 		}}
 
 	for _, tc := range tests {

@@ -742,6 +742,10 @@ func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agen
 
 	// validate metadata with state
 	vSpan, _ = apm.StartSpan(ctx, "validateUpgradeMetadata", "validate")
+	var (
+		terminal bool           // the upgrade ended in a failure (UPG_FAILED) or was rolled back (UPG_ROLLBACK)
+		outcome  upgradeOutcome // how it ended, recorded on the action result when terminal
+	)
 	switch details.State {
 	case UpgradeDetailsStateUPGDOWNLOADING:
 		if details.Metadata == nil {
@@ -771,11 +775,33 @@ func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agen
 			vSpan.End()
 			return fmt.Errorf("%w: %s metadata contains empty error_msg attribute", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGFAILED)
 		}
+		// A download failure that can still be retried is not an outcome yet: the agent is retrying
+		// the download. Store it as such, so the stored upgrade shows as progressed, and let a later
+		// check-in record the final failure.
+		if !upgradeFailureIsFinal(details.Metadata, time.Now()) {
+			retrying, err := details.Metadata.AsUpgradeMetadataDownloading()
+			if err == nil {
+				retrying.RetryErrorMsg = &meta.ErrorMsg
+				err = details.Metadata.FromUpgradeMetadataDownloading(retrying)
+			}
+			if err != nil {
+				vSpan.End()
+				return fmt.Errorf("%w %s: unable to repack metadata: %w", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGFAILED, err)
+			}
+			details.State = UpgradeDetailsStateUPGDOWNLOADING
+			break
+		}
 		// Repack metadata in failed case as the agent may send UPG_DOWNLOADING attributes.
 		if err = details.Metadata.FromUpgradeMetadataFailed(meta); err != nil {
 			vSpan.End()
 			return fmt.Errorf("%w %s: unable to repack metadata: %w", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGFAILED, err)
 		}
+		terminal = true
+		outcome = upgradeOutcome{errMsg: meta.ErrorMsg}
+	case UpgradeDetailsStateUPGROLLBACK:
+		// UPG_ROLLBACK carries no error_msg; the reason is in the metadata (e.g. "watch failed").
+		terminal = true
+		outcome = upgradeOutcome{errMsg: rollbackError(details.Metadata), rollback: true}
 	case UpgradeDetailsStateUPGSCHEDULED:
 		if details.Metadata == nil {
 			vSpan.End()
@@ -798,6 +824,20 @@ func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agen
 	doc := bulk.UpdateFields{
 		dl.FieldUpgradeDetails: details,
 	}
+	var resultErr error
+	if terminal {
+		// upgrade_started_at is cleared only once the result exists, so a stored terminal state
+		// whose upgrade_started_at is still set has no result yet. The agent keeps reporting the
+		// terminal state on later check-ins, which must not create the result again once settled.
+		settled := agent.UpgradeDetails != nil && agent.UpgradeDetails.ActionID == details.ActionId &&
+			agent.UpgradeDetails.State == string(details.State) && agent.UpgradeStartedAt == ""
+		if details.ActionId != "" && !settled {
+			resultErr = ct.createUpgradeResult(ctx, agent, details.ActionId, outcome)
+		}
+		if resultErr == nil {
+			doc[dl.FieldUpgradeStartedAt] = nil
+		}
+	}
 	if agent.UpgradeAttempts != nil && details.State == UpgradeDetailsStateUPGWATCHING {
 		doc[dl.FieldUpgradeAttempts] = nil
 	}
@@ -805,6 +845,14 @@ func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agen
 	body, err := doc.Marshal()
 	if err != nil {
 		return err
+	}
+	// The terminal details are stored even if the result could not be created, so that a later
+	// check-in without upgrade_details cannot mistake the upgrade for a successful one. A failed
+	// result does not fail the check-in (the agent must still report its health and receive
+	// actions): it is logged, and retried by the next check-in that reports the terminal state or
+	// omits upgrade_details, as upgrade_started_at is still set.
+	if resultErr != nil {
+		zerolog.Ctx(ctx).Error().Err(resultErr).Str(ecs.ActionID, details.ActionId).Str(ecs.AgentID, agent.Agent.ID).Msg("unable to record the upgrade result, retrying on a later check-in")
 	}
 	return ct.bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3))
 }
@@ -849,6 +897,18 @@ func (ct *CheckinT) markUpgradeComplete(ctx context.Context, agent *model.Agent,
 	span, ctx := apm.StartSpan(ctx, "Mark update complete", "update")
 	span.Context.SetLabel("agent_id", agent.Agent.ID)
 	defer span.End()
+	// A stored upgrade_details.action_id means the ack was (or will be) a no-op, so the result is
+	// recorded here once the outcome of the stored upgrade is known.
+	if ud := agent.UpgradeDetails; ud != nil && ud.ActionID != "" {
+		if outcome, ok := noDetailsOutcome(agent, ver); ok {
+			if err := ct.createUpgradeResult(ctx, agent, ud.ActionID, outcome); err != nil {
+				// Do not fail the check-in (the agent must still report its health and receive
+				// actions), and keep the stored upgrade_details so the next check-in tries again.
+				zerolog.Ctx(ctx).Error().Err(err).Str(ecs.ActionID, ud.ActionID).Str(ecs.AgentID, agent.Agent.ID).Msg("unable to record the upgrade result, retrying on a later check-in")
+				return nil
+			}
+		}
+	}
 	// Checkin had no upgrade_details but agent either had stored details (normal upgrade path) or
 	// changed version without intermediate details (fast upgrade race). Treat as successful upgrade.
 	doc := bulk.UpdateFields{

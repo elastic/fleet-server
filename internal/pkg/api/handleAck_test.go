@@ -21,6 +21,7 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/cache"
 	"github.com/elastic/fleet-server/v7/internal/pkg/config"
+	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
 	"github.com/elastic/fleet-server/v7/internal/pkg/policy"
@@ -29,6 +30,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func BenchmarkMakeUpdatePolicyBody(b *testing.B) {
@@ -1206,6 +1208,59 @@ func TestAckHandleUpgrade(t *testing.T) {
 
 			err := ack.handleUpgrade(ctx, logger, tc.agent, tc.event)
 			assert.NoError(t, err)
+			bulker.AssertExpectations(t)
+		})
+	}
+}
+
+func TestAckHandleActionResultUpgrade(t *testing.T) {
+	const (
+		actionID = "2b12dcd8-bde0-4045-92dc-c4b27668d733"
+		agentID  = "ab12dcd8-bde0-4045-92dc-c4b27668d735"
+	)
+	action := model.Action{Id: "doc", ActionID: actionID, Type: TypeUpgrade}
+	noRefresh := mock.MatchedBy(func(opts []bulk.Opt) bool { return len(opts) == 0 })
+
+	tests := []struct {
+		name       string
+		stored     *model.UpgradeDetails // the agent's stored upgrade_details
+		ackError   string
+		wantResult bool // the ack creates the result and updates the agent; otherwise it writes nothing
+	}{
+		{name: "stored upgrade_details match, no writes", stored: &model.UpgradeDetails{ActionID: actionID, State: "UPG_WATCHING"}},
+		{name: "stored upgrade_details never progressed (scheduled)", stored: &model.UpgradeDetails{ActionID: actionID, State: "UPG_SCHEDULED"}, wantResult: true},
+		{name: "stored upgrade_details never progressed (requested)", stored: &model.UpgradeDetails{ActionID: actionID, State: "UPG_REQUESTED"}, wantResult: true},
+		{name: "no stored upgrade_details", wantResult: true},
+		{name: "stored upgrade_details for another action", stored: &model.UpgradeDetails{ActionID: "other-action", State: "UPG_WATCHING"}, wantResult: true},
+		{name: "stored upgrade_details match but the ack carries an error", stored: &model.UpgradeDetails{ActionID: actionID, State: "UPG_WATCHING"}, ackError: "upgrade failed", wantResult: true},
+	}
+
+	cfg := &config.Server{Limits: config.ServerLimits{}}
+	c, err := cache.New(config.Cache{NumCounters: 100, MaxCost: 100000})
+	require.NoError(t, err)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			agent := &model.Agent{Id: agentID, Agent: &model.AgentMetadata{ID: "agent", Version: "8.0.0"}, UpgradeDetails: tc.stored}
+			event := map[string]any{"action_id": actionID, "agent_id": "agent"}
+			if tc.ackError != "" {
+				event["error"] = tc.ackError
+			}
+			rawEvent, err := json.Marshal(event)
+			require.NoError(t, err)
+
+			bulker := ftesting.NewMockBulk() // without expectations, any call fails the test
+			if tc.wantResult {
+				resultMatches := mock.MatchedBy(func(p []byte) bool {
+					var r model.ActionResult
+					return json.Unmarshal(p, &r) == nil && r.Error == tc.ackError
+				})
+				bulker.On("Create", mock.Anything, dl.FleetActionsResults, actionID+":"+agentID, resultMatches, noRefresh).Return("", nil).Once()
+				bulker.On("Update", mock.Anything, dl.FleetAgents, agentID, mock.Anything, mock.Anything).Return(nil).Once()
+			}
+
+			ack := NewAckT(cfg, bulker, c)
+			err = ack.handleActionResult(context.Background(), testlog.SetLogger(t), agent, action, AckRequest_Events_Item{rawEvent})
+			require.NoError(t, err)
 			bulker.AssertExpectations(t)
 		})
 	}

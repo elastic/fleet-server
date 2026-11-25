@@ -786,7 +786,17 @@
         },
         "upgrade_details": {
           "description": "Additional upgrade status details.",
-          "type": "object"
+          "type": "object",
+          "properties": {
+            "action_id": {
+              "description": "Upgrade action id reported by the agent",
+              "type": "string"
+            },
+            "state": {
+              "description": "Upgrade state reported by the agent",
+              "type": "string"
+            }
+          }
         },
         "upgrade_attempts": {
           "description": "List of timestamps of attempts of Elastic Agent automatic upgrades",

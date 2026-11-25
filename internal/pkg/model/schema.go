@@ -643,4 +643,10 @@ type Upgrade struct {
 
 // UpgradeDetails Additional upgrade status details.
 type UpgradeDetails struct {
+
+	// Upgrade action id reported by the agent
+	ActionID string `json:"action_id,omitempty"`
+
+	// Upgrade state reported by the agent
+	State string `json:"state,omitempty"`
 }

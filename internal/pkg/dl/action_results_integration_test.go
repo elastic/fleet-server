@@ -68,7 +68,7 @@ func storeRandomActionResults(ctx context.Context, bulker bulk.Bulk, index strin
 	}
 
 	for _, result := range results {
-		err = createActionResult(ctx, bulker, index, result)
+		err = createActionResult(ctx, bulker, index, result, bulk.WithRefresh())
 		if err != nil {
 			return nil, err
 		}
