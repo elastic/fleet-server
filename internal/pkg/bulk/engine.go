@@ -650,6 +650,7 @@ func failQueue(queue queueT, err error) {
 		select {
 		case n.ch <- respT{
 			err: err,
+			idx: n.idx,
 		}:
 		default:
 			panic("Unexpected blocked response channel on failQueue")

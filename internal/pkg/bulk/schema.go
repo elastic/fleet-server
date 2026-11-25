@@ -111,6 +111,9 @@ type MsearchResponseItem struct {
 	Aggregations map[string]es.Aggregation `json:"aggregations,omitempty"`
 
 	Error json.RawMessage `json:"error,omitempty"`
+
+	// RequestError is set when the HTTP request fails.
+	RequestError error `json:"-"`
 }
 
 //easyjson:json
