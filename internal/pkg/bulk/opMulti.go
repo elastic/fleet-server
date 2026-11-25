@@ -7,6 +7,7 @@ package bulk
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
 )
 
@@ -77,7 +78,7 @@ func (b *Bulker) multiWaitBulkOp(ctx context.Context, action actionT, ops []Mult
 
 		bulk := &bulks[i]
 		bulk.ch = ch
-		bulk.idx = int32(i) //nolint:gosec // disable G115
+		bulk.idx = int32(i)
 		bulk.action = action
 		bulk.buf.Set(bodySlice)
 		bulk.flushAfter = opt.FlushAfter
@@ -102,7 +103,11 @@ func (b *Bulker) multiWaitBulkOp(ctx context.Context, action actionT, ops []Mult
 				lastErr = r.err
 			}
 			if r.data != nil {
-				items[r.idx] = *r.data.(*BulkIndexerResponseItem)
+				item, ok := r.data.(*BulkIndexerResponseItem)
+				if !ok {
+					return nil, fmt.Errorf("unexpected bulk response type %T", r.data)
+				}
+				items[r.idx] = *item
 			}
 		case <-ctx.Done():
 			return nil, ctx.Err()
