@@ -809,10 +809,6 @@ func TestCreateFleetAgentSyncWrite(t *testing.T) {
 			wantErr: true,
 		},
 	}
-<<<<<<< HEAD
-	cli, err := elasticsearch.NewClient(elasticsearch.Config{Transport: mt})
-	require.NoError(t, err)
-=======
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mt := &MockTransport{}
@@ -820,11 +816,8 @@ func TestCreateFleetAgentSyncWrite(t *testing.T) {
 				assertSyncEnrollParams(t, req)
 				return syncEnrollResponse(tt.status), nil
 			}
-			cli, err := elasticsearch.New(
-				elasticsearch.WithTransportOptions(elastictransport.WithTransport(mt)),
-			)
+			cli, err := elasticsearch.NewClient(elasticsearch.Config{Transport: mt}) //nolint:staticcheck // uses deprecated NewClient because migration requires elastictransport dependency change
 			require.NoError(t, err)
->>>>>>> 39eeea5 (Load only the needed policies in Fleet Server health checks and enrollments (#8224))
 
 			bulker := ftesting.NewMockBulk()
 			bulker.On("Client").Return(cli)
@@ -837,17 +830,6 @@ func TestCreateFleetAgentSyncWrite(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
-<<<<<<< HEAD
-	cli, err := elasticsearch.NewClient(elasticsearch.Config{Transport: mt})
-	require.NoError(t, err)
-
-	bulker := ftesting.NewMockBulk()
-	bulker.On("Client").Return(cli)
-
-	err = createFleetAgent(t.Context(), bulker, "test-agent-id", model.Agent{}, true)
-	require.Error(t, err)
-=======
->>>>>>> 39eeea5 (Load only the needed policies in Fleet Server health checks and enrollments (#8224))
 }
 
 // recordSyncEnrollBody reads the request body and appends it to bodies so tests can
