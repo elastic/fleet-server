@@ -12,25 +12,23 @@ import (
 	"go.elastic.co/apm/v2"
 )
 
-// TODO: Are multi requests used by anything? a quick grep shows no hits outside the bulk package.
-
 func (b *Bulker) MCreate(ctx context.Context, ops []MultiOp, opts ...Opt) ([]BulkIndexerResponseItem, error) {
-	return b.multiWaitBulkOp(ctx, ActionCreate, ops)
+	return b.multiWaitBulkOp(ctx, ActionCreate, ops, opts...)
 }
 
 func (b *Bulker) MIndex(ctx context.Context, ops []MultiOp, opts ...Opt) ([]BulkIndexerResponseItem, error) {
-	return b.multiWaitBulkOp(ctx, ActionIndex, ops)
+	return b.multiWaitBulkOp(ctx, ActionIndex, ops, opts...)
 }
 
 func (b *Bulker) MUpdate(ctx context.Context, ops []MultiOp, opts ...Opt) ([]BulkIndexerResponseItem, error) {
-	return b.multiWaitBulkOp(ctx, ActionUpdate, ops)
+	return b.multiWaitBulkOp(ctx, ActionUpdate, ops, opts...)
 }
 
 func (b *Bulker) MDelete(ctx context.Context, ops []MultiOp, opts ...Opt) ([]BulkIndexerResponseItem, error) {
-	return b.multiWaitBulkOp(ctx, ActionDelete, ops)
+	return b.multiWaitBulkOp(ctx, ActionDelete, ops, opts...)
 }
 
-func (b *Bulker) multiWaitBulkOp(ctx context.Context, action actionT, ops []MultiOp, opts ...Opt) ([]BulkIndexerResponseItem, error) { //nolint:unparam // better to keep consistency with other methods
+func (b *Bulker) multiWaitBulkOp(ctx context.Context, action actionT, ops []MultiOp, opts ...Opt) ([]BulkIndexerResponseItem, error) {
 	if len(ops) == 0 {
 		return nil, nil
 	}
@@ -96,6 +94,7 @@ func (b *Bulker) multiWaitBulkOp(ctx context.Context, action actionT, ops []Mult
 		bulk.buf.Set(bodySlice)
 		bulk.spanLink = spanLink
 		bulk.hasSpanLink = hasSpanLink
+		bulk.flushAfter = opt.FlushAfter
 		if opt.Refresh {
 			bulk.flags.Set(flagRefresh)
 		}
