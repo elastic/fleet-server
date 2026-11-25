@@ -5,6 +5,7 @@
 package dl
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -39,8 +40,92 @@ func addLatestRevisionAggs(root *dsl.Node) {
 func prepareQueryLatestPolicies() []byte {
 	root := dsl.NewRoot()
 	root.Size(0)
+<<<<<<< HEAD
 	addLatestRevisionAggs(root)
 	return root.MustMarshalJSON()
+=======
+	root.Query().Bool().Filter().Term(FieldDefaultFleetServer, true, nil)
+	root.Aggs().Agg(FieldPolicyID).Terms("field", FieldPolicyID, nil).Size(10000)
+	tmpl.MustResolve(root)
+	return tmpl
+}
+
+func prepareQueryLatestDefaultFlags() *dsl.Tmpl {
+	tmpl := dsl.NewTmpl()
+	root := dsl.NewRoot()
+	root.Size(0)
+	root.Query().Bool().Filter().Terms(FieldPolicyID, tmpl.Bind(FieldPolicyID), nil)
+	addLatestRevisionAggs(root, FieldPolicyID, FieldRevisionIdx, FieldDefaultFleetServer)
+	tmpl.MustResolve(root)
+	return tmpl
+}
+
+// QueryLatestPoliciesByID gets the latest revision of each of the given policies.
+func QueryLatestPoliciesByID(ctx context.Context, bulker bulk.Bulk, policyIDs []string, opt ...Option) ([]model.Policy, error) {
+	if len(policyIDs) == 0 {
+		return nil, nil
+	}
+	o := newOption(FleetPolicies, opt...)
+	ops := make([]bulk.MultiOp, len(policyIDs))
+	for i, policyID := range policyIDs {
+		query, err := tmplQueryLatestPolicy.RenderOne(FieldPolicyID, policyID)
+		if err != nil {
+			return nil, err
+		}
+		ops[i] = bulk.MultiOp{
+			Index: o.indexName,
+			Body:  query,
+		}
+	}
+	items, searchErr := bulker.MSearch(ctx, ops, append(o.bulkOpts, bulk.WithIgnoreUnavailble())...)
+	if len(items) == 0 {
+		if errors.Is(searchErr, es.ErrIndexNotFound) {
+			zerolog.Ctx(ctx).Debug().Str("index", o.indexName).Msg(es.ErrIndexNotFound.Error())
+			return nil, nil
+		}
+		return nil, searchErr
+	}
+	policies := make([]model.Policy, 0, len(items))
+	sharer := NewStringSharer()
+	var errs []error
+	var failed int
+	var missingIndex bool
+	for i, policyID := range policyIDs {
+		item := items[i]
+		var err error
+		switch item.Status {
+		case http.StatusOK:
+			var found []model.Policy
+			if found, err = appendLatestPolicies(policies, item.Aggregations, sharer); err != nil {
+				err = fmt.Errorf("policy %s: %w: %w", policyID, ErrInvalidPolicy, err)
+			} else {
+				policies = found
+			}
+		case 0:
+			// The request of this search failed.
+			err = cmp.Or(item.RequestError, searchErr)
+		default:
+			err = es.TranslateError(item.Status, item.Error)
+		}
+		if errors.Is(err, es.ErrIndexNotFound) {
+			missingIndex = true
+			err = nil
+		}
+		if err != nil {
+			failed++
+			if !slices.ContainsFunc(errs, func(existing error) bool { return errors.Is(existing, err) }) {
+				errs = append(errs, err)
+			}
+		}
+	}
+	if missingIndex {
+		zerolog.Ctx(ctx).Debug().Str("index", o.indexName).Msg(es.ErrIndexNotFound.Error())
+	}
+	if failed > 0 {
+		return policies, fmt.Errorf("search failed for %d of %d policies: %w", failed, len(policyIDs), errors.Join(errs...))
+	}
+	return policies, nil
+>>>>>>> 02598fa (Fix error handling in batched policy searches (#8362))
 }
 
 // prepareQueryLatestPolicy prepares the same query as prepareQueryLatestPolicies, restricted to

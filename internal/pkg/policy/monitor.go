@@ -422,12 +422,23 @@ func (m *monitorT) fetchAndProcess(ctx context.Context, policyID string) error {
 	if policyID != "" {
 		opts = append(opts, dl.WithPolicyID(policyID))
 	}
+<<<<<<< HEAD
 	policies, err := m.policyF(ctx, m.bulker, opts...)
 	if err != nil {
 		if errors.Is(err, es.ErrIndexNotFound) {
 			m.log.Debug().
 				Str("index", m.policiesIndex).
 				Msg(es.ErrIndexNotFound.Error())
+=======
+	// Send the searches as soon as searchesBatch are queued because no more can be queued
+	// until they return.
+	policies, err := m.policiesF(ctx, m.bulker, policyIDs, dl.WithIndexName(m.policiesIndex),
+		dl.WithBulkOpts(bulk.WithFlushAfter(m.searchesBatch)))
+	m.searches.Release(n)
+	if len(policies) == 0 {
+		if err == nil {
+			m.log.Debug().Msg("no policy to monitor")
+>>>>>>> 02598fa (Fix error handling in batched policy searches (#8362))
 			return nil
 		}
 		return err
