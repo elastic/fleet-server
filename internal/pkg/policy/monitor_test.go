@@ -620,14 +620,98 @@ func TestUpdatePolicy_AppliesOnlyNewerRevisions(t *testing.T) {
 	}
 }
 
-// failingSecretsBulk wraps MockBulk and makes ReadSecrets return an error,
-// letting tests verify that secret resolution is never attempted for stale revisions.
-type failingSecretsBulk struct {
+type readSecretsBulk struct {
 	ftesting.MockBulk
+	readSecrets func() error
 }
 
-func (b *failingSecretsBulk) ReadSecrets(_ context.Context, _ []string) (map[string]string, error) {
-	return nil, fmt.Errorf("ReadSecrets must not be called for stale revisions")
+func (b *readSecretsBulk) ReadSecrets(_ context.Context, _ []string) (map[string]string, error) {
+	err := b.readSecrets()
+	return nil, err
+}
+
+func TestMonitor_StaleRevisionParseErrorIsIgnored(t *testing.T) {
+	older := newTestPolicy(1)
+	older.Data.SecretReferences = []model.SecretReferencesItems{{ID: "old-secret"}}
+	newer := older
+	newer.RevisionIdx = 2
+	newer.Data = policyDataDefault
+
+	var pm *monitorT
+	secretErr := errors.New("secret not found")
+	bulker := &readSecretsBulk{
+		readSecrets: func() error {
+			// A newer revision arrives while secret resolution is in flight.
+			pm.updatePolicy(t.Context(), &ParsedPolicy{Policy: newer})
+			return secretErr
+		},
+	}
+	pm = &monitorT{
+		bulker:   bulker,
+		policies: map[string]policyT{},
+		pendingQ: makeHead(),
+	}
+
+	err := pm.processPolicies(t.Context(), []model.Policy{older})
+	require.NoError(t, err, "parse error for a stale policy revision must be ignored")
+	assert.Equal(t, newer.RevisionIdx, pm.policies[older.PolicyID].pp.Policy.RevisionIdx, "cached revision must remain at the newer revision")
+}
+
+func TestMonitor_CurrentRevisionParseErrorIsReturned(t *testing.T) {
+	errSecretNotFound := errors.New("secret not found")
+	bulker := &readSecretsBulk{
+		readSecrets: func() error {
+			return errSecretNotFound
+		},
+	}
+
+	tests := []struct {
+		name             string
+		cachedRevision   int64
+		incomingRevision int64
+		wantRevision     int64
+	}{
+		{
+			name:             "parse error is returned for an uncached policy",
+			cachedRevision:   0,
+			incomingRevision: 1,
+		},
+		{
+			name:             "parse error is returned for a newer revision of a cached policy",
+			cachedRevision:   1,
+			incomingRevision: 2,
+			wantRevision:     1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			incoming := newTestPolicy(tt.incomingRevision)
+			incoming.Data.SecretReferences = []model.SecretReferencesItems{{ID: "secret-id"}}
+
+			policies := map[string]policyT{}
+			if tt.cachedRevision > 0 {
+				cached := incoming
+				cached.RevisionIdx = tt.cachedRevision
+				cached.Data = policyDataDefault
+				policies[incoming.PolicyID] = policyT{
+					pp:   ParsedPolicy{Policy: cached},
+					head: makeHead(),
+				}
+			}
+
+			pm := &monitorT{
+				bulker:   bulker,
+				policies: policies,
+				pendingQ: makeHead(),
+			}
+
+			err := pm.processPolicies(t.Context(), []model.Policy{incoming})
+			require.ErrorIs(t, err, errSecretNotFound, "parse error for a current policy revision must be returned")
+			gotRevision := pm.policies[incoming.PolicyID].pp.Policy.RevisionIdx
+			assert.Equal(t, tt.wantRevision, gotRevision, "cached revision must remain unchanged")
+		})
+	}
 }
 
 type blockingSecretsBulk struct {
@@ -751,7 +835,12 @@ func TestMonitor_StaleRevisionSkipsSecretResolution(t *testing.T) {
 		},
 	}
 
-	bulker := &failingSecretsBulk{}
+	bulker := &readSecretsBulk{
+		readSecrets: func() error {
+			assert.Fail(t, "ReadSecrets must not be called for stale revisions")
+			return nil
+		},
+	}
 	pm := &monitorT{
 		log:    zerolog.Ctx(ctx).With().Logger(),
 		bulker: bulker,
