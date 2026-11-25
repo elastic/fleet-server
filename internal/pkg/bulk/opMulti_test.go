@@ -6,11 +6,13 @@ package bulk
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -21,7 +23,33 @@ import (
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 )
 
-const payload = `{"_id" : "1", "_index" : "test"}`
+const (
+	payload   = `{"_id" : "1", "_index" : "test"}`
+	testIndex = "testidx"
+)
+
+type performFunc func(*http.Request) (*http.Response, error)
+
+func (f performFunc) Perform(req *http.Request) (*http.Response, error) {
+	resp, err := f(req)
+	return resp, err
+}
+
+func runBulker(t *testing.T, bulker *Bulker) context.Context {
+	t.Helper()
+	ctx, cancel := context.WithCancel(t.Context())
+	var wg sync.WaitGroup
+	wg.Go(func() {
+		if err := bulker.Run(ctx); !errors.Is(err, context.Canceled) {
+			t.Error(err)
+		}
+	})
+	t.Cleanup(func() {
+		cancel()
+		wg.Wait()
+	})
+	return ctx
+}
 
 func TestMultiWriteOptionsReachElasticsearch(t *testing.T) {
 	tests := []struct {
@@ -41,7 +69,7 @@ func TestMultiWriteOptionsReachElasticsearch(t *testing.T) {
 			name:        "a multi-create forwards refresh",
 			method:      (*Bulker).MCreate,
 			body:        []byte(`{}`),
-			opts:        []Opt{WithRefresh(), WithFlushAfter(1)},
+			opts:        []Opt{WithRefresh()},
 			want:        `{"create":{"_id":"1","_index":"testidx"}}`,
 			wantRefresh: true,
 		},
@@ -49,7 +77,7 @@ func TestMultiWriteOptionsReachElasticsearch(t *testing.T) {
 			name:        "a multi-index forwards refresh",
 			method:      (*Bulker).MIndex,
 			body:        []byte(`{}`),
-			opts:        []Opt{WithRefresh(), WithFlushAfter(1)},
+			opts:        []Opt{WithRefresh()},
 			want:        `{"index":{"_id":"1","_index":"testidx"}}`,
 			wantRefresh: true,
 		},
@@ -57,14 +85,14 @@ func TestMultiWriteOptionsReachElasticsearch(t *testing.T) {
 			name:        "a multi-update forwards refresh and conflict retries",
 			method:      (*Bulker).MUpdate,
 			body:        []byte(`{"doc":{}}`),
-			opts:        []Opt{WithRefresh(), WithFlushAfter(1), WithRetryOnConflict(3)},
+			opts:        []Opt{WithRefresh(), WithRetryOnConflict(3)},
 			want:        `{"update":{"_id":"1","retry_on_conflict":3,"_index":"testidx"}}`,
 			wantRefresh: true,
 		},
 		{
 			name:        "a multi-delete forwards refresh",
 			method:      (*Bulker).MDelete,
-			opts:        []Opt{WithRefresh(), WithFlushAfter(1)},
+			opts:        []Opt{WithRefresh()},
 			want:        `{"delete":{"_id":"1","_index":"testidx"}}`,
 			wantRefresh: true,
 		},
@@ -72,10 +100,6 @@ func TestMultiWriteOptionsReachElasticsearch(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ops := []MultiOp{{Index: testIndex, ID: "1", Body: tt.body}}
-			var bulkerOpts []BulkOpt
-			if len(tt.opts) > 0 {
-				bulkerOpts = []BulkOpt{WithFlushInterval(time.Hour)}
-			}
 			wantQuery := url.Values{}
 			if tt.wantRefresh {
 				wantQuery.Set("refresh", "true")
@@ -98,7 +122,7 @@ func TestMultiWriteOptionsReachElasticsearch(t *testing.T) {
 			})
 
 			synctest.Test(t, func(t *testing.T) {
-				bulker := NewBulker(recordBulkRequest, nil, bulkerOpts...)
+				bulker := NewBulker(recordBulkRequest, nil)
 				ctx, cancel := context.WithTimeout(runBulker(t, bulker), time.Minute)
 				defer cancel()
 

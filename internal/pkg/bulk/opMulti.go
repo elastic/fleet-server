@@ -80,12 +80,6 @@ func (b *Bulker) multiWaitBulkOp(ctx context.Context, action actionT, ops []Mult
 		bulk.idx = int32(i) //nolint:gosec // disable G115
 		bulk.action = action
 		bulk.buf.Set(bodySlice)
-<<<<<<< HEAD
-=======
-		bulk.spanLink = spanLink
-		bulk.hasSpanLink = hasSpanLink
-		bulk.flushAfter = opt.FlushAfter
->>>>>>> e1e4620 (Fix ignored options on Fleet Server bulk writes (#8297))
 		if opt.Refresh {
 			bulk.flags.Set(flagRefresh)
 		}
