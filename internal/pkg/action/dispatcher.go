@@ -7,6 +7,7 @@ package action
 
 import (
 	"context"
+	"slices"
 	"sync"
 	"time"
 
@@ -32,6 +33,12 @@ type Sub struct {
 // Ch returns the emitter channel for actions.
 func (s Sub) Ch() chan []model.Action {
 	return s.ch
+}
+
+// hasAction reports whether the agent already has the action with seqNo, as given by the
+// sequence number of its check-in.
+func (s Sub) hasAction(seqNo int64) bool {
+	return seqNo <= s.seqNo.Value()
 }
 
 // Dispatcher tracks agent subscriptions and emits actions to the subscriptions.
@@ -162,6 +169,13 @@ func (d *Dispatcher) dispatch(ctx context.Context, agentID string, acdocs []mode
 	sub, ok := d.getSub(agentID)
 	if !ok {
 		zerolog.Ctx(ctx).Debug().Str(ecs.AgentID, agentID).Msg("Agent is not currently connected. Not dispatching actions.")
+		return
+	}
+	// Skip the actions that the agent already has.
+	acdocs = slices.DeleteFunc(acdocs, func(action model.Action) bool {
+		return sub.hasAction(action.SeqNo)
+	})
+	if len(acdocs) == 0 {
 		return
 	}
 	select {

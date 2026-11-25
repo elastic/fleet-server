@@ -83,6 +83,7 @@ func Test_Dispatcher_Run(t *testing.T) {
 	tests := []struct {
 		name     string
 		throttle time.Duration
+		seqNo    sqn.SeqNo
 		getMock  func() *mockMonitor
 		expect   map[string][]model.Action
 	}{{
@@ -273,6 +274,47 @@ func Test_Dispatcher_Run(t *testing.T) {
 				Type:                   "upgrade",
 			}},
 		},
+	}, {
+		name:  "actions after the sequence number of the check-in",
+		seqNo: sqn.SeqNo{10},
+		getMock: func() *mockMonitor {
+			m := &mockMonitor{}
+			ch := make(chan []es.HitT)
+			go func() {
+				ch <- []es.HitT{{
+					SeqNo: 5,
+					Source: json.RawMessage(`{
+						"action_id": "action-5",
+						"agents": ["agent1"],
+						"type": "upgrade"
+					}`),
+				}, {
+					SeqNo: 10,
+					Source: json.RawMessage(`{
+						"action_id": "action-10",
+						"agents": ["agent1"],
+						"type": "upgrade"
+					}`),
+				}, {
+					SeqNo: 15,
+					Source: json.RawMessage(`{
+						"action_id": "action-15",
+						"agents": ["agent1"],
+						"type": "upgrade"
+					}`),
+				}}
+			}()
+			var rch <-chan []es.HitT = ch
+			m.On("Output").Return(rch)
+			return m
+		},
+		expect: map[string][]model.Action{
+			"agent1": []model.Action{model.Action{
+				SeqNo:    15,
+				ActionID: "action-15",
+				Type:     "upgrade",
+			}},
+		},
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -287,14 +329,17 @@ func Test_Dispatcher_Run(t *testing.T) {
 				subs: map[string]Sub{
 					"agent1": Sub{
 						agentID: "agent1",
+						seqNo:   tt.seqNo,
 						ch:      make(chan []model.Action, 1),
 					},
 					"agent2": Sub{
 						agentID: "agent2",
+						seqNo:   tt.seqNo,
 						ch:      make(chan []model.Action, 1),
 					},
 					"agent3": Sub{
 						agentID: "agent3",
+						seqNo:   tt.seqNo,
 						ch:      make(chan []model.Action, 1),
 					},
 				},
@@ -368,4 +413,21 @@ func TestDispatcherWaitsOnlyForConnectedAgents(t *testing.T) {
 		actions := sub.receiveActions()
 		assert.Len(t, actions, 1)
 	})
+}
+
+func TestDispatcherSendsNothingWhenTheAgentHasAllActions(t *testing.T) {
+	sub := Sub{agentID: "agent1", seqNo: sqn.SeqNo{10}, ch: make(chan []model.Action, 1)}
+	d := &Dispatcher{limit: rate.NewLimiter(rate.Inf, 1), subs: map[string]Sub{"agent1": sub}}
+
+	d.process(t.Context(), []es.HitT{{
+		SeqNo: 10,
+		Source: json.RawMessage(`{
+			"action_id": "action-10",
+			"agents": ["agent1"],
+			"type": "upgrade"
+		}`),
+	}})
+
+	actions := sub.receiveActions()
+	assert.Nil(t, actions, "the agent was woken up without new actions")
 }

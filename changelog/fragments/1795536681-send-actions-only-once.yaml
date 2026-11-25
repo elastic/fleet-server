@@ -1,0 +1,7 @@
+kind: bug-fix
+summary: Dispatch actions only once to Elastic Agents
+description: >-
+  Fleet Server dispatches actions to Elastic Agents only if the agents did not get them at an earlier
+  check-in. In large-scale environments agents send fewer acknowledgements and Fleet Server
+  writes fewer action results to Elasticsearch.
+component: fleet-server
