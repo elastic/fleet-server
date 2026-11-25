@@ -35,6 +35,7 @@ const (
 	FieldLocalMetadata                 = "local_metadata"
 	FieldComponents                    = "components"
 	FieldAgentPolicyID                 = "agent_policy_id"
+	FieldDefaultFleetServer            = "default_fleet_server"
 	FieldPolicyID                      = "policy_id"
 	FieldPolicyBaseID                  = "policy_base_id"
 	FieldPolicyOutputAPIKey            = "api_key"
