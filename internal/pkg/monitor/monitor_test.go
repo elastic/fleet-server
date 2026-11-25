@@ -12,11 +12,15 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"testing/synctest"
 
 	"github.com/elastic/elastic-transport-go/v8/elastictransport"
 	"github.com/elastic/go-elasticsearch/v9"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/fleet-server/v7/internal/pkg/es"
+	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 )
 
@@ -123,4 +127,20 @@ func TestSimpleMonitor_ShardRestoringInPollLoop(t *testing.T) {
 	default:
 		t.Fatal("monitor did not send on readyCh after successful init")
 	}
+}
+
+func TestSimpleMonitor_NotifyGivesHitsWithCheckpoint(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		m := &simpleMonitorT{checkpoint: sqn.SeqNo{10}, outCh: make(chan []es.HitT)}
+		hits := []es.HitT{{SeqNo: 11}, {SeqNo: 12}, {SeqNo: 13}}
+
+		go m.notify(t.Context(), hits)
+		synctest.Wait()
+
+		checkpoint := m.GetCheckpoint()
+		assert.Equal(t, sqn.SeqNo{13}, checkpoint)
+
+		got := <-m.Output()
+		assert.Equal(t, hits, got)
+	})
 }
