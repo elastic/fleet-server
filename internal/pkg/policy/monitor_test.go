@@ -649,6 +649,63 @@ func TestMonitor_StaleRevisionParseErrorIsIgnored(t *testing.T) {
 	assert.Equal(t, newer.RevisionIdx, pm.policies[older.PolicyID].pp.Policy.RevisionIdx, "cached revision must remain at the newer revision")
 }
 
+func TestMonitor_CurrentRevisionParseErrorIsReturned(t *testing.T) {
+	errSecretNotFound := errors.New("secret not found")
+	bulker := &readSecretsBulk{
+		readSecrets: func() error {
+			return errSecretNotFound
+		},
+	}
+
+	tests := []struct {
+		name             string
+		cachedRevision   int64
+		incomingRevision int64
+		wantRevision     int64
+	}{
+		{
+			name:             "parse error is returned for an uncached policy",
+			cachedRevision:   0,
+			incomingRevision: 1,
+		},
+		{
+			name:             "parse error is returned for a newer revision of a cached policy",
+			cachedRevision:   1,
+			incomingRevision: 2,
+			wantRevision:     1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			incoming := newTestPolicy(tt.incomingRevision)
+			incoming.Data.SecretReferences = []model.SecretReferencesItems{{ID: "secret-id"}}
+
+			policies := map[string]policyT{}
+			if tt.cachedRevision > 0 {
+				cached := incoming
+				cached.RevisionIdx = tt.cachedRevision
+				cached.Data = policyDataDefault
+				policies[incoming.PolicyID] = policyT{
+					pp:   ParsedPolicy{Policy: cached},
+					head: makeHead(),
+				}
+			}
+
+			pm := &monitorT{
+				bulker:   bulker,
+				policies: policies,
+				pendingQ: makeHead(),
+			}
+
+			err := pm.processPolicies(t.Context(), []model.Policy{incoming})
+			require.ErrorIs(t, err, errSecretNotFound, "parse error for a current policy revision must be returned")
+			gotRevision := pm.policies[incoming.PolicyID].pp.Policy.RevisionIdx
+			assert.Equal(t, tt.wantRevision, gotRevision, "cached revision must remain unchanged")
+		})
+	}
+}
+
 // TestMonitor_StaleRevisionSkipsSecretResolution verifies that processPolicies
 // skips NewParsedPolicy (and therefore secret resolution) for stale revisions.
 // Without the pre-parse guard a stale doc with deleted secrets would fail during
