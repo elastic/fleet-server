@@ -861,9 +861,9 @@ func (enrollTimeoutErr) Temporary() bool { return true }
 // newEnrollESClient returns a client with the same timeout retry policy as production.
 func newEnrollESClient(t *testing.T, mt *MockTransport, maxRetries int) *elasticsearch.Client {
 	t.Helper()
-	cfg := elasticsearch.Config{Transport: mt, MaxRetries: maxRetries}
+	cfg := elasticsearch.Config{Transport: mt, MaxRetries: maxRetries} //nolint:staticcheck // uses deprecated Config because migration requires elastictransport dependency change
 	es.WithRetryOnTimeoutForCreate()(&cfg)
-	cli, err := elasticsearch.NewClient(cfg)
+	cli, err := elasticsearch.NewClient(cfg) //nolint:staticcheck // uses deprecated NewClient because migration requires elastictransport dependency change
 	require.NoError(t, err)
 	return cli
 }
