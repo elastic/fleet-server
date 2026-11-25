@@ -16,7 +16,6 @@ import (
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
 	"github.com/elastic/fleet-server/v7/internal/pkg/dl"
 	"github.com/elastic/fleet-server/v7/internal/pkg/model"
-	"github.com/elastic/fleet-server/v7/internal/pkg/sqn"
 	ftesting "github.com/elastic/fleet-server/v7/internal/pkg/testing"
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 
@@ -59,7 +58,6 @@ func TestEffectiveConfigReplacesRemovedFields(t *testing.T) {
 	err = bc.CheckIn(agentID,
 		WithStatus("online"),
 		WithEffectiveConfig(updatedConfig),
-		WithSeqNo(sqn.SeqNo{1}), // triggers refresh on flush
 	)
 	require.NoError(t, err)
 
