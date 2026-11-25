@@ -41,6 +41,18 @@ func TestLabelHelpers(t *testing.T) {
 	require.False(t, contains(patchVersionBumpLabels(), labelDocs), "patch bump must not include docs label")
 }
 
+func TestPRAMainRemoveLabelsPolicy(t *testing.T) {
+	// Mirrors prepMainBackportAndVersion: create labels omit backport-*, RemoveLabels clears leftovers.
+	wantRemove := backportLabel(testReleaseBranch)
+	require.Equal(t, "backport-"+testReleaseBranch, wantRemove)
+	require.False(t, contains(prAMainLabels(), wantRemove))
+	opts := prOptions{
+		Labels:       prAMainLabels(),
+		RemoveLabels: []string{wantRemove},
+	}
+	require.Equal(t, []string{wantRemove}, opts.RemoveLabels)
+}
+
 func TestPRBodiesMentionFleetScope(t *testing.T) {
 	cfg := &ReleaseConfig{
 		NextRelease:             testVersion961,

@@ -260,19 +260,45 @@ func mergeReleaseIssueBody(existingBody string, isMajorMinor bool, prURLs []stri
 }
 
 // splitPRSectionAndTrailing splits content after the "## PRs" heading into the managed
-// checklist block and any later markdown sections (next line starting with "## ").
+// PR checklist (checkbox lines and the empty-list placeholder) and any trailing text.
 func splitPRSectionAndTrailing(after string) (prBlock, trailing string) {
 	content := strings.TrimPrefix(after, "\n")
 	lines := strings.Split(content, "\n")
-	for i, line := range lines {
-		if i == 0 {
+
+	i := 0
+	for i < len(lines) && strings.TrimSpace(lines[i]) == "" {
+		i++
+	}
+
+	managedEnd := i
+	for managedEnd < len(lines) {
+		trimmed := strings.TrimSpace(lines[managedEnd])
+		if trimmed == "" {
+			j := managedEnd + 1
+			for j < len(lines) && strings.TrimSpace(lines[j]) == "" {
+				j++
+			}
+			if j < len(lines) && isManagedPRChecklistLine(strings.TrimSpace(lines[j])) {
+				managedEnd = j
+				continue
+			}
+			break
+		}
+		if isManagedPRChecklistLine(trimmed) {
+			managedEnd++
 			continue
 		}
-		if strings.HasPrefix(line, "## ") {
-			return strings.Join(lines[:i], "\n"), strings.Join(lines[i:], "\n")
-		}
+		break
 	}
-	return content, ""
+
+	return strings.Join(lines[i:managedEnd], "\n"), strings.Join(lines[managedEnd:], "\n")
+}
+
+func isManagedPRChecklistLine(trimmed string) bool {
+	if strings.HasPrefix(trimmed, "- [") {
+		return true
+	}
+	return trimmed == "_No related Fleet Server release PRs discovered yet._"
 }
 
 func keys(m map[string]bool) []string {

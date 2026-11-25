@@ -203,6 +203,41 @@ Operator note: keep this section.
 	}
 }
 
+func TestMergeReleaseIssueBodyPreservesPlainAndNestedNotes(t *testing.T) {
+	existing := `## PRs
+
+- [x] ` + testPRURL10 + `
+
+Operator free-form note.
+
+### Notes
+
+Keep nested notes too.
+`
+	updated, changed := mergeReleaseIssueBody(existing, false, []string{
+		testPRURL10,
+		testPRURL11,
+	})
+	require.True(t, changed)
+	require.Contains(t, updated, "Operator free-form note.")
+	require.Contains(t, updated, "### Notes")
+	require.Contains(t, updated, "Keep nested notes too.")
+}
+
+func TestMergeReleaseIssueBodyPreservesNotesAfterEmptyPRSection(t *testing.T) {
+	existing := `## PRs
+
+## Notes
+
+Keep me when the PR list was empty.
+`
+	updated, changed := mergeReleaseIssueBody(existing, false, []string{testPRURL10})
+	require.True(t, changed)
+	require.Contains(t, updated, "- [ ] "+testPRURL10)
+	require.Contains(t, updated, "## Notes")
+	require.Contains(t, updated, "Keep me when the PR list was empty.")
+}
+
 func TestEnsureReleaseIssueTrackerDryRun(t *testing.T) {
 	cfg := &ReleaseConfig{
 		NextRelease: "9.4.1",

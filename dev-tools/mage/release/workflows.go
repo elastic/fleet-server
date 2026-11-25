@@ -214,14 +214,15 @@ func prepMainBackportAndVersion(repo *gitRepo, cfg *ReleaseConfig) (workflowPR, 
 		branch: branch,
 		base:   cfg.BaseBranch,
 		opts: prOptions{
-			Owner:     cfg.ProjectOwner,
-			Repo:      cfg.ProjectRepo,
-			Title:     fmt.Sprintf("[Release][%s] Prepare main for %s and mergify backport-%s", cfg.NextRelease, cfg.NextProjectMinorVersion, cfg.ReleaseBranch),
-			Head:      branch,
-			Base:      cfg.BaseBranch,
-			Body:      prAMainBody(cfg),
-			Reviewers: cfg.ProjectReviewers,
-			Labels:    prAMainLabels(),
+			Owner:        cfg.ProjectOwner,
+			Repo:         cfg.ProjectRepo,
+			Title:        fmt.Sprintf("[Release][%s] Prepare main for %s and mergify backport-%s", cfg.NextRelease, cfg.NextProjectMinorVersion, cfg.ReleaseBranch),
+			Head:         branch,
+			Base:         cfg.BaseBranch,
+			Body:         prAMainBody(cfg),
+			Reviewers:    cfg.ProjectReviewers,
+			Labels:       prAMainLabels(),
+			RemoveLabels: []string{backportLabel(cfg.ReleaseBranch)},
 		},
 	}, nil
 }
@@ -503,7 +504,7 @@ func finalizePR(repo *gitRepo, gh *gitHubClient, token, branchName, baseBranch s
 	}
 
 	if found {
-		if err := gh.ensurePRLabels(opts.Owner, opts.Repo, existingPR.GetNumber(), opts.Labels); err != nil {
+		if err := gh.applyPRLabels(opts.Owner, opts.Repo, existingPR.GetNumber(), opts.Labels, opts.RemoveLabels); err != nil {
 			return nil, err
 		}
 		return existingPR, nil

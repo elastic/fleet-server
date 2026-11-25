@@ -22,15 +22,16 @@ type gitHubClient struct {
 
 // prOptions holds options for creating a pull request.
 type prOptions struct {
-	Owner     string
-	Repo      string
-	Title     string
-	Head      string
-	Base      string
-	Body      string
-	Draft     bool
-	Reviewers []string
-	Labels    []string
+	Owner        string
+	Repo         string
+	Title        string
+	Head         string
+	Base         string
+	Body         string
+	Draft        bool
+	Reviewers    []string
+	Labels       []string
+	RemoveLabels []string // removed on create/reuse (e.g. leftover backport-* on PR-A)
 }
 
 // newGitHubClient creates a new GitHub API client.
@@ -59,7 +60,7 @@ func (gh *gitHubClient) createPR(opts prOptions) (*github.PullRequest, error) {
 	}
 	if found {
 		printf("Open PR already exists #%d: %s\n", existingPR.GetNumber(), existingPR.GetHTMLURL())
-		if err := gh.ensurePRLabels(opts.Owner, opts.Repo, existingPR.GetNumber(), opts.Labels); err != nil {
+		if err := gh.applyPRLabels(opts.Owner, opts.Repo, existingPR.GetNumber(), opts.Labels, opts.RemoveLabels); err != nil {
 			return nil, err
 		}
 		return existingPR, nil
@@ -92,7 +93,7 @@ func (gh *gitHubClient) createPR(opts prOptions) (*github.PullRequest, error) {
 		}
 	}
 
-	if err := gh.ensurePRLabels(opts.Owner, opts.Repo, pr.GetNumber(), opts.Labels); err != nil {
+	if err := gh.applyPRLabels(opts.Owner, opts.Repo, pr.GetNumber(), opts.Labels, opts.RemoveLabels); err != nil {
 		return nil, err
 	}
 
@@ -157,12 +158,10 @@ func (gh *gitHubClient) listPRsByHeadBase(owner, repo, head, base, state string)
 	}
 
 	prs, _, err := gh.client.PullRequests.List(gh.ctx, owner, repo, &github.PullRequestListOptions{
-		State: state,
-		Head:  headQuery,
-		Base:  base,
-		ListOptions: github.ListOptions{
-			PerPage: 30,
-		},
+		State:   state,
+		Head:    headQuery,
+		Base:    base,
+		PerPage: 30,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list pull requests: %w", err)
@@ -173,11 +172,9 @@ func (gh *gitHubClient) listPRsByHeadBase(owner, repo, head, base, state string)
 func (gh *gitHubClient) findPRByExactTitle(owner, repo, base, title string) (*github.PullRequest, bool, error) {
 	query := fmt.Sprintf(`repo:%s/%s is:pr base:%s "%s" in:title`, owner, repo, base, title)
 	result, _, err := gh.client.Search.Issues(gh.ctx, query, &github.SearchOptions{
-		Sort:  searchSortUpdated,
-		Order: searchOrderDesc,
-		ListOptions: github.ListOptions{
-			PerPage: 10,
-		},
+		Sort:    searchSortUpdated,
+		Order:   searchOrderDesc,
+		PerPage: 10,
 	})
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to search pull requests by title: %w", err)
@@ -280,6 +277,13 @@ var mergeLabelDefs = map[string]struct {
 	},
 }
 
+func (gh *gitHubClient) applyPRLabels(owner, repo string, number int, add, remove []string) error {
+	if err := gh.ensurePRLabels(owner, repo, number, add); err != nil {
+		return err
+	}
+	return gh.removePRLabels(owner, repo, number, remove)
+}
+
 func (gh *gitHubClient) ensurePRLabels(owner, repo string, number int, labels []string) error {
 	if len(labels) == 0 {
 		return nil
@@ -293,6 +297,25 @@ func (gh *gitHubClient) ensurePRLabels(owner, repo string, number int, labels []
 	}
 	if err := gh.addLabels(owner, repo, number, labels); err != nil {
 		return fmt.Errorf("failed to add labels on #%d: %w", number, err)
+	}
+	return nil
+}
+
+// removePRLabels drops labels from a PR. Missing labels are ignored so reruns stay idempotent.
+func (gh *gitHubClient) removePRLabels(owner, repo string, number int, labels []string) error {
+	for _, label := range labels {
+		label = strings.TrimSpace(label)
+		if label == "" {
+			continue
+		}
+		resp, err := gh.client.Issues.RemoveLabelForIssue(gh.ctx, owner, repo, number, label)
+		if err != nil {
+			if resp != nil && resp.StatusCode == http.StatusNotFound {
+				continue
+			}
+			return fmt.Errorf("failed to remove label %q on #%d: %w", label, number, err)
+		}
+		printf("Removed label %q from #%d\n", label, number)
 	}
 	return nil
 }
@@ -334,11 +357,9 @@ func (gh *gitHubClient) addLabels(owner, repo string, number int, labels []strin
 func (gh *gitHubClient) findIssueByTitle(owner, repo, title string) (*github.Issue, bool, error) {
 	query := fmt.Sprintf(`repo:%s/%s is:issue in:title "%s"`, owner, repo, title)
 	result, _, err := gh.client.Search.Issues(gh.ctx, query, &github.SearchOptions{
-		Sort:  searchSortUpdated,
-		Order: searchOrderDesc,
-		ListOptions: github.ListOptions{
-			PerPage: 20,
-		},
+		Sort:    searchSortUpdated,
+		Order:   searchOrderDesc,
+		PerPage: 20,
 	})
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to search issues for title %q: %w", title, err)
@@ -397,11 +418,9 @@ func (gh *gitHubClient) updateIssueBody(owner, repo string, number int, body str
 func (gh *gitHubClient) listReleaseLabeledPRsForVersion(owner, repo, version string) ([]*github.PullRequest, error) {
 	query := fmt.Sprintf(`repo:%s/%s is:pr label:release "%s"`, owner, repo, version)
 	opts := &github.SearchOptions{
-		Sort:  searchSortUpdated,
-		Order: searchOrderDesc,
-		ListOptions: github.ListOptions{
-			PerPage: 100,
-		},
+		Sort:    searchSortUpdated,
+		Order:   searchOrderDesc,
+		PerPage: 100,
 	}
 
 	var prs []*github.PullRequest
