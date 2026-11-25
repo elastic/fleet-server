@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"slices"
 	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
@@ -115,22 +116,24 @@ func (b *Bulker) MSearch(ctx context.Context, ops []MultiOp, opts ...Opt) ([]Mse
 		return nil, err
 	}
 
-	var requestErr error
+	var requestErrs []error
 	items := make([]MsearchResponseItem, len(ops))
 	for range ops {
 		select {
 		case r := <-ch:
-			if r.err != nil && r.data == nil {
-				requestErr = r.err
-			}
 			if r.data != nil {
 				items[r.idx] = *r.data.(*MsearchResponseItem) //nolint:errcheck // response data type is guaranteed by the bulk engine
+			} else if r.err != nil {
+				items[r.idx].RequestError = r.err
+				if !slices.ContainsFunc(requestErrs, func(err error) bool { return errors.Is(err, r.err) }) {
+					requestErrs = append(requestErrs, r.err)
+				}
 			}
 		case <-ctx.Done():
 			return nil, ctx.Err()
 		}
 	}
-	return items, requestErr
+	return items, errors.Join(requestErrs...)
 }
 
 func (b *Bulker) writeMsearchMeta(buf *Buf, index string, moreIndices []string, checkpoints []int64, ignoreUnavailble bool) error {

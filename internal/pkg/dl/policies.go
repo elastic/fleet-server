@@ -5,6 +5,7 @@
 package dl
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -172,11 +173,17 @@ func QueryLatestPoliciesByID(ctx context.Context, bulker bulk.Bulk, policyIDs []
 	}
 	items, searchErr := bulker.MSearch(ctx, ops, append(o.bulkOpts, bulk.WithIgnoreUnavailble())...)
 	if len(items) == 0 {
+		if errors.Is(searchErr, es.ErrIndexNotFound) {
+			zerolog.Ctx(ctx).Debug().Str("index", o.indexName).Msg(es.ErrIndexNotFound.Error())
+			return nil, nil
+		}
 		return nil, searchErr
 	}
 	policies := make([]model.Policy, 0, len(items))
 	sharer := NewStringSharer()
 	var errs []error
+	var failed int
+	var missingIndex bool
 	for i, policyID := range policyIDs {
 		item := items[i]
 		var err error
@@ -189,20 +196,27 @@ func QueryLatestPoliciesByID(ctx context.Context, bulker bulk.Bulk, policyIDs []
 				policies = found
 			}
 		case 0:
-			// The request of this search failed and searchErr holds its error.
-			err = searchErr
+			// The request of this search failed.
+			err = cmp.Or(item.RequestError, searchErr)
 		default:
 			err = es.TranslateError(item.Status, item.Error)
 		}
+		if errors.Is(err, es.ErrIndexNotFound) {
+			missingIndex = true
+			err = nil
+		}
 		if err != nil {
-			errs = append(errs, err)
+			failed++
+			if !slices.ContainsFunc(errs, func(existing error) bool { return errors.Is(existing, err) }) {
+				errs = append(errs, err)
+			}
 		}
 	}
-	if len(errs) > 0 {
-		// Remove the consecutive copies of a request error because a failed request gives the same
-		// error to each of its searches.
-		uniqueErrs := errors.Join(slices.Compact(errs)...)
-		return policies, fmt.Errorf("search failed for %d of %d policies: %w", len(errs), len(policyIDs), uniqueErrs)
+	if missingIndex {
+		zerolog.Ctx(ctx).Debug().Str("index", o.indexName).Msg(es.ErrIndexNotFound.Error())
+	}
+	if failed > 0 {
+		return policies, fmt.Errorf("search failed for %d of %d policies: %w", failed, len(policyIDs), errors.Join(errs...))
 	}
 	return policies, nil
 }
