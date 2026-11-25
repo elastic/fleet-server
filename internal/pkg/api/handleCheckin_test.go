@@ -564,6 +564,26 @@ func TestProcessUpgradeDetails(t *testing.T) {
 		return mCache
 	}
 	emptyCache := func() *testcache.MockCache { return testcache.NewMockCache() }
+	// updateStoresRetrying matches an agent update that stores a retryable download failure as
+	// UPG_DOWNLOADING, with the failure as retry_error_msg, and keeps upgrade_started_at.
+	updateStoresRetrying := mock.MatchedBy(func(p []byte) bool {
+		d := struct {
+			Doc map[string]json.RawMessage `json:"doc"`
+		}{}
+		if err := json.Unmarshal(p, &d); err != nil {
+			return false
+		}
+		if _, cleared := d.Doc[dl.FieldUpgradeStartedAt]; cleared {
+			return false
+		}
+		var ud struct {
+			State    string `json:"state"`
+			Metadata struct {
+				RetryErrorMsg string `json:"retry_error_msg"`
+			} `json:"metadata"`
+		}
+		return json.Unmarshal(d.Doc[dl.FieldUpgradeDetails], &ud) == nil && ud.State == "UPG_DOWNLOADING" && ud.Metadata.RetryErrorMsg == "copy failed"
+	})
 	tests := []struct {
 		name    string
 		agent   *model.Agent
@@ -1001,25 +1021,25 @@ func TestProcessUpgradeDetails(t *testing.T) {
 			},
 			err: nil,
 		}, {
-			name:  "upgrade failed while download retries remain creates no result",
+			name:  "upgrade failed while download retries remain is stored as downloading, without a result",
 			agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
 			details: &UpgradeDetails{
 				ActionId: "test-action",
 				State:    UpgradeDetailsStateUPGFAILED,
 				Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"error_msg":"copy failed","failed_state":"UPG_DOWNLOADING","retry_until":"` + retryFuture + `"}`)},
 			},
-			bulk:  bulkOf(),
+			bulk:  bulkOf(withUpdate(updateStoresRetrying)),
 			cache: actionInCache,
 			err:   nil,
 		}, {
-			name:  "upgrade failed shortly after retry_until is within the clock skew grace",
+			name:  "upgrade failed shortly after retry_until is still stored as downloading",
 			agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
 			details: &UpgradeDetails{
 				ActionId: "test-action",
 				State:    UpgradeDetailsStateUPGFAILED,
 				Metadata: &UpgradeDetails_Metadata{json.RawMessage(`{"error_msg":"copy failed","failed_state":"UPG_DOWNLOADING","retry_until":"` + retryJustPassed + `"}`)},
 			},
-			bulk:  bulkOf(),
+			bulk:  bulkOf(withUpdate(updateStoresRetrying)),
 			cache: actionInCache,
 			err:   nil,
 		}, {

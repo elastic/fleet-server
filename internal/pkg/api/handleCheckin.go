@@ -775,11 +775,21 @@ func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agen
 			vSpan.End()
 			return fmt.Errorf("%w: %s metadata contains empty error_msg attribute", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGFAILED)
 		}
-		// A download failure that can still be retried is not an outcome yet: ignore it, so the
-		// stored details keep their last state and a later check-in records the final failure.
+		// A download failure that can still be retried is not an outcome yet: the agent is retrying
+		// the download. Store it as such, so the stored upgrade shows as progressed, and let a later
+		// check-in record the final failure.
 		if !upgradeFailureIsFinal(details.Metadata, time.Now()) {
-			vSpan.End()
-			return nil
+			retrying, err := details.Metadata.AsUpgradeMetadataDownloading()
+			if err == nil {
+				retrying.RetryErrorMsg = &meta.ErrorMsg
+				err = details.Metadata.FromUpgradeMetadataDownloading(retrying)
+			}
+			if err != nil {
+				vSpan.End()
+				return fmt.Errorf("%w %s: unable to repack metadata: %w", ErrInvalidUpgradeMetadata, UpgradeDetailsStateUPGFAILED, err)
+			}
+			details.State = UpgradeDetailsStateUPGDOWNLOADING
+			break
 		}
 		// Repack metadata in failed case as the agent may send UPG_DOWNLOADING attributes.
 		if err = details.Metadata.FromUpgradeMetadataFailed(meta); err != nil {

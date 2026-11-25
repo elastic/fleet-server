@@ -64,7 +64,9 @@ func Test_Upgrade_Results(t *testing.T) {
 		retryUntil := time.Now().Add(time.Hour).UTC().Format(time.RFC3339)
 		u.checkin(api.UpgradeDetailsStateUPGFAILED, map[string]any{"failed_state": "UPG_DOWNLOADING", "error_msg": "copy failed", "retry_until": retryUntil})
 		require.Empty(t, u.results(), "no result while the download can still be retried")
-		require.NotEmpty(t, u.agent().UpgradeStartedAt, "agent stays updating while the download can be retried")
+		agent := u.agent()
+		require.NotEmpty(t, agent.UpgradeStartedAt, "agent stays updating while the download can be retried")
+		require.Equal(t, "UPG_DOWNLOADING", agent.UpgradeDetails.State, "a retryable failure is stored as the download being retried")
 
 		// The retry succeeded, the agent proceeds and the upgrade completes: a single success.
 		u.checkin(api.UpgradeDetailsStateUPGDOWNLOADING, nil)
@@ -74,6 +76,24 @@ func Test_Upgrade_Results(t *testing.T) {
 		u.checkinNoDetails()
 		res := u.waitResults()
 		require.Empty(t, res[0].Error)
+	})
+
+	t.Run("ack of a failed upgrade after a retryable failure does not record a success", func(t *testing.T) {
+		u := newUpgradeTest(t, ctx, srv)
+
+		// The check-in that first reports the upgrade after it was scheduled is a retryable failure.
+		u.checkin(api.UpgradeDetailsStateUPGSCHEDULED, map[string]any{"scheduled_at": time.Now().Add(-time.Minute).UTC().Format(time.RFC3339)})
+		retryUntil := time.Now().Add(time.Hour).UTC().Format(time.RFC3339)
+		u.checkin(api.UpgradeDetailsStateUPGFAILED, map[string]any{"failed_state": "UPG_DOWNLOADING", "error_msg": "copy failed", "retry_until": retryUntil})
+
+		// The agent acks a failed upgrade without an error, before the final failure is recorded.
+		u.ack("")
+		require.Empty(t, u.results(), "the ack must not record a success for a failing download")
+
+		retryUntil = time.Now().Add(-time.Hour).UTC().Format(time.RFC3339)
+		u.checkin(api.UpgradeDetailsStateUPGFAILED, map[string]any{"failed_state": "UPG_DOWNLOADING", "error_msg": "failed to get upgrade artifact", "retry_until": retryUntil})
+		res := u.waitResults()
+		require.Equal(t, "failed to get upgrade artifact", res[0].Error)
 	})
 
 	t.Run("failed download is recorded once retry_until has passed", func(t *testing.T) {
