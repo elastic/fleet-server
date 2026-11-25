@@ -7,28 +7,27 @@ package bulk
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
 )
 
-// TODO: Are multi requests used by anything? a quick grep shows no hits outside the bulk package.
-
 func (b *Bulker) MCreate(ctx context.Context, ops []MultiOp, opts ...Opt) ([]BulkIndexerResponseItem, error) {
-	return b.multiWaitBulkOp(ctx, ActionCreate, ops)
+	return b.multiWaitBulkOp(ctx, ActionCreate, ops, opts...)
 }
 
 func (b *Bulker) MIndex(ctx context.Context, ops []MultiOp, opts ...Opt) ([]BulkIndexerResponseItem, error) {
-	return b.multiWaitBulkOp(ctx, ActionIndex, ops)
+	return b.multiWaitBulkOp(ctx, ActionIndex, ops, opts...)
 }
 
 func (b *Bulker) MUpdate(ctx context.Context, ops []MultiOp, opts ...Opt) ([]BulkIndexerResponseItem, error) {
-	return b.multiWaitBulkOp(ctx, ActionUpdate, ops)
+	return b.multiWaitBulkOp(ctx, ActionUpdate, ops, opts...)
 }
 
 func (b *Bulker) MDelete(ctx context.Context, ops []MultiOp, opts ...Opt) ([]BulkIndexerResponseItem, error) {
-	return b.multiWaitBulkOp(ctx, ActionDelete, ops)
+	return b.multiWaitBulkOp(ctx, ActionDelete, ops, opts...)
 }
 
-func (b *Bulker) multiWaitBulkOp(ctx context.Context, action actionT, ops []MultiOp, opts ...Opt) ([]BulkIndexerResponseItem, error) { //nolint:unparam // better to keep consistency with other methods
+func (b *Bulker) multiWaitBulkOp(ctx context.Context, action actionT, ops []MultiOp, opts ...Opt) ([]BulkIndexerResponseItem, error) {
 	if len(ops) == 0 {
 		return nil, nil
 	}
@@ -79,7 +78,7 @@ func (b *Bulker) multiWaitBulkOp(ctx context.Context, action actionT, ops []Mult
 
 		bulk := &bulks[i]
 		bulk.ch = ch
-		bulk.idx = int32(i) //nolint:gosec // disable G115
+		bulk.idx = int32(i)
 		bulk.action = action
 		bulk.buf.Set(bodySlice)
 		if opt.Refresh {
@@ -103,7 +102,11 @@ func (b *Bulker) multiWaitBulkOp(ctx context.Context, action actionT, ops []Mult
 				lastErr = r.err
 			}
 			if r.data != nil {
-				items[r.idx] = *r.data.(*BulkIndexerResponseItem)
+				item, ok := r.data.(*BulkIndexerResponseItem)
+				if !ok {
+					return nil, fmt.Errorf("unexpected bulk response type %T", r.data)
+				}
+				items[r.idx] = *item
 			}
 		case <-ctx.Done():
 			return nil, ctx.Err()
