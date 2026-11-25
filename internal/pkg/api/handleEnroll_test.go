@@ -350,11 +350,7 @@ func replaceUpdateDoc(t *testing.T, bulker *ftesting.MockBulk) map[string]any {
 	for _, c := range bulker.Calls {
 		if c.Method == "Update" {
 			body, ok := c.Arguments.Get(3).([]byte)
-<<<<<<< HEAD
-			require.True(t, ok, "Update body is not []byte")
-=======
 			require.True(t, ok, "the Update body is a byte slice")
->>>>>>> 39eeea5 (Load only the needed policies in Fleet Server health checks and enrollments (#8224))
 			updateBody = body
 			break
 		}
@@ -799,18 +795,6 @@ func assertSyncEnrollParams(t *testing.T, req *http.Request) {
 	require.Equal(t, "wait_for", req.URL.Query().Get("refresh"), "refresh must be wait_for so the document is visible before the response is sent")
 }
 
-<<<<<<< HEAD
-//nolint:dupl // intentionally parallel to its sibling scenario test
-func TestCreateFleetAgentSyncWrite409Succeeds(t *testing.T) {
-	mt := &MockTransport{}
-	mt.RoundTripFn = func(req *http.Request) (*http.Response, error) {
-		assertSyncEnrollParams(t, req)
-		return &http.Response{
-			StatusCode: http.StatusConflict,
-			Body:       io.NopCloser(strings.NewReader(`{}`)),
-			Header:     http.Header{"X-Elastic-Product": []string{"Elasticsearch"}},
-		}, nil
-=======
 func TestCreateFleetAgentSyncWrite(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -826,7 +810,6 @@ func TestCreateFleetAgentSyncWrite(t *testing.T) {
 			status:  http.StatusInternalServerError,
 			wantErr: true,
 		},
->>>>>>> 39eeea5 (Load only the needed policies in Fleet Server health checks and enrollments (#8224))
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -843,22 +826,6 @@ func TestCreateFleetAgentSyncWrite(t *testing.T) {
 			bulker := ftesting.NewMockBulk()
 			bulker.On("Client").Return(cli)
 
-<<<<<<< HEAD
-	err = createFleetAgent(t.Context(), bulker, "test-agent-id", model.Agent{}, true)
-	require.NoError(t, err)
-}
-
-//nolint:dupl // intentionally parallel to its sibling scenario test
-func TestCreateFleetAgentSyncWriteErrorSurfaces(t *testing.T) {
-	mt := &MockTransport{}
-	mt.RoundTripFn = func(req *http.Request) (*http.Response, error) {
-		assertSyncEnrollParams(t, req)
-		return &http.Response{
-			StatusCode: http.StatusInternalServerError,
-			Body:       io.NopCloser(strings.NewReader(`{}`)),
-			Header:     http.Header{"X-Elastic-Product": []string{"Elasticsearch"}},
-		}, nil
-=======
 			err = createFleetAgent(t.Context(), bulker, "test-agent-id", model.Agent{}, true)
 			if tt.wantErr {
 				require.Error(t, err)
@@ -866,7 +833,6 @@ func TestCreateFleetAgentSyncWriteErrorSurfaces(t *testing.T) {
 			}
 			require.NoError(t, err)
 		})
->>>>>>> 39eeea5 (Load only the needed policies in Fleet Server health checks and enrollments (#8224))
 	}
 }
 
@@ -921,23 +887,6 @@ func syncEnrollResponse(status int) *http.Response {
 	}
 }
 
-<<<<<<< HEAD
-//nolint:dupl // intentionally parallel to its sibling scenario test
-func TestCreateFleetAgentSyncWriteTimeoutThenConflictSucceeds(t *testing.T) {
-	const agentID = "test-agent-id"
-	calls := 0
-	var bodies [][]byte
-	mt := &MockTransport{}
-	mt.RoundTripFn = func(req *http.Request) (*http.Response, error) {
-		assertSyncEnrollParams(t, req)
-		require.Contains(t, req.URL.Path, agentID, "agent UUID must be the same on every attempt")
-		recordSyncEnrollBody(t, req, &bodies)
-		calls++
-		if calls == 1 {
-			return nil, enrollTimeoutErr{}
-		}
-		return syncEnrollResponse(http.StatusConflict), nil
-=======
 func TestCreateFleetAgentSyncWriteTimeoutIsRetried(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -951,7 +900,6 @@ func TestCreateFleetAgentSyncWriteTimeoutIsRetried(t *testing.T) {
 			name:        "a created response after a timeout is a success",
 			finalStatus: http.StatusCreated,
 		},
->>>>>>> 39eeea5 (Load only the needed policies in Fleet Server health checks and enrollments (#8224))
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -972,35 +920,11 @@ func TestCreateFleetAgentSyncWriteTimeoutIsRetried(t *testing.T) {
 			bulker := ftesting.NewMockBulk()
 			bulker.On("Client").Return(newEnrollESClient(t, mt, 5))
 
-<<<<<<< HEAD
-	err := createFleetAgent(t.Context(), bulker, agentID, model.Agent{}, true)
-	require.NoError(t, err)
-	require.Equal(t, 2, calls, "expected exactly two transport calls")
-	requireSameBodies(t, bodies)
-}
-
-//nolint:dupl // intentionally parallel to its sibling scenario test
-func TestCreateFleetAgentSyncWriteTimeoutThenSucceeds(t *testing.T) {
-	const agentID = "test-agent-id"
-	calls := 0
-	var bodies [][]byte
-	mt := &MockTransport{}
-	mt.RoundTripFn = func(req *http.Request) (*http.Response, error) {
-		assertSyncEnrollParams(t, req)
-		require.Contains(t, req.URL.Path, agentID, "agent UUID must be the same on every attempt")
-		recordSyncEnrollBody(t, req, &bodies)
-		calls++
-		if calls == 1 {
-			return nil, enrollTimeoutErr{}
-		}
-		return syncEnrollResponse(http.StatusCreated), nil
-=======
 			err := createFleetAgent(t.Context(), bulker, agentID, model.Agent{}, true)
 			require.NoError(t, err)
 			require.Equal(t, 2, calls, "expected exactly two transport calls")
 			requireSameBodies(t, bodies)
 		})
->>>>>>> 39eeea5 (Load only the needed policies in Fleet Server health checks and enrollments (#8224))
 	}
 }
 

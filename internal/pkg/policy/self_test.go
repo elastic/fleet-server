@@ -59,11 +59,6 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 	bulker.On("GetBulkerMap").Return(emptyBulkerMap)
 
 	monitor := NewSelfMonitor(cfg, bulker, mm, "", reporter)
-<<<<<<< HEAD
-	sm := asSelfMonitorT(t, monitor)
-	sm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
-		return []model.Policy{}, nil
-=======
 	sm := selfMonitorOf(t, monitor)
 	var policyLock sync.Mutex
 	var policyResult []model.Policy
@@ -74,7 +69,6 @@ func TestSelfMonitor_DefaultPolicy(t *testing.T) {
 			return model.Policy{}, dl.ErrNotFound
 		}
 		return policyResult[0], nil
->>>>>>> 39eeea5 (Load only the needed policies in Fleet Server health checks and enrollments (#8224))
 	}
 
 	var merr error
@@ -209,11 +203,7 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 	bulker.On("GetBulkerMap").Return(emptyBulkerMap)
 
 	monitor := NewSelfMonitor(cfg, bulker, mm, "", reporter)
-<<<<<<< HEAD
-	sm := asSelfMonitorT(t, monitor)
-=======
 	sm := selfMonitorOf(t, monitor)
->>>>>>> 39eeea5 (Load only the needed policies in Fleet Server health checks and enrollments (#8224))
 	sm.checkTime = 100 * time.Millisecond
 
 	var policyLock sync.Mutex
@@ -303,11 +293,7 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 	}, ftesting.RetrySleep(1*time.Second))
 
 	// add an active token
-<<<<<<< HEAD
-	activeToken := model.EnrollmentAPIKey{ //nolint:gosec // G101: test fixture, not a real credential
-=======
 	activeToken := model.EnrollmentAPIKey{ //nolint:gosec // fake api key used in test
->>>>>>> 39eeea5 (Load only the needed policies in Fleet Server health checks and enrollments (#8224))
 		Id:       xid.New().String(),
 		Active:   true,
 		APIKey:   "d2JndlFIWUJJUVVxWDVia2NJTV86X0d6ZmljZGNTc1d4R1otbklrZFFRZw==",
@@ -372,11 +358,6 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 	bulker.On("GetBulkerMap").Return(emptyBulkerMap)
 
 	monitor := NewSelfMonitor(cfg, bulker, mm, policyID, reporter)
-<<<<<<< HEAD
-	sm := asSelfMonitorT(t, monitor)
-	sm.policyF = func(ctx context.Context, bulker bulk.Bulk, opt ...dl.Option) ([]model.Policy, error) {
-		return []model.Policy{}, nil
-=======
 	sm := selfMonitorOf(t, monitor)
 	var policyLock sync.Mutex
 	var policyResult []model.Policy
@@ -387,7 +368,6 @@ func TestSelfMonitor_SpecificPolicy(t *testing.T) {
 			return model.Policy{}, dl.ErrNotFound
 		}
 		return policyResult[0], nil
->>>>>>> 39eeea5 (Load only the needed policies in Fleet Server health checks and enrollments (#8224))
 	}
 
 	var merr error
@@ -521,11 +501,7 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 	bulker.On("GetBulkerMap").Return(emptyBulkerMap)
 
 	monitor := NewSelfMonitor(cfg, bulker, mm, policyID, reporter)
-<<<<<<< HEAD
-	sm := asSelfMonitorT(t, monitor)
-=======
 	sm := selfMonitorOf(t, monitor)
->>>>>>> 39eeea5 (Load only the needed policies in Fleet Server health checks and enrollments (#8224))
 	sm.checkTime = 100 * time.Millisecond
 
 	var policyLock sync.Mutex
@@ -614,11 +590,7 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 	}, ftesting.RetrySleep(1*time.Second))
 
 	// add an active token
-<<<<<<< HEAD
-	activeToken := model.EnrollmentAPIKey{ //nolint:gosec // G101: test fixture, not a real credential
-=======
 	activeToken := model.EnrollmentAPIKey{ //nolint:gosec // fake api key used in test
->>>>>>> 39eeea5 (Load only the needed policies in Fleet Server health checks and enrollments (#8224))
 		Id:       xid.New().String(),
 		Active:   true,
 		APIKey:   "d2JndlFIWUJJUVVxWDVia2NJTV86X0d6ZmljZGNTc1d4R1otbklrZFFRZw==",
@@ -787,15 +759,6 @@ func TestSelfMonitor_reportOutputSkipIfNotFound(t *testing.T) {
 	outputBulker.AssertExpectations(t)
 }
 
-<<<<<<< HEAD
-// asSelfMonitorT returns m as *selfMonitorT, failing the test if it is another type.
-func asSelfMonitorT(t *testing.T, m any) *selfMonitorT {
-	t.Helper()
-	sm, ok := m.(*selfMonitorT)
-	require.Truef(t, ok, "monitor is %T, want *selfMonitorT", m)
-	return sm
-}
-=======
 func TestSelfMonitor_SearchesOnlyItsPolicy(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -895,4 +858,3 @@ func (m *selfMonitorT) waitStart(ctx context.Context) error {
 	}
 	return nil
 }
->>>>>>> 39eeea5 (Load only the needed policies in Fleet Server health checks and enrollments (#8224))
