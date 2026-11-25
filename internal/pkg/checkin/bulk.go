@@ -370,16 +370,7 @@ func (bc *Bulk) flush(ctx context.Context) error {
 		})
 	}
 
-<<<<<<< HEAD
-	var opts []bulk.Opt
-	if needRefresh {
-		opts = append(opts, bulk.WithRefresh())
-	}
-
-	_, err = bc.bulker.MUpdate(ctx, updates, opts...)
-=======
-	items, err := bc.bulker.MUpdate(ctx, updates)
->>>>>>> e1e4620 (Fix ignored options on Fleet Server bulk writes (#8297))
+	_, err = bc.bulker.MUpdate(ctx, updates)
 
 	zerolog.Ctx(ctx).Trace().
 		Err(err).
