@@ -462,12 +462,6 @@ func (m *monitorT) fetchAndProcess(ctx context.Context, policyIDs []string) erro
 			m.log.Debug().Msg("no policy to monitor")
 			return nil
 		}
-		if errors.Is(err, es.ErrIndexNotFound) {
-			m.log.Debug().
-				Str("index", m.policiesIndex).
-				Msg(es.ErrIndexNotFound.Error())
-			return nil
-		}
 		return err
 	}
 	processErr := m.processPolicies(ctx, policies)

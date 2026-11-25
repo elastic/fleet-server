@@ -42,6 +42,11 @@ import (
 	testlog "github.com/elastic/fleet-server/v7/internal/pkg/testing/log"
 )
 
+<<<<<<< HEAD
+=======
+const monitorTestOutput = "default"
+
+>>>>>>> 02598fa (Fix error handling in batched policy searches (#8362))
 var policyDataDefault = &model.PolicyData{
 	Outputs: map[string]map[string]any{
 		"default": map[string]any{
@@ -1015,11 +1020,18 @@ func (s *policyStore) clear() {
 func TestMonitor_LoadPolicies(t *testing.T) {
 	store := &policyStore{
 		policies: map[string]error{
+<<<<<<< HEAD
 			"policy-a":             nil,
 			"policy-b":             nil,
 			"failed-policy":        errSearchFailed,
 			"invalid-policy":       errInvalidPolicy,
 			"missing-index-policy": es.ErrIndexNotFound,
+=======
+			"policy-a":       nil,
+			"policy-b":       nil,
+			"failed-policy":  errSearchFailed,
+			"invalid-policy": errInvalidPolicy,
+>>>>>>> 02598fa (Fix error handling in batched policy searches (#8362))
 		},
 	}
 
@@ -1052,10 +1064,13 @@ func TestMonitor_LoadPolicies(t *testing.T) {
 		{
 			name:        "no policy is loaded when none is in the store",
 			newPolicies: []string{"policy-not-in-store"},
+<<<<<<< HEAD
 		},
 		{
 			name:        "a missing index does not return an error",
 			newPolicies: []string{"missing-index-policy"},
+=======
+>>>>>>> 02598fa (Fix error handling in batched policy searches (#8362))
 		},
 		{
 			name:         "valid policies are loaded when other policies fail",
@@ -1104,19 +1119,19 @@ func TestMonitor_LoadPolicies(t *testing.T) {
 			wantErr:      errSearchFailed,
 		},
 	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 			policies := make(map[string]policyT)
-			for _, policyID := range tc.cachedPolicies {
+			for _, policyID := range tt.cachedPolicies {
 				policies[policyID] = policyT{pp: ParsedPolicy{Policy: model.Policy{PolicyID: policyID, RevisionIdx: 1}}}
 			}
 			// Policies of earlier subscriptions are in the monitor without data and they are not queued.
-			for _, policyID := range tc.oldPolicies {
+			for _, policyID := range tt.oldPolicies {
 				policies[policyID] = policyT{head: makeHead()}
 			}
 			// Subscribe adds an empty entry and queues the policy for the next load.
 			loadQ := make(map[string]struct{})
-			for _, policyID := range tc.newPolicies {
+			for _, policyID := range tt.newPolicies {
 				if _, ok := policies[policyID]; !ok {
 					policies[policyID] = policyT{head: makeHead()}
 				}
@@ -1124,8 +1139,8 @@ func TestMonitor_LoadPolicies(t *testing.T) {
 			}
 
 			batchSize := defaultPolicySearchBatchSize
-			if tc.batchSize > 0 {
-				batchSize = tc.batchSize
+			if tt.batchSize > 0 {
+				batchSize = tt.batchSize
 			}
 
 			pm := &monitorT{
@@ -1139,24 +1154,24 @@ func TestMonitor_LoadPolicies(t *testing.T) {
 
 			t.Cleanup(store.clear)
 			err := pm.loadPolicies(t.Context())
-			if tc.wantErr == nil {
-				require.NoError(t, err)
+			if tt.wantErr == nil {
+				require.NoError(t, err, "loadPolicies returned unexpected error")
 			} else {
-				require.ErrorIs(t, err, tc.wantErr)
+				require.ErrorIs(t, err, tt.wantErr, "loadPolicies must return error %v", tt.wantErr)
 			}
 
 			// Only the expected policies are searched.
 			searchedIDs := slices.Concat(store.searchedIDs...)
-			if len(tc.wantSearchedIDs) > 0 {
-				assert.ElementsMatch(t, tc.wantSearchedIDs, searchedIDs)
+			if len(tt.wantSearchedIDs) > 0 {
+				assert.ElementsMatch(t, tt.wantSearchedIDs, searchedIDs, "unexpected policy IDs searched")
 			}
 
 			// The expected policies are loaded.
-			assert.ElementsMatch(t, tc.wantPolicies, pm.loadedPolicyIDs())
+			assert.ElementsMatch(t, tt.wantPolicies, pm.loadedPolicyIDs(), "unexpected policy IDs loaded")
 
 			// The searches are split in batches of the batch size.
 			wantBatches := (len(searchedIDs) + batchSize - 1) / batchSize
-			assert.Len(t, store.searchedIDs, wantBatches)
+			assert.Len(t, store.searchedIDs, wantBatches, "unexpected number of search batches")
 		})
 	}
 }
