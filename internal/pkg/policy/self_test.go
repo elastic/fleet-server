@@ -293,7 +293,7 @@ func TestSelfMonitor_DefaultPolicy_Degraded(t *testing.T) {
 	}, ftesting.RetrySleep(1*time.Second))
 
 	// add an active token
-	activeToken := model.EnrollmentAPIKey{ //nolint:gosec // fake api key used in test
+	activeToken := model.EnrollmentAPIKey{
 		Id:       xid.New().String(),
 		Active:   true,
 		APIKey:   "d2JndlFIWUJJUVVxWDVia2NJTV86X0d6ZmljZGNTc1d4R1otbklrZFFRZw==",
@@ -590,7 +590,7 @@ func TestSelfMonitor_SpecificPolicy_Degraded(t *testing.T) {
 	}, ftesting.RetrySleep(1*time.Second))
 
 	// add an active token
-	activeToken := model.EnrollmentAPIKey{ //nolint:gosec // fake api key used in test
+	activeToken := model.EnrollmentAPIKey{
 		Id:       xid.New().String(),
 		Active:   true,
 		APIKey:   "d2JndlFIWUJJUVVxWDVia2NJTV86X0d6ZmljZGNTc1d4R1otbklrZFFRZw==",

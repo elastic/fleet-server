@@ -4,7 +4,6 @@
 
 //go:build !integration
 
-//nolint:dupl // duplicated lines used for test cases
 package config
 
 import (
@@ -193,7 +192,7 @@ func TestToESTransportConfig(t *testing.T) {
 	copts := cmp.Options{
 		cmpopts.IgnoreUnexported(http.Transport{}),
 		cmpopts.IgnoreFields(http.Transport{}, "DialContext"),
-		cmpopts.IgnoreUnexported(tls.Config{}), //nolint:gosec //test case
+		cmpopts.IgnoreUnexported(tls.Config{}),
 	}
 
 	for name, test := range testcases {

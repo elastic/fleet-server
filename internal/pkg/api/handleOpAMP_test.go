@@ -243,13 +243,13 @@ inputs:
 func TestEnrollAgentWithAgentToServerMessage(t *testing.T) {
 	bulker := ftesting.NewMockBulk()
 
-	enrollKey := model.EnrollmentAPIKey{ //nolint:gosec // fake api key used in test
+	enrollKey := model.EnrollmentAPIKey{
 		APIKeyID:   "enroll-key-id",
 		PolicyID:   "policy-123",
 		Namespaces: []string{"my-space"},
 		Active:     true,
 	}
-	enrollKeyBytes, err := json.Marshal(enrollKey) //nolint:gosec // fake api key used in test
+	enrollKeyBytes, err := json.Marshal(enrollKey)
 	require.NoError(t, err)
 
 	bulker.On("Search", mock.Anything, dl.FleetEnrollmentAPIKeys, mock.Anything, mock.Anything).
@@ -328,12 +328,12 @@ func TestEnrollAgentWithAgentToServerMessage(t *testing.T) {
 func TestEnrollAgentRateLimiter(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		bulker := ftesting.NewMockBulk()
-		enrollKey := model.EnrollmentAPIKey{ //nolint:gosec // fake api key used in test
+		enrollKey := model.EnrollmentAPIKey{
 			APIKeyID: "enroll-key-id",
 			PolicyID: "policy-123",
 			Active:   true,
 		}
-		enrollKeyBytes, err := json.Marshal(enrollKey) //nolint:gosec // fake api key used in test
+		enrollKeyBytes, err := json.Marshal(enrollKey)
 		require.NoError(t, err)
 
 		bulker.On("Search", mock.Anything, dl.FleetEnrollmentAPIKeys, mock.Anything, mock.Anything).
@@ -375,12 +375,12 @@ func TestEnrollAgentRateLimiter(t *testing.T) {
 func TestEnrollAgentGeneratesNewUIDWhenFlagSet(t *testing.T) {
 	bulker := ftesting.NewMockBulk()
 
-	enrollKey := model.EnrollmentAPIKey{ //nolint:gosec // fake api key used in test
+	enrollKey := model.EnrollmentAPIKey{
 		APIKeyID: "enroll-key-id",
 		PolicyID: "policy-123",
 		Active:   true,
 	}
-	enrollKeyBytes, err := json.Marshal(enrollKey) //nolint:gosec // fake api key used in test
+	enrollKeyBytes, err := json.Marshal(enrollKey)
 	require.NoError(t, err)
 
 	bulker.On("Search", mock.Anything, dl.FleetEnrollmentAPIKeys, mock.Anything, mock.Anything).
@@ -458,12 +458,12 @@ func TestEnrollAgentTags(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			bulker := ftesting.NewMockBulk()
-			enrollKey := model.EnrollmentAPIKey{ //nolint:gosec // test data, not real credentials
+			enrollKey := model.EnrollmentAPIKey{
 				APIKeyID: "enroll-key-id",
 				PolicyID: "policy-123",
 				Active:   true,
 			}
-			enrollKeyBytes, err := json.Marshal(enrollKey) //nolint:gosec // test data, not real credentials
+			enrollKeyBytes, err := json.Marshal(enrollKey)
 			require.NoError(t, err)
 			bulker.On("Search", mock.Anything, dl.FleetEnrollmentAPIKeys, mock.Anything, mock.Anything).
 				Return(&es.ResultT{Hits: []es.HitT{{Source: enrollKeyBytes}}}, nil)
@@ -689,7 +689,7 @@ func mockBulkerOpAMPNewEnrollment(t *testing.T, apiKeyID string) *ftesting.MockB
 		PolicyID: "policy-123",
 		Active:   true,
 	}
-	enrollKeyBytes, err := json.Marshal(enrollKey) //nolint:gosec // fake api key used in test
+	enrollKeyBytes, err := json.Marshal(enrollKey)
 	require.NoError(t, err)
 	bulker.On("Search", mock.Anything, dl.FleetEnrollmentAPIKeys, mock.Anything, mock.Anything).
 		Return(&es.ResultT{Hits: []es.HitT{{Source: enrollKeyBytes}}}, nil)
@@ -853,7 +853,7 @@ func TestHandleMessageRequestInstanceUid(t *testing.T) {
 					PolicyID: "policy-123",
 					Active:   true,
 				}
-				enrollKeyBytes, err := json.Marshal(enrollKey) //nolint:gosec // fake api key used in test
+				enrollKeyBytes, err := json.Marshal(enrollKey)
 				require.NoError(t, err)
 				bulker.On("Search", mock.Anything, dl.FleetEnrollmentAPIKeys, mock.Anything, mock.Anything).
 					Return(&es.ResultT{Hits: []es.HitT{{Source: enrollKeyBytes}}}, nil)
@@ -956,7 +956,7 @@ func TestHandleMessageReenrollOldDocBehavior(t *testing.T) {
 		PolicyID: "policy-123",
 		Active:   true,
 	}
-	enrollKeyBytes, err := json.Marshal(enrollKey) //nolint:gosec // fake api key used in test
+	enrollKeyBytes, err := json.Marshal(enrollKey)
 	require.NoError(t, err)
 
 	cases := []struct {
