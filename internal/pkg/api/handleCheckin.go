@@ -847,9 +847,14 @@ func (ct *CheckinT) processUpgradeDetails(ctx context.Context, agent *model.Agen
 		return err
 	}
 	// The terminal details are stored even if the result could not be created, so that a later
-	// check-in without upgrade_details cannot mistake the upgrade for a successful one.
-	updateErr := ct.bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3))
-	return errors.Join(resultErr, updateErr)
+	// check-in without upgrade_details cannot mistake the upgrade for a successful one. A failed
+	// result does not fail the check-in (the agent must still report its health and receive
+	// actions): it is logged, and retried by the next check-in that reports the terminal state or
+	// omits upgrade_details, as upgrade_started_at is still set.
+	if resultErr != nil {
+		zerolog.Ctx(ctx).Error().Err(resultErr).Str(ecs.ActionID, details.ActionId).Str(ecs.AgentID, agent.Agent.ID).Msg("unable to record the upgrade result, retrying on a later check-in")
+	}
+	return ct.bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3))
 }
 
 func (ct *CheckinT) markUpgradeComplete(ctx context.Context, agent *model.Agent, ver string) error {
@@ -897,7 +902,10 @@ func (ct *CheckinT) markUpgradeComplete(ctx context.Context, agent *model.Agent,
 	if ud := agent.UpgradeDetails; ud != nil && ud.ActionID != "" {
 		if outcome, ok := noDetailsOutcome(agent, ver); ok {
 			if err := ct.createUpgradeResult(ctx, agent, ud.ActionID, outcome); err != nil {
-				return err
+				// Do not fail the check-in (the agent must still report its health and receive
+				// actions), and keep the stored upgrade_details so the next check-in tries again.
+				zerolog.Ctx(ctx).Error().Err(err).Str(ecs.ActionID, ud.ActionID).Str(ecs.AgentID, agent.Agent.ID).Msg("unable to record the upgrade result, retrying on a later check-in")
+				return nil
 			}
 		}
 	}

@@ -1136,7 +1136,7 @@ func TestProcessUpgradeDetails(t *testing.T) {
 			},
 			err: nil,
 		}, {
-			name:  "upgrade failed result create error stores the details and keeps upgrade_started_at",
+			name:  "upgrade failed result create error stores the details, keeps upgrade_started_at and does not fail the check-in",
 			agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}},
 			details: &UpgradeDetails{
 				ActionId: "test-action",
@@ -1145,7 +1145,7 @@ func TestProcessUpgradeDetails(t *testing.T) {
 			},
 			bulk:  bulkOf(withResultError, withUpdate(updateKeepsStartedAt)),
 			cache: actionInCache,
-			err:   errBoom,
+			err:   nil, // the check-in does not fail, the result is retried later
 		}, {
 			name:  "upgrade rollback result create error stores the rollback over a watched upgrade",
 			agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}, UpgradeStartedAt: "2026-01-01T00:00:00Z", UpgradeDetails: &model.UpgradeDetails{ActionID: "test-action", State: "UPG_WATCHING"}},
@@ -1156,7 +1156,7 @@ func TestProcessUpgradeDetails(t *testing.T) {
 			},
 			bulk:  bulkOf(withResultError, withUpdate(updateKeepsStartedAt)),
 			cache: actionInCache,
-			err:   errBoom,
+			err:   nil, // the check-in does not fail, the result is retried later
 		}, {
 			name:  "upgrade failed re-reported with upgrade_started_at still set creates the missing result",
 			agent: &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}, UpgradeStartedAt: "2026-01-01T00:00:00Z", UpgradeDetails: &model.UpgradeDetails{ActionID: "test-action", State: "UPG_FAILED"}},
@@ -1246,6 +1246,13 @@ func TestProcessUpgradeDetails(t *testing.T) {
 			details: nil,
 			ver:     "9.3.0",
 			bulk:    bulkOf(withRollbackSuccess, withUpdate(mock.Anything)),
+			cache:   emptyCache,
+			err:     nil,
+		}, {
+			name:    "checkin details nil result create error keeps the stored details and does not fail the check-in",
+			agent:   &model.Agent{ESDocument: esd, Agent: &model.AgentMetadata{ID: "test-agent"}, UpgradeStartedAt: "2026-01-01T00:00:00Z", UpgradeDetails: &model.UpgradeDetails{ActionID: "test-action", State: "UPG_WATCHING"}},
+			details: nil,
+			bulk:    bulkOf(withResultError), // no update: the details are cleared once the result exists
 			cache:   emptyCache,
 			err:     nil,
 		}, {
