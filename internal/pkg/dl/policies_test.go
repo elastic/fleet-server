@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"testing"
 
@@ -27,6 +28,7 @@ import (
 type fakePolicySearchBulk struct {
 	bulk.Bulk
 	items            map[string]bulk.MsearchResponseItem
+	requestErrs      map[string]error
 	defaultPolicyIDs []string
 }
 
@@ -94,7 +96,7 @@ func (b *fakePolicySearchBulk) Search(_ context.Context, _ string, query []byte,
 
 func (b *fakePolicySearchBulk) MSearch(_ context.Context, ops []bulk.MultiOp, _ ...bulk.Opt) ([]bulk.MsearchResponseItem, error) {
 	items := make([]bulk.MsearchResponseItem, len(ops))
-	var requestErr error
+	var requestErrs []error
 	for i, op := range ops {
 		policyIDs, err := searchedPolicyIDs(op.Body)
 		if err != nil {
@@ -103,13 +105,23 @@ func (b *fakePolicySearchBulk) MSearch(_ context.Context, ops []bulk.MultiOp, _ 
 		if len(policyIDs) != 1 {
 			return nil, fmt.Errorf("got %d policy IDs, want 1", len(policyIDs))
 		}
+		if reqErr, ok := b.requestErrs[policyIDs[0]]; ok {
+			items[i].RequestError = reqErr
+			if !slices.ContainsFunc(requestErrs, func(err error) bool { return errors.Is(err, reqErr) }) {
+				requestErrs = append(requestErrs, reqErr)
+			}
+			continue
+		}
 		item, ok := b.items[policyIDs[0]]
 		if !ok {
-			requestErr = errRequestFailed
+			item.RequestError = errRequestFailed
+			if !slices.ContainsFunc(requestErrs, func(err error) bool { return errors.Is(err, errRequestFailed) }) {
+				requestErrs = append(requestErrs, errRequestFailed)
+			}
 		}
 		items[i] = item
 	}
-	return items, requestErr
+	return items, errors.Join(requestErrs...)
 }
 
 func searchedPolicyIDs(query []byte) ([]string, error) {
@@ -420,6 +432,14 @@ func TestQueryLatestPoliciesByID(t *testing.T) {
 					"reason": "timed out"
 				}`),
 			},
+			"missing-index-policy": {
+				Status: http.StatusNotFound,
+				Error: json.RawMessage(`{
+					"root_cause": [{"type": "index_not_found_exception", "reason": "no such index [.fleet-policies]"}],
+					"type": "index_not_found_exception",
+					"reason": "no such index [.fleet-policies]"
+				}`),
+			},
 			"missing-policy": {
 				Status: http.StatusOK,
 				Aggregations: map[string]es.Aggregation{
@@ -432,6 +452,9 @@ func TestQueryLatestPoliciesByID(t *testing.T) {
 					FieldPolicyID: {Buckets: []es.Bucket{}},
 				},
 			},
+		},
+		requestErrs: map[string]error{
+			"missing-index-request": es.ErrIndexNotFound,
 		},
 	}
 
@@ -450,7 +473,7 @@ func TestQueryLatestPoliciesByID(t *testing.T) {
 		},
 		{
 			name:      "valid policies are returned when other policies fail",
-			policyIDs: []string{"policy-a", "failed-policy", "malformed-policy", "timed-out-policy", "policy-b"},
+			policyIDs: []string{"policy-a", "failed-policy", "malformed-policy", "timed-out-policy", "failed-policy-2", "policy-b"},
 			wantPolicies: []model.Policy{
 				{PolicyID: "policy-a", RevisionIdx: 2},
 				{PolicyID: "policy-b", RevisionIdx: 1},
@@ -458,27 +481,52 @@ func TestQueryLatestPoliciesByID(t *testing.T) {
 			wantErrs: []error{errRequestFailed, ErrInvalidPolicy, es.ErrTimeout},
 		},
 		{
-			name:         "no policy is returned for a policy that does not exist",
-			policyIDs:    []string{"missing-policy"},
-			wantPolicies: []model.Policy{},
+			name:      "no policy is returned for a policy that does not exist",
+			policyIDs: []string{"missing-policy"},
 		},
 		{
-			name:         "query injection through the policy ID is prevented",
-			policyIDs:    []string{`policy"}]}} , "x": "y`},
-			wantPolicies: []model.Policy{},
+			name:      "a missing index does not return an error",
+			policyIDs: []string{"missing-index-policy"},
+		},
+		{
+			name:      "a missing index request error does not return an error",
+			policyIDs: []string{"missing-index-request"},
+		},
+		{
+			name:      "a missing index request error does not hide another request failure",
+			policyIDs: []string{"missing-index-request", "failed-policy"},
+			wantErrs:  []error{errRequestFailed},
+		},
+		{
+			name:      "a missing index does not hide other failures",
+			policyIDs: []string{"missing-index-policy", "timed-out-policy"},
+			wantErrs:  []error{es.ErrTimeout},
+		},
+		{
+			name:      "valid policies are returned when another search reports a missing index",
+			policyIDs: []string{"policy-a", "missing-index-policy"},
+			wantPolicies: []model.Policy{
+				{PolicyID: "policy-a", RevisionIdx: 2},
+			},
+		},
+		{
+			name:      "query injection through the policy ID is prevented",
+			policyIDs: []string{`policy"}]}} , "x": "y`},
 		},
 	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			policies, err := QueryLatestPoliciesByID(t.Context(), bulker, tc.policyIDs)
-			if len(tc.wantErrs) == 0 {
-				require.NoError(t, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			policies, err := QueryLatestPoliciesByID(t.Context(), bulker, tt.policyIDs)
+			if len(tt.wantErrs) == 0 {
+				require.NoError(t, err, "QueryLatestPoliciesByID returned unexpected error")
 			}
-			for _, wantErr := range tc.wantErrs {
-				require.ErrorIs(t, err, wantErr)
+			for _, wantErr := range tt.wantErrs {
+				require.ErrorIs(t, err, wantErr, "QueryLatestPoliciesByID must return error %v", wantErr)
+				assert.Equal(t, 1, strings.Count(err.Error(), wantErr.Error()), "error %q must not be repeated in %q", wantErr, err)
 			}
-			assert.ElementsMatch(t, tc.wantPolicies, policies)
+			assert.NotErrorIs(t, err, es.ErrIndexNotFound, "missing-index errors must be suppressed")
+			assert.ElementsMatch(t, tt.wantPolicies, policies, "unexpected policies returned")
 		})
 	}
 }
