@@ -158,6 +158,15 @@ linters:
       - path: _test\.go
         linters:
           - goconst
+      # Table-driven test cases repeat similar fixtures on purpose.
+      - path: _test\.go
+        linters:
+          - dupl
+      # Test fixtures that look like credentials (G101) or marshal fake secrets (G117) are not real ones.
+      - path: _test\.go
+        linters:
+          - gosec
+        text: "G101|G117"
     paths:
       - third_party$
       - builtin$

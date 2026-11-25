@@ -4,7 +4,6 @@
 
 //go:build !integration
 
-//nolint:dupl // duplicated lines used for test cases
 package config
 
 import (

@@ -4,7 +4,6 @@
 
 //go:build !integration
 
-//nolint:dupl // test cases have some duplication
 package api
 
 import (
@@ -382,7 +381,7 @@ func TestHandleAckEvents(t *testing.T) {
 				AccessAPIKeyID: "access-key-id",
 				LocalMetadata:  json.RawMessage(`{"elastic":{"agent":{"uninstallable":true}}}`),
 				Outputs: map[string]*model.PolicyOutput{
-					"default": { //nolint:gosec // test fixture, not a real credential
+					"default": {
 						APIKey:          "es-output-key",
 						APIKeyID:        "es-output-key-id",
 						PermissionsHash: "oldhash",

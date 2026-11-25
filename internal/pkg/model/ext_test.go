@@ -96,8 +96,8 @@ func TestAgentAPIKeyIDs(t *testing.T) {
 			agent: Agent{
 				AccessAPIKeyID: "access_api_key_id",
 				Outputs: map[string]*PolicyOutput{
-					"p1": {APIKeyID: "p1_api_key_id"}, //nolint:gosec // test data, not real credentials
-					"p2": {APIKeyID: "p2_api_key_id"}, //nolint:gosec // test data, not real credentials
+					"p1": {APIKeyID: "p1_api_key_id"},
+					"p2": {APIKeyID: "p2_api_key_id"},
 				},
 			},
 			want: []ToRetireAPIKeyIdsItems{{ID: "access_api_key_id", Output: "", RetiredAt: ""},
@@ -109,13 +109,13 @@ func TestAgentAPIKeyIDs(t *testing.T) {
 			agent: Agent{
 				AccessAPIKeyID: "access_api_key_id",
 				Outputs: map[string]*PolicyOutput{
-					"p1": { //nolint:gosec // test data, not real credentials
+					"p1": {
 						APIKeyID: "p1_api_key_id",
 						ToRetireAPIKeyIds: []ToRetireAPIKeyIdsItems{{
 							ID:     "p1_to_retire_key",
 							Output: "remote",
 						}}},
-					"p2": { //nolint:gosec // test data, not real credentials
+					"p2": {
 						APIKeyID: "p2_api_key_id",
 						ToRetireAPIKeyIds: []ToRetireAPIKeyIdsItems{{
 							ID:     "p2_to_retire_key",
@@ -144,7 +144,7 @@ func TestAgentAPIKeyIDs(t *testing.T) {
 			agent: Agent{
 				AccessAPIKeyID: "access_api_key_id",
 				Outputs: map[string]*PolicyOutput{
-					"p1": { //nolint:gosec // test data, not real credentials
+					"p1": {
 						APIKeyID: "p1_api_key_id",
 						ToRetireAPIKeyIds: []ToRetireAPIKeyIdsItems{{
 							ID: "",
@@ -178,8 +178,8 @@ func TestAgentOutputAPIKeyIDs(t *testing.T) {
 			agent: Agent{
 				AccessAPIKeyID: "access_api_key_id",
 				Outputs: map[string]*PolicyOutput{
-					"default": {APIKeyID: "default_api_key_id"}, //nolint:gosec // test data, not real credentials
-					"p2": { //nolint:gosec // test data, not real credentials
+					"default": {APIKeyID: "default_api_key_id"},
+					"p2": {
 						APIKeyID: "p2_api_key_id",
 						ToRetireAPIKeyIds: []ToRetireAPIKeyIdsItems{{
 							ID:     "p2_to_retire_key",

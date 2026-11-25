@@ -470,7 +470,6 @@ func TestResolveSeqNo(t *testing.T) {
 
 }
 
-//nolint:dupl // table-driven test cases intentionally repeat similar fixtures
 func TestProcessUpgradeDetails(t *testing.T) {
 	esd := model.ESDocument{Id: "doc-ID"}
 	doc := bulk.UpdateFields{
@@ -2338,7 +2337,7 @@ func TestProcessPolicyOTLPOutput(t *testing.T) {
 	const outputName = "my-otlp"
 
 	// secretDocID is returned by MockBulk.WriteSecret; MockBulk.ReadSecrets returns id+"_value".
-	const secretDocID = "otlp-secret-doc-id" //nolint:gosec // test fixture, not a real credential
+	const secretDocID = "otlp-secret-doc-id"
 	wantHeader := "ApiKey " + base64.StdEncoding.EncodeToString([]byte(secretDocID+"_value"))
 
 	tests := []struct {
@@ -2450,7 +2449,7 @@ func TestProcessPolicyOTLPOutput(t *testing.T) {
 func TestPrepareOTelExporters(t *testing.T) {
 	esAPIKey := "keyid:secret"
 	esAPIKeyB64 := base64.StdEncoding.EncodeToString([]byte(esAPIKey))
-	otlpAPIKey := "otlpid:otlpsecret" //nolint:gosec // test fixture, not a real credential
+	otlpAPIKey := "otlpid:otlpsecret"
 	otlpAPIKeyB64 := base64.StdEncoding.EncodeToString([]byte(otlpAPIKey))
 
 	esOutput := map[string]any{"type": policy.OutputTypeElasticsearch, "api_key": esAPIKey}
@@ -2558,9 +2557,9 @@ func TestPrepareOTelExporters(t *testing.T) {
 }
 
 func TestFetchAgentPendingActionsReplacesSecrets(t *testing.T) {
-	const actionWithSecret = `{"action_id":"action-with-secret","type":"INPUT_ACTION","data":{"parameters":{"credential":"$co.elastic.secret{ref1}"}},"secret_references":[{"id":"ref1"}]}`       //nolint:gosec // test fixture, not a real credential
-	const actionWithoutSecret = `{"action_id":"action-without-secret","type":"INPUT_ACTION","data":{"parameters":{"credential":"plain"}}}`                                                        //nolint:gosec // test fixture, not a real credential
-	const filteredActionWithSecret = `{"action_id":"filtered-action","type":"POLICY_CHANGE","data":{"parameters":{"credential":"$co.elastic.secret{ref1}"}},"secret_references":[{"id":"ref1"}]}` //nolint:gosec // test fixture, not a real credential
+	const actionWithSecret = `{"action_id":"action-with-secret","type":"INPUT_ACTION","data":{"parameters":{"credential":"$co.elastic.secret{ref1}"}},"secret_references":[{"id":"ref1"}]}`
+	const actionWithoutSecret = `{"action_id":"action-without-secret","type":"INPUT_ACTION","data":{"parameters":{"credential":"plain"}}}`
+	const filteredActionWithSecret = `{"action_id":"filtered-action","type":"POLICY_CHANGE","data":{"parameters":{"credential":"$co.elastic.secret{ref1}"}},"secret_references":[{"id":"ref1"}]}`
 
 	bulker := ftesting.NewMockBulk()
 	bulker.On("Search", mock.Anything, dl.FleetActions, mock.Anything, mock.Anything).
