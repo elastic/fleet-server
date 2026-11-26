@@ -27,6 +27,12 @@ const (
 	// per-agent escalation state when graceful_force_unenroll is enabled. At ~250 bytes per
 	// entry this holds approximately 200,000 agents.
 	DefaultGracefulForceUnenrollMaxBytes = 50_000_000 // 50 MB
+
+	// defaultLimitsFromMemoryPercent is the default percentage of the available memory that
+	// Fleet Server uses to calculate the limits when limits_from_memory is enabled. The rest is
+	// left for Elastic Agent and the other processes that share the container and its
+	// GOMEMLIMIT, such as APM Server in the Integrations Server on ECH.
+	defaultLimitsFromMemoryPercent = 75
 )
 
 // Policy is the configuration policy to use.
@@ -126,6 +132,30 @@ func (v *AgentVersionLimit) Unpack(raw any) error {
 }
 
 // Server is the configuration for the server
+// LimitsFromMemoryConfig controls the limits-from-memory feature.
+type LimitsFromMemoryConfig struct {
+	// Enabled calculates the server limits from the available memory instead of the memory
+	// tier when max_agents is not set.
+	Enabled bool `config:"enabled"`
+
+	// MemoryPercent is the percentage of the available memory that Fleet Server uses to
+	// calculate the limits, from 1 to 100.
+	MemoryPercent int `config:"memory_percent"`
+}
+
+// InitDefaults initializes the defaults for the configuration.
+func (c *LimitsFromMemoryConfig) InitDefaults() {
+	c.MemoryPercent = defaultLimitsFromMemoryPercent
+}
+
+// Validate ensures that the configuration is valid.
+func (c *LimitsFromMemoryConfig) Validate() error {
+	if c.MemoryPercent < 1 || c.MemoryPercent > 100 {
+		return fmt.Errorf("limits_from_memory.memory_percent must be between 1 and 100, got %d", c.MemoryPercent)
+	}
+	return nil
+}
+
 type (
 	Server struct {
 		Host               string                  `config:"host"`
@@ -168,6 +198,9 @@ type (
 
 		// EnableOpAMP controls whether the OpAMP endpoint is enabled. Defaults to true.
 		EnableOpAMP bool `config:"enable_opamp"`
+
+		// LimitsFromMemory configures the calculation of the server limits from the available memory.
+		LimitsFromMemory LimitsFromMemoryConfig `config:"limits_from_memory"`
 
 		// GracefulForceUnenroll configures the three-step escalation applied to agents that
 		// check in with an invalid or disabled API key.
@@ -237,6 +270,7 @@ func (c *Server) InitDefaults() {
 	c.Features.EnableOpAMP = true
 	c.Features.EvaluateConditions.AgentID = true
 	c.Features.GracefulForceUnenroll.MaxBytes = DefaultGracefulForceUnenrollMaxBytes
+	c.Features.LimitsFromMemory.InitDefaults()
 }
 
 // BindEndpoints returns the binding address for the all HTTP server listeners.

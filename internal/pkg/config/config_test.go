@@ -517,14 +517,14 @@ func defaultCache() Cache {
 	log := zerolog.Nop()
 	var d Cache
 	d.InitDefaults()
-	d.LoadLimits(loadLimits(&log, 0))
+	d.LoadLimits(loadLimits(&log, &Input{}))
 	return d
 }
 
 func generateCache(maxAgents int) Cache {
 	log := zerolog.Nop()
 	var d Cache
-	d.LoadLimits(loadLimits(&log, maxAgents))
+	d.LoadLimits(loadLimits(&log, &Input{Server: Server{Limits: ServerLimits{MaxAgents: maxAgents}}}))
 	return d
 }
 
@@ -532,7 +532,7 @@ func generateServerLimits(maxAgents int) ServerLimits {
 	log := zerolog.Nop()
 	var d ServerLimits
 	d.MaxAgents = maxAgents
-	d.LoadLimits(loadLimits(&log, maxAgents))
+	d.LoadLimits(loadLimits(&log, &Input{Server: Server{Limits: ServerLimits{MaxAgents: maxAgents}}}))
 	return d
 }
 
@@ -573,7 +573,7 @@ func defaultServer() Server {
 	log := zerolog.Nop()
 	var d Server
 	d.InitDefaults()
-	d.Limits.LoadLimits(loadLimits(&log, 0))
+	d.Limits.LoadLimits(loadLimits(&log, &Input{}))
 	return d
 }
 
