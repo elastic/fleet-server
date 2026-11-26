@@ -1093,8 +1093,10 @@ func captureAgentUpdates(t *testing.T, bulker *ftesting.MockBulk, agentID string
 	var updates []agentUpdateScript
 	bulker.On("Update", mock.Anything, dl.FleetAgents, agentID, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
+			body, ok := args.Get(3).([]byte)
+			require.True(t, ok)
 			var u agentUpdateScript
-			require.NoError(t, json.Unmarshal(args.Get(3).([]byte), &u))
+			require.NoError(t, json.Unmarshal(body, &u))
 			updates = append(updates, u)
 		}).
 		Return(nil)
@@ -1102,6 +1104,9 @@ func captureAgentUpdates(t *testing.T, bulker *ftesting.MockBulk, agentID string
 }
 
 func TestPolicyOutputPrepareWithoutAPIKey(t *testing.T) {
+	const secretID = "secret1"
+	secretRef := "$co.elastic.secret{" + secretID + "}"
+
 	t.Run("removed outputs are parked on the kafka output when no output with API keys is left", func(t *testing.T) {
 		logger := testlog.SetLogger(t)
 		bulker := ftesting.NewMockBulk()
@@ -1110,7 +1115,7 @@ func TestPolicyOutputPrepareWithoutAPIKey(t *testing.T) {
 		agent := &model.Agent{
 			ESDocument: model.ESDocument{Id: "agent1"},
 			Outputs: map[string]*model.PolicyOutput{
-				"default": {APIKey: "$co.elastic.secret{secret1}", APIKeyID: "key1", Type: OutputTypeElasticsearch},
+				"default": {APIKey: secretRef, APIKeyID: "key1", Type: OutputTypeElasticsearch},
 				"remote": {
 					APIKeyID:          "remoteKey1",
 					Type:              OutputTypeElasticsearch,
@@ -1139,7 +1144,7 @@ func TestPolicyOutputPrepareWithoutAPIKey(t *testing.T) {
 		assert.ElementsMatch(t, []string{"default", "remote"}, removed)
 		require.Len(t, parked, 3)
 		assert.Equal(t, model.ToRetireAPIKeyIdsItems{
-			ID: "key1", RetiredAt: parked["key1"].RetiredAt, Output: "default", OutputType: OutputTypeElasticsearch, SecretID: "secret1",
+			ID: "key1", RetiredAt: parked["key1"].RetiredAt, Output: "default", OutputType: OutputTypeElasticsearch, SecretID: secretID,
 		}, parked["key1"])
 		assert.Equal(t, "remote", parked["remoteKey1"].Output)
 		assert.Equal(t, "remote", parked["oldRemoteKey"].Output)
@@ -1158,7 +1163,7 @@ func TestPolicyOutputPrepareWithoutAPIKey(t *testing.T) {
 			ESDocument: model.ESDocument{Id: "agent1"},
 			Outputs: map[string]*model.PolicyOutput{
 				"default": {
-					APIKey:            "$co.elastic.secret{secret1}",
+					APIKey:            secretRef,
 					APIKeyID:          "key1",
 					PermissionsHash:   "hash1",
 					Type:              OutputTypeElasticsearch,
@@ -1178,7 +1183,7 @@ func TestPolicyOutputPrepareWithoutAPIKey(t *testing.T) {
 		assert.Equal(t, "default", park.OutputName)
 		require.NotNil(t, park.ToRetire)
 		assert.Equal(t, "key1", park.ToRetire.ID)
-		assert.Equal(t, "secret1", park.ToRetire.SecretID)
+		assert.Equal(t, secretID, park.ToRetire.SecretID)
 		assert.Equal(t, OutputTypeElasticsearch, park.ToRetire.OutputType)
 		require.NotNil(t, park.APIKeyID)
 		assert.Empty(t, *park.APIKeyID)

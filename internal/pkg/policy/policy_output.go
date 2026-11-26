@@ -594,23 +594,20 @@ ctx._source['outputs'][params.output_name].%s=params.%s;`, field, field)
 	maps.Copy(params, fields)
 	params["output_name"] = outputName
 
-	body, err := json.Marshal(map[string]any{
-		"script": map[string]any{
-			"lang":   "painless",
-			"source": source.String(),
-			"params": params,
-		},
-	})
-
-	return body, err
+	return renderPainlessScript(source.String(), params)
 }
 
 func renderRemoveOutputPainlessScript(outputName string) ([]byte, error) {
+	return renderPainlessScript("ctx._source['outputs'].remove(params.output_name)", map[string]any{"output_name": outputName})
+}
+
+// renderPainlessScript renders the body of an update request running the painless source with params.
+func renderPainlessScript(source string, params map[string]any) ([]byte, error) {
 	return json.Marshal(map[string]any{
 		"script": map[string]any{
 			"lang":   "painless",
-			"source": "ctx._source['outputs'].remove(params.output_name)",
-			"params": map[string]any{"output_name": outputName},
+			"source": source,
+			"params": params,
 		},
 	})
 }
