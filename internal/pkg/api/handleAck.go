@@ -362,7 +362,7 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 
 	// Process policy acks
 	if len(policyAcks) > 0 {
-		if err := ack.handlePolicyChange(ctx, zlog, agent, policyAcks...); err != nil {
+		if err := ack.handleAckForPolicyChange(ctx, zlog, agent, policyAcks...); err != nil {
 			for _, idx := range policyIdxs {
 				setError(idx, err)
 			}
@@ -442,7 +442,7 @@ func (ack *AckT) handleActionResult(ctx context.Context, zlog zerolog.Logger, ag
 	return nil
 }
 
-func (ack *AckT) handlePolicyChange(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, actionIds ...string) error {
+func (ack *AckT) handleAckForPolicyChange(ctx context.Context, zlog zerolog.Logger, agent *model.Agent, actionIds ...string) error {
 	span, ctx := apm.StartSpan(ctx, "ackPolicyChanges", "process")
 	defer span.End()
 	// If more than one, pick the winner;

@@ -1,0 +1,7 @@
+kind: bug-fix
+summary: Retire output API keys when an output changes to Logstash or Kafka
+description: >-
+  Fleet Server now retires the API keys of agent outputs that are removed or changed
+  to an output type without API keys, such as Logstash or Kafka. Previously, these
+  keys could remain valid after the policy change.
+component: fleet-server

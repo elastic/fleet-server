@@ -10,6 +10,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"maps"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -90,7 +92,7 @@ func TestPolicyLogstashOutputPrepare(t *testing.T) {
 		},
 	}
 
-	err := po.Prepare(context.Background(), logger, bulker, &model.Agent{}, map[string]map[string]any{})
+	err := po.Prepare(context.Background(), logger, bulker, &model.Agent{}, map[string]map[string]any{po.Name: {"type": po.Type}})
 	require.Nil(t, err, "expected prepare to pass")
 	bulker.AssertExpectations(t)
 }
@@ -103,7 +105,7 @@ func TestPolicyLogstashOutputPrepareNoRole(t *testing.T) {
 		Role: nil,
 	}
 
-	err := po.Prepare(context.Background(), logger, bulker, &model.Agent{}, map[string]map[string]any{})
+	err := po.Prepare(context.Background(), logger, bulker, &model.Agent{}, map[string]map[string]any{po.Name: {"type": po.Type}})
 	// No permissions are required by logstash currently
 	require.Nil(t, err, "expected prepare to pass")
 	bulker.AssertExpectations(t)
@@ -121,7 +123,7 @@ func TestPolicyDefaultLogstashOutputPrepare(t *testing.T) {
 		},
 	}
 
-	err := po.Prepare(context.Background(), logger, bulker, &model.Agent{}, map[string]map[string]any{})
+	err := po.Prepare(context.Background(), logger, bulker, &model.Agent{}, map[string]map[string]any{po.Name: {"type": po.Type}})
 	require.Nil(t, err, "expected prepare to pass")
 	bulker.AssertExpectations(t)
 }
@@ -138,7 +140,7 @@ func TestPolicyKafkaOutputPrepare(t *testing.T) {
 		},
 	}
 
-	err := po.Prepare(context.Background(), logger, bulker, &model.Agent{}, map[string]map[string]any{})
+	err := po.Prepare(context.Background(), logger, bulker, &model.Agent{}, map[string]map[string]any{po.Name: {"type": po.Type}})
 	require.Nil(t, err, "expected prepare to pass")
 	bulker.AssertExpectations(t)
 }
@@ -151,7 +153,7 @@ func TestPolicyKafkaOutputPrepareNoRole(t *testing.T) {
 		Role: nil,
 	}
 
-	err := po.Prepare(context.Background(), logger, bulker, &model.Agent{}, map[string]map[string]any{})
+	err := po.Prepare(context.Background(), logger, bulker, &model.Agent{}, map[string]map[string]any{po.Name: {"type": po.Type}})
 	// No permissions are required by kafka currently
 	require.Nil(t, err, "expected prepare to pass")
 	bulker.AssertExpectations(t)
@@ -786,7 +788,9 @@ func TestPolicyOTLPOutputPrepareRetiresRemovedOutput(t *testing.T) {
 
 			// If there were pending records, verify the first call transferred one of them.
 			if len(tc.pendingRecords) > 0 {
-				transferParams := parseParkParams(t, bulker.Calls[0].Arguments.Get(3).([]byte))
+				transferBody, ok := bulker.Calls[0].Arguments.Get(3).([]byte)
+				require.True(t, ok, "first Update body must be []byte")
+				transferParams := parseParkParams(t, transferBody)
 				transferRecord, ok := transferParams[dl.FieldPolicyOutputToRetireAPIKeyIDs].(map[string]any)
 				require.True(t, ok, "first Update must be a transfer of the pending record")
 				assert.Equal(t, pendingKeyID, transferRecord["id"])
@@ -794,7 +798,9 @@ func TestPolicyOTLPOutputPrepareRetiresRemovedOutput(t *testing.T) {
 
 			// The second-to-last call parks the removed output's active key onto the incoming output.
 			// Requirement (a): this call precedes the remove — enforced by NotBefore above.
-			parkParams := parseParkParams(t, bulker.Calls[tc.wantCalls-2].Arguments.Get(3).([]byte))
+			parkBody, ok := bulker.Calls[tc.wantCalls-2].Arguments.Get(3).([]byte)
+			require.True(t, ok, "park Update body must be []byte")
+			parkParams := parseParkParams(t, parkBody)
 			parkRecord, ok := parkParams[dl.FieldPolicyOutputToRetireAPIKeyIDs].(map[string]any)
 			require.True(t, ok, "park body must contain a retirement record map")
 			assert.Equal(t, removedKeyID, parkRecord["id"])
@@ -1034,7 +1040,7 @@ func TestPolicyRemoteESOutputPrepare(t *testing.T) {
 		logger := testlog.SetLogger(t)
 		bulker := ftesting.NewMockBulk()
 		var apiKey *bulk.APIKey = nil
-		var err error = errors.New("error connecting")
+		err := errors.New("error connecting")
 
 		outputBulker := ftesting.NewMockBulk()
 		outputBulker.On("APIKeyCreate",
@@ -1072,5 +1078,147 @@ func TestPolicyRemoteESOutputPrepare(t *testing.T) {
 		require.NoError(t, err, "expected prepare to pass")
 
 		bulker.AssertExpectations(t)
+	})
+}
+
+type agentUpdateScript struct {
+	Script struct {
+		Source string `json:"source"`
+		Params struct {
+			OutputName string                        `json:"output_name"`
+			ToRetire   *model.ToRetireAPIKeyIdsItems `json:"to_retire_api_key_ids"`
+			APIKeyID   *string                       `json:"api_key_id"`
+		} `json:"params"`
+	} `json:"script"`
+}
+
+func captureAgentUpdates(t *testing.T, bulker *ftesting.MockBulk, agentID string) *[]agentUpdateScript {
+	t.Helper()
+	var updates []agentUpdateScript
+	bulker.On("Update", mock.Anything, dl.FleetAgents, agentID, mock.Anything, mock.Anything).
+		Run(func(args mock.Arguments) {
+			body, ok := args.Get(3).([]byte)
+			require.True(t, ok)
+			var u agentUpdateScript
+			require.NoError(t, json.Unmarshal(body, &u))
+			updates = append(updates, u)
+		}).
+		Return(nil)
+	return &updates
+}
+
+func TestPolicyOutputPrepareWithoutAPIKey(t *testing.T) {
+	const secretID = "secret1"
+	secretRef := "$co.elastic.secret{" + secretID + "}"
+
+	t.Run("removed outputs are parked on the kafka output when no output with API keys is left", func(t *testing.T) {
+		logger := testlog.SetLogger(t)
+		bulker := ftesting.NewMockBulk()
+		updates := captureAgentUpdates(t, bulker, "agent1")
+
+		agent := &model.Agent{
+			Id: "agent1",
+			Outputs: map[string]*model.PolicyOutput{
+				"default": {APIKey: secretRef, APIKeyID: "key1", Type: OutputTypeElasticsearch},
+				"remote": {
+					APIKeyID:          "remoteKey1",
+					Type:              OutputTypeElasticsearch,
+					ToRetireAPIKeyIds: []model.ToRetireAPIKeyIdsItems{{ID: "oldRemoteKey", Output: "remote"}},
+				},
+			},
+		}
+		outputMap := map[string]map[string]any{
+			"kafka": {"type": OutputTypeKafka},
+		}
+
+		output := Output{Name: "kafka", Type: OutputTypeKafka}
+		require.NoError(t, output.Prepare(t.Context(), logger, bulker, agent, outputMap))
+
+		parked := map[string]model.ToRetireAPIKeyIdsItems{}
+		var removed []string
+		for _, u := range *updates {
+			if u.Script.Params.ToRetire != nil {
+				assert.Equal(t, "kafka", u.Script.Params.OutputName)
+				parked[u.Script.Params.ToRetire.ID] = *u.Script.Params.ToRetire
+				continue
+			}
+			assert.Contains(t, u.Script.Source, "remove(params.output_name)")
+			removed = append(removed, u.Script.Params.OutputName)
+		}
+		assert.ElementsMatch(t, []string{"default", "remote"}, removed)
+		require.Len(t, parked, 3)
+		assert.Equal(t, model.ToRetireAPIKeyIdsItems{
+			ID: "key1", RetiredAt: parked["key1"].RetiredAt, Output: "default", OutputType: OutputTypeElasticsearch, SecretID: secretID,
+		}, parked["key1"])
+		assert.Equal(t, "remote", parked["remoteKey1"].Output)
+		assert.Equal(t, "remote", parked["oldRemoteKey"].Output)
+
+		assert.Equal(t, []string{"kafka"}, slices.Sorted(maps.Keys(agent.Outputs)))
+		bulker.AssertNotCalled(t, "APIKeyInvalidate", mock.Anything, mock.Anything)
+		bulker.AssertNotCalled(t, "DeleteSecret", mock.Anything, mock.Anything)
+	})
+
+	t.Run("key of output changed from elasticsearch to logstash is parked on itself", func(t *testing.T) {
+		logger := testlog.SetLogger(t)
+		bulker := ftesting.NewMockBulk()
+		updates := captureAgentUpdates(t, bulker, "agent1")
+
+		agent := &model.Agent{
+			Id: "agent1",
+			Outputs: map[string]*model.PolicyOutput{
+				"default": {
+					APIKey:            secretRef,
+					APIKeyID:          "key1",
+					PermissionsHash:   "hash1",
+					Type:              OutputTypeElasticsearch,
+					ToRetireAPIKeyIds: []model.ToRetireAPIKeyIdsItems{{ID: "oldKey", Output: "default"}},
+				},
+			},
+		}
+		outputMap := map[string]map[string]any{
+			"default": {"type": OutputTypeLogstash},
+		}
+
+		output := Output{Name: "default", Type: OutputTypeLogstash}
+		require.NoError(t, output.Prepare(t.Context(), logger, bulker, agent, outputMap))
+
+		require.Len(t, *updates, 1)
+		park := (*updates)[0].Script.Params
+		assert.Equal(t, "default", park.OutputName)
+		require.NotNil(t, park.ToRetire)
+		assert.Equal(t, "key1", park.ToRetire.ID)
+		assert.Equal(t, secretID, park.ToRetire.SecretID)
+		assert.Equal(t, OutputTypeElasticsearch, park.ToRetire.OutputType)
+		require.NotNil(t, park.APIKeyID)
+		assert.Empty(t, *park.APIKeyID)
+
+		out := agent.Outputs["default"]
+		require.NotNil(t, out)
+		assert.Empty(t, out.APIKeyID)
+		assert.Empty(t, out.APIKey)
+		assert.Empty(t, out.PermissionsHash)
+		require.Len(t, out.ToRetireAPIKeyIds, 2)
+		assert.Equal(t, "oldKey", out.ToRetireAPIKeyIds[0].ID)
+		assert.Equal(t, "key1", out.ToRetireAPIKeyIds[1].ID)
+
+		// the next check-in finds no active key left to retire
+		require.NoError(t, output.Prepare(t.Context(), logger, bulker, agent, outputMap))
+		assert.Len(t, *updates, 1)
+		bulker.AssertNotCalled(t, "APIKeyInvalidate", mock.Anything, mock.Anything)
+	})
+
+	t.Run("logstash output without a previous key needs no update", func(t *testing.T) {
+		logger := testlog.SetLogger(t)
+		bulker := ftesting.NewMockBulk()
+		agent := &model.Agent{Id: "agent1"}
+		outputMap := map[string]map[string]any{
+			"ls": {"type": OutputTypeLogstash},
+		}
+
+		output := Output{Name: "ls", Type: OutputTypeLogstash}
+		require.NoError(t, output.Prepare(t.Context(), logger, bulker, agent, outputMap))
+
+		assert.Equal(t, []string{"ls"}, slices.Sorted(maps.Keys(agent.Outputs)))
+		bulker.AssertNotCalled(t, "Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	})
 }
