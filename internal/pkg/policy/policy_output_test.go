@@ -1117,7 +1117,7 @@ func TestPolicyOutputPrepareWithoutAPIKey(t *testing.T) {
 		updates := captureAgentUpdates(t, bulker, "agent1")
 
 		agent := &model.Agent{
-			ESDocument: model.ESDocument{Id: "agent1"},
+			Id: "agent1",
 			Outputs: map[string]*model.PolicyOutput{
 				"default": {APIKey: secretRef, APIKeyID: "key1", Type: OutputTypeElasticsearch},
 				"remote": {
@@ -1164,7 +1164,7 @@ func TestPolicyOutputPrepareWithoutAPIKey(t *testing.T) {
 		updates := captureAgentUpdates(t, bulker, "agent1")
 
 		agent := &model.Agent{
-			ESDocument: model.ESDocument{Id: "agent1"},
+			Id: "agent1",
 			Outputs: map[string]*model.PolicyOutput{
 				"default": {
 					APIKey:            secretRef,
@@ -1210,7 +1210,7 @@ func TestPolicyOutputPrepareWithoutAPIKey(t *testing.T) {
 	t.Run("logstash output without a previous key needs no update", func(t *testing.T) {
 		logger := testlog.SetLogger(t)
 		bulker := ftesting.NewMockBulk()
-		agent := &model.Agent{ESDocument: model.ESDocument{Id: "agent1"}}
+		agent := &model.Agent{Id: "agent1"}
 		outputMap := map[string]map[string]any{
 			"ls": {"type": OutputTypeLogstash},
 		}
