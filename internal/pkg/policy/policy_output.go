@@ -645,7 +645,8 @@ func agentDocOutputType(t string) string {
 	return t
 }
 
-// retireRemovedOutputs retires all outputs present in agent.Outputs but absent from outputMap.
+// retireRemovedOutputs retires all outputs present in agent.Outputs but absent from outputMap,
+// or that no longer have API keys in outputMap (e.g. an elasticsearch output changed to logstash).
 // For each, it parks a retirement record on survivingOutputName and removes the stale doc entry.
 //
 // This is called once per surviving output, so the in-memory delete is essential: without it
@@ -665,7 +666,7 @@ func retireRemovedOutputs(
 	outputMap map[string]map[string]any,
 ) error {
 	for agentOutputName, agentOutput := range agent.Outputs {
-		if _, stillInPolicy := outputMap[agentOutputName]; stillInPolicy {
+		if output, ok := outputMap[agentOutputName]; ok && hasAPIKeys(output) {
 			continue
 		}
 
@@ -688,15 +689,7 @@ func retireRemovedOutputs(
 			return r.ID == agentOutput.APIKeyID
 		})
 		if agentOutput.APIKeyID != "" && !alreadyParked {
-			retiring := model.ToRetireAPIKeyIdsItems{
-				ID:         agentOutput.APIKeyID,
-				RetiredAt:  time.Now().UTC().Format(time.RFC3339),
-				Output:     agentOutputName,
-				OutputType: agentOutput.Type,
-			}
-			if secretID, ok := secret.ParseSecretReference(agentOutput.APIKey); ok {
-				retiring.SecretID = secretID
-			}
+			retiring := retirementRecord(agentOutputName, agentOutput, time.Now().UTC().Format(time.RFC3339))
 			if err := parkRetirementRecord(ctx, zlog, bulker, agent.Id, survivingOutputName, retiring); err != nil {
 				return err
 			}

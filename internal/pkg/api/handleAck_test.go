@@ -1268,7 +1268,7 @@ func TestDeleteRetiredSecrets(t *testing.T) {
 			{ID: "key-3"}, // no SecretID — plaintext key, no cleanup needed
 		}
 
-		deleteRetiredSecrets(context.Background(), testlog.SetLogger(t), bulker, items)
+		policy.DeleteRetiredSecrets(context.Background(), testlog.SetLogger(t), bulker, items)
 		bulker.AssertExpectations(t)
 		bulker.AssertNotCalled(t, "DeleteSecret", mock.Anything, "")
 	})
@@ -1282,7 +1282,7 @@ func TestDeleteRetiredSecrets(t *testing.T) {
 		}
 
 		// Should not panic or propagate the error.
-		deleteRetiredSecrets(context.Background(), testlog.SetLogger(t), bulker, items)
+		policy.DeleteRetiredSecrets(context.Background(), testlog.SetLogger(t), bulker, items)
 		bulker.AssertExpectations(t)
 	})
 
@@ -1292,7 +1292,7 @@ func TestDeleteRetiredSecrets(t *testing.T) {
 			{ID: "key-1"},
 			{ID: "key-2"},
 		}
-		deleteRetiredSecrets(context.Background(), testlog.SetLogger(t), bulker, items)
+		policy.DeleteRetiredSecrets(context.Background(), testlog.SetLogger(t), bulker, items)
 		bulker.AssertNotCalled(t, "DeleteSecret", mock.Anything, mock.Anything)
 	})
 }
