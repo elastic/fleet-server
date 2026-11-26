@@ -210,7 +210,7 @@ func invalidateAPIKeysOfInactiveAgent(ctx context.Context, zlog zerolog.Logger, 
 		}
 	}
 	zlog.Info().Any("fleet.policy.apiKeyIDsToRetire", remoteAPIKeys).Msg("handleCheckin invalidate remote API keys")
-	policy.InvalidateAPIKeys(ctx, zlog, bulker, remoteAPIKeys, "")
+	invalidateAPIKeys(ctx, zlog, bulker, remoteAPIKeys, "")
 }
 
 // isInvalidAPIKeyErr reports whether err represents an invalid or disabled API key
@@ -1230,11 +1230,6 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 		for _, key := range ks {
 			pp.SecretKeys = append(pp.SecretKeys, "outputs."+name+"."+key)
 		}
-	}
-	// Retire keys before preparing outputs, as no output with API keys may be left
-	// to prepare when the policy switched to logstash or kafka.
-	if err := policy.RetireRemovedOutputs(ctx, zlog, bulker, agent, pp.Policy.Data.Outputs); err != nil {
-		return nil, nil, fmt.Errorf("failed to retire removed outputs: %w", err)
 	}
 	// Iterate through the policy outputs and prepare them
 	for _, policyOutput := range pp.Outputs {

@@ -567,8 +567,8 @@ func updateAPIKey(ctx context.Context,
 	// Process retirement records regardless of whether an active key is present.
 	// This handles entries that park records without a live replacement key — e.g.,
 	// an mOTLP→external OTLP transition where the output survives but the key is retired.
-	policy.InvalidateAPIKeys(ctx, zlog, bulk, toRetireAPIKeyIDs, apiKeyID)
-	policy.DeleteRetiredSecrets(ctx, zlog, bulk, toRetireAPIKeyIDs)
+	invalidateAPIKeys(ctx, zlog, bulk, toRetireAPIKeyIDs, apiKeyID)
+	deleteRetiredSecrets(ctx, zlog, bulk, toRetireAPIKeyIDs)
 
 	return nil
 }
@@ -635,7 +635,7 @@ func cleanRoles(roles json.RawMessage) (json.RawMessage, int, error) {
 }
 
 func (ack *AckT) invalidateAPIKeys(ctx context.Context, zlog zerolog.Logger, toRetireAPIKeyIDs []model.ToRetireAPIKeyIdsItems, skip string) {
-	policy.InvalidateAPIKeys(ctx, zlog, ack.bulk, toRetireAPIKeyIDs, skip)
+	invalidateAPIKeys(ctx, zlog, ack.bulk, toRetireAPIKeyIDs, skip)
 }
 
 // handleUnenroll performs the terminal invalidation shared by the legacy
@@ -662,7 +662,7 @@ func (ack *AckT) handleUnenroll(ctx context.Context, zlog zerolog.Logger, agent 
 			allSecretItems = append(allSecretItems, model.ToRetireAPIKeyIdsItems{SecretID: secretID})
 		}
 	}
-	policy.DeleteRetiredSecrets(ctx, zlog, ack.bulk, allSecretItems)
+	deleteRetiredSecrets(ctx, zlog, ack.bulk, allSecretItems)
 
 	// unenrolled_at is always stamped here, paired with active: false. The
 	// pending-uninstall step keeps the agent active and deliberately does not set
@@ -761,7 +761,7 @@ func (ack *AckT) handleUninstallPending(ctx context.Context, zlog zerolog.Logger
 			secretItems = append(secretItems, model.ToRetireAPIKeyIdsItems{SecretID: secretID})
 		}
 	}
-	policy.DeleteRetiredSecrets(ctx, zlog, ack.bulk, secretItems)
+	deleteRetiredSecrets(ctx, zlog, ack.bulk, secretItems)
 
 	// Clear the (now-invalidated) output key fields on the agent document so that,
 	// when the agent re-enrolls, policy preparation regenerates fresh keys instead
@@ -907,4 +907,95 @@ func makeUpdatePolicyBody(policyID string, newRev int64) []byte {
 	buf.WriteString(`"}}}`)
 
 	return buf.Bytes()
+}
+
+// invalidateAPIKeys retires the given API keys against the correct cluster.
+//
+// Each item's Output field names the output the key belongs to.
+// An empty Output routes directly to the primary cluster (bulk).
+// A non-empty Output triggers a remote-bulker lookup: GetBulker is tried first (hot path),
+// then CreateAndGetBulker via QueryOutputFromPolicy (cold/restart path). If neither resolves
+// a bulker, the primary cluster is used as a fallback — correct for local outputs (elasticsearch,
+// otlp) and benign for unreachable remote outputs (primary returns "not found" rather than
+// silently dropping the request).
+//
+// This mirrors the fail-safe pattern in updateAPIKey, which starts with the primary bulker
+// and only upgrades to a remote one when available.
+func invalidateAPIKeys(ctx context.Context, zlog zerolog.Logger, bulk bulk.Bulk, toRetireAPIKeyIDs []model.ToRetireAPIKeyIdsItems, skip string) {
+	ids := make([]string, 0, len(toRetireAPIKeyIDs))
+	remoteIds := make(map[string][]string)
+	for _, k := range toRetireAPIKeyIDs {
+		if k.ID == skip || k.ID == "" {
+			continue
+		}
+		// Route by output_type when available. OTLP keys are always on the primary cluster
+		// so they go directly into the primary bucket. All other types — including
+		// "elasticsearch", which the agent doc uses for both local and remote ES after
+		// normalization — stay on the name-based path so existing routing is preserved
+		// for records that predate this field or that cannot be distinguished from remote ES.
+		switch k.OutputType {
+		case policy.OutputTypeOTLP:
+			ids = append(ids, k.ID)
+		default:
+			if k.Output != "" {
+				if remoteIds[k.Output] == nil {
+					remoteIds[k.Output] = make([]string, 0)
+				}
+				remoteIds[k.Output] = append(remoteIds[k.Output], k.ID)
+			} else {
+				ids = append(ids, k.ID)
+			}
+		}
+	}
+	if len(ids) > 0 {
+		zlog.Info().Strs("fleet.policy.apiKeyIDsToRetire", ids).Msg("Invalidate old API keys")
+		if err := bulk.APIKeyInvalidate(ctx, ids...); err != nil {
+			zlog.Warn().Err(err).Strs("ids", ids).Msg("Failed to invalidate API keys. API keys will be orphaned.")
+		}
+	}
+	// using remote es bulker to invalidate api key
+	for outputName, outputIds := range remoteIds {
+		outputBulk := bulk.GetBulker(outputName)
+		usedPrimaryFallback := false
+
+		var outputPolicy *model.Policy
+		if outputBulk == nil {
+			// read output config from .fleet-policies, not filtering by policy id as agent could be reassigned
+			var err error
+			outputPolicy, err = dl.QueryOutputFromPolicy(ctx, bulk, outputName)
+			if err != nil || outputPolicy == nil {
+				zlog.Warn().Err(err).Str(ecs.PolicyOutputName, outputName).Any("ids", outputIds).Msg("Output policy not found, falling back to primary cluster for key invalidation")
+			} else {
+				outputBulk, _, err = bulk.CreateAndGetBulker(ctx, zlog, outputName, outputPolicy.Data.Outputs)
+				if err != nil {
+					zlog.Warn().Err(err).Str(ecs.PolicyOutputName, outputName).Any("ids", outputIds).Msg("Failed to recreate output bulker, falling back to primary cluster for key invalidation")
+				}
+			}
+		}
+		if outputBulk == nil {
+			if outputPolicy != nil && outputPolicy.Data.Outputs[outputName]["type"] == policy.OutputTypeRemoteElasticsearch {
+				zlog.Warn().Str(ecs.PolicyOutputName, outputName).Any("ids", outputIds).
+					Msg("Cannot invalidate remote ES API keys: remote cluster unreachable, API keys will be orphaned")
+				continue
+			}
+			outputBulk = bulk
+			usedPrimaryFallback = true
+		}
+		if err := outputBulk.APIKeyInvalidate(ctx, outputIds...); err != nil {
+			zlog.Warn().Err(err).Strs("ids", outputIds).Str(ecs.PolicyOutputName, outputName).
+				Bool("fallback_to_primary", usedPrimaryFallback).
+				Msg("Failed to invalidate output API keys. API keys will be orphaned.")
+		}
+	}
+}
+
+func deleteRetiredSecrets(ctx context.Context, zlog zerolog.Logger, bulk bulk.Bulk, toRetireAPIKeyIDs []model.ToRetireAPIKeyIdsItems) {
+	for _, k := range toRetireAPIKeyIDs {
+		if k.SecretID == "" {
+			continue
+		}
+		if err := bulk.DeleteSecret(ctx, k.SecretID); err != nil {
+			zlog.Warn().Err(err).Str("secret_id", k.SecretID).Msg("Failed to delete retired output API key secret")
+		}
+	}
 }

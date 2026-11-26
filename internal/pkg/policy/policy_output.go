@@ -115,10 +115,14 @@ func (p *Output) Prepare(ctx context.Context, zlog zerolog.Logger, bulker bulk.B
 		}
 	case OutputTypeLogstash:
 		zlog.Debug().Msg("preparing logstash output")
-		zlog.Info().Msg("no actions required for logstash output preparation")
+		if err := p.prepareWithoutAPIKey(ctx, zlog, bulker, agent, outputMap); err != nil {
+			return fmt.Errorf("failed to prepare logstash output %q: %w", p.Name, err)
+		}
 	case OutputTypeKafka:
 		zlog.Debug().Msg("preparing kafka output")
-		zlog.Info().Msg("no actions required for kafka output preparation")
+		if err := p.prepareWithoutAPIKey(ctx, zlog, bulker, agent, outputMap); err != nil {
+			return fmt.Errorf("failed to prepare kafka output %q: %w", p.Name, err)
+		}
 	case OutputTypeOTLP:
 		zlog.Debug().Msg("preparing OTLP output")
 		if err := p.prepareOTLP(ctx, zlog, bulker, agent, outputMap, cfg.secretCandidateCollector); err != nil {
@@ -290,6 +294,67 @@ func (p *Output) prepareElasticsearch(
 	return nil
 }
 
+// prepareWithoutAPIKey prepares an output that has no per-agent API key, such as a
+// logstash, kafka or external OTLP output. Keys of removed outputs, and the previous key
+// of this output if it used to have one (e.g. elasticsearch → logstash), are parked on
+// this output's agent doc entry and retired once the agent acks the new policy, so the
+// agent can keep using them until it has switched outputs.
+func (p *Output) prepareWithoutAPIKey(
+	ctx context.Context,
+	zlog zerolog.Logger,
+	bulker bulk.Bulk,
+	agent *model.Agent,
+	outputMap map[string]map[string]any) error {
+	// Ensure an in-memory entry exists so retireRemovedOutputs can park records for
+	// any concurrently removed outputs onto this surviving output's agent doc entry.
+	if agent.Outputs == nil {
+		agent.Outputs = map[string]*model.PolicyOutput{}
+	}
+	if _, ok := agent.Outputs[p.Name]; !ok {
+		agent.Outputs[p.Name] = &model.PolicyOutput{}
+	}
+	if err := retireRemovedOutputs(ctx, zlog, bulker, agent, p.Name, outputMap); err != nil {
+		return err
+	}
+
+	prev := agent.Outputs[p.Name]
+	if prev.APIKeyID == "" && prev.APIKey == "" {
+		return nil
+	}
+	// The output had an API key before, e.g. mOTLP → external OTLP or elasticsearch → logstash:
+	// park a retirement record on this entry and clear the active key fields. The entry
+	// persists so the ack/checkin gate can retire the key — the same deferred pattern used
+	// by retireRemovedOutputs for surviving outputs.
+	retiring := model.ToRetireAPIKeyIdsItems{
+		ID:         prev.APIKeyID,
+		RetiredAt:  time.Now().UTC().Format(time.RFC3339),
+		Output:     p.Name,
+		OutputType: prev.Type,
+	}
+	if secretID, ok := secret.ParseSecretReference(prev.APIKey); ok {
+		retiring.SecretID = secretID
+	}
+	fields := map[string]any{
+		dl.FieldPolicyOutputToRetireAPIKeyIDs: retiring,
+		dl.FieldPolicyOutputAPIKeyID:          "",
+		dl.FieldPolicyOutputAPIKey:            "",
+		dl.FieldPolicyOutputPermissionsHash:   "",
+	}
+	body, err := renderUpdatePainlessScript(p.Name, fields)
+	if err != nil {
+		return fmt.Errorf("could not render update script to retire previous output API key: %w", err)
+	}
+	if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
+		zlog.Error().Err(err).Msg("fail to park retirement record for previous output API key")
+		return fmt.Errorf("fail update agent record: %w", err)
+	}
+	prev.ToRetireAPIKeyIds = append(prev.ToRetireAPIKeyIds, retiring)
+	prev.APIKeyID = ""
+	prev.APIKey = ""
+	prev.PermissionsHash = ""
+	return nil
+}
+
 func (p *Output) prepareOTLP(
 	ctx context.Context,
 	zlog zerolog.Logger,
@@ -301,54 +366,7 @@ func (p *Output) prepareOTLP(
 	// Only mOTLP outputs carry an output_permissions block and need API key management.
 	if p.Role == nil {
 		zlog.Debug().Msg("no output permissions for OTLP output; skipping API key management")
-
-		// Ensure an in-memory entry exists so retireRemovedOutputs can park records for
-		// any concurrently removed outputs onto this surviving output's agent doc entry.
-		if agent.Outputs == nil {
-			agent.Outputs = map[string]*model.PolicyOutput{}
-		}
-		if _, ok := agent.Outputs[p.Name]; !ok {
-			agent.Outputs[p.Name] = &model.PolicyOutput{}
-		}
-		if err := retireRemovedOutputs(ctx, zlog, bulker, agent, p.Name, outputMap); err != nil {
-			return err
-		}
-
-		prev := agent.Outputs[p.Name]
-		if prev.APIKeyID == "" && prev.APIKey == "" {
-			return nil
-		}
-		// mOTLP → external transition: park a retirement record on this entry and clear the
-		// active key fields. The entry persists so the ack/checkin gate can retire the key —
-		// the same deferred pattern used by retireRemovedOutputs for surviving outputs.
-		retiring := model.ToRetireAPIKeyIdsItems{
-			ID:         prev.APIKeyID,
-			RetiredAt:  time.Now().UTC().Format(time.RFC3339),
-			Output:     p.Name,
-			OutputType: prev.Type,
-		}
-		if secretID, ok := secret.ParseSecretReference(prev.APIKey); ok {
-			retiring.SecretID = secretID
-		}
-		fields := map[string]any{
-			dl.FieldPolicyOutputToRetireAPIKeyIDs: retiring,
-			dl.FieldPolicyOutputAPIKeyID:          "",
-			dl.FieldPolicyOutputAPIKey:            "",
-			dl.FieldPolicyOutputPermissionsHash:   "",
-		}
-		body, err := renderUpdatePainlessScript(p.Name, fields)
-		if err != nil {
-			return fmt.Errorf("could not render update script for mOTLP→external transition: %w", err)
-		}
-		if err = bulker.Update(ctx, dl.FleetAgents, agent.Id, body, bulk.WithRefresh(), bulk.WithRetryOnConflict(3)); err != nil {
-			zlog.Error().Err(err).Msg("fail to park retirement record for mOTLP→external transition")
-			return fmt.Errorf("fail update agent record: %w", err)
-		}
-		prev.ToRetireAPIKeyIds = append(prev.ToRetireAPIKeyIds, retiring)
-		prev.APIKeyID = ""
-		prev.APIKey = ""
-		prev.PermissionsHash = ""
-		return nil
+		return p.prepareWithoutAPIKey(ctx, zlog, bulker, agent, outputMap)
 	}
 
 	if _, ok := outputMap[p.Name]; !ok {
@@ -645,8 +663,7 @@ func agentDocOutputType(t string) string {
 	return t
 }
 
-// retireRemovedOutputs retires all outputs present in agent.Outputs but absent from outputMap,
-// or that no longer have API keys in outputMap (e.g. an elasticsearch output changed to logstash).
+// retireRemovedOutputs retires all outputs present in agent.Outputs but absent from outputMap.
 // For each, it parks a retirement record on survivingOutputName and removes the stale doc entry.
 //
 // This is called once per surviving output, so the in-memory delete is essential: without it
@@ -666,7 +683,7 @@ func retireRemovedOutputs(
 	outputMap map[string]map[string]any,
 ) error {
 	for agentOutputName, agentOutput := range agent.Outputs {
-		if output, ok := outputMap[agentOutputName]; ok && hasAPIKeys(output) {
+		if _, stillInPolicy := outputMap[agentOutputName]; stillInPolicy {
 			continue
 		}
 
@@ -689,7 +706,15 @@ func retireRemovedOutputs(
 			return r.ID == agentOutput.APIKeyID
 		})
 		if agentOutput.APIKeyID != "" && !alreadyParked {
-			retiring := retirementRecord(agentOutputName, agentOutput, time.Now().UTC().Format(time.RFC3339))
+			retiring := model.ToRetireAPIKeyIdsItems{
+				ID:         agentOutput.APIKeyID,
+				RetiredAt:  time.Now().UTC().Format(time.RFC3339),
+				Output:     agentOutputName,
+				OutputType: agentOutput.Type,
+			}
+			if secretID, ok := secret.ParseSecretReference(agentOutput.APIKey); ok {
+				retiring.SecretID = secretID
+			}
 			if err := parkRetirementRecord(ctx, zlog, bulker, agent.Id, survivingOutputName, retiring); err != nil {
 				return err
 			}
