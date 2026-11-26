@@ -1305,6 +1305,54 @@ func TestIsInvalidAPIKeyErr(t *testing.T) {
 	}
 }
 
+func TestGetAgentAndVerifyAPIKeyID(t *testing.T) {
+	const (
+		agentID         = "agent-id"
+		requestAPIKeyID = "request-api-key-id"
+	)
+	tests := []struct {
+		name           string
+		storedAPIKeyID string
+		readErr        error
+		wantAgent      *model.Agent
+		wantErr        error
+	}{
+		{
+			name:           "an agent with the API key of the request is returned",
+			storedAPIKeyID: requestAPIKeyID,
+			wantAgent:      &model.Agent{Id: agentID, AccessAPIKeyID: requestAPIKeyID},
+		},
+		{
+			name:           "an agent with another API key is a wrong identity",
+			storedAPIKeyID: "other-api-key-id",
+			wantErr:        ErrAgentIdentity,
+		},
+		{
+			name:    "a missing agent is a wrong identity",
+			readErr: es.ErrElasticNotFound,
+			wantErr: ErrAgentIdentity,
+		},
+		{
+			name:    "a rejected read keeps the error of the read",
+			readErr: bulk.ErrTooManyBulkDispatches,
+			wantErr: bulk.ErrTooManyBulkDispatches,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			source, err := json.Marshal(model.Agent{AccessAPIKeyID: tt.storedAPIKeyID})
+			require.NoError(t, err)
+			bulker := ftesting.NewMockBulk()
+			bulker.On("ReadRaw", mock.Anything, dl.FleetAgents, agentID, mock.Anything).
+				Return(&bulk.MgetResponseItem{Found: true, Source: source}, tt.readErr)
+
+			agent, err := getAgentAndVerifyAPIKeyID(t.Context(), bulker, agentID, requestAPIKeyID)
+			assert.ErrorIs(t, err, tt.wantErr)
+			assert.Equal(t, tt.wantAgent, agent)
+		})
+	}
+}
+
 func TestWriteEmptyPolicyChangeResponse(t *testing.T) {
 	verCon := mustBuildConstraints("8.0.0")
 	cfg := &config.Server{}

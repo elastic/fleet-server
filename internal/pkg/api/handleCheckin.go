@@ -1408,19 +1408,20 @@ func getAgentAndVerifyAPIKeyID(ctx context.Context, bulker bulk.Bulk, agentID st
 	span, ctx := apm.StartSpan(ctx, "getAgentAndVerifyAPIKeyID", "read")
 	defer span.End()
 	agent, err := dl.GetAgent(ctx, bulker, agentID)
+	if errors.Is(err, dl.ErrNotFound) {
+		// Return ErrAgentIdentity (403) instead of 404 so an authenticated
+		// agent cannot enumerate whether another agent ID exists.
+		return nil, fmt.Errorf("invalid API Key ID %w", ErrAgentIdentity)
+	}
 	if err != nil {
-		if errors.Is(err, dl.ErrNotFound) {
-			err = ErrAgentNotFound
-		} else {
-			err = fmt.Errorf("GetAgent: %w", err)
-		}
+		return nil, fmt.Errorf("GetAgent: %w", err)
 	}
 
 	if agent.AccessAPIKeyID != apiKeyID {
-		err = fmt.Errorf("invalid API Key ID %w", ErrAgentIdentity)
+		return nil, fmt.Errorf("invalid API Key ID %w", ErrAgentIdentity)
 	}
 
-	return &agent, err
+	return &agent, nil
 }
 
 func findAgentByAPIKeyID(ctx context.Context, bulker bulk.Bulk, id string) (*model.Agent, error) {

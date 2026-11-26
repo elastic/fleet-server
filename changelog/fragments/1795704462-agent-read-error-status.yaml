@@ -1,0 +1,7 @@
+kind: bug-fix
+summary: Return the read error when Fleet Server cannot read an Elastic Agent
+description: >-
+  When Fleet Server cannot read an Elastic Agent during a check-in or an acknowledgement, it returns
+  the error of the read, for example 429 when it has too many pending requests to Elasticsearch.
+  Elastic Agents get a 403 response only when the agent does not exist or the request uses the API key of another agent.
+component: fleet-server
