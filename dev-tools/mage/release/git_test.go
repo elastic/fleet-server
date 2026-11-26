@@ -1,0 +1,510 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
+
+package release
+
+import (
+	"context"
+	"encoding/base64"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/stretchr/testify/require"
+
+	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/config"
+	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/object"
+)
+
+// convertLocalBranchToRemoteOnly moves a local branch tip to origin/<name> and
+// deletes the local ref (no git CLI / PlainClone required).
+func convertLocalBranchToRemoteOnly(t *testing.T, g *gitRepo, branchName string) {
+	t.Helper()
+
+	require.NoError(t, g.checkoutBranch("master"))
+
+	localRef, err := g.repo.Reference(plumbing.NewBranchReferenceName(branchName), true)
+	if err != nil {
+		t.Fatalf("Reference(%s) failed: %v", branchName, err)
+	}
+	remoteRef := plumbing.NewHashReference(
+		plumbing.NewRemoteReferenceName("origin", branchName),
+		localRef.Hash(),
+	)
+	if err := g.repo.Storer.SetReference(remoteRef); err != nil {
+		t.Fatalf("SetReference(origin/%s) failed: %v", branchName, err)
+	}
+	if err := g.repo.Storer.RemoveReference(plumbing.NewBranchReferenceName(branchName)); err != nil {
+		t.Fatalf("RemoveReference(%s) failed: %v", branchName, err)
+	}
+}
+
+func createTestGitRepo(t *testing.T) (*gitRepo, string) {
+	t.Helper()
+
+	tmpDir := t.TempDir()
+
+	repo, err := git.PlainInit(tmpDir, false)
+	require.NoError(t, err)
+
+	w, err := repo.Worktree()
+	require.NoError(t, err)
+
+	testFile := filepath.Join(tmpDir, "README.md")
+	err = os.WriteFile(testFile, []byte("# Test Repo"), 0o600)
+	require.NoError(t, err)
+
+	_, err = w.Add("README.md")
+	require.NoError(t, err)
+
+	_, err = w.Commit("Initial commit", &git.CommitOptions{
+		Author: &object.Signature{
+			Name:  testAuthorName,
+			Email: testAuthorEmail,
+		},
+	})
+	require.NoError(t, err)
+
+	return &gitRepo{repo: repo, path: tmpDir}, tmpDir
+}
+
+func TestEnsureExistingBranchRequiresRemoteOrLocal(t *testing.T) {
+	gitRepo, _ := createTestGitRepo(t)
+	err := gitRepo.ensureExistingBranch("9.6")
+	require.Error(t, err)
+	require.ErrorIs(t, err, errBranchNotFound)
+}
+
+func TestEnsureBranchFrom(t *testing.T) {
+	gitRepo, tmpDir := createTestGitRepo(t)
+
+	t.Chdir(tmpDir)
+
+	require.NoError(t, gitRepo.ensureBranchFrom("master", testReleaseBranch))
+
+	branch, err := gitRepo.getCurrentBranch()
+	require.NoError(t, err)
+	if branch != testReleaseBranch {
+		t.Fatalf("expected branch %s, got %s", testReleaseBranch, branch)
+	}
+
+	require.NoError(t, gitRepo.ensureBranchFrom("master", testReleaseBranch))
+}
+
+func TestEnsureBranchFromRemoteOnlyBase(t *testing.T) {
+	gitRepo, _ := createTestGitRepo(t)
+	require.NoError(t, gitRepo.createBranch("9.5"))
+	convertLocalBranchToRemoteOnly(t, gitRepo, "9.5")
+
+	exists, err := gitRepo.branchExists("9.5")
+	require.NoError(t, err)
+	if exists {
+		t.Fatal("expected 9.5 to exist only as a remote-tracking branch")
+	}
+
+	require.NoError(t, gitRepo.ensureBranchFrom("9.5", "patch-release-9.5.1"))
+	branch, err := gitRepo.getCurrentBranch()
+	require.NoError(t, err)
+	if branch != "patch-release-9.5.1" {
+		t.Fatalf("expected branch patch-release-9.5.1, got %s", branch)
+	}
+}
+
+func TestEnsureBranchFromRemoteOnlyTarget(t *testing.T) {
+	gitRepo, tmpDir := createTestGitRepo(t)
+	require.NoError(t, gitRepo.createBranch("prep-branch"))
+	require.NoError(t, gitRepo.checkoutBranch("prep-branch"))
+
+	w, err := gitRepo.repo.Worktree()
+	require.NoError(t, err)
+	marker := filepath.Join(tmpDir, "prep.txt")
+	require.NoError(t, os.WriteFile(marker, []byte("prep tip"), 0o600))
+	if _, err = w.Add("prep.txt"); err != nil {
+		t.Fatalf("Add failed: %v", err)
+	}
+	prepHash, err := w.Commit("prep tip commit", &git.CommitOptions{
+		Author: &object.Signature{Name: testAuthorName, Email: testAuthorEmail},
+	})
+	require.NoError(t, err)
+
+	convertLocalBranchToRemoteOnly(t, gitRepo, "prep-branch")
+
+	exists, err := gitRepo.branchExists("prep-branch")
+	require.NoError(t, err)
+	if exists {
+		t.Fatal("expected prep-branch to exist only as a remote-tracking branch")
+	}
+
+	require.NoError(t, gitRepo.ensureBranchFrom("master", "prep-branch"))
+	branch, err := gitRepo.getCurrentBranch()
+	require.NoError(t, err)
+	if branch != "prep-branch" {
+		t.Fatalf("expected branch prep-branch, got %s", branch)
+	}
+
+	head, err := gitRepo.repo.Head()
+	require.NoError(t, err)
+	if head.Hash() != prepHash {
+		t.Fatalf("expected HEAD %s (remote prep tip), got %s", prepHash, head.Hash())
+	}
+}
+
+func TestCommitAllNoChanges(t *testing.T) {
+	gitRepo, _ := createTestGitRepo(t)
+
+	committed, err := gitRepo.commitAll("Empty commit", "Test Author", testAuthorEmail)
+	require.NoError(t, err)
+	if committed {
+		t.Error("commitAll() should not commit when there are no changes")
+	}
+}
+
+func TestSetRemoteURLIdempotent(t *testing.T) {
+	gitRepo, _ := createTestGitRepo(t)
+	remoteURL := "https://github.com/test/repo.git"
+
+	err := gitRepo.setRemoteURL(remoteURL)
+	require.NoError(t, err)
+
+	err = gitRepo.setRemoteURL(remoteURL)
+	require.NoError(t, err)
+
+	remote, err := gitRepo.repo.Remote("origin")
+	require.NoError(t, err)
+	if len(remote.Config().URLs) == 0 || remote.Config().URLs[0] != remoteURL {
+		t.Errorf("setRemoteURL() URL = %v, want %s", remote.Config().URLs, remoteURL)
+	}
+}
+
+func TestWorkflowBranchNames(t *testing.T) {
+	// update-version-* is created by runPatch only (not runMajorMinor).
+	names := []string{
+		testFFPrepMainBranch,
+		"ff-release-9.6.0",
+		"update-version-9.6.1",
+	}
+	seen := make(map[string]struct{}, len(names))
+	for _, name := range names {
+		if _, ok := seen[name]; ok {
+			t.Fatalf("duplicate branch name: %s", name)
+		}
+		seen[name] = struct{}{}
+		if strings.TrimSpace(name) == "" {
+			t.Fatal("branch name empty")
+		}
+	}
+}
+
+func TestIsReleaseWritablePath(t *testing.T) {
+	if !isReleaseWritablePath("version/version.go") {
+		t.Fatal("version/version.go should be writable")
+	}
+	if !isReleaseWritablePath(".mergify.yml") {
+		t.Fatal(".mergify.yml should be writable")
+	}
+	if isReleaseWritablePath("main.go") {
+		t.Fatal("main.go should not be writable")
+	}
+}
+
+func TestGitHTTPSAuthExtraHeader(t *testing.T) {
+	got := gitHTTPSAuthExtraHeader("test-token")
+	wantPrefix := "Authorization: Basic "
+	if !strings.HasPrefix(got, wantPrefix) {
+		t.Fatalf("gitHTTPSAuthExtraHeader() = %q, want prefix %q", got, wantPrefix)
+	}
+	decoded, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(got, wantPrefix))
+	require.NoError(t, err)
+	if string(decoded) != "x-access-token:test-token" {
+		t.Fatalf("auth payload = %q, want %q", decoded, "x-access-token:test-token")
+	}
+	if strings.Contains(got, "Bearer") {
+		t.Fatalf("gitHTTPSAuthExtraHeader() must not use Bearer: %q", got)
+	}
+}
+
+func TestGitPushEnv(t *testing.T) {
+	env := gitPushEnv([]string{"PATH=/usr/bin"}, "test-token")
+	wantHeader := gitHTTPSAuthExtraHeader("test-token")
+	got := map[string]string{}
+	for _, entry := range env {
+		key, value, ok := strings.Cut(entry, "=")
+		if !ok {
+			t.Fatalf("malformed env entry %q", entry)
+		}
+		got[key] = value
+	}
+	if got["PATH"] != "/usr/bin" {
+		t.Fatalf("PATH = %q, want /usr/bin", got["PATH"])
+	}
+	if got["GIT_CONFIG_COUNT"] != "1" {
+		t.Fatalf("GIT_CONFIG_COUNT = %q, want 1", got["GIT_CONFIG_COUNT"])
+	}
+	if got["GIT_CONFIG_KEY_0"] != "http.extraHeader" {
+		t.Fatalf("GIT_CONFIG_KEY_0 = %q, want http.extraHeader", got["GIT_CONFIG_KEY_0"])
+	}
+	if got["GIT_CONFIG_VALUE_0"] != wantHeader {
+		t.Fatalf("GIT_CONFIG_VALUE_0 = %q, want %q", got["GIT_CONFIG_VALUE_0"], wantHeader)
+	}
+}
+
+func TestPushRequiresToken(t *testing.T) {
+	gitRepo, _ := createTestGitRepo(t)
+
+	err := gitRepo.push("origin", "", "elastic", "fleet-server")
+	if err == nil {
+		t.Fatal("push() should fail without a token")
+	}
+	if !strings.Contains(err.Error(), "token") {
+		t.Fatalf("push() error = %v, want token mention", err)
+	}
+}
+
+func TestPushRequiresOriginRemote(t *testing.T) {
+	gitRepo, _ := createTestGitRepo(t)
+
+	err := gitRepo.push("upstream", "test-token", "elastic", "fleet-server")
+	if err == nil {
+		t.Fatal("push() should reject non-origin remotes")
+	}
+	if !strings.Contains(err.Error(), "only supports origin") {
+		t.Fatalf("push() error = %v, want origin restriction", err)
+	}
+}
+
+func TestPushToLocalRemote(t *testing.T) {
+	gitRepo, workDir := createTestGitRepo(t)
+
+	bareDir := t.TempDir()
+	if _, err := git.PlainInit(bareDir, true); err != nil {
+		t.Fatalf("failed to init bare remote: %v", err)
+	}
+	remoteURL := "file://" + bareDir
+	require.NoError(t, gitRepo.setRemoteURL(remoteURL))
+
+	branch := "release-9.6"
+	require.NoError(t, gitRepo.createBranch(branch))
+	require.NoError(t, gitRepo.checkoutBranch(branch))
+
+	require.NoError(t, gitRepo.push("origin", "test-token", "elastic", "fleet-server"))
+
+	remoteHeads := runGitOutput(t, workDir, "ls-remote", "--heads", "origin", branch)
+	if !strings.Contains(remoteHeads, "refs/heads/"+branch) {
+		t.Fatalf("push() did not create remote branch %s; ls-remote:\n%s", branch, remoteHeads)
+	}
+}
+
+func TestParseGitHubOwnerRepo(t *testing.T) {
+	tests := []struct {
+		in        string
+		wantOwner string
+		wantRepo  string
+		ok        bool
+	}{
+		{testGitHubHTTPS, "elastic", "fleet-server", true},
+		{"https://github.com/elastic/fleet-server", "elastic", "fleet-server", true},
+		{"https://github.com/Fr4nc1sc0/fleet-server.git", "Fr4nc1sc0", "fleet-server", true},
+		{"https://example.com/elastic/fleet-server.git", "", "", false},
+		{"file:///tmp/repo.git", "", "", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.in, func(t *testing.T) {
+			owner, repo, ok := parseGitHubOwnerRepo(tt.in)
+			if ok != tt.ok || owner != tt.wantOwner || repo != tt.wantRepo {
+				t.Fatalf("parseGitHubOwnerRepo(%q) = (%q, %q, %v), want (%q, %q, %v)",
+					tt.in, owner, repo, ok, tt.wantOwner, tt.wantRepo, tt.ok)
+			}
+		})
+	}
+}
+
+func TestEnsureOriginMatchesProject(t *testing.T) {
+	t.Run("matches configured project", func(t *testing.T) {
+		gitRepo, _ := createTestGitRepo(t)
+		require.NoError(t, gitRepo.setRemoteURL(testGitHubHTTPS))
+		require.NoError(t, gitRepo.ensureOriginMatchesProject("elastic", "fleet-server"))
+	})
+	t.Run("rejects fork mismatch", func(t *testing.T) {
+		gitRepo, _ := createTestGitRepo(t)
+		require.NoError(t, gitRepo.setRemoteURL(testGitHubHTTPS))
+		err := gitRepo.ensureOriginMatchesProject("my-fork", "fleet-server")
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "PROJECT_OWNER/PROJECT_REPO")
+	})
+	t.Run("skips file remotes", func(t *testing.T) {
+		gitRepo, _ := createTestGitRepo(t)
+		require.NoError(t, gitRepo.setRemoteURL("file:///tmp/repo.git"))
+		require.NoError(t, gitRepo.ensureOriginMatchesProject("elastic", "fleet-server"))
+	})
+	t.Run("requires owner and repo", func(t *testing.T) {
+		gitRepo, _ := createTestGitRepo(t)
+		require.Error(t, gitRepo.ensureOriginMatchesProject("", "fleet-server"))
+		require.Error(t, gitRepo.ensureOriginMatchesProject("elastic", ""))
+	})
+}
+
+func TestGithubHTTPSPushURL(t *testing.T) {
+	tests := []struct {
+		name      string
+		in        string
+		want      string
+		rewritten bool
+	}{
+		{
+			name:      "scp ssh",
+			in:        testGitHubSSH,
+			want:      testGitHubHTTPS,
+			rewritten: true,
+		},
+		{
+			name:      "ssh scheme",
+			in:        "ssh://git@github.com/elastic/fleet-server.git",
+			want:      testGitHubHTTPS,
+			rewritten: true,
+		},
+		{
+			name:      "https unchanged",
+			in:        testGitHubHTTPS,
+			want:      testGitHubHTTPS,
+			rewritten: false,
+		},
+		{
+			name:      "http github upgraded",
+			in:        testGitHubHTTP,
+			want:      testGitHubHTTPS,
+			rewritten: true,
+		},
+		{
+			name:      "non-github ssh unchanged",
+			in:        testGitLabSSH,
+			want:      testGitLabSSH,
+			rewritten: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, rewritten := githubHTTPSPushURL(tt.in)
+			if got != tt.want || rewritten != tt.rewritten {
+				t.Errorf("githubHTTPSPushURL(%q) = (%q, %v), want (%q, %v)",
+					tt.in, got, rewritten, tt.want, tt.rewritten)
+			}
+		})
+	}
+}
+
+func TestIsTokenPushRemoteURL(t *testing.T) {
+	tests := []struct {
+		in   string
+		want bool
+	}{
+		{testGitHubHTTPS, true},
+		{"file:///tmp/repo.git", true},
+		{testGitHubHTTP, false},
+		{"https://evil.example/elastic/fleet-server.git", false},
+		{testGitHubSSH, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.in, func(t *testing.T) {
+			if got := isTokenPushRemoteURL(tt.in); got != tt.want {
+				t.Errorf("isTokenPushRemoteURL(%q) = %v, want %v", tt.in, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestEnsureHTTPSRemote(t *testing.T) {
+	t.Run("rewrites ssh to https", func(t *testing.T) {
+		gitRepo, _ := createTestGitRepo(t)
+		require.NoError(t, gitRepo.setRemoteURL(testGitHubSSH))
+		require.NoError(t, gitRepo.ensureHTTPSRemote("origin"))
+		remote, err := gitRepo.repo.Remote("origin")
+		require.NoError(t, err)
+		want := testGitHubHTTPS
+		if got := remote.Config().URLs[0]; got != want {
+			t.Errorf("origin URL = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("preserves fetch refspecs", func(t *testing.T) {
+		gitRepo, _ := createTestGitRepo(t)
+		require.NoError(t, gitRepo.setRemoteURL(testGitHubSSH))
+		before, err := gitRepo.repo.Remote("origin")
+		require.NoError(t, err)
+		beforeFetch := append([]config.RefSpec(nil), before.Config().Fetch...)
+		if len(beforeFetch) == 0 {
+			t.Fatal("expected default fetch refspecs before rewrite")
+		}
+		require.NoError(t, gitRepo.ensureHTTPSRemote("origin"))
+		after, err := gitRepo.repo.Remote("origin")
+		require.NoError(t, err)
+		if got := after.Config().Fetch; len(got) != len(beforeFetch) {
+			t.Fatalf("fetch refspecs = %#v, want %#v", got, beforeFetch)
+		}
+		for i := range beforeFetch {
+			if after.Config().Fetch[i] != beforeFetch[i] {
+				t.Fatalf("fetch[%d] = %q, want %q", i, after.Config().Fetch[i], beforeFetch[i])
+			}
+		}
+	})
+
+	t.Run("rejects non-github remote", func(t *testing.T) {
+		gitRepo, _ := createTestGitRepo(t)
+		require.NoError(t, gitRepo.setRemoteURL(testGitLabSSH))
+		err := gitRepo.ensureHTTPSRemote("origin")
+		if err == nil {
+			t.Fatal("ensureHTTPSRemote() expected error for non-GitHub remote")
+		}
+		if !strings.Contains(err.Error(), "https://github.com/") {
+			t.Errorf("ensureHTTPSRemote() error = %v, want mention of https://github.com/", err)
+		}
+	})
+
+	t.Run("rejects arbitrary https host", func(t *testing.T) {
+		gitRepo, _ := createTestGitRepo(t)
+		require.NoError(t, gitRepo.setRemoteURL("https://evil.example/elastic/fleet-server.git"))
+		err := gitRepo.ensureHTTPSRemote("origin")
+		if err == nil {
+			t.Fatal("ensureHTTPSRemote() expected error for non-GitHub HTTPS remote")
+		}
+	})
+
+	t.Run("rewrites pushurl entries", func(t *testing.T) {
+		gitRepo, tmpDir := createTestGitRepo(t)
+		require.NoError(t, gitRepo.setRemoteURL(testGitHubHTTPS))
+		require.NoError(t, gitRepo.gitConfigAdd("remote.origin.pushurl", testGitHubSSH))
+		require.NoError(t, gitRepo.ensureHTTPSRemote("origin"))
+
+		url := strings.TrimSpace(runGitOutput(t, tmpDir, "config", "--get-all", "remote.origin.url"))
+		push := strings.TrimSpace(runGitOutput(t, tmpDir, "config", "--get-all", "remote.origin.pushurl"))
+		require.Equal(t, testGitHubHTTPS, url)
+		require.Equal(t, testGitHubHTTPS, push)
+		// Exactly one fetch url — rewritten push destination stays under pushurl.
+		require.Equal(t, 1, len(strings.Split(url, "\n")))
+	})
+
+	t.Run("rejects untrusted pushurl", func(t *testing.T) {
+		gitRepo, _ := createTestGitRepo(t)
+		require.NoError(t, gitRepo.setRemoteURL(testGitHubHTTPS))
+		require.NoError(t, gitRepo.gitConfigAdd("remote.origin.pushurl", testGitLabSSH))
+		err := gitRepo.ensureHTTPSRemote("origin")
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "https://github.com/")
+	})
+}
+
+func runGitOutput(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	gitArgs := append([]string{"-c", "protocol.file.allow=always"}, args...)
+	cmd := exec.CommandContext(context.Background(), "git", gitArgs...)
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %v failed: %v\n%s", args, err, out)
+	}
+	return string(out)
+}
