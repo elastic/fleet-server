@@ -17,4 +17,4 @@ The [Dockerfile.fips](../Dockerfile.fips) contained with this project is used to
 ### Minimum MacOSX Version
 
 The [golang-crossbuild](https://github.com/elastic/golang-crossbuild) image is used as the base for the [Dockerfile.build](#dockerfilebuild) container.
-The `golang-crossbuild:1.16.X-darwin-debian11` images expects the minimum MacOSX version to be 10.14+.
+The `golang-crossbuild:1.16.X-darwin-debian12` images expects the minimum MacOSX version to be 10.14+.
