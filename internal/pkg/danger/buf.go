@@ -9,6 +9,7 @@ package danger
 // Effectively golang's string builder with a Reset option
 
 import (
+	"math"
 	"unicode/utf8"
 )
 
@@ -33,7 +34,31 @@ func (b *Buf) Reset() {
 }
 
 func (b *Buf) grow(n int) {
-	buf := make([]byte, len(b.buf), 2*cap(b.buf)+n)
+	if n < 0 {
+		panic("danger.Buf.grow: negative count")
+	}
+
+	l := len(b.buf)
+	c := cap(b.buf)
+
+	if n > math.MaxInt-l {
+		panic("danger.Buf.grow: size overflow")
+	}
+	need := l + n
+
+	var doubled int
+	if c > math.MaxInt/2 {
+		doubled = math.MaxInt
+	} else {
+		doubled = 2 * c
+	}
+
+	newCap := need
+	if doubled > newCap {
+		newCap = doubled
+	}
+
+	buf := make([]byte, l, newCap)
 	copy(buf, b.buf)
 	b.buf = buf
 }
@@ -50,6 +75,9 @@ func (b *Buf) Grow(n int) {
 // Write appends the contents of p to b's buffer.
 // Write always returns len(p), nil.
 func (b *Buf) Write(p []byte) (int, error) {
+	if len(p) > 0 {
+		b.Grow(len(p))
+	}
 	b.buf = append(b.buf, p...)
 	return len(p), nil
 }
@@ -57,6 +85,7 @@ func (b *Buf) Write(p []byte) (int, error) {
 // WriteByte appends the byte c to b's buffer.
 // The returned error is always nil.
 func (b *Buf) WriteByte(c byte) error {
+	b.Grow(1)
 	b.buf = append(b.buf, c)
 	return nil
 }
@@ -80,6 +109,9 @@ func (b *Buf) WriteRune(r rune) (int, error) {
 // WriteString appends the contents of s to b's buffer.
 // It returns the length of s and a nil error.
 func (b *Buf) WriteString(s string) (int, error) {
+	if len(s) > 0 {
+		b.Grow(len(s))
+	}
 	b.buf = append(b.buf, s...)
 	return len(s), nil
 }
