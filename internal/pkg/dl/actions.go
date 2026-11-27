@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/bulk"
@@ -20,9 +21,10 @@ import (
 )
 
 const (
-	FieldAgents     = "agents"
-	FieldExpiration = "expiration"
-	FieldSize       = "size"
+	FieldAgents      = "agents"
+	FieldExpiration  = "expiration"
+	FieldSize        = "size"
+	FieldTraceparent = "traceparent"
 
 	maxAgentActionsFetchSize = 100
 )
@@ -48,7 +50,8 @@ func prepareFindAction() *dsl.Tmpl {
 	root := dsl.NewRoot()
 	filter := root.Query().Bool().Filter()
 	filter.Term(FieldActionID, tmpl.Bind(FieldActionID), nil)
-	root.Source().Excludes(FieldAgents)
+	root.Size(1)
+	root.Source().Includes(FieldActionID, FiledType, FieldNamespaces, FieldTraceparent)
 	tmpl.MustResolve(root)
 	return tmpl
 }
@@ -102,23 +105,42 @@ func createBaseActionsQuery() (tmpl *dsl.Tmpl, root, filter *dsl.Node) {
 	return //nolint:nakedret // simple function
 }
 
-func FindAction(ctx context.Context, bulker bulk.Bulk, id string, opts ...Option) ([]model.Action, error) {
+func FindAction(ctx context.Context, bulker bulk.Bulk, id string, opts ...Option) (model.Action, error) {
 	o := newOption(FleetActions, opts...)
-	return findActions(ctx, bulker, QueryAction, o.indexName, map[string]any{
-		FieldActionID: id,
-	}, nil)
+	query, err := QueryAction.RenderOne(FieldActionID, id)
+	if err != nil {
+		return model.Action{}, err
+	}
+	res, err := findActionsHits(ctx, bulker, o.indexName, query, nil)
+	if err != nil {
+		return model.Action{}, err
+	}
+	if res == nil || len(res.Hits) == 0 {
+		return model.Action{}, ErrNotFound
+	}
+	if len(res.Hits) > 1 {
+		return model.Action{}, fmt.Errorf("find action %q: only one hit is expected, got %d", id, len(res.Hits))
+	}
+	actions, err := hitsToActions(res.Hits)
+	if err != nil {
+		return model.Action{}, err
+	}
+	return actions[0], nil
 }
 
 func FindAgentActions(ctx context.Context, bulker bulk.Bulk, minSeqNo, maxSeqNo sqn.SeqNo, agentID string) ([]model.Action, error) {
 	const index = FleetActions
-	params := map[string]any{
+	query, err := QueryAgentActions.Render(map[string]any{
 		FieldSeqNo:      minSeqNo.Value(),
 		FieldMaxSeqNo:   maxSeqNo.Value(),
 		FieldExpiration: time.Now().UTC().Format(time.RFC3339),
 		FieldAgents:     []string{agentID},
+	})
+	if err != nil {
+		return nil, err
 	}
 
-	res, err := findActionsHits(ctx, bulker, QueryAgentActions, index, params, maxSeqNo)
+	res, err := findActionsHits(ctx, bulker, index, query, maxSeqNo)
 	if err != nil || res == nil {
 		return nil, err
 	}
@@ -136,8 +158,8 @@ func DeleteExpiredForIndex(ctx context.Context, index string, bulker bulk.Bulk, 
 		return 0, err
 	}
 
-	res, err := bulker.Client().API.DeleteByQuery([]string{index}, bytes.NewReader(query),
-		bulker.Client().API.DeleteByQuery.WithContext(ctx))
+	res, err := bulker.Client().DeleteByQuery([]string{index}, bytes.NewReader(query),
+		bulker.Client().DeleteByQuery.WithContext(ctx))
 
 	if err != nil {
 		return 0, err
@@ -166,27 +188,27 @@ func DeleteExpiredForIndex(ctx context.Context, index string, bulker bulk.Bulk, 
 }
 
 func FindExpiredActionsHitsForIndex(ctx context.Context, index string, bulker bulk.Bulk, expiredBefore time.Time, size int) ([]es.HitT, error) {
-	params := map[string]any{
+	query, err := QueryFindExpiredActions.Render(map[string]any{
 		FieldExpiration: expiredBefore.UTC().Format(time.RFC3339),
 		FieldSize:       size,
-	}
-
-	res, err := findActionsHits(ctx, bulker, QueryFindExpiredActions, index, params, nil)
+	})
 	if err != nil {
 		return nil, err
 	}
-	if res != nil {
-		return res.Hits, nil
+
+	res, err := findActionsHits(ctx, bulker, index, query, nil)
+	if err != nil || res == nil {
+		return nil, err
 	}
-	return nil, nil
+	return res.Hits, nil
 }
 
-func findActionsHits(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, index string, params map[string]any, seqNos []int64) (*es.HitsT, error) {
+func findActionsHits(ctx context.Context, bulker bulk.Bulk, index string, query []byte, seqNos []int64) (*es.HitsT, error) {
 	var ops []bulk.Opt
 	if len(seqNos) > 0 {
 		ops = append(ops, bulk.WithWaitForCheckpoints(seqNos))
 	}
-	res, err := Search(ctx, bulker, tmpl, index, params, ops...)
+	res, err := bulker.Search(ctx, index, query, ops...)
 	if err != nil {
 		if errors.Is(err, es.ErrIndexNotFound) {
 			zerolog.Ctx(ctx).Debug().Str("index", index).Msg(es.ErrIndexNotFound.Error())
@@ -194,16 +216,10 @@ func findActionsHits(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, inde
 		}
 		return nil, err
 	}
-	return res, nil
-}
-
-func findActions(ctx context.Context, bulker bulk.Bulk, tmpl *dsl.Tmpl, index string, params map[string]any, seqNos []int64) ([]model.Action, error) {
-	res, err := findActionsHits(ctx, bulker, tmpl, index, params, seqNos)
-	if err != nil || res == nil {
-		return nil, err
+	if res == nil {
+		return nil, nil
 	}
-
-	return hitsToActions(res.Hits)
+	return &res.HitsT, nil
 }
 
 func hitsToActions(hits []es.HitT) ([]model.Action, error) {

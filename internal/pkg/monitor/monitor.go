@@ -385,10 +385,11 @@ func (m *simpleMonitorT) Run(ctx context.Context) (err error) {
 func (m *simpleMonitorT) notify(ctx context.Context, hits []es.HitT) int {
 	sz := len(hits)
 	if sz > 0 {
+		// Update the checkpoint first so that it always includes the hits sent to the consumer.
+		maxVal := hits[sz-1].SeqNo
+		m.storeCheckpoint([]int64{maxVal})
 		select {
 		case m.outCh <- hits:
-			maxVal := hits[sz-1].SeqNo
-			m.storeCheckpoint([]int64{maxVal})
 			return sz
 		case <-ctx.Done():
 		}

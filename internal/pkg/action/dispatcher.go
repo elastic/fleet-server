@@ -7,6 +7,7 @@ package action
 
 import (
 	"context"
+	"slices"
 	"sync"
 	"time"
 
@@ -32,6 +33,12 @@ type Sub struct {
 // Ch returns the emitter channel for actions.
 func (s Sub) Ch() chan []model.Action {
 	return s.ch
+}
+
+// hasAction reports whether the agent already has the action with seqNo, as given by the
+// sequence number of its check-in.
+func (s Sub) hasAction(seqNo int64) bool {
+	return seqNo <= s.seqNo.Value()
 }
 
 // Dispatcher tracks agent subscriptions and emits actions to the subscriptions.
@@ -127,14 +134,15 @@ func (d *Dispatcher) process(ctx context.Context, hits []es.HitT) {
 			break
 		}
 
-		numAgents := len(action.Agents)
 		for i, agentID := range action.Agents {
-			arr := agentActions[agentID]
-			actionNoAgents := action
-			actionNoAgents.StartTime = offsetStartTime(ctx, action.StartTime, action.RolloutDurationSeconds, i, numAgents)
-			actionNoAgents.Agents = nil
-			arr = append(arr, actionNoAgents)
-			agentActions[agentID] = arr
+			if _, ok := d.getSub(agentID); !ok {
+				continue
+			}
+			agentAction, err := action.ForAgent(i)
+			if err != nil {
+				zerolog.Ctx(ctx).Error().Err(err).Msg("unable to parse start_time string")
+			}
+			agentActions[agentID] = append(agentActions[agentID], agentAction)
 		}
 	}
 
@@ -145,23 +153,6 @@ func (d *Dispatcher) process(ctx context.Context, hits []es.HitT) {
 		}
 		d.dispatch(ctx, agentID, actions)
 	}
-}
-
-// offsetStartTime will return a new start time between start:start+dur based on index i and the total number of agents
-// As we expect i < total  the latest return time will always be < start+dur
-func offsetStartTime(ctx context.Context, start string, dur int64, i, total int) string {
-
-	if start == "" {
-		return ""
-	}
-	startTS, err := time.Parse(time.RFC3339, start)
-	if err != nil {
-		zerolog.Ctx(ctx).Error().Err(err).Msg("unable to parse start_time string")
-		return ""
-	}
-	d := time.Second * time.Duration(dur)
-	startTS = startTS.Add((d * time.Duration(i)) / time.Duration(total)) // adjust start to a position within the range
-	return startTS.Format(time.RFC3339)
 }
 
 // getSub returns the subscription (if any) for the specified agentID.
@@ -178,6 +169,13 @@ func (d *Dispatcher) dispatch(ctx context.Context, agentID string, acdocs []mode
 	sub, ok := d.getSub(agentID)
 	if !ok {
 		zerolog.Ctx(ctx).Debug().Str(ecs.AgentID, agentID).Msg("Agent is not currently connected. Not dispatching actions.")
+		return
+	}
+	// Skip the actions that the agent already has.
+	acdocs = slices.DeleteFunc(acdocs, func(action model.Action) bool {
+		return sub.hasAction(action.SeqNo)
+	})
+	if len(acdocs) == 0 {
 		return
 	}
 	select {

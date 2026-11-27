@@ -35,11 +35,19 @@ func TestSearchActionsQuery(t *testing.T) {
 
 	t.Run("all agents actions", func(t *testing.T) {
 
-		foundActions, err := findActions(ctx, bulker, QueryAllAgentActions, index, map[string]any{
+		query, err := QueryAllAgentActions.Render(map[string]any{
 			FieldSeqNo:      minSeqNo,
 			FieldMaxSeqNo:   maxSeqNo,
 			FieldExpiration: now,
-		}, nil)
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		res, err := findActionsHits(ctx, bulker, index, query, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		foundActions, err := hitsToActions(res.Hits)
 		if err != nil {
 			t.Fatal(err)
 		}

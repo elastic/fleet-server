@@ -297,7 +297,16 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 		action, ok := ack.cache.GetAction(event.ActionId)
 		if !ok {
 			// Find action by ID
-			actions, err := dl.FindAction(vCtx, ack.bulk, event.ActionId)
+			var err error
+			action, err = dl.FindAction(vCtx, ack.bulk, event.ActionId)
+			if errors.Is(err, dl.ErrNotFound) {
+				// Set 404 if action is not found. The agent can retry it later.
+				log.Error().Msg("no matching action")
+				setResult(n, http.StatusNotFound)
+				vSpan.End()
+				span.End()
+				continue
+			}
 			if err != nil {
 				log.Error().Err(err).Msg("find action")
 				setError(n, err)
@@ -305,16 +314,6 @@ func (ack *AckT) handleAckEvents(ctx context.Context, zlog zerolog.Logger, agent
 				span.End()
 				continue
 			}
-
-			// Set 404 if action is not found. The agent can retry it later.
-			if len(actions) == 0 {
-				log.Error().Msg("no matching action")
-				setResult(n, http.StatusNotFound)
-				vSpan.End()
-				span.End()
-				continue
-			}
-			action = actions[0]
 			ack.cache.SetAction(action)
 		}
 		vSpan.End()

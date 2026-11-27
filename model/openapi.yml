@@ -660,6 +660,7 @@ components:
         output_permissions:
           description: Elasticsearch permissions that the agent requires in order to run the policy.
           type: object
+          x-go-type: json.RawMessage
           x-go-type-skip-optional-pointer: true
         fleet:
           description: Agent configuration to describe how to connect to fleet-server.
@@ -678,26 +679,29 @@ components:
         pipelines:
           type: object
           additionalProperties:
-            type: object
-            properties:
-              exporters:
-                description: list of enabled exporters for each pipeline.
-                type: array
-                items:
-                  type: string
-                x-go-type-skip-optional-pointer: true
-              processors:
-                description: list of enabled processors for each pipeline.
-                type: array
-                items:
-                  type: string
-                x-go-type-skip-optional-pointer: true
-              receivers:
-                description: list of enabled receivers for each pipeline.
-                type: array
-                items:
-                  type: string
-                x-go-type-skip-optional-pointer: true
+            $ref: "#/components/schemas/otelConfigPipeline"
+          x-go-type-skip-optional-pointer: true
+    otelConfigPipeline:
+      description: OTel collector pipeline configuration.
+      type: object
+      properties:
+        exporters:
+          description: list of enabled exporters for each pipeline.
+          type: array
+          items:
+            type: string
+          x-go-type-skip-optional-pointer: true
+        processors:
+          description: list of enabled processors for each pipeline.
+          type: array
+          items:
+            type: string
+          x-go-type-skip-optional-pointer: true
+        receivers:
+          description: list of enabled receivers for each pipeline.
+          type: array
+          items:
+            type: string
           x-go-type-skip-optional-pointer: true
     actionUnenroll:
       description: The UNENROLL action data.

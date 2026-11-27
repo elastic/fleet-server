@@ -673,17 +673,17 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 func (ct *CheckinT) verifyActionExists(vCtx context.Context, vSpan *apm.Span, agent *model.Agent, details *UpgradeDetails) (*model.Action, error) {
 	action, ok := ct.cache.GetAction(details.ActionId)
 	if !ok {
-		actions, err := dl.FindAction(vCtx, ct.bulker, details.ActionId)
-		if err != nil {
-			vSpan.End()
-			return nil, fmt.Errorf("unable to find upgrade_details action: %w", err)
-		}
-		if len(actions) == 0 {
+		var err error
+		action, err = dl.FindAction(vCtx, ct.bulker, details.ActionId)
+		if errors.Is(err, dl.ErrNotFound) {
 			vSpan.End()
 			zerolog.Ctx(vCtx).Warn().Msgf("upgrade_details no action for id %q found (agent id %q)", details.ActionId, agent.Agent.ID)
 			return nil, nil
 		}
-		action = actions[0]
+		if err != nil {
+			vSpan.End()
+			return nil, fmt.Errorf("unable to find upgrade_details action: %w", err)
+		}
 		ct.cache.SetAction(action)
 	}
 	vSpan.End()
@@ -1287,16 +1287,7 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 		return nil, nil, fmt.Errorf("failed to prepare agent tags: %w", err)
 	}
 
-	// JSON transformations to turn a model.PolicyData into an Action.data
-	p, err := json.Marshal(pp.Policy.Data)
-	if err != nil {
-		return nil, nil, err
-	}
-	d := PolicyData{}
-	err = json.Unmarshal(p, &d)
-	if err != nil {
-		return nil, nil, err
-	}
+	d := NewPolicyDataFromParsedPolicy(pp)
 	// remove duplicates from secretkeys
 	slices.Sort(pp.SecretKeys)
 	keys := slices.Compact(pp.SecretKeys)
@@ -1408,19 +1399,20 @@ func getAgentAndVerifyAPIKeyID(ctx context.Context, bulker bulk.Bulk, agentID st
 	span, ctx := apm.StartSpan(ctx, "getAgentAndVerifyAPIKeyID", "read")
 	defer span.End()
 	agent, err := dl.GetAgent(ctx, bulker, agentID)
+	if errors.Is(err, dl.ErrNotFound) {
+		// Return ErrAgentIdentity (403) instead of 404 so an authenticated
+		// agent cannot enumerate whether another agent ID exists.
+		return nil, fmt.Errorf("invalid API Key ID %w", ErrAgentIdentity)
+	}
 	if err != nil {
-		if errors.Is(err, dl.ErrNotFound) {
-			err = ErrAgentNotFound
-		} else {
-			err = fmt.Errorf("GetAgent: %w", err)
-		}
+		return nil, fmt.Errorf("GetAgent: %w", err)
 	}
 
 	if agent.AccessAPIKeyID != apiKeyID {
-		err = fmt.Errorf("invalid API Key ID %w", ErrAgentIdentity)
+		return nil, fmt.Errorf("invalid API Key ID %w", ErrAgentIdentity)
 	}
 
-	return &agent, err
+	return &agent, nil
 }
 
 func findAgentByAPIKeyID(ctx context.Context, bulker bulk.Bulk, id string) (*model.Agent, error) {

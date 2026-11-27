@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/elastic/fleet-server/v7/internal/pkg/es"
@@ -36,6 +37,15 @@ func (m *mockMonitor) Run(ctx context.Context) error {
 func (m *mockMonitor) GetCheckpoint() sqn.SeqNo {
 	args := m.Called()
 	return args.Get(0).(sqn.SeqNo) //nolint:errcheck // we don't need to check here
+}
+
+func (s Sub) receiveActions() []model.Action {
+	select {
+	case actions := <-s.Ch():
+		return actions
+	default:
+		return nil
+	}
 }
 
 func TestNewDispatcher(t *testing.T) {
@@ -73,6 +83,7 @@ func Test_Dispatcher_Run(t *testing.T) {
 	tests := []struct {
 		name     string
 		throttle time.Duration
+		seqNo    sqn.SeqNo
 		getMock  func() *mockMonitor
 		expect   map[string][]model.Action
 	}{{
@@ -234,6 +245,76 @@ func Test_Dispatcher_Run(t *testing.T) {
 				Type:                   "upgrade",
 			}},
 		},
+	}, {
+		name: "action with scheduling for agents that are not connected",
+		getMock: func() *mockMonitor {
+			m := &mockMonitor{}
+			ch := make(chan []es.HitT)
+			go func() {
+				ch <- []es.HitT{es.HitT{
+					Source: json.RawMessage(`{
+						"action_id": "test-action",
+						"agents": ["other1", "other2", "agent1"],
+						"rollout_duration_seconds": 600,
+						"start_time": "2022-01-02T12:00:00Z",
+						"type": "upgrade"
+					}`),
+				}}
+			}()
+			var rch <-chan []es.HitT = ch
+			m.On("Output").Return(rch)
+			return m
+		},
+		expect: map[string][]model.Action{
+			"agent1": []model.Action{model.Action{
+				ActionID:               "test-action",
+				Agents:                 nil,
+				RolloutDurationSeconds: 600,
+				StartTime:              "2022-01-02T12:06:40Z",
+				Type:                   "upgrade",
+			}},
+		},
+	}, {
+		name:  "actions after the sequence number of the check-in",
+		seqNo: sqn.SeqNo{10},
+		getMock: func() *mockMonitor {
+			m := &mockMonitor{}
+			ch := make(chan []es.HitT)
+			go func() {
+				ch <- []es.HitT{{
+					SeqNo: 5,
+					Source: json.RawMessage(`{
+						"action_id": "action-5",
+						"agents": ["agent1"],
+						"type": "upgrade"
+					}`),
+				}, {
+					SeqNo: 10,
+					Source: json.RawMessage(`{
+						"action_id": "action-10",
+						"agents": ["agent1"],
+						"type": "upgrade"
+					}`),
+				}, {
+					SeqNo: 15,
+					Source: json.RawMessage(`{
+						"action_id": "action-15",
+						"agents": ["agent1"],
+						"type": "upgrade"
+					}`),
+				}}
+			}()
+			var rch <-chan []es.HitT = ch
+			m.On("Output").Return(rch)
+			return m
+		},
+		expect: map[string][]model.Action{
+			"agent1": []model.Action{model.Action{
+				SeqNo:    15,
+				ActionID: "action-15",
+				Type:     "upgrade",
+			}},
+		},
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -248,14 +329,17 @@ func Test_Dispatcher_Run(t *testing.T) {
 				subs: map[string]Sub{
 					"agent1": Sub{
 						agentID: "agent1",
+						seqNo:   tt.seqNo,
 						ch:      make(chan []model.Action, 1),
 					},
 					"agent2": Sub{
 						agentID: "agent2",
+						seqNo:   tt.seqNo,
 						ch:      make(chan []model.Action, 1),
 					},
 					"agent3": Sub{
 						agentID: "agent3",
+						seqNo:   tt.seqNo,
 						ch:      make(chan []model.Action, 1),
 					},
 				},
@@ -309,68 +393,41 @@ func Test_Dispatcher_Run(t *testing.T) {
 	}
 }
 
-func Test_offsetStartTime(t *testing.T) {
-	tests := []struct {
-		name   string
-		start  string
-		end    string
-		dur    int64
-		i      int
-		total  int
-		result string
-	}{{
-		name:   "no start",
-		result: "",
-	}, {
-		name:   "first agent",
-		start:  "2022-01-02T12:00:00Z",
-		end:    "2022-01-02T13:00:00Z",
-		i:      0,
-		total:  10,
-		result: "2022-01-02T12:00:00Z",
-	}, {
-		name:   "mid agent no dur",
-		start:  "2022-01-02T12:00:00Z",
-		end:    "2022-01-02T13:00:00Z",
-		i:      4,
-		total:  10,
-		result: "2022-01-02T12:00:00Z",
-	}, {
-		name:   "last agent no dur",
-		start:  "2022-01-02T12:00:00Z",
-		end:    "2022-01-02T13:00:00Z",
-		i:      9,
-		total:  10,
-		result: "2022-01-02T12:00:00Z",
-	}, {
-		name:   "first agent 10m dur",
-		start:  "2022-01-02T12:00:00Z",
-		end:    "2022-01-02T13:00:00Z",
-		dur:    600,
-		i:      0,
-		total:  10,
-		result: "2022-01-02T12:00:00Z",
-	}, {
-		name:   "mid agent 10m dur",
-		start:  "2022-01-02T12:00:00Z",
-		end:    "2022-01-02T13:00:00Z",
-		dur:    600,
-		i:      4,
-		total:  10,
-		result: "2022-01-02T12:04:00Z",
-	}, {
-		name:   "last agent 10m dur",
-		start:  "2022-01-02T12:00:00Z",
-		end:    "2022-01-02T13:00:00Z",
-		dur:    600,
-		i:      9,
-		total:  10,
-		result: "2022-01-02T12:09:00Z",
-	}}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			r := offsetStartTime(t.Context(), tt.start, tt.dur, tt.i, tt.total)
-			assert.Equal(t, tt.result, r)
-		})
-	}
+func TestDispatcherWaitsOnlyForConnectedAgents(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		sub := Sub{agentID: "connected", ch: make(chan []model.Action, 1)}
+		d := &Dispatcher{limit: rate.NewLimiter(rate.Every(50*time.Millisecond), 1), subs: map[string]Sub{"connected": sub}}
+		start := time.Now()
+
+		d.process(t.Context(), []es.HitT{{
+			Source: json.RawMessage(`{
+				"action_id": "test-action",
+				"agents": ["other1", "other2", "other3", "other4", "connected"],
+				"type": "upgrade"
+			}`),
+		}})
+
+		elapsed := time.Since(start)
+		assert.Zero(t, elapsed, "process waited for the agents that are not connected")
+
+		actions := sub.receiveActions()
+		assert.Len(t, actions, 1)
+	})
+}
+
+func TestDispatcherSendsNothingWhenTheAgentHasAllActions(t *testing.T) {
+	sub := Sub{agentID: "agent1", seqNo: sqn.SeqNo{10}, ch: make(chan []model.Action, 1)}
+	d := &Dispatcher{limit: rate.NewLimiter(rate.Inf, 1), subs: map[string]Sub{"agent1": sub}}
+
+	d.process(t.Context(), []es.HitT{{
+		SeqNo: 10,
+		Source: json.RawMessage(`{
+			"action_id": "action-10",
+			"agents": ["agent1"],
+			"type": "upgrade"
+		}`),
+	}})
+
+	actions := sub.receiveActions()
+	assert.Nil(t, actions, "the agent was woken up without new actions")
 }

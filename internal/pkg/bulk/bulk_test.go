@@ -567,3 +567,102 @@ func runBulker(t *testing.T, bulker *Bulker) context.Context {
 	})
 	return ctx
 }
+
+func TestFlushBufPoolCap(t *testing.T) {
+	// Under -race, sync.Pool.Put randomly drops 25% of entries.
+	const poolAttempts = 64
+
+	tests := []struct {
+		name      string
+		bufCap    int
+		wantReuse bool
+	}{
+		{
+			name:      "buffer at cap is reused",
+			bufCap:    maxFlushBufCap,
+			wantReuse: true,
+		},
+		{
+			name:      "buffer over cap is dropped",
+			bufCap:    maxFlushBufCap + 1,
+			wantReuse: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := NewBulker(nil, nil)
+			buf := bytes.NewBuffer(make([]byte, 0, tt.bufCap))
+
+			var reused bool
+			for range poolAttempts {
+				_, err := buf.WriteString("payload")
+				require.NoError(t, err)
+				b.putFlushBuf(buf)
+
+				bufLen := buf.Len()
+				require.Zero(t, bufLen)
+
+				got, ok := b.flushBufPool.Get().(*bytes.Buffer)
+				require.True(t, ok)
+
+				if got == buf {
+					reused = true
+					break
+				}
+			}
+
+			assert.Equal(t, tt.wantReuse, reused)
+		})
+	}
+}
+
+func TestBlkPoolCap(t *testing.T) {
+	// Under -race, sync.Pool.Put randomly drops 25% of entries.
+	const poolAttempts = 64
+
+	tests := []struct {
+		name         string
+		bufCap       int
+		wantRetained bool
+	}{
+		{
+			name:         "block buffer at cap is reused",
+			bufCap:       maxBlkBufCap,
+			wantRetained: true,
+		},
+		{
+			name:         "block buffer over cap is released",
+			bufCap:       maxBlkBufCap + 1,
+			wantRetained: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := NewBulker(nil, nil)
+			backing := make([]byte, 0, tt.bufCap)
+
+			var retained bool
+			for range poolAttempts {
+				blk := b.newBlk(ActionSearch, optionsT{})
+				blk.buf.Set(backing[:0])
+				_, err := blk.buf.WriteString("payload")
+				require.NoError(t, err)
+				b.freeBlk(blk)
+
+				got := b.newBlk(ActionSearch, optionsT{})
+
+				gotLen := got.buf.Len()
+				require.Zero(t, gotLen)
+
+				if got.buf.Cap() > 0 {
+					retained = true
+					break
+				}
+			}
+
+			assert.Equal(t, tt.wantRetained, retained)
+		})
+	}
+}
