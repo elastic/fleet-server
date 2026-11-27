@@ -179,7 +179,6 @@ func (bc *Bulk) flush(ctx context.Context) error {
 	nowTimestamp := start.UTC().Format(time.RFC3339)
 
 	var err error
-	var needRefresh bool
 	for id, pendingData := range pending {
 
 		// In the simple case, there are no fields and no seqNo.
@@ -220,9 +219,6 @@ func (bc *Bulk) flush(ctx context.Context) error {
 			if err != nil {
 				return fmt.Errorf("could not marshall script action: %w", err)
 			}
-			if pendingData.extra.seqNo.IsSet() {
-				needRefresh = true
-			}
 		} else {
 			fields := bulk.UpdateFields{
 				dl.FieldLastCheckin:        pendingData.ts,      // Set the checkin timestamp
@@ -256,9 +252,6 @@ func (bc *Bulk) flush(ctx context.Context) error {
 			// If seqNo changed, set the field appropriately
 			if pendingData.extra.seqNo.IsSet() {
 				fields[dl.FieldActionSeqNo] = pendingData.extra.seqNo
-
-				// Only refresh if seqNo changed; dropping metadata not important.
-				needRefresh = true
 			}
 
 			if body, err = fields.Marshal(); err != nil {
@@ -273,18 +266,12 @@ func (bc *Bulk) flush(ctx context.Context) error {
 		})
 	}
 
-	var opts []bulk.Opt
-	if needRefresh {
-		opts = append(opts, bulk.WithRefresh())
-	}
-
-	_, err = bc.bulker.MUpdate(ctx, updates, opts...)
+	_, err = bc.bulker.MUpdate(ctx, updates)
 
 	zerolog.Ctx(ctx).Trace().
 		Err(err).
 		Dur("rtt", time.Since(start)).
 		Int("cnt", len(updates)).
-		Bool("refresh", needRefresh).
 		Msg("Flush updates")
 
 	return err

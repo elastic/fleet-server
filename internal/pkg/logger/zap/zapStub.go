@@ -12,15 +12,17 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
-	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/beats/v7/pkg/logp"
 )
+
+const timestampKey = "@timestamp"
 
 func encoderConfig() zapcore.EncoderConfig {
 	return zapcore.EncoderConfig{
 		MessageKey:     "message",
 		LevelKey:       "log.level",
 		NameKey:        "log.logger",
-		TimeKey:        "@timestamp",
+		TimeKey:        timestampKey,
 		CallerKey:      "log.origin",
 		StacktraceKey:  "log.origin.stack_trace",
 		LineEnding:     "\n",
@@ -67,7 +69,7 @@ func (z zapStub) Write(p []byte) (n int, err error) {
 
 	e := log.Log()
 	for key, val := range m {
-		if key != "@timestamp" {
+		if key != timestampKey {
 			e.Interface(key, val)
 		}
 	}
