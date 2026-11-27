@@ -152,6 +152,12 @@ const (
 	// Three flush intervals give enough headroom for the blk to be picked
 	// up, sent to ES, and responded to even under heavy load.
 	dispatchAbortDrainTimeout = 3 * defaultFlushInterval
+
+	// maxBlkBufCap is the maximum capacity (64 KiB) for a pooled block buffer.
+	maxBlkBufCap = 64 << 10
+
+	// maxFlushBufCap is the maximum capacity (1 MiB) for a pooled flush buffer.
+	maxFlushBufCap = 1 << 20
 )
 
 func NewBulker(es esapi.Transport, tracer *apm.Tracer, opts ...BulkOpt) *Bulker {
@@ -684,7 +690,20 @@ func (b *Bulker) newBlk(action actionT, opts optionsT) *bulkT {
 
 func (b *Bulker) freeBlk(blk *bulkT) {
 	blk.reset()
+	// Replace a large buffer so the pool does not hold it across GC cycles.
+	if blk.buf.Cap() > maxBlkBufCap {
+		blk.buf = Buf{}
+	}
 	b.blkPool.Put(blk)
+}
+
+func (b *Bulker) putFlushBuf(buf *bytes.Buffer) {
+	buf.Reset()
+	// Discard a large buffer so the pool does not hold it across GC cycles.
+	if buf.Cap() > maxFlushBufCap {
+		return
+	}
+	b.flushBufPool.Put(buf)
 }
 
 func (b *Bulker) validateIndex(index string) error {

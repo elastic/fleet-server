@@ -77,7 +77,7 @@ func (b *Bulker) flushRead(ctx context.Context, queue queueT) error {
 	buf.Reset()
 	buf.Grow(bufSz + len(rPrefix))
 	buf.WriteString(rPrefix)
-	defer b.flushBufPool.Put(buf)
+	defer b.putFlushBuf(buf)
 
 	// Each item a JSON array element followed by comma
 	queueCnt := 0

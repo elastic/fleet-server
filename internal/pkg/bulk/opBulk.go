@@ -180,7 +180,7 @@ func (b *Bulker) flushBulk(ctx context.Context, queue queueT) error {
 	buf := b.flushBufPool.Get().(*bytes.Buffer) //nolint:errcheck // we control what is placed in the pool
 	buf.Reset()
 	buf.Grow(bufSz)
-	defer b.flushBufPool.Put(buf)
+	defer b.putFlushBuf(buf)
 
 	queueCnt := 0
 	links := make([]apm.SpanLink, 0, queue.cnt)
