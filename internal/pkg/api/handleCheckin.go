@@ -1287,16 +1287,7 @@ func processPolicy(ctx context.Context, zlog zerolog.Logger, bulker bulk.Bulk, a
 		return nil, nil, fmt.Errorf("failed to prepare agent tags: %w", err)
 	}
 
-	// JSON transformations to turn a model.PolicyData into an Action.data
-	p, err := json.Marshal(pp.Policy.Data)
-	if err != nil {
-		return nil, nil, err
-	}
-	d := PolicyData{}
-	err = json.Unmarshal(p, &d)
-	if err != nil {
-		return nil, nil, err
-	}
+	d := NewPolicyDataFromParsedPolicy(pp)
 	// remove duplicates from secretkeys
 	slices.Sort(pp.SecretKeys)
 	keys := slices.Compact(pp.SecretKeys)

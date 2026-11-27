@@ -931,20 +931,23 @@ type InputEvent struct {
 	Type EventType `json:"type"`
 }
 
+// OtelConfigPipeline OTel collector pipeline configuration.
+type OtelConfigPipeline struct {
+	// Exporters list of enabled exporters for each pipeline.
+	Exporters []string `json:"exporters,omitempty"`
+
+	// Processors list of enabled processors for each pipeline.
+	Processors []string `json:"processors,omitempty"`
+
+	// Receivers list of enabled receivers for each pipeline.
+	Receivers []string `json:"receivers,omitempty"`
+}
+
 // OtelConfigService OTel collector pipelines setup.
 type OtelConfigService struct {
 	// Extensions List of enabled extensions.
-	Extensions []string `json:"extensions,omitempty"`
-	Pipelines  map[string]struct {
-		// Exporters list of enabled exporters for each pipeline.
-		Exporters []string `json:"exporters,omitempty"`
-
-		// Processors list of enabled processors for each pipeline.
-		Processors []string `json:"processors,omitempty"`
-
-		// Receivers list of enabled receivers for each pipeline.
-		Receivers []string `json:"receivers,omitempty"`
-	} `json:"pipelines,omitempty"`
+	Extensions []string                      `json:"extensions,omitempty"`
+	Pipelines  map[string]OtelConfigPipeline `json:"pipelines,omitempty"`
 }
 
 // PolicyData The full policy that an agent should run after combining with local configuration/env vars.
@@ -971,7 +974,7 @@ type PolicyData struct {
 	Inputs []map[string]interface{} `json:"inputs,omitempty"`
 
 	// OutputPermissions Elasticsearch permissions that the agent requires in order to run the policy.
-	OutputPermissions map[string]interface{} `json:"output_permissions,omitempty"`
+	OutputPermissions json.RawMessage `json:"output_permissions,omitempty"`
 
 	// Outputs A map of all outputs that the agent running the policy can use to send data to.
 	Outputs map[string]interface{} `json:"outputs,omitempty"`
