@@ -673,17 +673,17 @@ func (ct *CheckinT) ProcessRequest(zlog zerolog.Logger, w http.ResponseWriter, r
 func (ct *CheckinT) verifyActionExists(vCtx context.Context, vSpan *apm.Span, agent *model.Agent, details *UpgradeDetails) (*model.Action, error) {
 	action, ok := ct.cache.GetAction(details.ActionId)
 	if !ok {
-		actions, err := dl.FindAction(vCtx, ct.bulker, details.ActionId)
-		if err != nil {
-			vSpan.End()
-			return nil, fmt.Errorf("unable to find upgrade_details action: %w", err)
-		}
-		if len(actions) == 0 {
+		var err error
+		action, err = dl.FindAction(vCtx, ct.bulker, details.ActionId)
+		if errors.Is(err, dl.ErrNotFound) {
 			vSpan.End()
 			zerolog.Ctx(vCtx).Warn().Msgf("upgrade_details no action for id %q found (agent id %q)", details.ActionId, agent.Agent.ID)
 			return nil, nil
 		}
-		action = actions[0]
+		if err != nil {
+			vSpan.End()
+			return nil, fmt.Errorf("unable to find upgrade_details action: %w", err)
+		}
 		ct.cache.SetAction(action)
 	}
 	vSpan.End()
